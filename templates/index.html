@@ -1,0 +1,424 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Speech to Text — Whisper</title>
+    <style>
+        :root {
+            --bg: #0f0f0f;
+            --surface: #1a1a2e;
+            --primary: #e94560;
+            --primary-hover: #ff6b6b;
+            --text: #eee;
+            --text-muted: #888;
+            --border: #333;
+        }
+        * { margin:0; padding:0; box-sizing:border-box; }
+        body {
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 2rem 1rem;
+        }
+        h1 {
+            font-size: 2.5rem;
+            margin-bottom: .5rem;
+            background: linear-gradient(135deg, var(--primary), #ff9a76);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .subtitle {
+            color: var(--text-muted);
+            margin-bottom: 2rem;
+        }
+        .container {
+            max-width: 800px;
+            width: 100%;
+        }
+        .card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 2rem;
+            margin-bottom: 1.5rem;
+        }
+        .card h2 { margin-bottom: 1rem; font-size: 1.2rem; }
+        .mode-selector {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+        }
+        .mode-btn {
+            flex: 1;
+            padding: .8rem;
+            border: 2px solid var(--border);
+            background: transparent;
+            color: var(--text);
+            border-radius: 10px;
+            cursor: pointer;
+            font-size: 1rem;
+            transition: all .2s;
+        }
+        .mode-btn.active {
+            border-color: var(--primary);
+            background: rgba(233,69,96,.1);
+        }
+        .mode-btn:hover { border-color: var(--primary-hover); }
+
+        .record-btn {
+            width: 120px;
+            height: 120px;
+            border-radius: 50%;
+            border: none;
+            background: var(--primary);
+            color: white;
+            font-size: .9rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all .2s;
+            box-shadow: 0 0 30px rgba(233,69,96,.4);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: .3rem;
+        }
+        .record-btn:hover { background: var(--primary-hover); transform: scale(1.05); }
+        .record-btn.recording {
+            background: #444;
+            animation: pulse 1.5s infinite;
+            box-shadow: 0 0 40px rgba(233,69,96,.6);
+        }
+        @keyframes pulse {
+            0%, 100% { box-shadow: 0 0 30px rgba(233,69,96,.4); }
+            50% { box-shadow: 0 0 60px rgba(233,69,96,.8); }
+        }
+        .record-btn .icon { font-size: 2rem; }
+
+        .file-drop {
+            border: 2px dashed var(--border);
+            border-radius: 12px;
+            padding: 3rem 2rem;
+            text-align: center;
+            cursor: pointer;
+            transition: all .2s;
+        }
+        .file-drop:hover, .file-drop.dragover {
+            border-color: var(--primary);
+            background: rgba(233,69,96,.05);
+        }
+        .file-drop input { display: none; }
+        .file-drop .icon { font-size: 3rem; margin-bottom: .5rem; }
+
+        .model-select {
+            background: var(--bg);
+            color: var(--text);
+            border: 1px solid var(--border);
+            padding: .6rem 1rem;
+            border-radius: 8px;
+            font-size: 1rem;
+            margin-bottom: 1rem;
+            width: 100%;
+        }
+        select, button { outline: none; }
+
+        .output-box {
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 1.5rem;
+            min-height: 150px;
+            white-space: pre-wrap;
+            line-height: 1.6;
+            font-size: 1.05rem;
+            position: relative;
+        }
+        .output-box.placeholder {
+            color: var(--text-muted);
+            font-style: italic;
+        }
+        .copy-btn {
+            position: absolute;
+            top: .8rem;
+            right: .8rem;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            color: var(--text);
+            padding: .4rem .8rem;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: .85rem;
+            opacity: 0;
+            transition: opacity .2s;
+        }
+        .output-box:hover .copy-btn { opacity: 1; }
+        .copy-btn:hover { background: var(--primary); border-color: var(--primary); }
+
+        .loading {
+            display: none;
+            text-align: center;
+            color: var(--text-muted);
+            padding: 1rem;
+        }
+        .loading.active { display: block; }
+        .spinner {
+            display: inline-block;
+            width: 24px; height: 24px;
+            border: 3px solid var(--border);
+            border-top-color: var(--primary);
+            border-radius: 50%;
+            animation: spin .8s linear infinite;
+            margin-bottom: .5rem;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        .status {
+            margin-top: .5rem;
+            font-size: .9rem;
+            color: var(--text-muted);
+        }
+        .status.success { color: #4ade80; }
+        .status.error { color: #f87171; }
+
+        footer {
+            margin-top: 3rem;
+            color: var(--text-muted);
+            font-size: .85rem;
+        }
+        footer a { color: var(--primary); text-decoration: none; }
+    </style>
+</head>
+<body>
+    <h1>⚡ Speech to Text</h1>
+    <p class="subtitle">Powered by OpenAI Whisper — runs locally in your container</p>
+
+    <div class="container">
+        <div class="card">
+            <h2>📋 Output Model</h2>
+            <select class="model-select" id="modelSelect">
+                <option value="tiny">Tiny (fastest, less accurate)</option>
+                <option value="base">Base (default balance)</option>
+                <option value="small">Small (good balance)</option>
+                <option value="medium">Medium (more accurate, slower)</option>
+                <option value="large" disabled>Large (most accurate, needs GPU/vRAM)</option>
+            </select>
+        </div>
+
+        <div class="card">
+            <h2>🎙️ Capture Mode</h2>
+            <div class="mode-selector">
+                <button class="mode-btn active" data-mode="microphone">🎤 Microphone</button>
+                <button class="mode-btn" data-mode="upload">📁 Upload Audio</button>
+            </div>
+
+            <!-- Microphone mode -->
+            <div id="microphoneMode" style="text-align:center;">
+                <button class="record-btn" id="recordBtn">
+                    <span class="icon">🎤</span>
+                    <span>Record</span>
+                </button>
+                <p class="status" id="micStatus"></p>
+                <canvas id="visualizer" width="500" height="80" style="margin-top:1rem;display:none;"></canvas>
+            </div>
+
+            <!-- Upload mode -->
+            <div id="uploadMode" style="display:none;">
+                <div class="file-drop" id="fileDrop">
+                    <input type="file" id="fileInput" accept="audio/*,.mp3,.wav,.mp4,.flac,.ogg,.m4a,.webm">
+                    <div class="icon">📁</div>
+                    <p>Drop audio file here or click to browse</p>
+                    <p style="font-size:.85rem;color:var(--text-muted);margin-top:.5rem;">
+                        Supports: WAV, MP3, MP4, FLAC, OGG, M4A, WEBM
+                    </p>
+                </div>
+                <p class="status" id="fileStatus"></p>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2>✍️ Transcription Result</h2>
+            <div class="loading" id="loading">
+                <div class="spinner"></div>
+                <p>Transcribing audio...</p>
+            </div>
+            <div class="output-box placeholder" id="output">
+                Transcription will appear here...
+                <button class="copy-btn" id="copyBtn" onclick="copyText()">📋 Copy</button>
+            </div>
+        </div>
+    </div>
+
+    <footer>
+        Built with FastAPI + OpenAI Whisper · <a href="https://github.com/openai/whisper">GitHub</a>
+    </footer>
+
+    <script>
+        // --- State ---
+        let currentMode = 'microphone';
+        let isRecording = false;
+        let mediaRecorder = null;
+        let audioChunks = [];
+        let audioContext = null;
+        let analyser = null;
+        let animFrame = null;
+        let stream = null;
+
+        // --- Mode Switch ---
+        document.querySelectorAll('.mode-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                currentMode = btn.dataset.mode;
+                document.getElementById('microphoneMode').style.display = currentMode === 'microphone' ? 'block' : 'none';
+                document.getElementById('uploadMode').style.display = currentMode === 'upload' ? 'block' : 'none';
+            });
+        });
+
+        // --- Microphone ---
+        const recordBtn = document.getElementById('recordBtn');
+        recordBtn.addEventListener('click', toggleRecording);
+
+        async function toggleRecording() {
+            if (!isRecording) {
+                try {
+                    stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                    mediaRecorder = new MediaRecorder(stream);
+                    audioChunks = [];
+                    mediaRecorder.ondataavailable = e => audioChunks.push(e.data);
+                    mediaRecorder.onstop = () => sendAudio(new Blob(audioChunks, { type: 'audio/webm' }), 'mic');
+                    mediaRecorder.start();
+                    isRecording = true;
+                    recordBtn.classList.add('recording');
+                    recordBtn.querySelector('span:last-child').textContent = 'Stop';
+                    recordBtn.querySelector('.icon').textContent = '⏹️';
+                    showStatus('Recording...', '');
+                    startVisualizer(stream);
+                } catch (e) {
+                    showStatus('Microphone access denied', 'error');
+                }
+            } else {
+                mediaRecorder.stop();
+                stream.getTracks().forEach(t => t.stop());
+                isRecording = false;
+                recordBtn.classList.remove('recording');
+                recordBtn.querySelector('span:last-child').textContent = 'Record';
+                recordBtn.querySelector('.icon').textContent = '🎤';
+                stopVisualizer();
+            }
+        }
+
+        // --- Audio Visualizer ---
+        function startVisualizer(stream) {
+            audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            const source = audioContext.createMediaStreamSource(stream);
+            analyser = audioContext.createAnalyser();
+            analyser.fftSize = 256;
+            source.connect(analyser);
+            const canvas = document.getElementById('visualizer');
+            canvas.style.display = 'block';
+            const ctx = canvas.getContext('2d');
+            const bufferLength = analyser.frequencyBinCount;
+            const dataArray = new Uint8Array(bufferLength);
+
+            function draw() {
+                animFrame = requestAnimationFrame(draw);
+                analyser.getByteFrequencyData(dataArray);
+                ctx.fillStyle = '#1a1a2e';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                const barWidth = (canvas.width / bufferLength) * 2.5;
+                let x = 0;
+                for (let i = 0; i < bufferLength; i++) {
+                    const barHeight = (dataArray[i] / 255) * canvas.height;
+                    const r = barHeight + 50;
+                    ctx.fillStyle = `rgb(${r},69,96)`;
+                    ctx.fillRect(x, canvas.height - barHeight, barWidth, barHeight);
+                    x += barWidth + 1;
+                }
+            }
+            draw();
+        }
+
+        function stopVisualizer() {
+            if (animFrame) cancelAnimationFrame(animFrame);
+            if (audioContext) audioContext.close();
+            audioContext = null;
+            document.getElementById('visualizer').style.display = 'none';
+        }
+
+        // --- Upload ---
+        const fileDrop = document.getElementById('fileDrop');
+        const fileInput = document.getElementById('fileInput');
+
+        fileDrop.addEventListener('click', () => fileInput.click());
+        fileDrop.addEventListener('dragover', e => { e.preventDefault(); fileDrop.classList.add('dragover'); });
+        fileDrop.addEventListener('dragleave', () => fileDrop.classList.remove('dragover'));
+        fileDrop.addEventListener('drop', e => {
+            e.preventDefault();
+            fileDrop.classList.remove('dragover');
+            if (e.dataTransfer.files.length) handleFile(e.dataTransfer.files[0]);
+        });
+        fileInput.addEventListener('change', () => {
+            if (fileInput.files.length) handleFile(fileInput.files[0]);
+        });
+
+        function handleFile(file) {
+            showStatus(`Selected: ${file.name}`, 'success');
+            sendAudio(file, 'upload');
+        }
+
+        // --- Send Audio ---
+        async function sendAudio(fileOrBlob, source) {
+            const output = document.getElementById('output');
+            const loading = document.getElementById('loading');
+            const model = document.getElementById('modelSelect').value;
+
+            output.textContent = 'Transcription will appear here...';
+            output.classList.add('placeholder');
+            loading.classList.add('active');
+
+            const formData = new FormData();
+            formData.append('file', source === 'mic'
+                ? new Blob([fileOrBlob], { type: 'audio/webm' })
+                : fileOrBlob, source === 'mic' ? 'recording.webm' : fileOrBlob.name);
+
+            try {
+                const resp = await fetch('/transcribe', { method: 'POST', body: formData });
+                if (!resp.ok) throw new Error(await resp.text());
+                const data = await resp.json();
+                output.textContent = data.text;
+                output.classList.remove('placeholder');
+                showStatus(`Language: ${data.language}`, 'success');
+            } catch (e) {
+                output.textContent = `Error: ${e.message}`;
+                output.classList.remove('placeholder');
+                showStatus('Transcription failed', 'error');
+            } finally {
+                loading.classList.remove('active');
+            }
+        }
+
+        // --- Utilities ---
+        function showStatus(msg, type) {
+            const el = currentMode === 'microphone'
+                ? document.getElementById('micStatus')
+                : document.getElementById('fileStatus');
+            el.textContent = msg;
+            el.className = 'status ' + (type || '');
+        }
+
+        function copyText() {
+            const text = document.getElementById('output').textContent;
+            navigator.clipboard.writeText(text).then(() => {
+                const btn = document.getElementById('copyBtn');
+                btn.textContent = '✅ Copied!';
+                setTimeout(() => btn.textContent = '📋 Copy', 2000);
+            });
+        }
+    </script>
+</body>
+</html>
