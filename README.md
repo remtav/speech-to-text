@@ -191,6 +191,21 @@ sudo systemctl restart docker
 docker compose up --build
 ```
 
+#### One-shot GPU container
+
+If you don't want to use `docker compose` or have a custom image/tag, you can start the container directly with GPU support:
+
+```bash
+docker run -d --name whisper --gpus all -p 8081:8081 \
+  -e WHISPER_MODEL=base \
+  -e WHISPER_DEVICE=cuda \
+  -e WHISPER_PORT=8081 \
+  -e FFMPEG_PATH=/usr/bin/ffmpeg \
+  -v whisper-model-cache:/root/.cache \
+  --restart unless-stopped \
+  whisper:latest
+```
+
 ## Running
 
 ### Virtual Environment

@@ -333,7 +333,7 @@ def _get_ffmpeg_path():
 
     for path in [
         "/home/remi/miniconda3/envs/whisper-gpu/bin/ffmpeg",
-        "/home/remi/miniconda3/bin/ffmpeg",
+        "/usr/bin/ffmpeg",
     ]:
         if os.path.exists(path):
             return path
