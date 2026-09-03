@@ -258,6 +258,17 @@ speech-to-text/
 - **fp16 precision** can be enabled by setting `fp16=True` in the `model.transcribe()` call (already set in future versions)
 - Model weights are cached in `~/.cache/whisper/` — no re-download needed between restarts
 
+## Testing
+
+Run the test suite with pytest:
+
+```bash
+source venv/bin/activate
+pytest tests/ -v
+```
+
+The test suite covers app initialization, health/progress endpoints, model switching, audio conversion, transcription (mocked), error handling, and more. Tests use `fastapi.testclient` and mock Whisper to run without requiring a model download.
+
 ## License
 
 MIT

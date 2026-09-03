@@ -137,6 +137,8 @@
             line-height: 1.6;
             font-size: 1.05rem;
             position: relative;
+            max-height: 600px;
+            overflow-y: auto;
         }
         .output-box.placeholder {
             color: var(--text-muted);
@@ -158,6 +160,77 @@
         }
         .output-box:hover .copy-btn { opacity: 1; }
         .copy-btn:hover { background: var(--primary); border-color: var(--primary); }
+
+        /* --- Progress bar for model loading & transcription --- */
+        .progress-card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 1rem 1.5rem;
+            margin-bottom: 1.5rem;
+            display: none;
+        }
+        .progress-card.active { display: block; }
+        .progress-card .progress-stage {
+            font-size: .9rem;
+            color: var(--text-muted);
+            margin-bottom: .5rem;
+            display: flex;
+            align-items: center;
+            gap: .5rem;
+        }
+        .progress-card .progress-stage .spinner-sm {
+            width: 16px;
+            height: 16px;
+            border: 2px solid var(--border);
+            border-top-color: var(--primary);
+            border-radius: 50%;
+            animation: spin .8s linear infinite;
+            flex-shrink: 0;
+        }
+        .progress-card .progress-bar-bg {
+            width: 100%;
+            height: 8px;
+            background: var(--bg);
+            border-radius: 4px;
+            overflow: hidden;
+        }
+        .progress-card .progress-bar-fill {
+            height: 100%;
+            width: 0%;
+            background: linear-gradient(90deg, var(--primary), #ff9a76);
+            border-radius: 4px;
+            transition: width .3s ease;
+        }
+        .progress-card .progress-percent {
+            font-size: .8rem;
+            color: var(--text-muted);
+            margin-top: .3rem;
+            text-align: right;
+        }
+        .progress-card.complete {
+            border-color: #4ade80;
+            background: rgba(74,222,128,.05);
+        }
+        .progress-card.complete .progress-bar-fill {
+            background: linear-gradient(90deg, #4ade80, #22c55e);
+        }
+        .progress-card.complete .spinner-sm,
+        .progress-card.complete .progress-percent {
+            display: none;
+        }
+        .progress-card.complete .progress-stage::before {
+            content: '✅ ';
+            margin-right: .3rem;
+        }
+        .progress-card.complete .progress-stage {
+            font-weight: 600;
+            color: var(--text);
+        }
+        .progress-card.error {
+            border-color: #f87171;
+            background: rgba(248,113,113,.05);
+        }
 
         .loading {
             display: none;
@@ -184,6 +257,60 @@
         }
         .status.success { color: #4ade80; }
         .status.error { color: #f87171; }
+        
+        /* GPU Status Indicator */
+        .gpu-status {
+            display: flex;
+            align-items: center;
+            gap: .8rem;
+            padding: .8rem 1rem;
+            background: var(--bg);
+            border-radius: 10px;
+            margin-bottom: 1rem;
+        }
+        .gpu-dot {
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+            flex-shrink: 0;
+        }
+        .gpu-dot.green { background: #4ade80; box-shadow: 0 0 10px rgba(74,222,128,.5); }
+        .gpu-dot.yellow { background: #facc15; box-shadow: 0 0 10px rgba(250,204,21,.5); }
+        .gpu-dot.red   { background: #f87171; box-shadow: 0 0 10px rgba(248,113,113,.5); }
+        .gpu-text {
+            flex: 1;
+        }
+        .gpu-text .gpu-title { font-size: .95rem; font-weight: 600; }
+        .gpu-text .gpu-detail { font-size: .8rem; color: var(--text-muted); margin-top: .2rem; }
+        .gpu-status.loading .gpu-dot { background: #888; animation: pulse 1s infinite; }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: .4; }
+        }
+
+        /* Model Switcher */
+        .model-switcher {
+            display: flex;
+            align-items: center;
+            gap: .5rem;
+            margin-top: .5rem;
+        }
+        .model-switcher select {
+            flex: 1;
+        }
+        .model-switcher button {
+            padding: .6rem 1rem;
+            border: 1px solid var(--border);
+            background: var(--surface);
+            color: var(--text);
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: .9rem;
+            transition: all .2s;
+        }
+        .model-switcher button:hover { border-color: var(--primary); background: rgba(233,69,96,.1); }
+        .model-switcher button:disabled { opacity: .5; cursor: not-allowed; }
+        .model-switcher button.switched { border-color: #4ade80; background: rgba(74,222,128,.1); }
 
         footer {
             margin-top: 3rem;
@@ -198,15 +325,57 @@
     <p class="subtitle">Powered by OpenAI Whisper — runs locally in your container</p>
 
     <div class="container">
+        <div class="gpu-status loading" id="gpuStatus">
+            <div class="gpu-dot"></div>
+            <div class="gpu-text">
+                <div class="gpu-title">Checking GPU...</div>
+                <div class="gpu-detail">Loading system info...</div>
+            </div>
+        </div>
+
         <div class="card">
-            <h2>📋 Output Model</h2>
-            <select class="model-select" id="modelSelect">
-                <option value="tiny">Tiny (fastest, less accurate)</option>
-                <option value="base">Base (default balance)</option>
-                <option value="small">Small (good balance)</option>
-                <option value="medium">Medium (more accurate, slower)</option>
-                <option value="large" disabled>Large (most accurate, needs GPU/vRAM)</option>
-            </select>
+            <h2>🧠 Model & Device</h2>
+            <div style="display:flex;gap:.8rem;margin-bottom:.8rem;flex-wrap:wrap;">
+                <select class="model-select" id="modelSelect" style="margin:0;flex:1;min-width:200px;">
+                    <option value="tiny">Tiny (fastest, less accurate)</option>
+                    <option value="base" selected>Base (default balance)</option>
+                    <option value="small">Small (good balance)</option>
+                    <option value="medium">Medium (more accurate, slower)</option>
+                    <option value="large">Large (most accurate, needs GPU/vRAM)</option>
+                    <option value="large-v3">Large-v3 (best accuracy, needs GPU/vRAM)</option>
+                </select>
+                <select class="model-select" id="deviceSelect" style="margin:0;flex:1;min-width:200px;">
+                    <option value="cpu">CPU</option>
+                    <option value="cuda" id="cudaOption">CUDA (GPU)</option>
+                </select>
+            </div>
+            <div class="model-switcher">
+                <span style="font-size:.85rem;color:var(--text-muted);">Current:</span>
+                <span id="currentModelDisplay" style="font-weight:600;color:var(--primary);">base (cpu)</span>
+                <button id="switchModelBtn" onclick="switchModel()">Switch Model</button>
+            </div>
+            <p class="status" id="modelStatus"></p>
+        </div>
+
+        <div class="card">
+            <h2>🖥️ GPU Health</h2>
+            <div id="gpuHealthContent" style="font-size:.9rem;color:var(--text-muted);"></div>
+            <button id="ejectBtn" onclick="ejectModel()" style="margin-top:.8rem;padding:.5rem 1.2rem;border:1px solid var(--border);background:var(--bg);color:var(--text);border-radius:8px;cursor:pointer;font-size:.9rem;transition:all .2s;">
+                💾 Eject Model from GPU
+            </button>
+            <p class="status" id="ejectStatus"></p>
+        </div>
+
+        <!-- Progress Card (model load & transcribe) -->
+        <div class="progress-card" id="progressCard">
+            <div class="progress-stage">
+                <span class="spinner-sm"></span>
+                <span id="progressStageText">Initializing...</span>
+            </div>
+            <div class="progress-bar-bg">
+                <div class="progress-bar-fill" id="progressBarFill"></div>
+            </div>
+            <div class="progress-percent" id="progressPercent">0%</div>
         </div>
 
         <div class="card">
@@ -371,7 +540,73 @@
             sendAudio(file, 'upload');
         }
 
-        // --- Send Audio ---
+        // --- Progress polling ---
+        let lastProgressMessage = '';
+        let progressPolling = null;
+
+        function startProgressPolling() {
+            if (progressPolling) clearInterval(progressPolling);
+            const card = document.getElementById('progressCard');
+            card.classList.remove('complete', 'error');
+            card.classList.add('active');
+            progressPolling = setInterval(updateProgress, 500);
+        }
+
+        function stopProgressPolling() {
+            if (progressPolling) {
+                clearInterval(progressPolling);
+                progressPolling = null;
+            }
+        }
+
+        async function updateProgress() {
+            try {
+                const resp = await fetch('/progress');
+                const data = await resp.json();
+                const stageText = document.getElementById('progressStageText');
+                const barFill = document.getElementById('progressBarFill');
+                const percentText = document.getElementById('progressPercent');
+
+                if (data.progress === 0 && !data.done && lastProgressMessage === '') {
+                    return;
+                }
+
+                stageText.textContent = data.message || 'Processing...';
+                const pct = Math.round((data.progress || 0) * 100);
+                barFill.style.width = pct + '%';
+                percentText.textContent = pct + '%';
+
+                if (data.done && data.progress >= 1) {
+                    document.getElementById('progressCard').classList.add('complete');
+                    stageText.textContent = data.message || 'Complete!';
+                    barFill.style.width = '100%';
+                    percentText.textContent = '100%';
+                    stopProgressPolling();
+                    lastProgressMessage = '';
+                    // Remove complete class after 2s to allow re-use
+                    setTimeout(() => {
+                        const card = document.getElementById('progressCard');
+                        if (card.classList.contains('complete')) {
+                            card.classList.remove('complete');
+                            barFill.style.width = '0%';
+                            percentText.textContent = '0%';
+                            stageText.textContent = 'Initializing...';
+                        }
+                    }, 2000);
+                } else if (data.done && data.progress < 1) {
+                    document.getElementById('progressCard').classList.add('error');
+                    stageText.textContent = data.message || 'Error';
+                    stopProgressPolling();
+                    lastProgressMessage = '';
+                } else {
+                    lastProgressMessage = data.message;
+                }
+            } catch {
+                // ignore polling errors
+            }
+        }
+
+        // --- Send Audio (with progress) ---
         async function sendAudio(fileOrBlob, source) {
             const output = document.getElementById('output');
             const loading = document.getElementById('loading');
@@ -380,6 +615,9 @@
             output.textContent = 'Transcription will appear here...';
             output.classList.add('placeholder');
             loading.classList.add('active');
+
+            startProgressPolling();
+            lastProgressMessage = '';
 
             const formData = new FormData();
             formData.append('file', source === 'mic'
@@ -397,12 +635,84 @@
                 output.textContent = `Error: ${e.message}`;
                 output.classList.remove('placeholder');
                 showStatus('Transcription failed', 'error');
+                document.getElementById('progressCard').classList.add('error');
+                document.getElementById('progressStageText').textContent = e.message;
+                stopProgressPolling();
             } finally {
                 loading.classList.remove('active');
             }
         }
 
-        // --- Utilities ---
+        // --- Model Switcher (with progress) ---
+        async function switchModel() {
+            const btn = document.getElementById('switchModelBtn');
+            const status = document.getElementById('modelStatus');
+            const newModel = document.getElementById('modelSelect').value;
+            const device = document.getElementById('deviceSelect').value;
+
+            btn.disabled = true;
+            btn.textContent = 'Loading...';
+            status.textContent = 'Loading model...';
+            status.className = 'status';
+
+            startProgressPolling();
+            lastProgressMessage = '';
+
+            try {
+                const resp = await fetch('/switch-model', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ model: newModel, device: device }),
+                });
+                const data = await resp.json();
+                if (!resp.ok) throw new Error(data.detail || 'Failed to switch model');
+
+                document.getElementById('currentModelDisplay').textContent = data.model + ' (' + data.device + ')';
+                status.textContent = '✅ ' + data.message;
+                status.className = 'status success';
+                btn.classList.add('switched');
+                setTimeout(() => btn.classList.remove('switched'), 2000);
+            } catch (e) {
+                status.textContent = '❌ ' + e.message;
+                status.className = 'status error';
+                document.getElementById('progressCard').classList.add('error');
+                document.getElementById('progressStageText').textContent = e.message;
+                stopProgressPolling();
+            } finally {
+                btn.disabled = false;
+                btn.textContent = 'Switch Model';
+            }
+        }
+
+        async function ejectModel() {
+            const btn = document.getElementById('ejectBtn');
+            const status = document.getElementById('ejectStatus');
+            btn.disabled = true;
+            btn.textContent = 'Ejecting...';
+            status.textContent = 'Ejecting model from GPU...';
+            status.className = 'status';
+            try {
+                const resp = await fetch('/eject', { method: 'POST' });
+                const data = await resp.json();
+                if (data.status === 'success') {
+                    status.textContent = '✅ Model ejected — GPU VRAM freed.';
+                    status.className = 'status success';
+                    btn.textContent = 'Ejected!';
+                    document.getElementById('currentModelDisplay').textContent = 'ejected';
+                } else {
+                    status.textContent = '⚠️ ' + data.message;
+                    status.className = 'status';
+                    btn.textContent = 'Eject Model from GPU';
+                }
+            } catch (e) {
+                status.textContent = '❌ Eject failed: ' + e.message;
+                status.className = 'status error';
+                btn.textContent = 'Eject Model from GPU';
+            } finally {
+                btn.disabled = false;
+            }
+        }
+
         function showStatus(msg, type) {
             const el = currentMode === 'microphone'
                 ? document.getElementById('micStatus')
@@ -419,6 +729,79 @@
                 setTimeout(() => btn.textContent = '📋 Copy', 2000);
             });
         }
+
+        // --- Device option visibility ---
+        function updateDeviceOptions(hasCuda) {
+            const cudaOpt = document.getElementById('cudaOption');
+            cudaOpt.disabled = !hasCuda;
+            cudaOpt.style.opacity = hasCuda ? 1 : .5;
+            if (!hasCuda && document.getElementById('deviceSelect').value === 'cuda') {
+                document.getElementById('deviceSelect').value = 'cpu';
+            }
+        }
+
+        // --- Health polling ---
+        async function loadHealth() {
+            try {
+                const resp = await fetch('/health');
+                const data = await resp.json();
+
+                // GPU status dot
+                const gpuStatusEl = document.getElementById('gpuStatus');
+                gpuStatusEl.classList.remove('loading');
+                const dot = gpuStatusEl.querySelector('.gpu-dot');
+                dot.className = 'gpu-dot ' + data.status;
+                gpuStatusEl.querySelector('.gpu-title').textContent = data.recommendation;
+                gpuStatusEl.querySelector('.gpu-detail').textContent =
+                    `Model: ${data.model} on ${data.device}`;
+
+                // GPU health details
+                const gpuHealthEl = document.getElementById('gpuHealthContent');
+                if (data.nvidia_gpu && data.nvidia_gpu.length) {
+                    const gpu = data.nvidia_gpu[0];
+                    const usedPct = ((gpu.vram_used_mb / gpu.vram_total_mb) * 100).toFixed(1);
+                    const freePct = ((gpu.vram_free_mb / gpu.vram_total_mb) * 100).toFixed(1);
+                    gpuHealthEl.innerHTML =
+                        `<div style="margin-bottom:.8rem;">
+                            <strong>VRAM Usage:</strong>
+                            <div style="margin-top:.3rem;">
+                                <div style="height:10px;background:var(--border);border-radius:5px;overflow:hidden;">
+                                    <div style="height:100%;width:${usedPct}%;background:${data.status==='green'?'#4ade80':data.status==='yellow'?'#facc15':'#f87171'};transition:width .5s;"></div>
+                                </div>
+                            </div>
+                            <div style="display:flex;justify-content:space-between;margin-top:.3rem;font-size:.8rem;">
+                                <span>Used: ${(gpu.vram_used_mb/1024).toFixed(1)} GB</span>
+                                <span>Free: ${(gpu.vram_free_mb/1024).toFixed(1)} GB</span>
+                                <span>Total: ${(gpu.vram_total_mb/1024).toFixed(1)} GB</span>
+                            </div>
+                        </div>
+                        <div style="display:flex;gap:1rem;margin-bottom:.8rem;">
+                            <div>Utilization: <strong>${gpu.utilization_pct}%</strong></div>
+                            <div>Memory Clock: <strong>${gpu.mem_clock_mhz || 'N/A'} MHz</strong></div>
+                        </div>`;
+
+                    // Enable CUDA option
+                    updateDeviceOptions(true);
+
+                    // Show CUDA option if GPU available
+                    const cudaOpt = document.getElementById('cudaOption');
+                    if (data.torch_cuda && data.torch_cuda.available) {
+                        cudaOpt.textContent = `CUDA (GPU - ${data.torch_cuda.devices[0]?.name || 'GPU'})`;
+                    } else {
+                        cudaOpt.textContent = 'CUDA (GPU) — not available';
+                    }
+                } else {
+                    gpuHealthEl.textContent = 'No NVIDIA GPU detected — using CPU inference.';
+                    updateDeviceOptions(false);
+                }
+            } catch {
+                // ignore health errors
+            }
+        }
+
+        loadHealth();
+        setInterval(loadHealth, 15000);
+
     </script>
 </body>
 </html>
