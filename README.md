@@ -128,9 +128,23 @@ Diarization uses the gated [`pyannote/speaker-diarization-community-1`](https://
 
 1. Create a Hugging Face access token (read access) at <https://huggingface.co/settings/tokens>
 2. Accept the user conditions on the [model page](https://huggingface.co/pyannote/speaker-diarization-community-1)
-3. Set `HF_TOKEN` in the server environment and restart
+3. Give the token to the server, either way:
+   - **Saved login (persists across reboots, recommended):** run this once as the user that runs the server:
+     ```bash
+     source venv/bin/activate
+     hf auth login   # paste the token when prompted; it is saved to ~/.cache/huggingface/token
+     ```
+     The server reads the saved token on each request, so no restart is needed.
+     In Docker, the `model-cache` volume mounted on `/root/.cache` keeps it: run `docker compose exec speech-to-text hf auth login` once.
+   - **Environment variable:** set `HF_TOKEN` (it takes precedence over the saved login). Don't put it in the tracked `.env` file.
 
-Without `HF_TOKEN`, transcription works as usual and the "Identify speakers" toggle in the UI is disabled. The diarization pipeline is loaded on first use and freed by `/eject`.
+Without a token, transcription works as usual and the "Identify speakers" toggle in the UI is disabled. The diarization pipeline is loaded on first use and freed by `/eject`.
+
+To check that the token can access the model:
+
+```bash
+python -c "from huggingface_hub import model_info; print(model_info('pyannote/speaker-diarization-community-1').id)"
+```
 
 ## Web UI
 
@@ -155,7 +169,7 @@ Set environment variables in `.env` or at startup:
 | `WHISPER_DEVICE`    | `cpu`                                           | Inference device (`cpu`/`cuda`)|
 | `WHISPER_COMPUTE_TYPE` | `float16` on GPU, `int8` on CPU              | CTranslate2 compute type (`float16`, `int8_float16`, `int8`, `float32`) |
 | `WHISPER_BATCH_SIZE`| `16`                                            | Batch size for VAD chunks (lower it if GPU runs out of memory) |
-| `HF_TOKEN`          | unset                                           | Hugging Face token, required for speaker diarization |
+| `HF_TOKEN`          | saved `hf auth login` token                     | Hugging Face token, required for speaker diarization |
 | `WHISPER_DIARIZE`   | `false`                                         | Diarize by default when the request doesn't say |
 | `WHISPER_DIARIZE_MODEL` | `pyannote/speaker-diarization-community-1`  | pyannote pipeline used for diarization |
 | `FFMPEG_PATH`       | auto-detected                                   | Path to ffmpeg binary          |

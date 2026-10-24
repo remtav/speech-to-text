@@ -36,7 +36,17 @@ def _env_bool(name, default=False):
     return os.getenv(name, str(default)).strip().lower() in ("1", "true", "yes", "on")
 
 
-HF_TOKEN = os.getenv("HF_TOKEN") or None
+def _get_hf_token():
+    """Hugging Face token from HF_TOKEN, else the one saved by `hf auth login`.
+
+    Read on each call so a login done while the server runs is picked up.
+    """
+    try:
+        from huggingface_hub import get_token
+        return get_token()  # checks HF_TOKEN first, then the saved token file
+    except ImportError:
+        return os.getenv("HF_TOKEN") or None
+
 DIARIZE_DEFAULT = _env_bool("WHISPER_DIARIZE", False)
 DIARIZE_MODEL = os.getenv("WHISPER_DIARIZE_MODEL") or None  # None = whisperx default (pyannote community-1)
 BATCH_SIZE = int(os.getenv("WHISPER_BATCH_SIZE", "16"))
@@ -314,12 +324,14 @@ def _get_diarize_model():
         if diarize_model is None:
             from whisperx.diarize import DiarizationPipeline
             try:
-                diarize_model = DiarizationPipeline(model_name=DIARIZE_MODEL, token=HF_TOKEN, device=current_device)
+                diarize_model = DiarizationPipeline(model_name=DIARIZE_MODEL, token=_get_hf_token(),
+                                                    device=current_device)
             except Exception as e:
                 name = DIARIZE_MODEL or "pyannote/speaker-diarization-community-1"
                 raise DiarizationUnavailable(
                     f"Could not load diarization model '{name}': {e}. "
-                    f"Check HF_TOKEN and accept the model terms at https://huggingface.co/{name}"
+                    f"Check your Hugging Face token (HF_TOKEN or `hf auth login`) and accept "
+                    f"the model terms at https://huggingface.co/{name}"
                 ) from e
         return diarize_model
 
@@ -366,7 +378,7 @@ def get_health_info():
         "recommendation": recommendation,
         "ffmpeg_available": ffmpeg_path is not None,
         "ffmpeg_path": ffmpeg_path,
-        "diarization_available": HF_TOKEN is not None,
+        "diarization_available": _get_hf_token() is not None,
         "diarization_loaded": diarize_model is not None,
         "diarize_default": DIARIZE_DEFAULT,
     }
@@ -608,11 +620,11 @@ async def transcribe(
     """Transcribe uploaded audio with word timestamps, optionally labelling speakers."""
     diarize = DIARIZE_DEFAULT if diarize is None else diarize
     _validate_speaker_hints(num_speakers, min_speakers, max_speakers)
-    if diarize and HF_TOKEN is None:
+    if diarize and _get_hf_token() is None:
         raise HTTPException(
             status_code=503,
-            detail="Speaker diarization is not configured: set HF_TOKEN to a Hugging Face token "
-                   "that has accepted the pyannote model terms.",
+            detail="Speaker diarization is not configured: set HF_TOKEN or run `hf auth login` "
+                   "with a Hugging Face token that has accepted the pyannote model terms.",
         )
 
     tmp_path = await _save_upload(file)
@@ -684,7 +696,7 @@ async def startup_event():
     print(f"Starting Speech-to-Text server")
     print(f"Initial model: {current_model_name} on {current_device}")
     print(f"Model cache dir: {_get_model_cache_dir()}")
-    print(f"Speaker diarization: {'available' if HF_TOKEN else 'disabled (HF_TOKEN not set)'}")
+    print(f"Speaker diarization: {'available' if _get_hf_token() else 'disabled (no Hugging Face token)'}")
     print(f"{'='*60}\n")
 
     _clear_progress()

@@ -843,7 +843,7 @@
             const hintsDisabled = !available || !toggle.checked;
             document.getElementById('minSpeakers').disabled = hintsDisabled;
             document.getElementById('maxSpeakers').disabled = hintsDisabled;
-            status.textContent = available ? '' : 'Speaker identification needs HF_TOKEN to be set on the server.';
+            status.textContent = available ? '' : 'Speaker identification needs a Hugging Face token on the server (HF_TOKEN or `hf auth login`).';
         }
         let diarizeInitialized = false;
         let diarizeAvailable = false;

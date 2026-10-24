@@ -14,6 +14,9 @@ COPY requirements.txt .
 
 RUN pip install --no-cache-dir -r requirements.txt
 
+# Sentence tokenizer used by WhisperX alignment (otherwise downloaded at runtime)
+RUN python -m nltk.downloader -d /usr/local/share/nltk_data punkt_tab
+
 COPY app/ ./app/
 COPY templates/ ./templates/
 

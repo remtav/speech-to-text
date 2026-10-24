@@ -231,7 +231,8 @@ def _fake_whisperx():
     def assign_word_speakers(diarize_segments, result, fill_nearest=False):
         for seg in result["segments"]:
             for word in seg.get("words", []):
-                word["speaker"] = "SPEAKER_00" if word["start"] < 1.0 else "SPEAKER_01"
+                # Words are spread evenly over 0-2 s: "Hello." starts at 0, "Hi" at ~0.67
+                word["speaker"] = "SPEAKER_00" if word["start"] < 0.5 else "SPEAKER_01"
             seg["speaker"] = "SPEAKER_01"
         return result
 
@@ -255,7 +256,7 @@ def mock_engine():
             patch.object(app.main, "load_audio", return_value=np.zeros(32000, dtype=np.float32)), \
             patch.object(app.main, "_get_align_model", return_value=("align-model", {"language": "en"})), \
             patch.object(app.main, "_get_diarize_model", return_value=diarizer), \
-            patch.object(app.main, "HF_TOKEN", "hf_test"):
+            patch.object(app.main, "_get_hf_token", return_value="hf_test"):
         yield {"asr": asr, "diarizer": diarizer}
 
 
@@ -302,10 +303,29 @@ class TestTranscribeEndpoint:
         assert "words" not in data["segments"][0]
 
     def test_diarize_without_hf_token(self, mock_engine):
-        with patch.object(app.main, "HF_TOKEN", None):
+        with patch.object(app.main, "_get_hf_token", return_value=None):
             response = _post_audio(data={"diarize": "true"})
         assert response.status_code == 503
         assert "HF_TOKEN" in response.json()["detail"]
+
+    def test_hf_token_from_env(self):
+        with patch.dict(os.environ, {"HF_TOKEN": "hf_from_env"}):
+            assert app.main._get_hf_token() == "hf_from_env"
+
+    def test_hf_token_from_saved_login(self, tmp_path):
+        token_file = tmp_path / "token"
+        token_file.write_text("hf_saved_login\n")
+        hf_constants = pytest.importorskip("huggingface_hub.constants")
+        env = {k: v for k, v in os.environ.items() if k not in ("HF_TOKEN", "HUGGING_FACE_HUB_TOKEN")}
+        with patch.dict(os.environ, env, clear=True), \
+                patch.object(hf_constants, "HF_TOKEN_PATH", str(token_file)):
+            assert app.main._get_hf_token() == "hf_saved_login"
+
+    def test_health_reports_diarization_availability(self):
+        with patch.object(app.main, "_get_hf_token", return_value=None):
+            assert client.get("/health").json()["diarization_available"] is False
+        with patch.object(app.main, "_get_hf_token", return_value="hf_x"):
+            assert client.get("/health").json()["diarization_available"] is True
 
     def test_diarization_model_unavailable(self, mock_engine):
         error = app.main.DiarizationUnavailable("gated model")
