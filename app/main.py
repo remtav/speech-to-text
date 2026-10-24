@@ -1,600 +1,56 @@
-import gc
+"""FastAPI application: web UI and HTTP API."""
+import asyncio
+import logging
 import os
-import threading
+import re
 import tempfile
-import subprocess
+import threading
+from contextlib import asynccontextmanager
+from pathlib import Path
 from typing import Optional
+from urllib.parse import urlsplit
 
-import numpy as np
-from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Body
+from fastapi import Body, FastAPI, File, Form, HTTPException, Query, Request, UploadFile
 from fastapi.concurrency import run_in_threadpool
-from fastapi.responses import HTMLResponse
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import HTMLResponse, JSONResponse, Response
+from fastapi.staticfiles import StaticFiles
 
-from app.speakers import (
-    split_segments_by_speaker,
-    list_speakers,
-    format_speaker_transcript,
-    to_builtin,
-)
+from app import hf, system
+from app.config import VALID_DEVICES, VALID_MODELS, load_settings
+from app.errors import http_status_for
+from app.formats import EXPORT_FORMATS, export
+from app.jobs import JobManager
+from app.languages import LANGUAGES
+from app.pipeline import Engine, model_cache_dir
+from app.worker import InlineBackend, ProcessBackend
 
-app = FastAPI(title="Speech-to-Text", description="Voice transcription with speaker diarization powered by WhisperX")
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+__version__ = "2.0.0"
 
-SAMPLE_RATE = 16000
+ROOT = Path(__file__).resolve().parent.parent
+TEMPLATES_DIR = ROOT / "templates"
+STATIC_DIR = ROOT / "static"
+UPLOAD_CHUNK = 1024 * 1024
 
-VALID_MODELS = ["tiny", "base", "small", "medium", "large", "large-v2", "large-v3", "large-v3-turbo"]
-VALID_DEVICES = ["cpu", "cuda"]
-
-
-def _env_bool(name, default=False):
-    return os.getenv(name, str(default)).strip().lower() in ("1", "true", "yes", "on")
+log = logging.getLogger("app")
 
 
-def _get_hf_token():
-    """Hugging Face token from HF_TOKEN, else the one saved by `hf auth login`.
-
-    Read on each call so a login done while the server runs is picked up.
-    """
-    try:
-        from huggingface_hub import get_token
-        return get_token()  # checks HF_TOKEN first, then the saved token file
-    except ImportError:
-        return os.getenv("HF_TOKEN") or None
-
-DIARIZE_DEFAULT = _env_bool("WHISPER_DIARIZE", False)
-DIARIZE_MODEL = os.getenv("WHISPER_DIARIZE_MODEL") or None  # None = whisperx default (pyannote community-1)
-BATCH_SIZE = int(os.getenv("WHISPER_BATCH_SIZE", "16"))
-
-# ============================================================
-# Global state
-# ============================================================
-model = None  # whisperx FasterWhisperPipeline
-model_lock = threading.Lock()
-current_model_name = os.getenv("WHISPER_MODEL", "base")
-current_device = os.getenv("WHISPER_DEVICE", "cpu")
-
-# Auxiliary models, loaded lazily on current_device
-align_models: dict = {}  # language -> (align_model, metadata)
-diarize_model = None
-aux_lock = threading.Lock()
-
-# --- Progress tracking ---
-# A shared event queue that allows polling from the frontend
-_lock = threading.Lock()
-_progress_events: list[dict] = []  # [{progress, message, stage, done}]
-
-def _append_progress(progress: float, message: str, stage: str = "transcribe", done: bool = False):
-    """Thread-safe: append a progress event."""
-    with _lock:
-        _progress_events.append({
-            "progress": round(progress, 4),
-            "message": message,
-            "stage": stage,
-            "done": done,
-        })
-
-def _get_progress():
-    """Return the latest progress event (without clearing)."""
-    with _lock:
-        if _progress_events:
-            return _progress_events[-1]
-        return {"progress": 0.0, "message": "Waiting...", "stage": "idle", "done": False}
-
-def _clear_progress():
-    with _lock:
-        _progress_events.clear()
-
-
-# ============================================================
-# GPU model eject
-# ============================================================
-
-def _free_device_memory():
-    gc.collect()
-    try:
-        import torch
-        if torch.cuda.is_available():
-            torch.cuda.empty_cache()
-    except ImportError:
-        pass
-
-
-def _unload_aux_models():
-    """Drop alignment and diarization models. Returns True if any were loaded."""
-    global diarize_model
-    with aux_lock:
-        had_models = bool(align_models) or diarize_model is not None
-        align_models.clear()
-        diarize_model = None
-    return had_models
-
-
-def _eject_models():
-    """Unload Whisper, alignment and diarization models to free VRAM. Thread-safe.
-
-    The model name and device are kept so the next transcription reloads them.
-    """
-    global model
-    with model_lock:
-        had_model = model is not None
-        model = None
-    had_aux = _unload_aux_models()
-    if had_model or had_aux:
-        _free_device_memory()
-        _clear_progress()
-        return True
-    return False
-
-
-# ============================================================
-# GPU / Device helpers
-# ============================================================
-
-def _get_nvidia_gpu_info():
-    """Return GPU info via nvidia-smi or None."""
-    try:
-        result = subprocess.run(
-            ["nvidia-smi", "--query-gpu=index,name,memory.total,memory.used,memory.free,utilization.gpu",
-             "--format=csv,noheader,nounits"],
-            capture_output=True, text=True, timeout=5,
-        )
-        if result.returncode == 0:
-            gpus = []
-            for line in result.stdout.strip().splitlines():
-                parts = [p.strip() for p in line.split(",")]
-                if len(parts) == 6:
-                    gpus.append({
-                        "index": int(parts[0]),
-                        "name": parts[1],
-                        "vram_total_mb": int(parts[2]) * 1024,
-                        "vram_used_mb": int(parts[3]) * 1024,
-                        "vram_free_mb": int(parts[4]) * 1024,
-                        "utilization_pct": int(parts[5]),
-                    })
-            return gpus
-    except Exception:
-        pass
-    return None
-
-
-def _check_torch_cuda():
-    """Check PyTorch CUDA availability without loading any models."""
-    cuda = {
-        "available": False,
-        "driver_version": None,
-        "runtime_version": None,
-        "device_count": 0,
-        "current_device": None,
-        "devices": [],
-    }
-    try:
-        import torch
-        if torch.cuda.is_available():
-            cuda["available"] = True
-            cuda["device_count"] = torch.cuda.device_count()
-            cuda["current_device"] = torch.cuda.current_device()
-            try:
-                cuda["driver_version"] = torch.version.cuda
-            except Exception:
-                pass
-            for i in range(cuda["device_count"]):
-                cuda["devices"].append({
-                    "index": i,
-                    "name": torch.cuda.get_device_name(i),
-                    "total_memory_mb": torch.cuda.get_device_properties(i).total_memory / (1024 ** 2),
-                    "free_memory_mb": torch.cuda.get_device_properties(i).total_memory / (1024 ** 2),
-                })
-    except ImportError:
-        pass
-    return cuda
-
-
-def _get_model_cache_dir():
-    """Return the Whisper (CTranslate2) model cache directory."""
-    xdg = os.getenv("XDG_CACHE_HOME", os.path.join(os.path.expanduser("~"), ".cache"))
-    return os.path.join(xdg, "whisper")
-
-
-def _get_compute_type(device):
-    """CTranslate2 compute type: WHISPER_COMPUTE_TYPE, else float16 on GPU and int8 on CPU."""
-    return os.getenv("WHISPER_COMPUTE_TYPE") or ("float16" if device == "cuda" else "int8")
-
-
-# ============================================================
-# Model pre-download with progress reporting
-# ============================================================
-
-def _predownload_model(model_name: str, download_root: str):
-    """
-    Download a faster-whisper (CTranslate2) model from the Hugging Face Hub and keep it cached.
-    Reports progress via _append_progress.
-    Returns (model_path, 0, cached_size) or (None, None, None) on error.
-    """
-    from faster_whisper.utils import available_models, download_model
-
-    if model_name not in available_models():
-        return None, None, None
-
-    os.makedirs(download_root, exist_ok=True)
-
-    try:
-        # Cached already? Avoid touching the network.
-        model_path = download_model(model_name, cache_dir=download_root, local_files_only=True)
-    except Exception:
-        _append_progress(0.0, f"Downloading Whisper model '{model_name}'", "download", False)
-        try:
-            model_path = download_model(model_name, cache_dir=download_root)
-        except Exception as e:
-            print(f"[Failed to pre-download {model_name}: {e}]")
-            _append_progress(0.0, f"Failed to download model '{model_name}': {e}", "download", False)
-            return None, None, None
-        _append_progress(1.0, f"Model '{model_name}' cached at {model_path}", "download", False)
-        print(f"[Model {model_name} cached at {model_path}]")
-
-    cached_size = sum(
-        os.path.getsize(os.path.join(root, f))
-        for root, _, files in os.walk(model_path) for f in files
-    )
-    return model_path, 0, cached_size
-
-
-# ============================================================
-# Model loading with progress reporting
-# ============================================================
-
-def _ensure_model(name=None, device=None, final=True):
-    """Load or switch to the requested Whisper model. Thread-safe. Reports progress.
-
-    `final=False` keeps the "ready" event from being marked done, for loads that
-    happen in the middle of a transcription.
-    """
-    global model, current_model_name, current_device
-    name = name or current_model_name
-    device = device or current_device
-
-    if device == "cuda":
-        import torch
-        if not torch.cuda.is_available():
-            device = "cpu"
-
-    with model_lock:
-        if model is not None and current_model_name == name and current_device == device:
-            return True
-
-        model = None
-        if device != current_device:
-            # Alignment / diarization models live on the old device
-            _unload_aux_models()
-        _free_device_memory()
-
-        compute_type = _get_compute_type(device)
-        _append_progress(0.1, f"Loading model '{name}' on {device} ({compute_type})", "load", False)
-
-        try:
-            import whisperx
-
-            model_path, _, _ = _predownload_model(name, _get_model_cache_dir())
-            _append_progress(0.5, "Loading weights into model…", "load", False)
-            model = whisperx.load_model(
-                model_path or name,
-                device,
-                compute_type=compute_type,
-                download_root=_get_model_cache_dir(),
-            )
-            current_model_name = name
-            current_device = device
-            _append_progress(1.0, f"Model '{name}' ready on {device}", "load", final)
-            return True
-        except Exception as e:
-            print(f"Error loading model {name}: {e}")
-            import traceback
-            traceback.print_exc()
-            _append_progress(0.0, f"Failed to load model: {e}", "load", True)
-            return False
-
-
-def _get_align_model(language):
-    """Return a cached (align_model, metadata) for `language`, or None if unsupported."""
-    with aux_lock:
-        if language not in align_models:
-            import whisperx
-            try:
-                align_models[language] = whisperx.load_align_model(language_code=language, device=current_device)
-            except ValueError as e:
-                # No default wav2vec2 alignment model for this language
-                print(f"[Alignment unavailable for '{language}': {e}]")
-                align_models[language] = None
-        return align_models[language]
-
-
-class DiarizationUnavailable(RuntimeError):
-    """Speaker diarization requested but the pipeline cannot be used."""
-
-
-def _get_diarize_model():
-    """Return the cached pyannote diarization pipeline, loading it on first use."""
-    global diarize_model
-    with aux_lock:
-        if diarize_model is None:
-            from whisperx.diarize import DiarizationPipeline
-            try:
-                diarize_model = DiarizationPipeline(model_name=DIARIZE_MODEL, token=_get_hf_token(),
-                                                    device=current_device)
-            except Exception as e:
-                name = DIARIZE_MODEL or "pyannote/speaker-diarization-community-1"
-                raise DiarizationUnavailable(
-                    f"Could not load diarization model '{name}': {e}. "
-                    f"Check your Hugging Face token (HF_TOKEN or `hf auth login`) and accept "
-                    f"the model terms at https://huggingface.co/{name}"
-                ) from e
-        return diarize_model
-
-
-# ============================================================
-# Health info
-# ============================================================
-
-def get_health_info():
-    """Return server health info."""
-    torch_cuda = _check_torch_cuda()
-    nvidia_gpu = _get_nvidia_gpu_info()
-
-    has_nvidia_gpu = nvidia_gpu is not None and len(nvidia_gpu) > 0
-    gpu_available_for_model = has_nvidia_gpu
-    gpu_busy = False
-
-    if has_nvidia_gpu:
-        for gpu in nvidia_gpu:
-            if gpu["utilization_pct"] > 90 or gpu["vram_used_mb"] > gpu["vram_total_mb"] * 0.9:
-                gpu_busy = True
-
-    recommendation = "CPU is fine for small/medium models."
-    if has_nvidia_gpu:
-        total_free = sum(g["vram_free_mb"] for g in nvidia_gpu)
-        if total_free >= 8000:
-            recommendation = "GPU available — safe to use large/large-v3 models."
-        elif total_free >= 4000:
-            recommendation = "GPU partially available — medium model OK, large may run out of VRAM."
-        else:
-            recommendation = "GPU VRAM limited — stay with small/base models or free up VRAM."
-    else:
-        recommendation = "No NVIDIA GPU detected — use CPU or base/small models."
-
-    ffmpeg_path = _get_ffmpeg_path()
-    return {
-        "device": current_device,
-        "model": current_model_name,
-        "model_loaded": model is not None,
-        "torch_cuda": torch_cuda,
-        "nvidia_gpu": nvidia_gpu,
-        "gpu_available_for_model": gpu_available_for_model and not gpu_busy,
-        "gpu_busy": gpu_busy,
-        "recommendation": recommendation,
-        "ffmpeg_available": ffmpeg_path is not None,
+def create_backend(settings, ffmpeg_path):
+    engine_kwargs = {
+        "batch_size": settings.batch_size,
+        "compute_type": settings.compute_type,
+        "diarize_model": settings.diarize_model,
         "ffmpeg_path": ffmpeg_path,
-        "diarization_available": _get_hf_token() is not None,
-        "diarization_loaded": diarize_model is not None,
-        "diarize_default": DIARIZE_DEFAULT,
+        "ffmpeg_timeout": settings.ffmpeg_timeout,
     }
-
-
-def _get_ffmpeg_path():
-    """Get the ffmpeg path."""
-    ffmpeg_path = os.getenv("FFMPEG_PATH")
-    if ffmpeg_path and os.path.exists(ffmpeg_path):
-        return ffmpeg_path
-
-    conda_env = os.getenv("CONDA_PREFIX")
-    if conda_env:
-        conda_ffmpeg = os.path.join(conda_env, "bin", "ffmpeg")
-        if os.path.exists(conda_ffmpeg):
-            return conda_ffmpeg
-
-    for path in [
-        "/home/remi/miniconda3/envs/whisper-gpu/bin/ffmpeg",
-        "/usr/bin/ffmpeg",
-    ]:
-        if os.path.exists(path):
-            return path
-    return None
-
-
-FFMPEG_PATH = _get_ffmpeg_path()
-if FFMPEG_PATH:
-    print(f"ffmpeg found at: {FFMPEG_PATH}")
-else:
-    print("Warning: ffmpeg not found, falling back to 'ffmpeg' on PATH for audio decoding")
+    if settings.worker_mode == "inline":
+        return InlineBackend(Engine(**engine_kwargs))
+    return ProcessBackend("app.pipeline:Engine", engine_kwargs)
 
 
 # ============================================================
-# FastAPI routes
+# Request helpers
 # ============================================================
-
-@app.get("/", response_class=HTMLResponse)
-async def index():
-    with open("templates/index.html", "r") as f:
-        return f.read()
-
-
-@app.get("/health")
-async def health():
-    info = get_health_info()
-    if info["gpu_available_for_model"]:
-        info["status"] = "green"
-    elif info.get("gpu_busy"):
-        info["status"] = "yellow"
-    else:
-        info["status"] = "red"
-    return info
-
-
-@app.get("/progress")
-async def progress():
-    """Return current progress event for model download / load / transcription."""
-    return _get_progress()
-
-
-@app.post("/eject")
-async def eject():
-    """Eject all loaded models from GPU to free VRAM."""
-    success = _eject_models()
-    return {"status": "success" if success else "no model was loaded",
-            "message": "Models ejected from GPU" if success else "No model was loaded"}
-
-
-@app.post("/switch-model")
-async def switch_model(request: dict = Body(...)):
-    """Dynamically switch the Whisper model and device."""
-    new_model = request.get("model", current_model_name)
-    new_device = request.get("device", current_device)
-
-    if new_model not in VALID_MODELS:
-        raise HTTPException(status_code=400, detail=f"Invalid model. Choose from: {VALID_MODELS}")
-
-    if new_device not in VALID_DEVICES:
-        raise HTTPException(status_code=400, detail=f"Invalid device. Choose from: {VALID_DEVICES}")
-
-    if new_device == "cuda":
-        import torch
-        if not torch.cuda.is_available():
-            raise HTTPException(status_code=400, detail="CUDA not available on this system.")
-        if not _check_torch_cuda()["available"]:
-            raise HTTPException(status_code=400, detail="CUDA not available on this system.")
-
-    _clear_progress()
-
-    try:
-        success = await run_in_threadpool(_ensure_model, new_model, new_device)
-        if not success:
-            raise HTTPException(status_code=500, detail=f"Failed to load model: {new_model}")
-
-        return {
-            "status": "success",
-            "model": current_model_name,
-            "device": current_device,
-            "message": f"Switched to {current_model_name} on {current_device}",
-        }
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to load model: {str(e)}")
-
-
-# ============================================================
-# Audio decoding
-# ============================================================
-
-class AudioDecodeError(ValueError):
-    """The uploaded file could not be decoded as audio."""
-
-
-def load_audio(path):
-    """Decode any ffmpeg-supported file to a 16 kHz mono float32 waveform.
-
-    The same array is shared by transcription, alignment and diarization,
-    so the file is only decoded once.
-    """
-    cmd = [
-        FFMPEG_PATH or "ffmpeg", "-nostdin", "-threads", "0", "-i", path,
-        "-f", "s16le", "-ac", "1", "-acodec", "pcm_s16le", "-ar", str(SAMPLE_RATE), "-",
-    ]
-    try:
-        result = subprocess.run(cmd, capture_output=True, check=True, timeout=300)
-    except FileNotFoundError as e:
-        raise RuntimeError("ffmpeg not found: install it or set FFMPEG_PATH") from e
-    except subprocess.CalledProcessError as e:
-        stderr = e.stderr.decode(errors="replace").strip().splitlines()
-        raise AudioDecodeError(f"Could not decode audio: {stderr[-1] if stderr else e}") from e
-
-    audio = np.frombuffer(result.stdout, np.int16).flatten().astype(np.float32) / 32768.0
-    if audio.size == 0:
-        raise AudioDecodeError("Could not decode audio: file contains no audio samples")
-    return audio
-
-
-async def _save_upload(file: UploadFile):
-    with tempfile.NamedTemporaryFile(suffix=os.path.splitext(file.filename or "")[1], delete=False) as tmp:
-        tmp.write(await file.read())
-        return tmp.name
-
-
-# ============================================================
-# Transcription pipeline
-# ============================================================
-
-def _progress_range(start, end, message, stage):
-    """Map a whisperx 0-100 progress callback onto [start, end] of the overall progress."""
-    def callback(pct):
-        _append_progress(start + (end - start) * min(pct, 100.0) / 100.0,
-                         f"{message} ({pct:.0f}%)", stage, False)
-    return callback
-
-
-def _run_transcription(audio, diarize=False, num_speakers=None, min_speakers=None, max_speakers=None):
-    """Transcribe, align and optionally diarize a 16 kHz waveform. Blocking."""
-    import whisperx
-
-    if not _ensure_model(final=False):
-        raise RuntimeError(f"Failed to load model: {current_model_name}")
-    asr_model = model
-
-    # Phase 1: Transcribe (VAD-batched faster-whisper)
-    _append_progress(0.1, "Running Whisper transcription…", "transcribe", False)
-    result = asr_model.transcribe(
-        audio,
-        batch_size=BATCH_SIZE,
-        progress_callback=_progress_range(0.1, 0.5, "Transcribing", "transcribe"),
-    )
-    language = result.get("language", "unknown")
-
-    # Phase 2: Word-level alignment (wav2vec2)
-    aligned = False
-    align = _get_align_model(language) if result["segments"] else None
-    if align is not None:
-        _append_progress(0.5, f"Aligning words ({language})…", "align", False)
-        align_model, align_metadata = align
-        result = whisperx.align(
-            result["segments"], align_model, align_metadata, audio, current_device,
-            return_char_alignments=False,
-            progress_callback=_progress_range(0.5, 0.65, "Aligning words", "align"),
-        )
-        aligned = True
-
-    # Phase 3: Speaker diarization (pyannote)
-    if diarize and result["segments"]:
-        _append_progress(0.65, "Identifying speakers…", "diarize", False)
-        diarize_segments = _get_diarize_model()(
-            audio,
-            num_speakers=num_speakers,
-            min_speakers=min_speakers,
-            max_speakers=max_speakers,
-            progress_callback=_progress_range(0.65, 0.95, "Identifying speakers", "diarize"),
-        )
-        result = whisperx.assign_word_speakers(diarize_segments, result, fill_nearest=True)
-
-    segments = result["segments"]
-    if diarize:
-        segments = split_segments_by_speaker(segments, language)
-    else:
-        segments = [dict(seg, id=i) for i, seg in enumerate(segments)]
-
-    response = {
-        "text": " ".join(seg["text"].strip() for seg in segments if seg.get("text")).strip(),
-        "language": language,
-        "aligned": aligned,
-        "segments": segments,
-    }
-    if diarize:
-        response["speakers"] = list_speakers(segments)
-        response["text_with_speakers"] = format_speaker_transcript(segments, language)
-    return to_builtin(response)
-
 
 def _validate_speaker_hints(num_speakers, min_speakers, max_speakers):
     for name, value in (("num_speakers", num_speakers), ("min_speakers", min_speakers),
@@ -605,109 +61,387 @@ def _validate_speaker_hints(num_speakers, min_speakers, max_speakers):
         raise HTTPException(status_code=400, detail="min_speakers must be <= max_speakers")
 
 
-# ============================================================
-# Transcribe endpoint (with progress tracking)
-# ============================================================
+def _validate_language(language):
+    language = (language or "").strip().lower()
+    if language in ("", "auto"):
+        return None
+    if language not in LANGUAGES:
+        raise HTTPException(status_code=400, detail=f"Unsupported language '{language}'")
+    return language
 
-@app.post("/transcribe")
-async def transcribe(
-    file: UploadFile = File(...),
-    diarize: Optional[bool] = Form(None),
-    num_speakers: Optional[int] = Form(None),
-    min_speakers: Optional[int] = Form(None),
-    max_speakers: Optional[int] = Form(None),
-):
-    """Transcribe uploaded audio with word timestamps, optionally labelling speakers."""
-    diarize = DIARIZE_DEFAULT if diarize is None else diarize
-    _validate_speaker_hints(num_speakers, min_speakers, max_speakers)
-    if diarize and _get_hf_token() is None:
+
+def _require_diarization_token():
+    if hf.get_token() is None:
         raise HTTPException(
             status_code=503,
-            detail="Speaker diarization is not configured: set HF_TOKEN or run `hf auth login` "
-                   "with a Hugging Face token that has accepted the pyannote model terms.",
+            detail="Speaker diarization is not configured: add a Hugging Face token in the web UI, "
+                   "set HF_TOKEN or run `hf auth login` (the token must have accepted the pyannote model terms).",
         )
 
-    tmp_path = await _save_upload(file)
+
+async def _save_upload(file: UploadFile, max_bytes):
+    """Copy the upload to a temporary file in chunks. Returns (path, size)."""
+    suffix = Path(file.filename or "").suffix
+    suffix = suffix if re.fullmatch(r"\.[A-Za-z0-9]{1,10}", suffix or "") else ""
+    fd, path = tempfile.mkstemp(prefix="stt-upload-", suffix=suffix)
+    size = 0
     try:
-        file_size = os.path.getsize(tmp_path)
-        _append_progress(0.0, f"Processing '{file.filename}' ({file_size} bytes)", "transcribe", False)
-
-        _append_progress(0.05, "Decoding audio…", "transcribe", False)
-        audio = await run_in_threadpool(load_audio, tmp_path)
-
-        response = await run_in_threadpool(
-            _run_transcription, audio, diarize, num_speakers, min_speakers, max_speakers,
-        )
-        _append_progress(1.0, "Transcription complete!", "transcribe", True)
-        return response
-
-    except AudioDecodeError as e:
-        _append_progress(0.0, f"Error: {e}", "transcribe", True)
-        raise HTTPException(status_code=400, detail=str(e))
-    except DiarizationUnavailable as e:
-        _append_progress(0.0, f"Error: {e}", "diarize", True)
-        raise HTTPException(status_code=503, detail=str(e))
-    except Exception as e:
-        _append_progress(0.0, f"Error: {e}", "transcribe", True)
-        raise HTTPException(status_code=500, detail=str(e))
-    finally:
-        os.unlink(tmp_path)
+        with os.fdopen(fd, "wb") as out:
+            while chunk := await file.read(UPLOAD_CHUNK):
+                size += len(chunk)
+                if size > max_bytes:
+                    raise HTTPException(status_code=413,
+                                        detail=f"File too large (limit {max_bytes // (1024 * 1024)} MB, "
+                                               f"set WHISPER_MAX_UPLOAD_MB to change it)")
+                out.write(chunk)
+        if size == 0:
+            raise HTTPException(status_code=400, detail="The uploaded file is empty")
+    except BaseException:
+        os.unlink(path)
+        raise
+    return path, size
 
 
-def _run_quick_transcription(audio):
-    """Transcription only (no alignment / diarization), for low-latency use. Blocking."""
-    if not _ensure_model(final=False):
-        raise RuntimeError(f"Failed to load model: {current_model_name}")
-    result = model.transcribe(audio, batch_size=BATCH_SIZE)
+async def _wait(job, poll=0.1):
+    while not job.finished:
+        await asyncio.sleep(poll)
+    return job
+
+
+def _raise_for_job(job):
+    if job.status == "cancelled":
+        raise HTTPException(status_code=409, detail="The job was cancelled")
+    if job.status == "error":
+        raise HTTPException(status_code=http_status_for(job.error["code"]), detail=job.error["message"])
+
+
+def _get_job(request, job_id):
+    job = request.app.state.jobs.get(job_id)
+    if job is None:
+        raise HTTPException(status_code=404, detail="Job not found (it may have expired)")
+    return job
+
+
+def _require_same_origin(request: Request):
+    """Token settings may only be changed from this server's own page, whatever the CORS policy."""
+    origin = request.headers.get("origin")
+    if origin and urlsplit(origin).netloc != request.headers.get("host"):
+        raise HTTPException(status_code=403, detail="Token settings can only be changed from the server's own web UI")
+
+
+def _hf_token_status(settings):
+    token = hf.get_token()
     return {
-        "text": " ".join(seg["text"].strip() for seg in result["segments"]).strip(),
-        "language": result.get("language", "unknown"),
-        "task": "transcribe",
+        "configured": token is not None,
+        "source": hf.token_source(),
+        "masked": hf.mask(token),
+        "diarize_model": settings.diarize_model_name,
+        "model_url": f"https://huggingface.co/{settings.diarize_model_name}",
+        "token_path": str(hf.token_path()),
     }
 
 
-@app.post("/transcribe/streaming")
-async def transcribe_streaming(file: UploadFile = File(...)):
-    """Fast transcription with language detection, skipping alignment and diarization."""
-    tmp_path = await _save_upload(file)
-    try:
-        _append_progress(0.0, f"Streaming: '{file.filename}'", "streaming", False)
-        audio = await run_in_threadpool(load_audio, tmp_path)
-        _append_progress(0.3, "Transcribing (streaming)…", "streaming", False)
-        response = await run_in_threadpool(_run_quick_transcription, audio)
-        _append_progress(1.0, "Streaming transcription complete!", "streaming", True)
-        return response
-    except AudioDecodeError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-    finally:
-        os.unlink(tmp_path)
-
-
 # ============================================================
-# Startup
+# Application
 # ============================================================
 
-@app.on_event("startup")
-async def startup_event():
-    """Pre-download and cache the initial model on server startup."""
-    print(f"\n{'='*60}")
-    print(f"Starting Speech-to-Text server")
-    print(f"Initial model: {current_model_name} on {current_device}")
-    print(f"Model cache dir: {_get_model_cache_dir()}")
-    print(f"Speaker diarization: {'available' if _get_hf_token() else 'disabled (no Hugging Face token)'}")
-    print(f"{'='*60}\n")
+def create_app(settings=None, backend=None):
+    settings = settings or load_settings()
+    ffmpeg_path = system.find_ffmpeg(settings.ffmpeg_path)
+    max_upload_bytes = settings.max_upload_mb * 1024 * 1024
 
-    _clear_progress()
-    _append_progress(0.0, "Loading initial model…", "load", False)
-    success = _ensure_model(current_model_name, current_device)
-    if success:
-        print(f"Whisper model ready: {current_model_name} on {current_device}")
-    else:
-        print(f"Warning: Failed to load initial model {current_model_name}")
+    @asynccontextmanager
+    async def lifespan(app):
+        device = settings.device
+        if device == "cuda" and not await run_in_threadpool(system.cuda_available):
+            log.warning("WHISPER_DEVICE=cuda but CUDA is not available to PyTorch: using the CPU")
+            device = "cpu"
+        else:
+            threading.Thread(target=system.torch_cuda_info, daemon=True).start()  # warm the cache
+
+        manager = JobManager(backend or create_backend(settings, ffmpeg_path), settings.model, device,
+                             settings.job_history)
+        app.state.jobs = manager
+        manager.start()
+
+        log.info("=" * 60)
+        log.info("Speech-to-Text %s on http://%s:%s", __version__, settings.host, settings.port)
+        log.info("Model: %s on %s (worker mode: %s)", settings.model, device, settings.worker_mode)
+        log.info("Model cache dir: %s", model_cache_dir())
+        log.info("ffmpeg: %s", ffmpeg_path or "NOT FOUND (install it or set FFMPEG_PATH)")
+        source = hf.token_source()
+        log.info("Speaker diarization: %s", f"available (token from {source})" if source
+                 else "disabled until a Hugging Face token is added")
+        log.info("=" * 60)
+
+        if settings.preload:
+            manager.submit("load", {"model": settings.model, "device": device})
+        try:
+            yield
+        finally:
+            await run_in_threadpool(manager.stop)
+
+    app = FastAPI(
+        title="Speech-to-Text",
+        description="Voice transcription with speaker diarization powered by WhisperX",
+        version=__version__,
+        lifespan=lifespan,
+    )
+    app.state.settings = settings
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=list(settings.cors_origins),
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+    if STATIC_DIR.is_dir():
+        app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
+
+    @app.exception_handler(Exception)
+    async def unhandled_error(request: Request, exc: Exception):
+        # Always answer JSON, so clients can show the reason instead of a parse error
+        log.error("Unhandled error on %s %s: %r", request.method, request.url.path, exc)
+        return JSONResponse(status_code=500, content={"detail": f"Internal server error: {type(exc).__name__}: {exc}"})
+
+    # -------------------------------------------------------------- UI
+
+    @app.get("/", response_class=HTMLResponse)
+    def index():
+        html = (TEMPLATES_DIR / "index.html").read_text(encoding="utf-8")
+        return HTMLResponse(html.replace("{{version}}", __version__), headers={"Cache-Control": "no-cache"})
+
+    # ---------------------------------------------------------- status
+
+    @app.get("/healthz")
+    def healthz():
+        """Liveness probe: answers as long as the web server runs."""
+        return {"status": "ok"}
+
+    @app.get("/health")
+    def health(request: Request):
+        state = request.app.state.jobs.state()
+        gpus = system.nvidia_gpu_info()
+        status, busy, recommendation = system.gpu_summary(gpus)
+        source = hf.token_source()
+        return {
+            "status": status,
+            "version": __version__,
+            "device": state["device"],
+            "model": state["model"],
+            "model_loaded": state["model_loaded"],
+            "busy": state["busy"],
+            "current_job": state["current_job"],
+            "queued": state["queued"],
+            "torch_cuda": system.torch_cuda_info(),
+            "nvidia_gpu": gpus,
+            "gpu_available_for_model": status == "green",
+            "gpu_busy": busy,
+            "recommendation": recommendation,
+            "ffmpeg_available": ffmpeg_path is not None,
+            "ffmpeg_path": ffmpeg_path,
+            "diarization_available": source is not None,
+            "diarization_loaded": state["diarization_loaded"],
+            "diarize_default": settings.diarize_default,
+            "hf_token_source": source,
+            "valid_models": VALID_MODELS,
+            "valid_devices": VALID_DEVICES,
+            "languages": LANGUAGES,
+            "max_upload_mb": settings.max_upload_mb,
+            "worker_mode": settings.worker_mode,
+        }
+
+    @app.get("/progress")
+    def progress(request: Request):
+        """Latest progress event (model download / load / transcription), for any job."""
+        return request.app.state.jobs.latest_progress()
+
+    # ---------------------------------------------------------- models
+
+    @app.post("/eject")
+    async def eject(request: Request, wait: bool = True):
+        """Unload all models to free GPU / RAM memory (after the running job, if any)."""
+        job = request.app.state.jobs.submit("eject")
+        if not wait:
+            return JSONResponse(status_code=202, content={"status": "queued", "job": job.to_dict()})
+        await _wait(job)
+        _raise_for_job(job)
+        ejected = job.result["ejected"]
+        return {"status": "success" if ejected else "no model was loaded",
+                "message": "Models ejected from memory" if ejected else "No model was loaded"}
+
+    @app.post("/switch-model")
+    async def switch_model(request: Request, body: dict = Body(...)):
+        """Switch the Whisper model and device. Pass `"wait": false` to get a job to poll instead."""
+        jobs = request.app.state.jobs
+        new_model = body.get("model") or jobs.model
+        new_device = body.get("device") or jobs.device
+
+        if new_model not in VALID_MODELS:
+            raise HTTPException(status_code=400, detail=f"Invalid model. Choose from: {VALID_MODELS}")
+        if new_device not in VALID_DEVICES:
+            raise HTTPException(status_code=400, detail=f"Invalid device. Choose from: {VALID_DEVICES}")
+        if new_device == "cuda" and not await run_in_threadpool(system.cuda_available):
+            raise HTTPException(status_code=400, detail="CUDA not available on this system.")
+
+        job = jobs.submit("load", {"model": new_model, "device": new_device})
+        if body.get("wait") is False:
+            return JSONResponse(status_code=202, content={"status": "queued", "job": job.to_dict()})
+        await _wait(job)
+        _raise_for_job(job)
+        return {
+            "status": "success",
+            "model": new_model,
+            "device": new_device,
+            "message": f"Switched to {new_model} on {new_device}",
+        }
+
+    # --------------------------------------------------- transcription
+
+    async def submit_transcription(request, file, diarize, num_speakers, min_speakers, max_speakers,
+                                   language, quick=False):
+        params = {"quick": quick, "language": _validate_language(language)}
+        if not quick:
+            diarize = settings.diarize_default if diarize is None else diarize
+            _validate_speaker_hints(num_speakers, min_speakers, max_speakers)
+            if diarize:
+                _require_diarization_token()
+            params.update(diarize=bool(diarize), num_speakers=num_speakers, min_speakers=min_speakers,
+                          max_speakers=max_speakers)
+        path, size = await _save_upload(file, max_upload_bytes)
+        return request.app.state.jobs.submit("transcribe", params, filename=file.filename, file_size=size,
+                                             audio_path=path)
+
+    @app.post("/transcribe")
+    async def transcribe(
+        request: Request,
+        file: UploadFile = File(...),
+        diarize: Optional[bool] = Form(None),
+        num_speakers: Optional[int] = Form(None),
+        min_speakers: Optional[int] = Form(None),
+        max_speakers: Optional[int] = Form(None),
+        language: Optional[str] = Form(None),
+    ):
+        """Transcribe audio with word timestamps, optionally labelling speakers. Waits for the result."""
+        job = await submit_transcription(request, file, diarize, num_speakers, min_speakers, max_speakers, language)
+        await _wait(job)
+        _raise_for_job(job)
+        return job.result
+
+    @app.post("/transcribe/streaming")
+    async def transcribe_streaming(request: Request, file: UploadFile = File(...),
+                                   language: Optional[str] = Form(None)):
+        """Fast transcription with language detection, skipping alignment and diarization."""
+        job = await submit_transcription(request, file, None, None, None, None, language, quick=True)
+        await _wait(job)
+        _raise_for_job(job)
+        return job.result
+
+    # ------------------------------------------------------------ jobs
+
+    @app.post("/jobs", status_code=202)
+    async def create_job(
+        request: Request,
+        file: UploadFile = File(...),
+        diarize: Optional[bool] = Form(None),
+        num_speakers: Optional[int] = Form(None),
+        min_speakers: Optional[int] = Form(None),
+        max_speakers: Optional[int] = Form(None),
+        language: Optional[str] = Form(None),
+        quick: bool = Form(False),
+    ):
+        """Queue a transcription and return immediately; poll GET /jobs/{id} for progress and result."""
+        job = await submit_transcription(request, file, diarize, num_speakers, min_speakers, max_speakers,
+                                         language, quick)
+        return job.to_dict()
+
+    @app.get("/jobs")
+    def list_jobs(request: Request):
+        return {"jobs": [job.to_dict(include_result=False) for job in request.app.state.jobs.list()]}
+
+    @app.get("/jobs/{job_id}")
+    def get_job(request: Request, job_id: str):
+        return _get_job(request, job_id).to_dict()
+
+    @app.post("/jobs/{job_id}/cancel")
+    def cancel_job(request: Request, job_id: str):
+        _get_job(request, job_id)
+        return request.app.state.jobs.cancel(job_id).to_dict()
+
+    @app.get("/jobs/{job_id}/export")
+    def export_job(request: Request, job_id: str, format: str = Query("txt")):
+        job = _get_job(request, job_id)
+        if format not in EXPORT_FORMATS:
+            raise HTTPException(status_code=400, detail=f"Unknown format. Choose from: {list(EXPORT_FORMATS)}")
+        if job.kind != "transcribe" or job.status != "done":
+            raise HTTPException(status_code=409, detail="This job has no transcription to export")
+        if format in ("srt", "vtt") and not job.result.get("segments"):
+            raise HTTPException(status_code=409, detail="Quick transcriptions have no timestamps to export")
+        stem = re.sub(r"[^\w.-]+", "_", Path(job.filename or "transcription").stem)[:80] or "transcription"
+        return Response(
+            export(job.result, format),
+            media_type=EXPORT_FORMATS[format],
+            headers={"Content-Disposition": f'attachment; filename="{stem}.{format}"'},
+        )
+
+    # -------------------------------------------------------- settings
+
+    @app.get("/settings/hf-token")
+    def get_hf_token():
+        """Whether a Hugging Face token is configured (the token itself is never returned)."""
+        return _hf_token_status(settings)
+
+    @app.put("/settings/hf-token")
+    async def put_hf_token(request: Request, body: dict = Body(...)):
+        """Verify and save a Hugging Face token (used for speaker identification)."""
+        _require_same_origin(request)
+        token = str(body.get("token") or "").strip()
+        if not re.fullmatch(r"[A-Za-z0-9_\-]{8,512}", token):
+            raise HTTPException(status_code=400, detail="This does not look like a Hugging Face token "
+                                                        "(expected something like hf_xxxxxxxx).")
+        check = None
+        if body.get("verify", True):
+            check = await run_in_threadpool(hf.check_token, token, settings.diarize_model_name)
+            if check["valid"] is False:
+                raise HTTPException(status_code=400, detail=check["message"])
+        await run_in_threadpool(hf.save_token, token)
+        status = _hf_token_status(settings)
+        warning = None
+        if status["source"] == "env":
+            warning = ("The token was saved, but the HF_TOKEN environment variable is set and takes "
+                       "precedence. Unset it to use the saved token.")
+        return {**status, "saved": True, "check": check, "warning": warning}
+
+    @app.delete("/settings/hf-token")
+    async def delete_hf_token(request: Request):
+        """Remove the saved Hugging Face token."""
+        _require_same_origin(request)
+        removed = await run_in_threadpool(hf.delete_token)
+        status = _hf_token_status(settings)
+        warning = None
+        if status["source"] == "env":
+            warning = "The HF_TOKEN environment variable is still set: speaker identification stays enabled."
+        return {**status, "removed": removed, "warning": warning}
+
+    @app.post("/settings/hf-token/check")
+    async def check_hf_token(request: Request):
+        """Check the configured token against the Hub (validity and access to the diarization model)."""
+        _require_same_origin(request)
+        token = hf.get_token()
+        if token is None:
+            raise HTTPException(status_code=404, detail="No Hugging Face token is configured")
+        check = await run_in_threadpool(hf.check_token, token, settings.diarize_model_name)
+        return {**_hf_token_status(settings), "check": check}
+
+    return app
+
+
+if not logging.getLogger().handlers:
+    logging.basicConfig(level=os.getenv("WHISPER_LOG_LEVEL", "INFO").upper(),
+                        format="%(asctime)s %(levelname)s %(name)s: %(message)s")
+
+app = create_app()
 
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=int(os.getenv("WHISPER_PORT", "8081")))
+    uvicorn.run(app, host=app.state.settings.host, port=app.state.settings.port)
