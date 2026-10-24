@@ -4,8 +4,8 @@ build
 numpy
 fastapi==0.115.6
 uvicorn[standard]==0.34.0
-openai-whisper==20250625
-torch
+# WhisperX brings faster-whisper, pyannote.audio and pins torch/torchaudio ~= 2.8
+whisperx==3.8.6
 python-multipart==0.0.20
 ffmpeg-python==0.2.0
 edge-tts==7.0.0

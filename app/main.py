@@ -1,17 +1,24 @@
+import gc
 import os
-import sys
-import time
-import hashlib
-import json
 import threading
 import tempfile
 import subprocess
-from pathlib import Path
-from fastapi import FastAPI, UploadFile, File, HTTPException, Body
-from fastapi.responses import HTMLResponse, JSONResponse
+from typing import Optional
+
+import numpy as np
+from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Body
+from fastapi.concurrency import run_in_threadpool
+from fastapi.responses import HTMLResponse
 from fastapi.middleware.cors import CORSMiddleware
 
-app = FastAPI(title="Speech-to-Text", description="Voice transcription powered by OpenAI Whisper")
+from app.speakers import (
+    split_segments_by_speaker,
+    list_speakers,
+    format_speaker_transcript,
+    to_builtin,
+)
+
+app = FastAPI(title="Speech-to-Text", description="Voice transcription with speaker diarization powered by WhisperX")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -19,13 +26,33 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+SAMPLE_RATE = 16000
+
+VALID_MODELS = ["tiny", "base", "small", "medium", "large", "large-v2", "large-v3", "large-v3-turbo"]
+VALID_DEVICES = ["cpu", "cuda"]
+
+
+def _env_bool(name, default=False):
+    return os.getenv(name, str(default)).strip().lower() in ("1", "true", "yes", "on")
+
+
+HF_TOKEN = os.getenv("HF_TOKEN") or None
+DIARIZE_DEFAULT = _env_bool("WHISPER_DIARIZE", False)
+DIARIZE_MODEL = os.getenv("WHISPER_DIARIZE_MODEL") or None  # None = whisperx default (pyannote community-1)
+BATCH_SIZE = int(os.getenv("WHISPER_BATCH_SIZE", "16"))
+
 # ============================================================
 # Global state
 # ============================================================
-model = None
+model = None  # whisperx FasterWhisperPipeline
 model_lock = threading.Lock()
 current_model_name = os.getenv("WHISPER_MODEL", "base")
 current_device = os.getenv("WHISPER_DEVICE", "cpu")
+
+# Auxiliary models, loaded lazily on current_device
+align_models: dict = {}  # language -> (align_model, metadata)
+diarize_model = None
+aux_lock = threading.Lock()
 
 # --- Progress tracking ---
 # A shared event queue that allows polling from the frontend
@@ -58,19 +85,40 @@ def _clear_progress():
 # GPU model eject
 # ============================================================
 
+def _free_device_memory():
+    gc.collect()
+    try:
+        import torch
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+    except ImportError:
+        pass
+
+
+def _unload_aux_models():
+    """Drop alignment and diarization models. Returns True if any were loaded."""
+    global diarize_model
+    with aux_lock:
+        had_models = bool(align_models) or diarize_model is not None
+        align_models.clear()
+        diarize_model = None
+    return had_models
+
+
 def _eject_models():
-    """Unload all Whisper models from GPU to free VRAM. Thread-safe."""
-    global model, current_model_name, current_device
+    """Unload Whisper, alignment and diarization models to free VRAM. Thread-safe.
+
+    The model name and device are kept so the next transcription reloads them.
+    """
+    global model
     with model_lock:
-        if model is not None:
-            # Move model to CPU then delete to free GPU memory
-            model.cpu()
-            del model
-            model = None
-            current_model_name = None
-            current_device = None
-            _clear_progress()
-            return True
+        had_model = model is not None
+        model = None
+    had_aux = _unload_aux_models()
+    if had_model or had_aux:
+        _free_device_memory()
+        _clear_progress()
+        return True
     return False
 
 
@@ -138,9 +186,14 @@ def _check_torch_cuda():
 
 
 def _get_model_cache_dir():
-    """Return the Whisper model cache directory."""
+    """Return the Whisper (CTranslate2) model cache directory."""
     xdg = os.getenv("XDG_CACHE_HOME", os.path.join(os.path.expanduser("~"), ".cache"))
     return os.path.join(xdg, "whisper")
+
+
+def _get_compute_type(device):
+    """CTranslate2 compute type: WHISPER_COMPUTE_TYPE, else float16 on GPU and int8 on CPU."""
+    return os.getenv("WHISPER_COMPUTE_TYPE") or ("float16" if device == "cuda" else "int8")
 
 
 # ============================================================
@@ -149,114 +202,85 @@ def _get_model_cache_dir():
 
 def _predownload_model(model_name: str, download_root: str):
     """
-    Force-download a Whisper model and keep it cached.
+    Download a faster-whisper (CTranslate2) model from the Hugging Face Hub and keep it cached.
     Reports progress via _append_progress.
-    Returns (checkpoint_path, file_size, cached_size) or (None, None, None) on error.
+    Returns (model_path, 0, cached_size) or (None, None, None) on error.
     """
-    import whisper
+    from faster_whisper.utils import available_models, download_model
 
-    cache_dir = _get_model_cache_dir()
-    os.makedirs(cache_dir, exist_ok=True)
-
-    if model_name not in whisper._MODELS:
+    if model_name not in available_models():
         return None, None, None
 
-    url = whisper._MODELS[model_name]
-    expected_hash = ""  # hash not stored in whisper._MODELS (dict of str)
-    filename = url.split("/")[-1]
-    checkpoint_path = os.path.join(cache_dir, filename)
-
-    # Already cached? (skip hash check since it's not available)
-    if os.path.exists(checkpoint_path):
-        file_size = os.path.getsize(checkpoint_path)
-        return checkpoint_path, 0, file_size
-
-    _append_progress(0.0, f"Downloading Whisper model '{model_name}'", "download", False)
+    os.makedirs(download_root, exist_ok=True)
 
     try:
-        import urllib.request
+        # Cached already? Avoid touching the network.
+        model_path = download_model(model_name, cache_dir=download_root, local_files_only=True)
+    except Exception:
+        _append_progress(0.0, f"Downloading Whisper model '{model_name}'", "download", False)
+        try:
+            model_path = download_model(model_name, cache_dir=download_root)
+        except Exception as e:
+            print(f"[Failed to pre-download {model_name}: {e}]")
+            _append_progress(0.0, f"Failed to download model '{model_name}': {e}", "download", False)
+            return None, None, None
+        _append_progress(1.0, f"Model '{model_name}' cached at {model_path}", "download", False)
+        print(f"[Model {model_name} cached at {model_path}]")
 
-        tmp_path = checkpoint_path + ".tmp"
-        with urllib.request.urlopen(url, timeout=60) as response:
-            total = int(response.headers.get("Content-Length", 0))
-            downloaded = 0
-            with open(tmp_path, "wb") as f:
-                while True:
-                    chunk = response.read(8192)
-                    if not chunk:
-                        break
-                    f.write(chunk)
-                    downloaded += len(chunk)
-                    pct = downloaded / total if total else 0
-                    _append_progress(pct,
-                                     f"Downloading '{model_name}': {downloaded}/{total} bytes ({pct*100:.1f}%)",
-                                     "download", False)
-
-        os.replace(tmp_path, checkpoint_path)
-        file_size = os.path.getsize(checkpoint_path)
-        _append_progress(1.0, f"Model '{model_name}' cached at {checkpoint_path}", "download", True)
-        print(f"[Model {model_name} cached at {checkpoint_path}]")
-        return checkpoint_path, 0, file_size
-
-    except Exception as e:
-        print(f"[Failed to pre-download {model_name}: {e}]")
-        tmp_path = checkpoint_path + ".tmp"
-        if os.path.exists(tmp_path):
-            os.unlink(tmp_path)
-        return None, None, None
+    cached_size = sum(
+        os.path.getsize(os.path.join(root, f))
+        for root, _, files in os.walk(model_path) for f in files
+    )
+    return model_path, 0, cached_size
 
 
 # ============================================================
 # Model loading with progress reporting
 # ============================================================
 
-def _ensure_model(name=None, device=None):
-    """Load or switch to the requested Whisper model. Thread-safe. Reports progress."""
+def _ensure_model(name=None, device=None, final=True):
+    """Load or switch to the requested Whisper model. Thread-safe. Reports progress.
+
+    `final=False` keeps the "ready" event from being marked done, for loads that
+    happen in the middle of a transcription.
+    """
     global model, current_model_name, current_device
     name = name or current_model_name
     device = device or current_device
+
+    if device == "cuda":
+        import torch
+        if not torch.cuda.is_available():
+            device = "cpu"
 
     with model_lock:
         if model is not None and current_model_name == name and current_device == device:
             return True
 
-        if model is not None:
-            del model
-            model = None
+        model = None
+        if device != current_device:
+            # Alignment / diarization models live on the old device
+            _unload_aux_models()
+        _free_device_memory()
 
-        if device == "cuda":
-            import torch
-            if not torch.cuda.is_available():
-                device = "cpu"
-
-        _append_progress(0.1, f"Loading model '{name}' on {device}", "load", False)
+        compute_type = _get_compute_type(device)
+        _append_progress(0.1, f"Loading model '{name}' on {device} ({compute_type})", "load", False)
 
         try:
-            result = _predownload_model(name, _get_model_cache_dir())
-            if result[0]:
-                checkpoint_path, _, _ = result
-                import torch
-                import whisper
+            import whisperx
 
-                if name in whisper._MODELS:
-                    _append_progress(0.5, "Loading weights into model…", "load", False)
-
-                    kwargs = {"weights_only": True} if torch.__version__ >= "1.13" else {}
-                    checkpoint = torch.load(checkpoint_path, map_location=device, **kwargs)
-
-                    dims = whisper.ModelDimensions(**checkpoint["dims"])
-                    model = whisper.Whisper(dims)
-                    model.load_state_dict(checkpoint["model_state_dict"])
-
-                    alignment_heads = whisper._ALIGNMENT_HEADS.get(name)
-                    if alignment_heads is not None:
-                        model.set_alignment_heads(alignment_heads)
-
-                    model = model.to(device)
-                    current_model_name = name
-                    current_device = device
-                    _append_progress(1.0, f"Model '{name}' ready on {device}", "load", True)
-                    return True
+            model_path, _, _ = _predownload_model(name, _get_model_cache_dir())
+            _append_progress(0.5, "Loading weights into model…", "load", False)
+            model = whisperx.load_model(
+                model_path or name,
+                device,
+                compute_type=compute_type,
+                download_root=_get_model_cache_dir(),
+            )
+            current_model_name = name
+            current_device = device
+            _append_progress(1.0, f"Model '{name}' ready on {device}", "load", final)
+            return True
         except Exception as e:
             print(f"Error loading model {name}: {e}")
             import traceback
@@ -264,14 +288,40 @@ def _ensure_model(name=None, device=None):
             _append_progress(0.0, f"Failed to load model: {e}", "load", True)
             return False
 
-        # Fallback
-        _append_progress(0.3, "Using Whisper built-in loader (fallback)", "load", False)
-        import whisper
-        model = whisper.load_model(name, device=device)
-        current_model_name = name
-        current_device = device
-        _append_progress(1.0, f"Model '{name}' ready on {device}", "load", True)
-        return True
+
+def _get_align_model(language):
+    """Return a cached (align_model, metadata) for `language`, or None if unsupported."""
+    with aux_lock:
+        if language not in align_models:
+            import whisperx
+            try:
+                align_models[language] = whisperx.load_align_model(language_code=language, device=current_device)
+            except ValueError as e:
+                # No default wav2vec2 alignment model for this language
+                print(f"[Alignment unavailable for '{language}': {e}]")
+                align_models[language] = None
+        return align_models[language]
+
+
+class DiarizationUnavailable(RuntimeError):
+    """Speaker diarization requested but the pipeline cannot be used."""
+
+
+def _get_diarize_model():
+    """Return the cached pyannote diarization pipeline, loading it on first use."""
+    global diarize_model
+    with aux_lock:
+        if diarize_model is None:
+            from whisperx.diarize import DiarizationPipeline
+            try:
+                diarize_model = DiarizationPipeline(model_name=DIARIZE_MODEL, token=HF_TOKEN, device=current_device)
+            except Exception as e:
+                name = DIARIZE_MODEL or "pyannote/speaker-diarization-community-1"
+                raise DiarizationUnavailable(
+                    f"Could not load diarization model '{name}': {e}. "
+                    f"Check HF_TOKEN and accept the model terms at https://huggingface.co/{name}"
+                ) from e
+        return diarize_model
 
 
 # ============================================================
@@ -316,6 +366,9 @@ def get_health_info():
         "recommendation": recommendation,
         "ffmpeg_available": ffmpeg_path is not None,
         "ffmpeg_path": ffmpeg_path,
+        "diarization_available": HF_TOKEN is not None,
+        "diarization_loaded": diarize_model is not None,
+        "diarize_default": DIARIZE_DEFAULT,
     }
 
 
@@ -344,7 +397,7 @@ FFMPEG_PATH = _get_ffmpeg_path()
 if FFMPEG_PATH:
     print(f"ffmpeg found at: {FFMPEG_PATH}")
 else:
-    print("Warning: ffmpeg not found, will rely on librosa for audio loading")
+    print("Warning: ffmpeg not found, falling back to 'ffmpeg' on PATH for audio decoding")
 
 
 # ============================================================
@@ -389,13 +442,11 @@ async def switch_model(request: dict = Body(...)):
     new_model = request.get("model", current_model_name)
     new_device = request.get("device", current_device)
 
-    valid_models = ["tiny", "base", "small", "medium", "large", "large-v3"]
-    if new_model not in valid_models:
-        raise HTTPException(status_code=400, detail=f"Invalid model. Choose from: {valid_models}")
+    if new_model not in VALID_MODELS:
+        raise HTTPException(status_code=400, detail=f"Invalid model. Choose from: {VALID_MODELS}")
 
-    valid_devices = ["cpu", "cuda"]
-    if new_device not in valid_devices:
-        raise HTTPException(status_code=400, detail=f"Invalid device. Choose from: {valid_devices}")
+    if new_device not in VALID_DEVICES:
+        raise HTTPException(status_code=400, detail=f"Invalid device. Choose from: {VALID_DEVICES}")
 
     if new_device == "cuda":
         import torch
@@ -407,9 +458,9 @@ async def switch_model(request: dict = Body(...)):
     _clear_progress()
 
     try:
-        success = _ensure_model(new_model, new_device)
+        success = await run_in_threadpool(_ensure_model, new_model, new_device)
         if not success:
-            raise HTTPException(status_code=500, detail=f"Failed to load model: {current_model_name}")
+            raise HTTPException(status_code=500, detail=f"Failed to load model: {new_model}")
 
         return {
             "status": "success",
@@ -424,28 +475,122 @@ async def switch_model(request: dict = Body(...)):
 
 
 # ============================================================
-# Audio conversion
+# Audio decoding
 # ============================================================
 
-def convert_audio_to_wav(tmp_path):
-    """Convert uploaded audio to WAV using ffmpeg."""
-    ext = os.path.splitext(tmp_path)[1].lower()
-    if ext in ('.wav', '.wave'):
-        return tmp_path, ext
+class AudioDecodeError(ValueError):
+    """The uploaded file could not be decoded as audio."""
 
-    if FFMPEG_PATH:
-        try:
-            wav_path = tmp_path + ".wav"
-            result = subprocess.run(
-                [FFMPEG_PATH, "-y", "-i", tmp_path, wav_path],
-                capture_output=True, text=True, timeout=30,
-            )
-            if result.returncode == 0 and os.path.exists(wav_path):
-                return wav_path, ".wav"
-        except (FileNotFoundError, subprocess.TimeoutExpired):
-            pass
 
-    return tmp_path, ext
+def load_audio(path):
+    """Decode any ffmpeg-supported file to a 16 kHz mono float32 waveform.
+
+    The same array is shared by transcription, alignment and diarization,
+    so the file is only decoded once.
+    """
+    cmd = [
+        FFMPEG_PATH or "ffmpeg", "-nostdin", "-threads", "0", "-i", path,
+        "-f", "s16le", "-ac", "1", "-acodec", "pcm_s16le", "-ar", str(SAMPLE_RATE), "-",
+    ]
+    try:
+        result = subprocess.run(cmd, capture_output=True, check=True, timeout=300)
+    except FileNotFoundError as e:
+        raise RuntimeError("ffmpeg not found: install it or set FFMPEG_PATH") from e
+    except subprocess.CalledProcessError as e:
+        stderr = e.stderr.decode(errors="replace").strip().splitlines()
+        raise AudioDecodeError(f"Could not decode audio: {stderr[-1] if stderr else e}") from e
+
+    audio = np.frombuffer(result.stdout, np.int16).flatten().astype(np.float32) / 32768.0
+    if audio.size == 0:
+        raise AudioDecodeError("Could not decode audio: file contains no audio samples")
+    return audio
+
+
+async def _save_upload(file: UploadFile):
+    with tempfile.NamedTemporaryFile(suffix=os.path.splitext(file.filename or "")[1], delete=False) as tmp:
+        tmp.write(await file.read())
+        return tmp.name
+
+
+# ============================================================
+# Transcription pipeline
+# ============================================================
+
+def _progress_range(start, end, message, stage):
+    """Map a whisperx 0-100 progress callback onto [start, end] of the overall progress."""
+    def callback(pct):
+        _append_progress(start + (end - start) * min(pct, 100.0) / 100.0,
+                         f"{message} ({pct:.0f}%)", stage, False)
+    return callback
+
+
+def _run_transcription(audio, diarize=False, num_speakers=None, min_speakers=None, max_speakers=None):
+    """Transcribe, align and optionally diarize a 16 kHz waveform. Blocking."""
+    import whisperx
+
+    if not _ensure_model(final=False):
+        raise RuntimeError(f"Failed to load model: {current_model_name}")
+    asr_model = model
+
+    # Phase 1: Transcribe (VAD-batched faster-whisper)
+    _append_progress(0.1, "Running Whisper transcription…", "transcribe", False)
+    result = asr_model.transcribe(
+        audio,
+        batch_size=BATCH_SIZE,
+        progress_callback=_progress_range(0.1, 0.5, "Transcribing", "transcribe"),
+    )
+    language = result.get("language", "unknown")
+
+    # Phase 2: Word-level alignment (wav2vec2)
+    aligned = False
+    align = _get_align_model(language) if result["segments"] else None
+    if align is not None:
+        _append_progress(0.5, f"Aligning words ({language})…", "align", False)
+        align_model, align_metadata = align
+        result = whisperx.align(
+            result["segments"], align_model, align_metadata, audio, current_device,
+            return_char_alignments=False,
+            progress_callback=_progress_range(0.5, 0.65, "Aligning words", "align"),
+        )
+        aligned = True
+
+    # Phase 3: Speaker diarization (pyannote)
+    if diarize and result["segments"]:
+        _append_progress(0.65, "Identifying speakers…", "diarize", False)
+        diarize_segments = _get_diarize_model()(
+            audio,
+            num_speakers=num_speakers,
+            min_speakers=min_speakers,
+            max_speakers=max_speakers,
+            progress_callback=_progress_range(0.65, 0.95, "Identifying speakers", "diarize"),
+        )
+        result = whisperx.assign_word_speakers(diarize_segments, result, fill_nearest=True)
+
+    segments = result["segments"]
+    if diarize:
+        segments = split_segments_by_speaker(segments, language)
+    else:
+        segments = [dict(seg, id=i) for i, seg in enumerate(segments)]
+
+    response = {
+        "text": " ".join(seg["text"].strip() for seg in segments if seg.get("text")).strip(),
+        "language": language,
+        "aligned": aligned,
+        "segments": segments,
+    }
+    if diarize:
+        response["speakers"] = list_speakers(segments)
+        response["text_with_speakers"] = format_speaker_transcript(segments, language)
+    return to_builtin(response)
+
+
+def _validate_speaker_hints(num_speakers, min_speakers, max_speakers):
+    for name, value in (("num_speakers", num_speakers), ("min_speakers", min_speakers),
+                        ("max_speakers", max_speakers)):
+        if value is not None and value < 1:
+            raise HTTPException(status_code=400, detail=f"{name} must be >= 1")
+    if min_speakers is not None and max_speakers is not None and min_speakers > max_speakers:
+        raise HTTPException(status_code=400, detail="min_speakers must be <= max_speakers")
 
 
 # ============================================================
@@ -453,79 +598,79 @@ def convert_audio_to_wav(tmp_path):
 # ============================================================
 
 @app.post("/transcribe")
-async def transcribe(file: UploadFile = File(...)):
-    """Transcribe uploaded audio file with progress tracking."""
-    try:
-        # Save uploaded file
-        with tempfile.NamedTemporaryFile(suffix=os.path.splitext(file.filename)[1], delete=False) as tmp:
-            content = await file.read()
-            tmp.write(content)
-            tmp_path = tmp.name
+async def transcribe(
+    file: UploadFile = File(...),
+    diarize: Optional[bool] = Form(None),
+    num_speakers: Optional[int] = Form(None),
+    min_speakers: Optional[int] = Form(None),
+    max_speakers: Optional[int] = Form(None),
+):
+    """Transcribe uploaded audio with word timestamps, optionally labelling speakers."""
+    diarize = DIARIZE_DEFAULT if diarize is None else diarize
+    _validate_speaker_hints(num_speakers, min_speakers, max_speakers)
+    if diarize and HF_TOKEN is None:
+        raise HTTPException(
+            status_code=503,
+            detail="Speaker diarization is not configured: set HF_TOKEN to a Hugging Face token "
+                   "that has accepted the pyannote model terms.",
+        )
 
+    tmp_path = await _save_upload(file)
+    try:
         file_size = os.path.getsize(tmp_path)
         _append_progress(0.0, f"Processing '{file.filename}' ({file_size} bytes)", "transcribe", False)
 
-        # Phase 1: Convert
-        _append_progress(0.1, "Converting audio format…", "transcribe", False)
-        processed_path, _ = convert_audio_to_wav(tmp_path)
-        _append_progress(0.25, "Analyzing audio…", "transcribe", False)
+        _append_progress(0.05, "Decoding audio…", "transcribe", False)
+        audio = await run_in_threadpool(load_audio, tmp_path)
 
-        # Phase 2: Transcribe with progress callback
-        _append_progress(0.35, "Running Whisper transcription…", "transcribe", False)
-
-        result = model.transcribe(
-            processed_path,
-            fp16=(current_device == "cuda"),
+        response = await run_in_threadpool(
+            _run_transcription, audio, diarize, num_speakers, min_speakers, max_speakers,
         )
-
-        # Mark complete
-        _append_progress(0.95, "Processing segments…", "transcribe", False)
         _append_progress(1.0, "Transcription complete!", "transcribe", True)
+        return response
 
-        os.unlink(tmp_path)
-        if processed_path != tmp_path:
-            os.unlink(processed_path)
-
-        return {
-            "text": result["text"],
-            "language": result.get("language", "unknown"),
-            "segments": result.get("segments", []),
-        }
-
+    except AudioDecodeError as e:
+        _append_progress(0.0, f"Error: {e}", "transcribe", True)
+        raise HTTPException(status_code=400, detail=str(e))
+    except DiarizationUnavailable as e:
+        _append_progress(0.0, f"Error: {e}", "diarize", True)
+        raise HTTPException(status_code=503, detail=str(e))
     except Exception as e:
         _append_progress(0.0, f"Error: {e}", "transcribe", True)
         raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        os.unlink(tmp_path)
+
+
+def _run_quick_transcription(audio):
+    """Transcription only (no alignment / diarization), for low-latency use. Blocking."""
+    if not _ensure_model(final=False):
+        raise RuntimeError(f"Failed to load model: {current_model_name}")
+    result = model.transcribe(audio, batch_size=BATCH_SIZE)
+    return {
+        "text": " ".join(seg["text"].strip() for seg in result["segments"]).strip(),
+        "language": result.get("language", "unknown"),
+        "task": "transcribe",
+    }
 
 
 @app.post("/transcribe/streaming")
 async def transcribe_streaming(file: UploadFile = File(...)):
-    """Return partial results in real-time."""
+    """Fast transcription with language detection, skipping alignment and diarization."""
+    tmp_path = await _save_upload(file)
     try:
-        with tempfile.NamedTemporaryFile(suffix=os.path.splitext(file.filename)[1], delete=False) as tmp:
-            content = await file.read()
-            tmp.write(content)
-            tmp_path = tmp.name
-
         _append_progress(0.0, f"Streaming: '{file.filename}'", "streaming", False)
-        processed_path, _ = convert_audio_to_wav(tmp_path)
+        audio = await run_in_threadpool(load_audio, tmp_path)
         _append_progress(0.3, "Transcribing (streaming)…", "streaming", False)
-
-        audio = model.load_audio(processed_path)
-        language = model.detect_language(audio)
-        result = model.transcribe(processed_path, fp16=(current_device == "cuda"))
+        response = await run_in_threadpool(_run_quick_transcription, audio)
         _append_progress(1.0, "Streaming transcription complete!", "streaming", True)
-
-        os.unlink(tmp_path)
-        if processed_path != tmp_path:
-            os.unlink(processed_path)
-
-        return {
-            "text": result["text"],
-            "language": language.language,
-            "task": "transcribe",
-        }
+        return response
+    except AudioDecodeError as e:
+        raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        os.unlink(tmp_path)
 
 
 # ============================================================
@@ -539,6 +684,7 @@ async def startup_event():
     print(f"Starting Speech-to-Text server")
     print(f"Initial model: {current_model_name} on {current_device}")
     print(f"Model cache dir: {_get_model_cache_dir()}")
+    print(f"Speaker diarization: {'available' if HF_TOKEN else 'disabled (HF_TOKEN not set)'}")
     print(f"{'='*60}\n")
 
     _clear_progress()
