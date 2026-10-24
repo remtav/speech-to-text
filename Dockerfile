@@ -19,12 +19,17 @@ RUN python -m nltk.downloader -d /usr/local/share/nltk_data punkt_tab
 
 COPY app/ ./app/
 COPY templates/ ./templates/
+COPY static/ ./static/
 
 ENV WHISPER_MODEL=base
+ENV WHISPER_PORT=8081
 ENV PYTHONUNBUFFERED=1
 # CTranslate2 (faster-whisper) loads cuDNN/cuBLAS from the pip-installed NVIDIA wheels
 ENV LD_LIBRARY_PATH=/usr/local/lib/python3.12/site-packages/nvidia/cudnn/lib:/usr/local/lib/python3.12/site-packages/nvidia/cublas/lib
 
-EXPOSE 8000
+EXPOSE 8081
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=60s --retries=3 \
+    CMD python -c "import os, urllib.request; urllib.request.urlopen('http://127.0.0.1:%s/healthz' % os.getenv('WHISPER_PORT', '8081'), timeout=4)"
 
 CMD ["python", "-m", "app.main"]

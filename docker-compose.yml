@@ -1,17 +1,18 @@
-version: "3.8"
-
 services:
   speech-to-text:
     build: .
     ports:
-      - "8000:8000"
+      - "8081:8081"
     environment:
       - WHISPER_MODEL=base
-      # Speaker diarization: Hugging Face token with the pyannote model terms accepted
+      - WHISPER_PORT=8081
+      # Speaker diarization: Hugging Face token with the pyannote model terms accepted.
+      # Optional: the token can also be added from the web UI (saved in the model-cache volume).
       - HF_TOKEN=${HF_TOKEN:-}
       - WHISPER_DIARIZE=${WHISPER_DIARIZE:-false}
     volumes:
       - model-cache:/root/.cache
+    restart: unless-stopped
     deploy:
       resources:
         reservations:

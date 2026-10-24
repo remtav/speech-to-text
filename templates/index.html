@@ -4,371 +4,32 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Speech to Text — WhisperX</title>
-    <style>
-        :root {
-            --bg: #0f0f0f;
-            --surface: #1a1a2e;
-            --primary: #e94560;
-            --primary-hover: #ff6b6b;
-            --text: #eee;
-            --text-muted: #888;
-            --border: #333;
-        }
-        * { margin:0; padding:0; box-sizing:border-box; }
-        body {
-            font-family: 'Segoe UI', system-ui, sans-serif;
-            background: var(--bg);
-            color: var(--text);
-            min-height: 100vh;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            padding: 2rem 1rem;
-        }
-        h1 {
-            font-size: 2.5rem;
-            margin-bottom: .5rem;
-            background: linear-gradient(135deg, var(--primary), #ff9a76);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-        }
-        .subtitle {
-            color: var(--text-muted);
-            margin-bottom: 2rem;
-        }
-        .container {
-            max-width: 800px;
-            width: 100%;
-        }
-        .card {
-            background: var(--surface);
-            border: 1px solid var(--border);
-            border-radius: 16px;
-            padding: 2rem;
-            margin-bottom: 1.5rem;
-        }
-        .card h2 { margin-bottom: 1rem; font-size: 1.2rem; }
-        .mode-selector {
-            display: flex;
-            gap: 1rem;
-            margin-bottom: 1.5rem;
-        }
-        .mode-btn {
-            flex: 1;
-            padding: .8rem;
-            border: 2px solid var(--border);
-            background: transparent;
-            color: var(--text);
-            border-radius: 10px;
-            cursor: pointer;
-            font-size: 1rem;
-            transition: all .2s;
-        }
-        .mode-btn.active {
-            border-color: var(--primary);
-            background: rgba(233,69,96,.1);
-        }
-        .mode-btn:hover { border-color: var(--primary-hover); }
-
-        .record-btn {
-            width: 120px;
-            height: 120px;
-            border-radius: 50%;
-            border: none;
-            background: var(--primary);
-            color: white;
-            font-size: .9rem;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all .2s;
-            box-shadow: 0 0 30px rgba(233,69,96,.4);
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            gap: .3rem;
-        }
-        .record-btn:hover { background: var(--primary-hover); transform: scale(1.05); }
-        .record-btn.recording {
-            background: #444;
-            animation: pulse 1.5s infinite;
-            box-shadow: 0 0 40px rgba(233,69,96,.6);
-        }
-        @keyframes pulse {
-            0%, 100% { box-shadow: 0 0 30px rgba(233,69,96,.4); }
-            50% { box-shadow: 0 0 60px rgba(233,69,96,.8); }
-        }
-        .record-btn .icon { font-size: 2rem; }
-
-        .file-drop {
-            border: 2px dashed var(--border);
-            border-radius: 12px;
-            padding: 3rem 2rem;
-            text-align: center;
-            cursor: pointer;
-            transition: all .2s;
-        }
-        .file-drop:hover, .file-drop.dragover {
-            border-color: var(--primary);
-            background: rgba(233,69,96,.05);
-        }
-        .file-drop input { display: none; }
-        .file-drop .icon { font-size: 3rem; margin-bottom: .5rem; }
-
-        .model-select {
-            background: var(--bg);
-            color: var(--text);
-            border: 1px solid var(--border);
-            padding: .6rem 1rem;
-            border-radius: 8px;
-            font-size: 1rem;
-            margin-bottom: 1rem;
-            width: 100%;
-        }
-        select, button { outline: none; }
-
-        .output-box {
-            background: var(--bg);
-            border: 1px solid var(--border);
-            border-radius: 12px;
-            padding: 1.5rem;
-            min-height: 150px;
-            white-space: pre-wrap;
-            line-height: 1.6;
-            font-size: 1.05rem;
-            position: relative;
-            max-height: 600px;
-            overflow-y: auto;
-        }
-        .output-box.placeholder {
-            color: var(--text-muted);
-            font-style: italic;
-        }
-        .copy-btn {
-            position: absolute;
-            top: .8rem;
-            right: .8rem;
-            background: var(--surface);
-            border: 1px solid var(--border);
-            color: var(--text);
-            padding: .4rem .8rem;
-            border-radius: 6px;
-            cursor: pointer;
-            font-size: .85rem;
-            opacity: 0;
-            transition: opacity .2s;
-        }
-        .output-box:hover .copy-btn { opacity: 1; }
-        .copy-btn:hover { background: var(--primary); border-color: var(--primary); }
-
-        /* --- Progress bar for model loading & transcription --- */
-        .progress-card {
-            background: var(--surface);
-            border: 1px solid var(--border);
-            border-radius: 12px;
-            padding: 1rem 1.5rem;
-            margin-bottom: 1.5rem;
-            display: none;
-        }
-        .progress-card.active { display: block; }
-        .progress-card .progress-stage {
-            font-size: .9rem;
-            color: var(--text-muted);
-            margin-bottom: .5rem;
-            display: flex;
-            align-items: center;
-            gap: .5rem;
-        }
-        .progress-card .progress-stage .spinner-sm {
-            width: 16px;
-            height: 16px;
-            border: 2px solid var(--border);
-            border-top-color: var(--primary);
-            border-radius: 50%;
-            animation: spin .8s linear infinite;
-            flex-shrink: 0;
-        }
-        .progress-card .progress-bar-bg {
-            width: 100%;
-            height: 8px;
-            background: var(--bg);
-            border-radius: 4px;
-            overflow: hidden;
-        }
-        .progress-card .progress-bar-fill {
-            height: 100%;
-            width: 0%;
-            background: linear-gradient(90deg, var(--primary), #ff9a76);
-            border-radius: 4px;
-            transition: width .3s ease;
-        }
-        .progress-card .progress-percent {
-            font-size: .8rem;
-            color: var(--text-muted);
-            margin-top: .3rem;
-            text-align: right;
-        }
-        .progress-card.complete {
-            border-color: #4ade80;
-            background: rgba(74,222,128,.05);
-        }
-        .progress-card.complete .progress-bar-fill {
-            background: linear-gradient(90deg, #4ade80, #22c55e);
-        }
-        .progress-card.complete .spinner-sm,
-        .progress-card.complete .progress-percent {
-            display: none;
-        }
-        .progress-card.complete .progress-stage::before {
-            content: '✅ ';
-            margin-right: .3rem;
-        }
-        .progress-card.complete .progress-stage {
-            font-weight: 600;
-            color: var(--text);
-        }
-        .progress-card.error {
-            border-color: #f87171;
-            background: rgba(248,113,113,.05);
-        }
-
-        .loading {
-            display: none;
-            text-align: center;
-            color: var(--text-muted);
-            padding: 1rem;
-        }
-        .loading.active { display: block; }
-        .spinner {
-            display: inline-block;
-            width: 24px; height: 24px;
-            border: 3px solid var(--border);
-            border-top-color: var(--primary);
-            border-radius: 50%;
-            animation: spin .8s linear infinite;
-            margin-bottom: .5rem;
-        }
-        @keyframes spin { to { transform: rotate(360deg); } }
-
-        .status {
-            margin-top: .5rem;
-            font-size: .9rem;
-            color: var(--text-muted);
-        }
-        .status.success { color: #4ade80; }
-        .status.error { color: #f87171; }
-        
-        /* GPU Status Indicator */
-        .gpu-status {
-            display: flex;
-            align-items: center;
-            gap: .8rem;
-            padding: .8rem 1rem;
-            background: var(--bg);
-            border-radius: 10px;
-            margin-bottom: 1rem;
-        }
-        .gpu-dot {
-            width: 14px;
-            height: 14px;
-            border-radius: 50%;
-            flex-shrink: 0;
-        }
-        .gpu-dot.green { background: #4ade80; box-shadow: 0 0 10px rgba(74,222,128,.5); }
-        .gpu-dot.yellow { background: #facc15; box-shadow: 0 0 10px rgba(250,204,21,.5); }
-        .gpu-dot.red   { background: #f87171; box-shadow: 0 0 10px rgba(248,113,113,.5); }
-        .gpu-text {
-            flex: 1;
-        }
-        .gpu-text .gpu-title { font-size: .95rem; font-weight: 600; }
-        .gpu-text .gpu-detail { font-size: .8rem; color: var(--text-muted); margin-top: .2rem; }
-        .gpu-status.loading .gpu-dot { background: #888; animation: pulse 1s infinite; }
-        @keyframes pulse {
-            0%, 100% { opacity: 1; }
-            50% { opacity: .4; }
-        }
-
-        /* Model Switcher */
-        .model-switcher {
-            display: flex;
-            align-items: center;
-            gap: .5rem;
-            margin-top: .5rem;
-        }
-        .model-switcher select {
-            flex: 1;
-        }
-        .model-switcher button {
-            padding: .6rem 1rem;
-            border: 1px solid var(--border);
-            background: var(--surface);
-            color: var(--text);
-            border-radius: 8px;
-            cursor: pointer;
-            font-size: .9rem;
-            transition: all .2s;
-        }
-        .model-switcher button:hover { border-color: var(--primary); background: rgba(233,69,96,.1); }
-        .model-switcher button:disabled { opacity: .5; cursor: not-allowed; }
-        .model-switcher button.switched { border-color: #4ade80; background: rgba(74,222,128,.1); }
-
-        /* Speaker diarization */
-        .speaker-options {
-            display: flex;
-            align-items: center;
-            flex-wrap: wrap;
-            gap: 1rem;
-            margin-top: 1rem;
-            font-size: .9rem;
-        }
-        .speaker-options label { display: flex; align-items: center; gap: .4rem; cursor: pointer; }
-        .speaker-options input[type=number] {
-            width: 4.5rem;
-            background: var(--bg);
-            color: var(--text);
-            border: 1px solid var(--border);
-            border-radius: 6px;
-            padding: .3rem .5rem;
-        }
-        .speaker-options input:disabled, .speaker-options label.disabled { opacity: .5; cursor: not-allowed; }
-        .speaker-turn { margin-bottom: .8rem; }
-        .speaker-turn:last-child { margin-bottom: 0; }
-        .speaker-label {
-            display: inline-block;
-            font-size: .8rem;
-            font-weight: 600;
-            padding: .1rem .5rem;
-            border-radius: 4px;
-            margin-right: .5rem;
-            color: #111;
-        }
-        .speaker-time { font-size: .75rem; color: var(--text-muted); margin-right: .5rem; }
-
-        footer {
-            margin-top: 3rem;
-            color: var(--text-muted);
-            font-size: .85rem;
-        }
-        footer a { color: var(--primary); text-decoration: none; }
-    </style>
+    <link rel="stylesheet" href="/static/app.css?v={{version}}">
 </head>
 <body>
-    <h1>⚡ Speech to Text</h1>
-    <p class="subtitle">Powered by WhisperX — transcription with speaker identification, runs locally in your container</p>
+    <header>
+        <h1>⚡ Speech to Text</h1>
+        <p class="subtitle">Powered by WhisperX — transcription with speaker identification, runs locally on your machine</p>
+    </header>
 
     <div class="container">
-        <div class="gpu-status loading" id="gpuStatus">
-            <div class="gpu-dot"></div>
+        <div class="banner" id="connBanner" role="alert" hidden>
+            <span class="spinner-sm"></span>
+            <span id="connBannerText">Cannot reach the server — retrying…</span>
+        </div>
+
+        <div class="gpu-status loading" id="gpuStatus" aria-live="polite">
+            <div class="gpu-dot" id="gpuDot"></div>
             <div class="gpu-text">
-                <div class="gpu-title">Checking GPU...</div>
-                <div class="gpu-detail">Loading system info...</div>
+                <div class="gpu-title" id="gpuTitle">Checking server…</div>
+                <div class="gpu-detail" id="gpuDetail">Loading system info…</div>
             </div>
         </div>
 
-        <div class="card">
-            <h2>🧠 Model & Device</h2>
-            <div style="display:flex;gap:.8rem;margin-bottom:.8rem;flex-wrap:wrap;">
-                <select class="model-select" id="modelSelect" style="margin:0;flex:1;min-width:200px;">
+        <section class="card">
+            <h2>🧠 Model &amp; Device</h2>
+            <div class="row wrap">
+                <select class="input grow" id="modelSelect" aria-label="Whisper model">
                     <option value="tiny">Tiny (fastest, less accurate)</option>
                     <option value="base" selected>Base (default balance)</option>
                     <option value="small">Small (good balance)</option>
@@ -376,563 +37,144 @@
                     <option value="large-v3-turbo">Large-v3-turbo (near large accuracy, much faster)</option>
                     <option value="large-v2">Large-v2 (very accurate, needs GPU/vRAM)</option>
                     <option value="large-v3">Large-v3 (best accuracy, needs GPU/vRAM)</option>
+                    <option value="large">Large (alias of large-v3)</option>
                 </select>
-                <select class="model-select" id="deviceSelect" style="margin:0;flex:1;min-width:200px;">
+                <select class="input grow" id="deviceSelect" aria-label="Device">
                     <option value="cpu">CPU</option>
                     <option value="cuda" id="cudaOption">CUDA (GPU)</option>
                 </select>
             </div>
-            <div class="model-switcher">
-                <span style="font-size:.85rem;color:var(--text-muted);">Current:</span>
-                <span id="currentModelDisplay" style="font-weight:600;color:var(--primary);">base (cpu)</span>
-                <button id="switchModelBtn" onclick="switchModel()">Switch Model</button>
+            <div class="row model-switcher">
+                <span class="muted small">Current:</span>
+                <span id="currentModelDisplay" class="current-model">—</span>
+                <button class="btn" id="switchModelBtn" type="button">Switch Model</button>
             </div>
             <p class="status" id="modelStatus"></p>
+        </section>
+
+        <section class="card">
+            <h2>⚙️ Transcription Options</h2>
+            <div class="row wrap options">
+                <label class="field">
+                    <span>🌐 Language</span>
+                    <select class="input" id="languageSelect">
+                        <option value="">Auto-detect</option>
+                    </select>
+                </label>
+            </div>
             <div class="speaker-options">
-                <label>
+                <label id="diarizeLabel">
                     <input type="checkbox" id="diarizeToggle">
                     👥 Identify speakers
                 </label>
                 <label>
                     Speakers
-                    <input type="number" id="minSpeakers" min="1" placeholder="min" title="Minimum number of speakers (optional)">
+                    <input class="input num" type="number" id="minSpeakers" min="1" placeholder="min" title="Minimum number of speakers (optional)">
                     –
-                    <input type="number" id="maxSpeakers" min="1" placeholder="max" title="Maximum number of speakers (optional)">
+                    <input class="input num" type="number" id="maxSpeakers" min="1" placeholder="max" title="Maximum number of speakers (optional)">
                 </label>
             </div>
             <p class="status" id="diarizeStatus"></p>
-        </div>
 
-        <div class="card">
+            <details class="hf-panel" id="hfPanel">
+                <summary>🔑 Hugging Face token <span class="badge" id="hfBadge">checking…</span></summary>
+                <div class="hf-body">
+                    <p class="muted small">
+                        Only needed for speaker identification (the pyannote model is gated).
+                    </p>
+                    <ol class="muted small steps">
+                        <li>Create a token with <em>read</em> access at
+                            <a href="https://huggingface.co/settings/tokens" target="_blank" rel="noopener">huggingface.co/settings/tokens</a></li>
+                        <li>Accept the user conditions on the
+                            <a id="hfModelLink" href="https://huggingface.co/pyannote/speaker-diarization-community-1" target="_blank" rel="noopener">model page</a></li>
+                        <li>Paste the token below. It is verified, then stored on the server (never shown again).</li>
+                    </ol>
+                    <form class="row" id="hfForm" autocomplete="off">
+                        <input class="input grow mono" type="password" id="hfTokenInput" placeholder="hf_…" spellcheck="false" autocomplete="off" aria-label="Hugging Face token">
+                        <button class="btn icon-btn" type="button" id="hfShowBtn" title="Show / hide">👁</button>
+                        <button class="btn primary" type="submit" id="hfSaveBtn">Save</button>
+                    </form>
+                    <div class="row">
+                        <button class="btn" type="button" id="hfCheckBtn">Test current token</button>
+                        <button class="btn danger" type="button" id="hfRemoveBtn">Remove saved token</button>
+                    </div>
+                    <p class="status" id="hfStatus"></p>
+                </div>
+            </details>
+        </section>
+
+        <section class="card">
             <h2>🖥️ GPU Health</h2>
-            <div id="gpuHealthContent" style="font-size:.9rem;color:var(--text-muted);"></div>
-            <button id="ejectBtn" onclick="ejectModel()" style="margin-top:.8rem;padding:.5rem 1.2rem;border:1px solid var(--border);background:var(--bg);color:var(--text);border-radius:8px;cursor:pointer;font-size:.9rem;transition:all .2s;">
-                💾 Eject Model from GPU
-            </button>
+            <div id="gpuHealthContent" class="muted small">Loading…</div>
+            <button class="btn" id="ejectBtn" type="button">💾 Eject Model from Memory</button>
             <p class="status" id="ejectStatus"></p>
-        </div>
+        </section>
 
-        <!-- Progress Card (model load & transcribe) -->
-        <div class="progress-card" id="progressCard">
+        <!-- Progress Card (model load & transcription) -->
+        <div class="progress-card" id="progressCard" aria-live="polite">
             <div class="progress-stage">
                 <span class="spinner-sm"></span>
-                <span id="progressStageText">Initializing...</span>
+                <span id="progressStageText">Initializing…</span>
+                <button class="btn small-btn" type="button" id="cancelBtn" hidden>Cancel</button>
             </div>
             <div class="progress-bar-bg">
                 <div class="progress-bar-fill" id="progressBarFill"></div>
             </div>
-            <div class="progress-percent" id="progressPercent">0%</div>
+            <div class="progress-percent"><span id="progressElapsed"></span><span id="progressPercent">0%</span></div>
         </div>
 
-        <div class="card">
+        <section class="card">
             <h2>🎙️ Capture Mode</h2>
-            <div class="mode-selector">
-                <button class="mode-btn active" data-mode="microphone">🎤 Microphone</button>
-                <button class="mode-btn" data-mode="upload">📁 Upload Audio</button>
+            <div class="mode-selector" role="tablist">
+                <button class="mode-btn active" data-mode="microphone" type="button" role="tab">🎤 Microphone</button>
+                <button class="mode-btn" data-mode="upload" type="button" role="tab">📁 Upload Audio</button>
             </div>
 
-            <!-- Microphone mode -->
-            <div id="microphoneMode" style="text-align:center;">
-                <button class="record-btn" id="recordBtn">
-                    <span class="icon">🎤</span>
-                    <span>Record</span>
+            <div id="microphoneMode" class="center">
+                <button class="record-btn" id="recordBtn" type="button">
+                    <span class="icon" id="recordIcon">🎤</span>
+                    <span id="recordLabel">Record</span>
                 </button>
                 <p class="status" id="micStatus"></p>
-                <canvas id="visualizer" width="500" height="80" style="margin-top:1rem;display:none;"></canvas>
+                <canvas id="visualizer" height="80" hidden></canvas>
             </div>
 
-            <!-- Upload mode -->
-            <div id="uploadMode" style="display:none;">
-                <div class="file-drop" id="fileDrop">
-                    <input type="file" id="fileInput" accept="audio/*,.mp3,.wav,.mp4,.flac,.ogg,.m4a,.webm">
+            <div id="uploadMode" hidden>
+                <div class="file-drop" id="fileDrop" tabindex="0" role="button" aria-label="Choose an audio file">
+                    <input type="file" id="fileInput" accept="audio/*,video/*,.mp3,.wav,.mp4,.flac,.ogg,.m4a,.webm,.opus,.aac,.wma,.mkv,.mov">
                     <div class="icon">📁</div>
                     <p>Drop audio file here or click to browse</p>
-                    <p style="font-size:.85rem;color:var(--text-muted);margin-top:.5rem;">
-                        Supports: WAV, MP3, MP4, FLAC, OGG, M4A, WEBM
-                    </p>
+                    <p class="muted small">Supports: WAV, MP3, MP4, FLAC, OGG, M4A, WEBM and any format ffmpeg reads</p>
                 </div>
                 <p class="status" id="fileStatus"></p>
             </div>
-        </div>
+        </section>
 
-        <div class="card">
-            <h2>✍️ Transcription Result</h2>
-            <div class="loading" id="loading">
-                <div class="spinner"></div>
-                <p>Transcribing audio...</p>
+        <section class="card">
+            <div class="result-header">
+                <h2>✍️ Transcription Result</h2>
+                <div class="result-actions" id="resultActions" hidden>
+                    <label class="small muted"><input type="checkbox" id="timestampsToggle"> Timestamps</label>
+                    <button class="btn small-btn" type="button" id="copyBtn">📋 Copy</button>
+                    <a class="btn small-btn" id="dlTxt" download>TXT</a>
+                    <a class="btn small-btn" id="dlSrt" download>SRT</a>
+                    <a class="btn small-btn" id="dlVtt" download>VTT</a>
+                    <a class="btn small-btn" id="dlJson" download>JSON</a>
+                </div>
             </div>
+            <p class="status" id="resultMeta"></p>
+            <ul class="warnings" id="resultWarnings" hidden></ul>
             <div class="output-box placeholder" id="outputBox">
                 <div id="output">Transcription will appear here...</div>
-                <button class="copy-btn" id="copyBtn" onclick="copyText()">📋 Copy</button>
             </div>
-        </div>
+        </section>
     </div>
 
     <footer>
-        Built with FastAPI + WhisperX · <a href="https://github.com/m-bain/whisperX">GitHub</a>
+        Built with FastAPI + WhisperX · v{{version}} · <a href="/docs" target="_blank" rel="noopener">API docs</a> ·
+        <a href="https://github.com/m-bain/whisperX" target="_blank" rel="noopener">WhisperX on GitHub</a>
     </footer>
 
-    <script>
-        // --- State ---
-        let currentMode = 'microphone';
-        let isRecording = false;
-        let mediaRecorder = null;
-        let audioChunks = [];
-        let audioContext = null;
-        let analyser = null;
-        let animFrame = null;
-        let stream = null;
-
-        // --- Mode Switch ---
-        document.querySelectorAll('.mode-btn').forEach(btn => {
-            btn.addEventListener('click', () => {
-                document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
-                btn.classList.add('active');
-                currentMode = btn.dataset.mode;
-                document.getElementById('microphoneMode').style.display = currentMode === 'microphone' ? 'block' : 'none';
-                document.getElementById('uploadMode').style.display = currentMode === 'upload' ? 'block' : 'none';
-            });
-        });
-
-        // --- Microphone ---
-        const recordBtn = document.getElementById('recordBtn');
-        recordBtn.addEventListener('click', toggleRecording);
-
-        async function toggleRecording() {
-            if (!isRecording) {
-                try {
-                    stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                    mediaRecorder = new MediaRecorder(stream);
-                    audioChunks = [];
-                    mediaRecorder.ondataavailable = e => audioChunks.push(e.data);
-                    mediaRecorder.onstop = () => sendAudio(new Blob(audioChunks, { type: 'audio/webm' }), 'mic');
-                    mediaRecorder.start();
-                    isRecording = true;
-                    recordBtn.classList.add('recording');
-                    recordBtn.querySelector('span:last-child').textContent = 'Stop';
-                    recordBtn.querySelector('.icon').textContent = '⏹️';
-                    showStatus('Recording...', '');
-                    startVisualizer(stream);
-                } catch (e) {
-                    showStatus('Microphone access denied', 'error');
-                }
-            } else {
-                mediaRecorder.stop();
-                stream.getTracks().forEach(t => t.stop());
-                isRecording = false;
-                recordBtn.classList.remove('recording');
-                recordBtn.querySelector('span:last-child').textContent = 'Record';
-                recordBtn.querySelector('.icon').textContent = '🎤';
-                stopVisualizer();
-            }
-        }
-
-        // --- Audio Visualizer ---
-        function startVisualizer(stream) {
-            audioContext = new (window.AudioContext || window.webkitAudioContext)();
-            const source = audioContext.createMediaStreamSource(stream);
-            analyser = audioContext.createAnalyser();
-            analyser.fftSize = 256;
-            source.connect(analyser);
-            const canvas = document.getElementById('visualizer');
-            canvas.style.display = 'block';
-            const ctx = canvas.getContext('2d');
-            const bufferLength = analyser.frequencyBinCount;
-            const dataArray = new Uint8Array(bufferLength);
-
-            function draw() {
-                animFrame = requestAnimationFrame(draw);
-                analyser.getByteFrequencyData(dataArray);
-                ctx.fillStyle = '#1a1a2e';
-                ctx.fillRect(0, 0, canvas.width, canvas.height);
-                const barWidth = (canvas.width / bufferLength) * 2.5;
-                let x = 0;
-                for (let i = 0; i < bufferLength; i++) {
-                    const barHeight = (dataArray[i] / 255) * canvas.height;
-                    const r = barHeight + 50;
-                    ctx.fillStyle = `rgb(${r},69,96)`;
-                    ctx.fillRect(x, canvas.height - barHeight, barWidth, barHeight);
-                    x += barWidth + 1;
-                }
-            }
-            draw();
-        }
-
-        function stopVisualizer() {
-            if (animFrame) cancelAnimationFrame(animFrame);
-            if (audioContext) audioContext.close();
-            audioContext = null;
-            document.getElementById('visualizer').style.display = 'none';
-        }
-
-        // --- Upload ---
-        const fileDrop = document.getElementById('fileDrop');
-        const fileInput = document.getElementById('fileInput');
-
-        fileDrop.addEventListener('click', () => fileInput.click());
-        fileDrop.addEventListener('dragover', e => { e.preventDefault(); fileDrop.classList.add('dragover'); });
-        fileDrop.addEventListener('dragleave', () => fileDrop.classList.remove('dragover'));
-        fileDrop.addEventListener('drop', e => {
-            e.preventDefault();
-            fileDrop.classList.remove('dragover');
-            if (e.dataTransfer.files.length) handleFile(e.dataTransfer.files[0]);
-        });
-        fileInput.addEventListener('change', () => {
-            if (fileInput.files.length) handleFile(fileInput.files[0]);
-        });
-
-        function handleFile(file) {
-            showStatus(`Selected: ${file.name}`, 'success');
-            sendAudio(file, 'upload');
-        }
-
-        // --- Progress polling ---
-        let lastProgressMessage = '';
-        let progressPolling = null;
-
-        function startProgressPolling() {
-            if (progressPolling) clearInterval(progressPolling);
-            const card = document.getElementById('progressCard');
-            card.classList.remove('complete', 'error');
-            card.classList.add('active');
-            progressPolling = setInterval(updateProgress, 500);
-        }
-
-        function stopProgressPolling() {
-            if (progressPolling) {
-                clearInterval(progressPolling);
-                progressPolling = null;
-            }
-        }
-
-        async function updateProgress() {
-            try {
-                const resp = await fetch('/progress');
-                const data = await resp.json();
-                const stageText = document.getElementById('progressStageText');
-                const barFill = document.getElementById('progressBarFill');
-                const percentText = document.getElementById('progressPercent');
-
-                if (data.progress === 0 && !data.done && lastProgressMessage === '') {
-                    return;
-                }
-
-                stageText.textContent = data.message || 'Processing...';
-                const pct = Math.round((data.progress || 0) * 100);
-                barFill.style.width = pct + '%';
-                percentText.textContent = pct + '%';
-
-                if (data.done && data.progress >= 1) {
-                    document.getElementById('progressCard').classList.add('complete');
-                    stageText.textContent = data.message || 'Complete!';
-                    barFill.style.width = '100%';
-                    percentText.textContent = '100%';
-                    stopProgressPolling();
-                    lastProgressMessage = '';
-                    // Remove complete class after 2s to allow re-use
-                    setTimeout(() => {
-                        const card = document.getElementById('progressCard');
-                        if (card.classList.contains('complete')) {
-                            card.classList.remove('complete');
-                            barFill.style.width = '0%';
-                            percentText.textContent = '0%';
-                            stageText.textContent = 'Initializing...';
-                        }
-                    }, 2000);
-                } else if (data.done && data.progress < 1) {
-                    document.getElementById('progressCard').classList.add('error');
-                    stageText.textContent = data.message || 'Error';
-                    stopProgressPolling();
-                    lastProgressMessage = '';
-                } else {
-                    lastProgressMessage = data.message;
-                }
-            } catch {
-                // ignore polling errors
-            }
-        }
-
-        // --- Send Audio (with progress) ---
-        async function sendAudio(fileOrBlob, source) {
-            const output = document.getElementById('output');
-            const outputBox = document.getElementById('outputBox');
-            const loading = document.getElementById('loading');
-            const diarize = document.getElementById('diarizeToggle').checked;
-
-            output.textContent = 'Transcription will appear here...';
-            outputBox.classList.add('placeholder');
-            copyableText = '';
-            loading.classList.add('active');
-
-            startProgressPolling();
-            lastProgressMessage = '';
-
-            const formData = new FormData();
-            formData.append('file', source === 'mic'
-                ? new Blob([fileOrBlob], { type: 'audio/webm' })
-                : fileOrBlob, source === 'mic' ? 'recording.webm' : fileOrBlob.name);
-            formData.append('diarize', diarize ? 'true' : 'false');
-            if (diarize) {
-                const minSpk = document.getElementById('minSpeakers').value;
-                const maxSpk = document.getElementById('maxSpeakers').value;
-                if (minSpk) formData.append('min_speakers', minSpk);
-                if (maxSpk) formData.append('max_speakers', maxSpk);
-            }
-
-            try {
-                const resp = await fetch('/transcribe', { method: 'POST', body: formData });
-                if (!resp.ok) {
-                    const body = await resp.text();
-                    let detail = body;
-                    try { detail = JSON.parse(body).detail || body; } catch {}
-                    throw new Error(detail);
-                }
-                const data = await resp.json();
-                outputBox.classList.remove('placeholder');
-                if (diarize && data.speakers) {
-                    renderSpeakerTranscript(output, data.segments, data.speakers);
-                    copyableText = data.text_with_speakers;
-                    showStatus(`Language: ${data.language} · Speakers: ${data.speakers.length}`, 'success');
-                } else {
-                    output.textContent = data.text;
-                    copyableText = data.text;
-                    showStatus(`Language: ${data.language}`, 'success');
-                }
-            } catch (e) {
-                output.textContent = `Error: ${e.message}`;
-                outputBox.classList.remove('placeholder');
-                showStatus('Transcription failed', 'error');
-                document.getElementById('progressCard').classList.add('error');
-                document.getElementById('progressStageText').textContent = e.message;
-                stopProgressPolling();
-            } finally {
-                loading.classList.remove('active');
-            }
-        }
-
-        // --- Model Switcher (with progress) ---
-        async function switchModel() {
-            const btn = document.getElementById('switchModelBtn');
-            const status = document.getElementById('modelStatus');
-            const newModel = document.getElementById('modelSelect').value;
-            const device = document.getElementById('deviceSelect').value;
-
-            btn.disabled = true;
-            btn.textContent = 'Loading...';
-            status.textContent = 'Loading model...';
-            status.className = 'status';
-
-            startProgressPolling();
-            lastProgressMessage = '';
-
-            try {
-                const resp = await fetch('/switch-model', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ model: newModel, device: device }),
-                });
-                const data = await resp.json();
-                if (!resp.ok) throw new Error(data.detail || 'Failed to switch model');
-
-                document.getElementById('currentModelDisplay').textContent = data.model + ' (' + data.device + ')';
-                status.textContent = '✅ ' + data.message;
-                status.className = 'status success';
-                btn.classList.add('switched');
-                setTimeout(() => btn.classList.remove('switched'), 2000);
-            } catch (e) {
-                status.textContent = '❌ ' + e.message;
-                status.className = 'status error';
-                document.getElementById('progressCard').classList.add('error');
-                document.getElementById('progressStageText').textContent = e.message;
-                stopProgressPolling();
-            } finally {
-                btn.disabled = false;
-                btn.textContent = 'Switch Model';
-            }
-        }
-
-        async function ejectModel() {
-            const btn = document.getElementById('ejectBtn');
-            const status = document.getElementById('ejectStatus');
-            btn.disabled = true;
-            btn.textContent = 'Ejecting...';
-            status.textContent = 'Ejecting model from GPU...';
-            status.className = 'status';
-            try {
-                const resp = await fetch('/eject', { method: 'POST' });
-                const data = await resp.json();
-                if (data.status === 'success') {
-                    status.textContent = '✅ Model ejected — GPU VRAM freed.';
-                    status.className = 'status success';
-                    btn.textContent = 'Ejected!';
-                    document.getElementById('currentModelDisplay').textContent = 'ejected';
-                } else {
-                    status.textContent = '⚠️ ' + data.message;
-                    status.className = 'status';
-                    btn.textContent = 'Eject Model from GPU';
-                }
-            } catch (e) {
-                status.textContent = '❌ Eject failed: ' + e.message;
-                status.className = 'status error';
-                btn.textContent = 'Eject Model from GPU';
-            } finally {
-                btn.disabled = false;
-            }
-        }
-
-        function showStatus(msg, type) {
-            const el = currentMode === 'microphone'
-                ? document.getElementById('micStatus')
-                : document.getElementById('fileStatus');
-            el.textContent = msg;
-            el.className = 'status ' + (type || '');
-        }
-
-        // --- Speaker-grouped transcript ---
-        const SPEAKER_COLORS = ['#60a5fa', '#f472b6', '#4ade80', '#facc15', '#c084fc', '#fb923c', '#2dd4bf', '#f87171'];
-        let copyableText = '';
-
-        function formatTime(seconds) {
-            if (seconds == null) return '';
-            const m = Math.floor(seconds / 60);
-            const s = Math.floor(seconds % 60).toString().padStart(2, '0');
-            return `${m}:${s}`;
-        }
-
-        function renderSpeakerTranscript(container, segments, speakers) {
-            container.textContent = '';
-            // Merge consecutive segments from the same speaker into one turn
-            const turns = [];
-            for (const seg of segments) {
-                const text = (seg.text || '').trim();
-                if (!text) continue;
-                const speaker = seg.speaker || 'UNKNOWN';
-                const last = turns[turns.length - 1];
-                if (last && last.speaker === speaker) {
-                    last.texts.push(text);
-                } else {
-                    turns.push({ speaker, start: seg.start, texts: [text] });
-                }
-            }
-            for (const turn of turns) {
-                const idx = speakers.indexOf(turn.speaker);
-                const div = document.createElement('div');
-                div.className = 'speaker-turn';
-                const label = document.createElement('span');
-                label.className = 'speaker-label';
-                label.textContent = turn.speaker;
-                label.style.background = idx >= 0 ? SPEAKER_COLORS[idx % SPEAKER_COLORS.length] : '#888';
-                const time = document.createElement('span');
-                time.className = 'speaker-time';
-                time.textContent = formatTime(turn.start);
-                div.append(label, time, document.createTextNode(turn.texts.join(' ')));
-                container.appendChild(div);
-            }
-        }
-
-        function updateDiarizeOptions(available, isDefault) {
-            const toggle = document.getElementById('diarizeToggle');
-            const status = document.getElementById('diarizeStatus');
-            if (!diarizeInitialized) {
-                toggle.checked = available && isDefault;
-                diarizeInitialized = true;
-            }
-            toggle.disabled = !available;
-            toggle.closest('label').classList.toggle('disabled', !available);
-            if (!available) toggle.checked = false;
-            const hintsDisabled = !available || !toggle.checked;
-            document.getElementById('minSpeakers').disabled = hintsDisabled;
-            document.getElementById('maxSpeakers').disabled = hintsDisabled;
-            status.textContent = available ? '' : 'Speaker identification needs a Hugging Face token on the server (HF_TOKEN or `hf auth login`).';
-        }
-        let diarizeInitialized = false;
-        let diarizeAvailable = false;
-        document.getElementById('diarizeToggle').addEventListener('change', () => updateDiarizeOptions(diarizeAvailable));
-
-        function copyText() {
-            const text = copyableText || document.getElementById('output').textContent;
-            navigator.clipboard.writeText(text).then(() => {
-                const btn = document.getElementById('copyBtn');
-                btn.textContent = '✅ Copied!';
-                setTimeout(() => btn.textContent = '📋 Copy', 2000);
-            });
-        }
-
-        // --- Device option visibility ---
-        function updateDeviceOptions(hasCuda) {
-            const cudaOpt = document.getElementById('cudaOption');
-            cudaOpt.disabled = !hasCuda;
-            cudaOpt.style.opacity = hasCuda ? 1 : .5;
-            if (!hasCuda && document.getElementById('deviceSelect').value === 'cuda') {
-                document.getElementById('deviceSelect').value = 'cpu';
-            }
-        }
-
-        // --- Health polling ---
-        async function loadHealth() {
-            try {
-                const resp = await fetch('/health');
-                const data = await resp.json();
-
-                // GPU status dot
-                const gpuStatusEl = document.getElementById('gpuStatus');
-                gpuStatusEl.classList.remove('loading');
-                const dot = gpuStatusEl.querySelector('.gpu-dot');
-                dot.className = 'gpu-dot ' + data.status;
-                gpuStatusEl.querySelector('.gpu-title').textContent = data.recommendation;
-                gpuStatusEl.querySelector('.gpu-detail').textContent =
-                    `Model: ${data.model} on ${data.device}`;
-
-                diarizeAvailable = !!data.diarization_available;
-                updateDiarizeOptions(diarizeAvailable, !!data.diarize_default);
-
-                // GPU health details
-                const gpuHealthEl = document.getElementById('gpuHealthContent');
-                if (data.nvidia_gpu && data.nvidia_gpu.length) {
-                    const gpu = data.nvidia_gpu[0];
-                    const usedPct = ((gpu.vram_used_mb / gpu.vram_total_mb) * 100).toFixed(1);
-                    const freePct = ((gpu.vram_free_mb / gpu.vram_total_mb) * 100).toFixed(1);
-                    gpuHealthEl.innerHTML =
-                        `<div style="margin-bottom:.8rem;">
-                            <strong>VRAM Usage:</strong>
-                            <div style="margin-top:.3rem;">
-                                <div style="height:10px;background:var(--border);border-radius:5px;overflow:hidden;">
-                                    <div style="height:100%;width:${usedPct}%;background:${data.status==='green'?'#4ade80':data.status==='yellow'?'#facc15':'#f87171'};transition:width .5s;"></div>
-                                </div>
-                            </div>
-                            <div style="display:flex;justify-content:space-between;margin-top:.3rem;font-size:.8rem;">
-                                <span>Used: ${(gpu.vram_used_mb/1024).toFixed(1)} GB</span>
-                                <span>Free: ${(gpu.vram_free_mb/1024).toFixed(1)} GB</span>
-                                <span>Total: ${(gpu.vram_total_mb/1024).toFixed(1)} GB</span>
-                            </div>
-                        </div>
-                        <div style="display:flex;gap:1rem;margin-bottom:.8rem;">
-                            <div>Utilization: <strong>${gpu.utilization_pct}%</strong></div>
-                            <div>Memory Clock: <strong>${gpu.mem_clock_mhz || 'N/A'} MHz</strong></div>
-                        </div>`;
-
-                    // Enable CUDA option
-                    updateDeviceOptions(true);
-
-                    // Show CUDA option if GPU available
-                    const cudaOpt = document.getElementById('cudaOption');
-                    if (data.torch_cuda && data.torch_cuda.available) {
-                        cudaOpt.textContent = `CUDA (GPU - ${data.torch_cuda.devices[0]?.name || 'GPU'})`;
-                    } else {
-                        cudaOpt.textContent = 'CUDA (GPU) — not available';
-                    }
-                } else {
-                    gpuHealthEl.textContent = 'No NVIDIA GPU detected — using CPU inference.';
-                    updateDeviceOptions(false);
-                }
-            } catch {
-                // ignore health errors
-            }
-        }
-
-        loadHealth();
-        setInterval(loadHealth, 15000);
-
-    </script>
+    <script src="/static/app.js?v={{version}}"></script>
 </body>
 </html>

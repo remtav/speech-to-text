@@ -10,7 +10,11 @@ Voice transcription powered by **[WhisperX](https://github.com/m-bain/whisperX)*
 - 👥 **Speaker identification** — optional diarization labels who said what (`SPEAKER_00`, `SPEAKER_01`, …)
 - ⏱️ **Word-level timestamps** — accurate per-word timing via forced alignment
 - 📊 **Model selection** — choose from Tiny, Base, Small, Medium, Large models
-- 📋 **Copy results** — one-click copy of transcribed text
+- 🌐 **Language choice** — auto-detect or force one of Whisper's ~100 languages
+- 📋 **Copy & export** — one-click copy, download as TXT, SRT, WebVTT or JSON
+- 🔑 **Hugging Face token from the UI** — add, test or remove the token needed for speaker identification
+- 🛡️ **Crash-proof worker** — models run in a separate process: a GPU/driver crash fails the job with a clear message instead of killing the server
+- ⏳ **Background jobs** — progress per job, cancel button, survives network hiccups and page reloads
 - 🌐 **CORS-enabled** — easily integrates with external frontends
 
 ## Architecture
@@ -36,15 +40,28 @@ Voice transcription powered by **[WhisperX](https://github.com/m-bain/whisperX)*
 ```
 
 **Flow:**
-1. Browser sends audio file (via mic capture → `MediaRecorder` or file upload → drag-and-drop)
-2. FastAPI receives `multipart/form-data`, saves to temp file
-3. `ffmpeg` decodes the file once into a 16 kHz mono waveform shared by every stage
-4. WhisperX transcribes with faster-whisper (CTranslate2), batched over VAD speech chunks
-5. A language-specific wav2vec2 model aligns the transcript to get word-level timestamps
-6. If `diarize=true`, pyannote finds speaker turns; each word gets the speaker that overlaps it most, and segments are split where the speaker changes
-7. Results (`text`, `language`, `segments`, plus `speakers` / `text_with_speakers` when diarizing) returned as JSON
+1. Browser sends audio file (via mic capture → `MediaRecorder` or file upload → drag-and-drop) to `POST /jobs`
+2. FastAPI streams the upload to a temp file and queues a job; the browser polls `GET /jobs/{id}`
+3. A dispatcher thread runs jobs one at a time (transcriptions, model switches, ejects), in order
+4. The job runs in the **worker process**: `ffmpeg` decodes the file once into a 16 kHz mono waveform shared by every stage
+5. WhisperX transcribes with faster-whisper (CTranslate2), batched over VAD speech chunks
+6. A language-specific wav2vec2 model aligns the transcript to get word-level timestamps (if this fails, the transcript is still returned, with a warning)
+7. If `diarize=true`, pyannote finds speaker turns; each word gets the speaker that overlaps it most, and segments are split where the speaker changes
+8. Results (`text`, `language`, `segments`, plus `speakers` / `text_with_speakers` when diarizing) are stored on the job
 
-The heavy work runs in a worker thread, so `/progress` keeps responding during transcription (stages: `transcribe`, `align`, `diarize`).
+### Robustness
+
+- **Worker process.** WhisperX relies on native libraries (CTranslate2, CUDA, cuDNN) that can abort the whole
+  process — a missing cuDNN library, a GPU out of memory. They run in a separate process: if it dies, the job
+  fails with an explanation (signal, likely cause) and the worker restarts on the next request. Ejecting the
+  model stops the worker, which gives back *all* GPU memory, CUDA context included.
+- **Jobs instead of long requests.** The browser no longer holds one HTTP request open for the whole
+  transcription (which proxies, sleep or Wi-Fi drops would cut, showing *"Failed to fetch"*). Polling retries
+  through network errors, and the current job — or the last result — is restored when the page is reloaded.
+- **Clear errors.** Every error is returned as JSON with a readable `detail`; the UI never shows raw parse
+  errors. Invalid environment variables are logged and replaced by defaults instead of crashing the server.
+- **Non-blocking startup.** The initial model loads in the background: the UI is reachable immediately and shows
+  the download progress (with size and percentage for large models).
 
 ## API Endpoints
 
@@ -102,7 +119,11 @@ Transcribe an audio file, optionally identifying speakers.
 
 `aligned` is `false` when no wav2vec2 alignment model exists for the detected language; segments then have no `words`, and speakers are assigned per segment.
 
-**Errors:** `400` for undecodable audio or invalid speaker hints, `503` when diarization is requested but `HF_TOKEN` is missing or the pyannote model can't be loaded.
+Fields added in v2: `language` (form field, optional: a Whisper language code such as `fr`, or `auto`), and in the response `duration` (seconds) and `warnings` (e.g. word alignment skipped).
+
+**Errors:** `400` for undecodable audio, empty file, invalid language or speaker hints, `413` for files over `WHISPER_MAX_UPLOAD_MB`, `503` when diarization is requested but no Hugging Face token is configured or the pyannote model can't be loaded, `500` with a `detail` message otherwise (including a worker crash).
+
+`POST /transcribe` waits for the result, which is convenient for scripts. For long files, prefer the job API below.
 
 **Example with curl:**
 
@@ -122,14 +143,56 @@ curl -F "file=@recording.webm" http://localhost:8081/transcribe
 
 Fast transcription with language detection, skipping alignment and diarization. Returns `text`, `language` and `task`.
 
+### Jobs
+
+| Method & path                     | Description |
+|-----------------------------------|-------------|
+| `POST /jobs`                      | Same form fields as `/transcribe` (+ `quick=true` for the streaming mode). Returns `202` with the job right away |
+| `GET /jobs/{id}`                  | `status` (`queued`, `running`, `done`, `error`, `cancelled`), `progress` (0–1), `message`, `stage`, `result`, `error` (`code`, `message`) |
+| `GET /jobs`                       | Recent jobs (without results) |
+| `POST /jobs/{id}/cancel`          | Cancel a queued or running job |
+| `GET /jobs/{id}/export?format=…`  | Download the result as `txt`, `srt`, `vtt` or `json` |
+
+```bash
+JOB=$(curl -s -F "file=@meeting.mp3" -F language=fr http://localhost:8081/jobs | jq -r .id)
+curl -s http://localhost:8081/jobs/$JOB | jq '{status, progress, message}'
+curl -s -o meeting.srt "http://localhost:8081/jobs/$JOB/export?format=srt"
+```
+
+Jobs live in memory (the last `WHISPER_JOB_HISTORY` are kept) and are lost when the server restarts.
+
+### Model and status endpoints
+
+| Method & path            | Description |
+|--------------------------|-------------|
+| `GET /health`            | Model, device, GPU info, ffmpeg, diarization availability, queue state |
+| `GET /healthz`           | Liveness probe (`{"status": "ok"}`), used by the Docker healthcheck |
+| `GET /progress`          | Latest progress event of any job |
+| `POST /switch-model`     | `{"model": "small", "device": "cuda"}` — waits for the load; add `"wait": false` to get a job instead |
+| `POST /eject`            | Unload all models (`?wait=false` to get a job) |
+
+### Hugging Face token endpoints
+
+| Method & path                     | Description |
+|-----------------------------------|-------------|
+| `GET /settings/hf-token`          | Whether a token is configured, its source (`env` / `file`) and a masked preview |
+| `PUT /settings/hf-token`          | `{"token": "hf_…"}` — verifies it with the Hub (rejects invalid tokens, warns if the model terms are not accepted) and saves it |
+| `POST /settings/hf-token/check`   | Re-check the configured token |
+| `DELETE /settings/hf-token`       | Remove the saved token |
+
+The token is never returned by the API. Interactive API docs are at `/docs`.
+
 ## Speaker Diarization Setup
 
 Diarization uses the gated [`pyannote/speaker-diarization-community-1`](https://huggingface.co/pyannote/speaker-diarization-community-1) pipeline:
 
 1. Create a Hugging Face access token (read access) at <https://huggingface.co/settings/tokens>
 2. Accept the user conditions on the [model page](https://huggingface.co/pyannote/speaker-diarization-community-1)
-3. Give the token to the server, either way:
-   - **Saved login (persists across reboots, recommended):** run this once as the user that runs the server:
+3. Give the token to the server, in one of these ways:
+   - **Web UI (simplest):** open *Transcription Options → 🔑 Hugging Face token*, paste the token and click *Save*.
+     The server checks it with Hugging Face, then saves it where `hf auth login` does (`~/.cache/huggingface/token`,
+     readable only by its owner). *Test current token* checks the access to the model at any time.
+   - **Saved login from a terminal:** run this once as the user that runs the server:
      ```bash
      source venv/bin/activate
      hf auth login   # paste the token when prompted; it is saved to ~/.cache/huggingface/token
@@ -155,8 +218,13 @@ http://localhost:8081
 The web interface provides:
 - **Microphone mode** — click "Record" to capture audio, with a live frequency visualizer
 - **Upload mode** — drag and drop audio files or click to browse
-- **Model selector** — pick the desired Whisper model before transcribing
+- **Model selector** — pick the desired Whisper model and device, with live download / load progress
+- **Language** — auto-detect, or force the language when detection gets it wrong (short or accented recordings)
 - **Identify speakers** — toggle diarization, optionally with a min/max speaker count; the transcript is grouped by color-coded speaker and "Copy" includes the speaker labels
+- **Hugging Face token** — add, test or remove the token used for speaker identification
+- **Progress & cancel** — upload percentage, stage, elapsed time, and a Cancel button
+- **Result** — copy, timestamps view, download as TXT / SRT / VTT / JSON, warnings when something was skipped
+- **Connection banner** — shown when the server can't be reached; polling resumes automatically
 
 ## Configuration
 
@@ -172,7 +240,17 @@ Set environment variables in `.env` or at startup:
 | `HF_TOKEN`          | saved `hf auth login` token                     | Hugging Face token, required for speaker diarization |
 | `WHISPER_DIARIZE`   | `false`                                         | Diarize by default when the request doesn't say |
 | `WHISPER_DIARIZE_MODEL` | `pyannote/speaker-diarization-community-1`  | pyannote pipeline used for diarization |
-| `FFMPEG_PATH`       | auto-detected                                   | Path to ffmpeg binary          |
+| `FFMPEG_PATH`       | auto-detected                                   | Path to ffmpeg binary (conda env, then `PATH`) |
+| `WHISPER_HOST`      | `0.0.0.0`                                       | Listen address (`python -m app.main`) |
+| `WHISPER_PRELOAD`   | `true`                                          | Load the model in the background at startup |
+| `WHISPER_MAX_UPLOAD_MB` | `2048`                                      | Largest accepted upload |
+| `WHISPER_FFMPEG_TIMEOUT` | `1800`                                     | Seconds allowed to decode one file |
+| `WHISPER_WORKER_MODE` | `process`                                     | `process` (isolated worker, recommended) or `inline` (same process, for debugging) |
+| `WHISPER_JOB_HISTORY` | `50`                                          | Finished jobs kept in memory |
+| `WHISPER_CORS_ORIGINS` | `*`                                          | Comma-separated allowed origins |
+| `WHISPER_LOG_LEVEL` | `INFO`                                          | Log level |
+
+Invalid values (e.g. a port above 65535) are logged as warnings and replaced by the default.
 
 ### Available Models
 
@@ -227,7 +305,7 @@ python -m uvicorn app.main:app --host 0.0.0.0 --port $WHISPER_PORT
 4. **Verify CUDA is active** by checking server logs at startup:
 
 ```
-Loading Whisper model: large on cuda...
+Model: large on cuda (worker mode: process)
 ```
 
 5. **Download model weights** (first run will auto-download to `~/.cache/whisper/`):
@@ -281,7 +359,7 @@ docker run -d --name whisper --gpus all -p 8081:8081 \
 ### Virtual Environment
 
 ```bash
-cd /home/remi/speech-to-text
+cd speech-to-text
 python -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt
@@ -311,15 +389,40 @@ python -m uvicorn app.main:app --host 0.0.0.0 --port $WHISPER_PORT
 docker compose up --build
 ```
 
+## Troubleshooting
+
+| Symptom | Cause and fix |
+|---------|---------------|
+| **"Failed to fetch"** / *Cannot reach the server* | The browser lost the connection to the server. Before v2 a long transcription held one request open and a native crash killed the server; both are handled now. If the banner stays, check that the server is running and look at its logs. |
+| *The transcription worker stopped unexpectedly (SIGABRT / SIGSEGV)* | A native library crashed in the worker, usually CUDA: missing cuDNN/cuBLAS (`LD_LIBRARY_PATH`), or GPU out of memory. Try a smaller model, `WHISPER_BATCH_SIZE=4`, `WHISPER_COMPUTE_TYPE=int8_float16`, or the CPU. The worker restarts by itself. |
+| *SIGKILL — often the system running out of RAM* | The OS killed the worker. Use a smaller model or free memory. |
+| Warning *Word timestamps skipped: … punkt_tab* | The NLTK sentence data is missing and couldn't be downloaded. Run `python -m nltk.downloader punkt_tab` once (already done in the Docker image). |
+| *Microphone needs HTTPS or localhost* | Browsers only allow the microphone on secure origins. Open the UI as `http://localhost:8081` on the server machine, put it behind HTTPS, or use Upload. |
+| Speaker identification disabled | No Hugging Face token: add one in the UI. If saving says *accept the model terms*, open the model page while logged in and accept them. |
+| *Could not load diarization model* | The token can't access the gated model, or the download failed. Use *Test current token* in the UI. |
+
 ## File Structure
 
 ```
 speech-to-text/
 ├── app/
-│   ├── main.py          # FastAPI application + WhisperX pipeline
-│   └── speakers.py      # Speaker post-processing (split segments, speaker transcript)
+│   ├── main.py          # FastAPI application: routes, uploads, startup
+│   ├── config.py        # Settings from environment variables (validated)
+│   ├── jobs.py          # Job queue: one job at a time, progress, cancel, history
+│   ├── worker.py        # Worker process (crash isolation) and inline backend
+│   ├── pipeline.py      # WhisperX engine: model download/load, transcribe, align, diarize
+│   ├── audio.py         # ffmpeg decoding
+│   ├── speakers.py      # Speaker post-processing (split segments, speaker transcript)
+│   ├── formats.py       # TXT / SRT / VTT / JSON export
+│   ├── hf.py            # Hugging Face token storage and verification
+│   ├── system.py        # ffmpeg, NVIDIA GPU and CUDA detection
+│   ├── errors.py        # Error types with stable codes
+│   └── languages.py     # Languages supported by Whisper
 ├── templates/
 │   └── index.html       # Web UI
+├── static/
+│   ├── app.css          # Web UI styles
+│   └── app.js           # Web UI logic
 ├── requirements.txt     # Python dependencies
 ├── .env                 # Environment configuration
 ├── docker-compose.yml   # Docker configuration
@@ -355,7 +458,7 @@ source venv/bin/activate
 pytest tests/ -v
 ```
 
-The test suite covers app initialization, health/progress endpoints, model switching, audio decoding, transcription and speaker diarization (mocked), speaker post-processing, error handling, and more. Tests use `fastapi.testclient` and mock WhisperX so the transcription tests run without a model download.
+The test suite covers the HTTP API (transcription, jobs, cancel, export, model switching, Hugging Face token settings, error handling), the WhisperX pipeline with mocked models (alignment, diarization, fallbacks), the worker process (including a real crash and restart), the job queue, configuration, exports and speaker post-processing. No model is downloaded: WhisperX is mocked, and a fake engine stands in for the worker tests.
 
 ## License
 
