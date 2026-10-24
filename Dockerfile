@@ -14,13 +14,17 @@ COPY requirements.txt .
 
 RUN pip install --no-cache-dir -r requirements.txt
 
+# Sentence tokenizer used by WhisperX alignment (otherwise downloaded at runtime)
+RUN python -m nltk.downloader -d /usr/local/share/nltk_data punkt_tab
+
 COPY app/ ./app/
 COPY templates/ ./templates/
 
 ENV WHISPER_MODEL=base
 ENV PYTHONUNBUFFERED=1
+# CTranslate2 (faster-whisper) loads cuDNN/cuBLAS from the pip-installed NVIDIA wheels
+ENV LD_LIBRARY_PATH=/usr/local/lib/python3.12/site-packages/nvidia/cudnn/lib:/usr/local/lib/python3.12/site-packages/nvidia/cublas/lib
 
 EXPOSE 8000
 
 CMD ["python", "-m", "app.main"]
-

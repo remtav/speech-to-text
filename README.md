@@ -1,12 +1,14 @@
 # Speech to Text
 
-Voice transcription powered by **OpenAI Whisper** — runs locally, supports microphone recording and file upload.
+Voice transcription powered by **[WhisperX](https://github.com/m-bain/whisperX)** (faster-whisper + wav2vec2 word alignment + pyannote speaker diarization) — runs locally, supports microphone recording and file upload.
 
 ## Features
 
 - 🎤 **Microphone capture** — record directly in the browser with audio visualizer
 - 📁 **File upload** — drag-and-drop or browse for audio files
 - 🎵 **Multi-format support** — WAV, MP3, MP4, FLAC, OGG, M4A, WEBM
+- 👥 **Speaker identification** — optional diarization labels who said what (`SPEAKER_00`, `SPEAKER_01`, …)
+- ⏱️ **Word-level timestamps** — accurate per-word timing via forced alignment
 - 📊 **Model selection** — choose from Tiny, Base, Small, Medium, Large models
 - 📋 **Copy results** — one-click copy of transcribed text
 - 🌐 **CORS-enabled** — easily integrates with external frontends
@@ -20,57 +22,87 @@ Voice transcription powered by **OpenAI Whisper** — runs locally, supports mic
 └──────────────┘                          └────────┬────────┘
                                                     │
                                             ┌───────▼────────┐
-                                            │  Whisper Model │
-                                            │  (CPU/GPU)     │
+                                            │  ffmpeg        │
+                                            │  (decode once, │
+                                            │  16 kHz mono)  │
                                             └───────┬────────┘
                                                     │
-                                            ┌───────▼────────┐
-                                            │  ffmpeg /      │
-                                            │  librosa       │
-                                            │  (audio load)  │
-                                            └────────────────┘
+                          ┌─────────────────────────┼─────────────────────────┐
+                  ┌───────▼────────┐        ┌───────▼────────┐        ┌───────▼────────┐
+                  │ faster-whisper │        │ wav2vec2 align │        │ pyannote       │
+                  │ (VAD-batched)  │──────► │ (word times)   │──────► │ diarization    │
+                  └────────────────┘        └────────────────┘        │ (optional)     │
+                                                                      └────────────────┘
 ```
 
 **Flow:**
 1. Browser sends audio file (via mic capture → `MediaRecorder` or file upload → drag-and-drop)
 2. FastAPI receives `multipart/form-data`, saves to temp file
-3. Audio is converted to WAV via `ffmpeg` if needed (or loaded directly via `librosa`)
-4. Whisper model transcribes the audio on CPU or GPU
-5. Results (`text`, `language`, `segments`) returned as JSON
+3. `ffmpeg` decodes the file once into a 16 kHz mono waveform shared by every stage
+4. WhisperX transcribes with faster-whisper (CTranslate2), batched over VAD speech chunks
+5. A language-specific wav2vec2 model aligns the transcript to get word-level timestamps
+6. If `diarize=true`, pyannote finds speaker turns; each word gets the speaker that overlaps it most, and segments are split where the speaker changes
+7. Results (`text`, `language`, `segments`, plus `speakers` / `text_with_speakers` when diarizing) returned as JSON
+
+The heavy work runs in a worker thread, so `/progress` keeps responding during transcription (stages: `transcribe`, `align`, `diarize`).
 
 ## API Endpoints
 
 ### POST `/transcribe`
 
-Transcribe an audio file.
+Transcribe an audio file, optionally identifying speakers.
 
-**Request:** `multipart/form-data` with field `file`
+**Request:** `multipart/form-data`
 
-| Field  | Type    | Description              |
-|--------|---------|--------------------------|
-| `file` | `file`  | Audio file to transcribe |
+| Field          | Type    | Description                                                        |
+|----------------|---------|--------------------------------------------------------------------|
+| `file`         | `file`  | Audio file to transcribe                                           |
+| `diarize`      | `bool`  | Label speakers (default: `WHISPER_DIARIZE`, i.e. `false`)          |
+| `num_speakers` | `int`   | Exact number of speakers, if known (optional)                      |
+| `min_speakers` | `int`   | Minimum number of speakers (optional)                              |
+| `max_speakers` | `int`   | Maximum number of speakers (optional)                              |
 
-**Response (200):**
+**Response (200), without diarization:**
 
 ```json
 {
   "text": "Hello, this is a test.",
   "language": "en",
+  "aligned": true,
   "segments": [
     {
       "id": 0,
-      "start": 0.0,
-      "end": 4.24,
+      "start": 0.03,
+      "end": 1.92,
       "text": "Hello, this is a test.",
-      "tokens": [50364, 2425, ...],
-      "temperature": 0.0,
-      "avg_logprob": -0.31,
-      "compression_ratio": 0.98,
-      "no_speech_prob": 0.002
+      "words": [
+        {"word": "Hello,", "start": 0.03, "end": 0.41, "score": 0.93},
+        ...
+      ]
     }
   ]
 }
 ```
+
+**Response (200), with `diarize=true`:** segments are split wherever the speaker changes, and each segment and word carries a `speaker`:
+
+```json
+{
+  "text": "Hello. Hi, how are you?",
+  "language": "en",
+  "aligned": true,
+  "speakers": ["SPEAKER_00", "SPEAKER_01"],
+  "segments": [
+    {"id": 0, "start": 0.0, "end": 1.2, "text": "Hello.", "speaker": "SPEAKER_00", "words": [...]},
+    {"id": 1, "start": 1.4, "end": 3.0, "text": "Hi, how are you?", "speaker": "SPEAKER_01", "words": [...]}
+  ],
+  "text_with_speakers": "SPEAKER_00: Hello.\nSPEAKER_01: Hi, how are you?"
+}
+```
+
+`aligned` is `false` when no wav2vec2 alignment model exists for the detected language; segments then have no `words`, and speakers are assigned per segment.
+
+**Errors:** `400` for undecodable audio or invalid speaker hints, `503` when diarization is requested but `HF_TOKEN` is missing or the pyannote model can't be loaded.
 
 **Example with curl:**
 
@@ -78,13 +110,41 @@ Transcribe an audio file.
 # From file
 curl -F "file=@recording.wav" http://localhost:8081/transcribe
 
+# With speaker identification (2 to 4 speakers)
+curl -F "file=@meeting.mp3" -F diarize=true -F min_speakers=2 -F max_speakers=4 \
+  http://localhost:8081/transcribe
+
 # From microphone (webm)
 curl -F "file=@recording.webm" http://localhost:8081/transcribe
 ```
 
 ### POST `/transcribe/streaming`
 
-Transcribe with language detection (alias endpoint for real-time workflows).
+Fast transcription with language detection, skipping alignment and diarization. Returns `text`, `language` and `task`.
+
+## Speaker Diarization Setup
+
+Diarization uses the gated [`pyannote/speaker-diarization-community-1`](https://huggingface.co/pyannote/speaker-diarization-community-1) pipeline:
+
+1. Create a Hugging Face access token (read access) at <https://huggingface.co/settings/tokens>
+2. Accept the user conditions on the [model page](https://huggingface.co/pyannote/speaker-diarization-community-1)
+3. Give the token to the server, either way:
+   - **Saved login (persists across reboots, recommended):** run this once as the user that runs the server:
+     ```bash
+     source venv/bin/activate
+     hf auth login   # paste the token when prompted; it is saved to ~/.cache/huggingface/token
+     ```
+     The server reads the saved token on each request, so no restart is needed.
+     In Docker, the `model-cache` volume mounted on `/root/.cache` keeps it: run `docker compose exec speech-to-text hf auth login` once.
+   - **Environment variable:** set `HF_TOKEN` (it takes precedence over the saved login). Don't put it in the tracked `.env` file.
+
+Without a token, transcription works as usual and the "Identify speakers" toggle in the UI is disabled. The diarization pipeline is loaded on first use and freed by `/eject`.
+
+To check that the token can access the model:
+
+```bash
+python -c "from huggingface_hub import model_info; print(model_info('pyannote/speaker-diarization-community-1').id)"
+```
 
 ## Web UI
 
@@ -96,6 +156,7 @@ The web interface provides:
 - **Microphone mode** — click "Record" to capture audio, with a live frequency visualizer
 - **Upload mode** — drag and drop audio files or click to browse
 - **Model selector** — pick the desired Whisper model before transcribing
+- **Identify speakers** — toggle diarization, optionally with a min/max speaker count; the transcript is grouped by color-coded speaker and "Copy" includes the speaker labels
 
 ## Configuration
 
@@ -106,19 +167,28 @@ Set environment variables in `.env` or at startup:
 | `WHISPER_PORT`      | `8081`                                          | HTTP server port               |
 | `WHISPER_MODEL`     | `base`                                          | Whisper model name             |
 | `WHISPER_DEVICE`    | `cpu`                                           | Inference device (`cpu`/`cuda`)|
+| `WHISPER_COMPUTE_TYPE` | `float16` on GPU, `int8` on CPU              | CTranslate2 compute type (`float16`, `int8_float16`, `int8`, `float32`) |
+| `WHISPER_BATCH_SIZE`| `16`                                            | Batch size for VAD chunks (lower it if GPU runs out of memory) |
+| `HF_TOKEN`          | saved `hf auth login` token                     | Hugging Face token, required for speaker diarization |
+| `WHISPER_DIARIZE`   | `false`                                         | Diarize by default when the request doesn't say |
+| `WHISPER_DIARIZE_MODEL` | `pyannote/speaker-diarization-community-1`  | pyannote pipeline used for diarization |
 | `FFMPEG_PATH`       | auto-detected                                   | Path to ffmpeg binary          |
-| `WHISPER_FP16`      | `false`                                         | Enable FP16 for speed (GPU)   |
 
 ### Available Models
 
-| Model    | Params  | Disk Space | GPU Memory | Speed   | Accuracy |
-|----------|---------|------------|------------|---------|----------|
-| `tiny`   | 39M     | ~150 MB    | ~300 MB    | Fastest | Lower    |
-| `base`   | 74M     | ~460 MB    | ~600 MB    | Fast    | Good     |
-| `small`  | 244M    | ~1.5 GB    | ~1.5 GB    | Moderate| Very Good|
-| `medium` | 769M    | ~5 GB      | ~3.5 GB    | Slow    | Excellent|
-| `large`  | 1550M   | ~10 GB     | ~6 GB      | Slowest | Best     |
-| `large-v3`| 1550M  | ~10 GB     | ~7 GB      | Slowest | Best     |
+Whisper models run through faster-whisper (CTranslate2), which is faster and lighter than the original implementation. Weights are downloaded from the Hugging Face Hub on first use.
+
+| Model    | Params  | Speed   | Accuracy |
+|----------|---------|---------|----------|
+| `tiny`   | 39M     | Fastest | Lower    |
+| `base`   | 74M     | Fast    | Good     |
+| `small`  | 244M    | Moderate| Very Good|
+| `medium` | 769M    | Slow    | Excellent|
+| `large-v3-turbo` | 809M | Fast | Near large-v3 |
+| `large-v2`| 1550M  | Slowest | Best     |
+| `large` / `large-v3`| 1550M  | Slowest | Best     |
+
+Word alignment additionally downloads a ~360 MB–1.2 GB wav2vec2 model per language (first use), and diarization a ~30 MB pyannote pipeline.
 
 ## GPU Inference
 
@@ -164,7 +234,7 @@ Loading Whisper model: large on cuda...
 
 ```bash
 # Download large model explicitly
-python -c "import whisper; whisper.load_model('large', device='cuda')"
+python -c "from faster_whisper.utils import download_model; import os; download_model('large-v3', cache_dir=os.path.expanduser('~/.cache/whisper'))"
 ```
 
 ### Docker GPU Support
@@ -246,7 +316,8 @@ docker compose up --build
 ```
 speech-to-text/
 ├── app/
-│   └── main.py          # FastAPI application
+│   ├── main.py          # FastAPI application + WhisperX pipeline
+│   └── speakers.py      # Speaker post-processing (split segments, speaker transcript)
 ├── templates/
 │   └── index.html       # Web UI
 ├── requirements.txt     # Python dependencies
@@ -261,8 +332,8 @@ speech-to-text/
 |------------------|---------|-----------------------------|
 | `fastapi`        | 0.115.6 | Web framework               |
 | `uvicorn`        | 0.34.0  | ASGI server                 |
-| `openai-whisper` | 20240930| Speech-to-text engine       |
-| `torch`          | 2.6.0   | Deep learning framework     |
+| `whisperx`       | 3.8.6   | Speech-to-text engine (faster-whisper, alignment, pyannote diarization) |
+| `torch`          | ~2.8.0  | Deep learning framework (pinned by WhisperX) |
 | `ffmpeg-python`  | 0.2.0   | Audio format conversion     |
 | `edge-tts`       | 7.0.0   | Text-to-speech (testing)    |
 
@@ -270,8 +341,10 @@ speech-to-text/
 
 - **CPU inference** works for all models but is slow for `large` / `large-v3`
 - **GPU inference** with CUDA is highly recommended for `medium` and larger models
-- **fp16 precision** can be enabled by setting `fp16=True` in the `model.transcribe()` call (already set in future versions)
-- Model weights are cached in `~/.cache/whisper/` — no re-download needed between restarts
+- **Compute type** defaults to `float16` on GPU and `int8` on CPU; override with `WHISPER_COMPUTE_TYPE`
+- **Diarization** adds noticeable time on CPU for long recordings; GPU is recommended
+- Whisper weights are cached in `~/.cache/whisper/`, alignment and pyannote models in `~/.cache/huggingface/` — no re-download needed between restarts
+- **Known limitations:** overlapping speech is attributed to a single speaker per word; words at a speaker boundary can occasionally be mislabelled
 
 ## Testing
 
@@ -282,7 +355,7 @@ source venv/bin/activate
 pytest tests/ -v
 ```
 
-The test suite covers app initialization, health/progress endpoints, model switching, audio conversion, transcription (mocked), error handling, and more. Tests use `fastapi.testclient` and mock Whisper to run without requiring a model download.
+The test suite covers app initialization, health/progress endpoints, model switching, audio decoding, transcription and speaker diarization (mocked), speaker post-processing, error handling, and more. Tests use `fastapi.testclient` and mock WhisperX so the transcription tests run without a model download.
 
 ## License
 

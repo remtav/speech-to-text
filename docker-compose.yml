@@ -7,6 +7,9 @@ services:
       - "8000:8000"
     environment:
       - WHISPER_MODEL=base
+      # Speaker diarization: Hugging Face token with the pyannote model terms accepted
+      - HF_TOKEN=${HF_TOKEN:-}
+      - WHISPER_DIARIZE=${WHISPER_DIARIZE:-false}
     volumes:
       - model-cache:/root/.cache
     deploy:

@@ -2,11 +2,11 @@
 Comprehensive test suite for the Speech-to-Text FastAPI application.
 
 Tests cover:
-- Audio conversion functions
+- Audio decoding
 - GPU/device detection helpers
 - Progress tracking
 - Health info endpoints
-- Transcription endpoints (mocked)
+- Transcription and speaker diarization endpoints (mocked WhisperX)
 - Error handling and edge cases
 
 Run with: pytest tests/ -v
@@ -21,6 +21,9 @@ import hashlib
 import threading
 from pathlib import Path
 from unittest.mock import patch, MagicMock, mock_open
+
+import numpy as np
+import pytest
 
 # Ensure app module can be imported
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -186,57 +189,164 @@ class TestGetNvidiaGpuInfo:
             assert gpu["vram_total_mb"] > 0
 
 
-class TestAudioConversion:
-    """Test the convert_audio_to_wav function."""
+class TestLoadAudio:
+    """Test the load_audio function (ffmpeg decode to 16 kHz mono)."""
 
-    def test_wav_file_unchanged(self):
-        with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as f:
-            f.write(b"dummy wav content")
-            tmp_path = f.name
-        try:
-            result_path, ext = app.main.convert_audio_to_wav(tmp_path)
-            assert result_path == tmp_path
-            assert ext == ".wav"
-        finally:
-            os.unlink(tmp_path)
+    def test_decodes_pcm(self):
+        pcm = np.array([0, 16384, -16384], dtype=np.int16).tobytes()
+        with patch("app.main.subprocess.run", return_value=MagicMock(stdout=pcm)) as mock_run:
+            audio = app.main.load_audio("input.mp3")
+        assert audio.dtype == np.float32
+        np.testing.assert_allclose(audio, [0.0, 0.5, -0.5])
+        cmd = mock_run.call_args[0][0]
+        assert "input.mp3" in cmd and "16000" in cmd
 
-    def test_non_wav_file_conversion(self):
-        with tempfile.NamedTemporaryFile(suffix=".mp3", delete=False) as f:
-            f.write(b"dummy mp3 content")
-            tmp_path = f.name
-        try:
-            with patch("app.main.subprocess") as mock_subprocess:
-                mock_subprocess.run.return_value = MagicMock(returncode=0)
-                with patch("os.path.exists", return_value=True):
-                    result_path, ext = app.main.convert_audio_to_wav(tmp_path)
-                assert ext == ".wav"
-        finally:
-            os.unlink(tmp_path)
+    def test_decode_failure_raises(self):
+        error = subprocess.CalledProcessError(1, "ffmpeg", stderr=b"Invalid data found when processing input")
+        with patch("app.main.subprocess.run", side_effect=error):
+            with pytest.raises(app.main.AudioDecodeError, match="Invalid data"):
+                app.main.load_audio("bad.wav")
+
+    def test_empty_audio_raises(self):
+        with patch("app.main.subprocess.run", return_value=MagicMock(stdout=b"")):
+            with pytest.raises(app.main.AudioDecodeError):
+                app.main.load_audio("empty.wav")
+
+
+def _fake_whisperx():
+    """A stand-in whisperx module: alignment adds words, diarization splits speakers by time."""
+    fake = MagicMock()
+
+    def align(segments, model, metadata, audio, device, **kwargs):
+        aligned = []
+        for seg in segments:
+            words = seg["text"].split()
+            step = (seg["end"] - seg["start"]) / len(words)
+            aligned.append(dict(seg, words=[
+                {"word": w, "start": seg["start"] + i * step, "end": seg["start"] + (i + 1) * step, "score": 0.9}
+                for i, w in enumerate(words)
+            ]))
+        return {"segments": aligned, "word_segments": []}
+
+    def assign_word_speakers(diarize_segments, result, fill_nearest=False):
+        for seg in result["segments"]:
+            for word in seg.get("words", []):
+                # Words are spread evenly over 0-2 s: "Hello." starts at 0, "Hi" at ~0.67
+                word["speaker"] = "SPEAKER_00" if word["start"] < 0.5 else "SPEAKER_01"
+            seg["speaker"] = "SPEAKER_01"
+        return result
+
+    fake.align.side_effect = align
+    fake.assign_word_speakers.side_effect = assign_word_speakers
+    return fake
+
+
+@pytest.fixture
+def mock_engine():
+    """Mock the WhisperX pipeline so /transcribe runs without models."""
+    asr = MagicMock()
+    asr.transcribe.return_value = {
+        "segments": [{"start": 0.0, "end": 2.0, "text": " Hello. Hi there", "avg_logprob": -0.2}],
+        "language": "en",
+    }
+    diarizer = MagicMock(return_value="diarize-df")
+    with patch.dict(sys.modules, {"whisperx": _fake_whisperx()}), \
+            patch.object(app.main, "model", asr), \
+            patch.object(app.main, "_ensure_model", return_value=True), \
+            patch.object(app.main, "load_audio", return_value=np.zeros(32000, dtype=np.float32)), \
+            patch.object(app.main, "_get_align_model", return_value=("align-model", {"language": "en"})), \
+            patch.object(app.main, "_get_diarize_model", return_value=diarizer), \
+            patch.object(app.main, "_get_hf_token", return_value="hf_test"):
+        yield {"asr": asr, "diarizer": diarizer}
+
+
+def _post_audio(path="/transcribe", data=None):
+    files = {"file": ("test.wav", b"dummy wav audio data", "audio/wav")}
+    return client.post(path, files=files, data=data or {})
 
 
 class TestTranscribeEndpoint:
-    """Test the /transcribe endpoint with mocked Whisper."""
+    """Test the /transcribe endpoint with mocked WhisperX."""
 
-    def test_transcribe_file_success(self):
-        """Test successful transcription with a mock file."""
-        with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as wav_file:
-            wav_file.write(b"dummy wav audio data")
-            wav_path = wav_file.name
+    def test_transcribe_without_diarization(self, mock_engine):
+        response = _post_audio()
+        assert response.status_code == 200
+        data = response.json()
+        assert data["text"] == "Hello. Hi there"
+        assert data["language"] == "en"
+        assert data["aligned"] is True
+        assert len(data["segments"]) == 1
+        assert [w["word"] for w in data["segments"][0]["words"]] == ["Hello.", "Hi", "there"]
+        assert "speakers" not in data
+        assert "text_with_speakers" not in data
+        mock_engine["diarizer"].assert_not_called()
 
-        try:
-            with open(wav_path, "rb") as f:
-                files = {"file": ("test.wav", f, "audio/wav")}
-                response = client.post("/transcribe", files=files)
-            # Response may fail if model isn't loaded
-            assert response.status_code in (200, 500)
+    def test_transcribe_with_diarization_splits_segments(self, mock_engine):
+        response = _post_audio(data={"diarize": "true", "min_speakers": "1", "max_speakers": "3"})
+        assert response.status_code == 200
+        data = response.json()
+        assert data["speakers"] == ["SPEAKER_00", "SPEAKER_01"]
+        assert [(s["speaker"], s["text"]) for s in data["segments"]] == [
+            ("SPEAKER_00", "Hello."), ("SPEAKER_01", "Hi there"),
+        ]
+        assert data["text_with_speakers"] == "SPEAKER_00: Hello.\nSPEAKER_01: Hi there"
+        kwargs = mock_engine["diarizer"].call_args.kwargs
+        assert (kwargs["min_speakers"], kwargs["max_speakers"], kwargs["num_speakers"]) == (1, 3, None)
 
-            if response.status_code == 200:
-                data = response.json()
-                assert "text" in data
-                assert "language" in data
-                assert "segments" in data
-        finally:
-            os.unlink(wav_path)
+    def test_transcribe_unaligned_language(self, mock_engine):
+        with patch.object(app.main, "_get_align_model", return_value=None):
+            response = _post_audio(data={"diarize": "true"})
+        assert response.status_code == 200
+        data = response.json()
+        assert data["aligned"] is False
+        assert data["segments"][0]["speaker"] == "SPEAKER_01"
+        assert "words" not in data["segments"][0]
+
+    def test_diarize_without_hf_token(self, mock_engine):
+        with patch.object(app.main, "_get_hf_token", return_value=None):
+            response = _post_audio(data={"diarize": "true"})
+        assert response.status_code == 503
+        assert "HF_TOKEN" in response.json()["detail"]
+
+    def test_hf_token_from_env(self):
+        with patch.dict(os.environ, {"HF_TOKEN": "hf_from_env"}):
+            assert app.main._get_hf_token() == "hf_from_env"
+
+    def test_hf_token_from_saved_login(self, tmp_path):
+        token_file = tmp_path / "token"
+        token_file.write_text("hf_saved_login\n")
+        hf_constants = pytest.importorskip("huggingface_hub.constants")
+        env = {k: v for k, v in os.environ.items() if k not in ("HF_TOKEN", "HUGGING_FACE_HUB_TOKEN")}
+        with patch.dict(os.environ, env, clear=True), \
+                patch.object(hf_constants, "HF_TOKEN_PATH", str(token_file)):
+            assert app.main._get_hf_token() == "hf_saved_login"
+
+    def test_health_reports_diarization_availability(self):
+        with patch.object(app.main, "_get_hf_token", return_value=None):
+            assert client.get("/health").json()["diarization_available"] is False
+        with patch.object(app.main, "_get_hf_token", return_value="hf_x"):
+            assert client.get("/health").json()["diarization_available"] is True
+
+    def test_diarization_model_unavailable(self, mock_engine):
+        error = app.main.DiarizationUnavailable("gated model")
+        with patch.object(app.main, "_get_diarize_model", side_effect=error):
+            response = _post_audio(data={"diarize": "true"})
+        assert response.status_code == 503
+        assert "gated model" in response.json()["detail"]
+
+    def test_invalid_speaker_hints(self, mock_engine):
+        assert _post_audio(data={"diarize": "true", "num_speakers": "0"}).status_code == 400
+        assert _post_audio(data={"diarize": "true", "min_speakers": "3", "max_speakers": "2"}).status_code == 400
+
+    def test_undecodable_audio(self, mock_engine):
+        with patch.object(app.main, "load_audio", side_effect=app.main.AudioDecodeError("bad audio")):
+            response = _post_audio()
+        assert response.status_code == 400
+
+    def test_temp_file_removed(self, mock_engine):
+        with patch.object(app.main.os, "unlink", wraps=os.unlink) as mock_unlink:
+            _post_audio()
+        assert mock_unlink.call_count == 1
 
     def test_transcribe_no_file(self):
         """Test transcription without providing a file."""
@@ -247,19 +357,10 @@ class TestTranscribeEndpoint:
 class TestTranscribeStreamingEndpoint:
     """Test the /transcribe/streaming endpoint."""
 
-    def test_streaming_transcribe(self):
-        """Test streaming transcription."""
-        with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as wav_file:
-            wav_file.write(b"dummy wav audio data")
-            wav_path = wav_file.name
-
-        try:
-            with open(wav_path, "rb") as f:
-                files = {"file": ("test.wav", f, "audio/wav")}
-                response = client.post("/transcribe/streaming", files=files)
-            assert response.status_code in (200, 500)
-        finally:
-            os.unlink(wav_path)
+    def test_streaming_transcribe(self, mock_engine):
+        response = _post_audio("/transcribe/streaming")
+        assert response.status_code == 200
+        assert response.json() == {"text": "Hello. Hi there", "language": "en", "task": "transcribe"}
 
 
 class TestGetHealthInfo:
@@ -363,13 +464,15 @@ class TestModelSelection:
 
     def test_all_valid_models(self):
         """Test that all listed models are accepted (as valid names)."""
-        valid_models = ["tiny", "base", "small", "medium", "large", "large-v3"]
-        for model_name in valid_models:
-            with patch("app.main._check_torch_cuda") as mock_check:
-                mock_check.return_value = {"available": False}
+        for model_name in app.main.VALID_MODELS:
+            # Validation only: don't download every model
+            with patch("app.main._ensure_model", return_value=True):
                 response = client.post("/switch-model", json={"model": model_name, "device": "cpu"})
-                # Should be 200 or 500 (loading failure), not 400 (validation failure)
-                assert response.status_code not in (400,), f"Model {model_name} was rejected"
+                assert response.status_code == 200, f"Model {model_name} was rejected"
+
+    def test_valid_models_known_to_faster_whisper(self):
+        faster_whisper_utils = pytest.importorskip("faster_whisper.utils")
+        assert set(app.main.VALID_MODELS) <= set(faster_whisper_utils.available_models())
 
 
 if __name__ == "__main__":

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Speech to Text — Whisper</title>
+    <title>Speech to Text — WhisperX</title>
     <style>
         :root {
             --bg: #0f0f0f;
@@ -312,6 +312,38 @@
         .model-switcher button:disabled { opacity: .5; cursor: not-allowed; }
         .model-switcher button.switched { border-color: #4ade80; background: rgba(74,222,128,.1); }
 
+        /* Speaker diarization */
+        .speaker-options {
+            display: flex;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 1rem;
+            margin-top: 1rem;
+            font-size: .9rem;
+        }
+        .speaker-options label { display: flex; align-items: center; gap: .4rem; cursor: pointer; }
+        .speaker-options input[type=number] {
+            width: 4.5rem;
+            background: var(--bg);
+            color: var(--text);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: .3rem .5rem;
+        }
+        .speaker-options input:disabled, .speaker-options label.disabled { opacity: .5; cursor: not-allowed; }
+        .speaker-turn { margin-bottom: .8rem; }
+        .speaker-turn:last-child { margin-bottom: 0; }
+        .speaker-label {
+            display: inline-block;
+            font-size: .8rem;
+            font-weight: 600;
+            padding: .1rem .5rem;
+            border-radius: 4px;
+            margin-right: .5rem;
+            color: #111;
+        }
+        .speaker-time { font-size: .75rem; color: var(--text-muted); margin-right: .5rem; }
+
         footer {
             margin-top: 3rem;
             color: var(--text-muted);
@@ -322,7 +354,7 @@
 </head>
 <body>
     <h1>⚡ Speech to Text</h1>
-    <p class="subtitle">Powered by OpenAI Whisper — runs locally in your container</p>
+    <p class="subtitle">Powered by WhisperX — transcription with speaker identification, runs locally in your container</p>
 
     <div class="container">
         <div class="gpu-status loading" id="gpuStatus">
@@ -341,7 +373,8 @@
                     <option value="base" selected>Base (default balance)</option>
                     <option value="small">Small (good balance)</option>
                     <option value="medium">Medium (more accurate, slower)</option>
-                    <option value="large">Large (most accurate, needs GPU/vRAM)</option>
+                    <option value="large-v3-turbo">Large-v3-turbo (near large accuracy, much faster)</option>
+                    <option value="large-v2">Large-v2 (very accurate, needs GPU/vRAM)</option>
                     <option value="large-v3">Large-v3 (best accuracy, needs GPU/vRAM)</option>
                 </select>
                 <select class="model-select" id="deviceSelect" style="margin:0;flex:1;min-width:200px;">
@@ -355,6 +388,19 @@
                 <button id="switchModelBtn" onclick="switchModel()">Switch Model</button>
             </div>
             <p class="status" id="modelStatus"></p>
+            <div class="speaker-options">
+                <label>
+                    <input type="checkbox" id="diarizeToggle">
+                    👥 Identify speakers
+                </label>
+                <label>
+                    Speakers
+                    <input type="number" id="minSpeakers" min="1" placeholder="min" title="Minimum number of speakers (optional)">
+                    –
+                    <input type="number" id="maxSpeakers" min="1" placeholder="max" title="Maximum number of speakers (optional)">
+                </label>
+            </div>
+            <p class="status" id="diarizeStatus"></p>
         </div>
 
         <div class="card">
@@ -415,15 +461,15 @@
                 <div class="spinner"></div>
                 <p>Transcribing audio...</p>
             </div>
-            <div class="output-box placeholder" id="output">
-                Transcription will appear here...
+            <div class="output-box placeholder" id="outputBox">
+                <div id="output">Transcription will appear here...</div>
                 <button class="copy-btn" id="copyBtn" onclick="copyText()">📋 Copy</button>
             </div>
         </div>
     </div>
 
     <footer>
-        Built with FastAPI + OpenAI Whisper · <a href="https://github.com/openai/whisper">GitHub</a>
+        Built with FastAPI + WhisperX · <a href="https://github.com/m-bain/whisperX">GitHub</a>
     </footer>
 
     <script>
@@ -609,11 +655,13 @@
         // --- Send Audio (with progress) ---
         async function sendAudio(fileOrBlob, source) {
             const output = document.getElementById('output');
+            const outputBox = document.getElementById('outputBox');
             const loading = document.getElementById('loading');
-            const model = document.getElementById('modelSelect').value;
+            const diarize = document.getElementById('diarizeToggle').checked;
 
             output.textContent = 'Transcription will appear here...';
-            output.classList.add('placeholder');
+            outputBox.classList.add('placeholder');
+            copyableText = '';
             loading.classList.add('active');
 
             startProgressPolling();
@@ -623,17 +671,36 @@
             formData.append('file', source === 'mic'
                 ? new Blob([fileOrBlob], { type: 'audio/webm' })
                 : fileOrBlob, source === 'mic' ? 'recording.webm' : fileOrBlob.name);
+            formData.append('diarize', diarize ? 'true' : 'false');
+            if (diarize) {
+                const minSpk = document.getElementById('minSpeakers').value;
+                const maxSpk = document.getElementById('maxSpeakers').value;
+                if (minSpk) formData.append('min_speakers', minSpk);
+                if (maxSpk) formData.append('max_speakers', maxSpk);
+            }
 
             try {
                 const resp = await fetch('/transcribe', { method: 'POST', body: formData });
-                if (!resp.ok) throw new Error(await resp.text());
+                if (!resp.ok) {
+                    const body = await resp.text();
+                    let detail = body;
+                    try { detail = JSON.parse(body).detail || body; } catch {}
+                    throw new Error(detail);
+                }
                 const data = await resp.json();
-                output.textContent = data.text;
-                output.classList.remove('placeholder');
-                showStatus(`Language: ${data.language}`, 'success');
+                outputBox.classList.remove('placeholder');
+                if (diarize && data.speakers) {
+                    renderSpeakerTranscript(output, data.segments, data.speakers);
+                    copyableText = data.text_with_speakers;
+                    showStatus(`Language: ${data.language} · Speakers: ${data.speakers.length}`, 'success');
+                } else {
+                    output.textContent = data.text;
+                    copyableText = data.text;
+                    showStatus(`Language: ${data.language}`, 'success');
+                }
             } catch (e) {
                 output.textContent = `Error: ${e.message}`;
-                output.classList.remove('placeholder');
+                outputBox.classList.remove('placeholder');
                 showStatus('Transcription failed', 'error');
                 document.getElementById('progressCard').classList.add('error');
                 document.getElementById('progressStageText').textContent = e.message;
@@ -721,8 +788,69 @@
             el.className = 'status ' + (type || '');
         }
 
+        // --- Speaker-grouped transcript ---
+        const SPEAKER_COLORS = ['#60a5fa', '#f472b6', '#4ade80', '#facc15', '#c084fc', '#fb923c', '#2dd4bf', '#f87171'];
+        let copyableText = '';
+
+        function formatTime(seconds) {
+            if (seconds == null) return '';
+            const m = Math.floor(seconds / 60);
+            const s = Math.floor(seconds % 60).toString().padStart(2, '0');
+            return `${m}:${s}`;
+        }
+
+        function renderSpeakerTranscript(container, segments, speakers) {
+            container.textContent = '';
+            // Merge consecutive segments from the same speaker into one turn
+            const turns = [];
+            for (const seg of segments) {
+                const text = (seg.text || '').trim();
+                if (!text) continue;
+                const speaker = seg.speaker || 'UNKNOWN';
+                const last = turns[turns.length - 1];
+                if (last && last.speaker === speaker) {
+                    last.texts.push(text);
+                } else {
+                    turns.push({ speaker, start: seg.start, texts: [text] });
+                }
+            }
+            for (const turn of turns) {
+                const idx = speakers.indexOf(turn.speaker);
+                const div = document.createElement('div');
+                div.className = 'speaker-turn';
+                const label = document.createElement('span');
+                label.className = 'speaker-label';
+                label.textContent = turn.speaker;
+                label.style.background = idx >= 0 ? SPEAKER_COLORS[idx % SPEAKER_COLORS.length] : '#888';
+                const time = document.createElement('span');
+                time.className = 'speaker-time';
+                time.textContent = formatTime(turn.start);
+                div.append(label, time, document.createTextNode(turn.texts.join(' ')));
+                container.appendChild(div);
+            }
+        }
+
+        function updateDiarizeOptions(available, isDefault) {
+            const toggle = document.getElementById('diarizeToggle');
+            const status = document.getElementById('diarizeStatus');
+            if (!diarizeInitialized) {
+                toggle.checked = available && isDefault;
+                diarizeInitialized = true;
+            }
+            toggle.disabled = !available;
+            toggle.closest('label').classList.toggle('disabled', !available);
+            if (!available) toggle.checked = false;
+            const hintsDisabled = !available || !toggle.checked;
+            document.getElementById('minSpeakers').disabled = hintsDisabled;
+            document.getElementById('maxSpeakers').disabled = hintsDisabled;
+            status.textContent = available ? '' : 'Speaker identification needs a Hugging Face token on the server (HF_TOKEN or `hf auth login`).';
+        }
+        let diarizeInitialized = false;
+        let diarizeAvailable = false;
+        document.getElementById('diarizeToggle').addEventListener('change', () => updateDiarizeOptions(diarizeAvailable));
+
         function copyText() {
-            const text = document.getElementById('output').textContent;
+            const text = copyableText || document.getElementById('output').textContent;
             navigator.clipboard.writeText(text).then(() => {
                 const btn = document.getElementById('copyBtn');
                 btn.textContent = '✅ Copied!';
@@ -754,6 +882,9 @@
                 gpuStatusEl.querySelector('.gpu-title').textContent = data.recommendation;
                 gpuStatusEl.querySelector('.gpu-detail').textContent =
                     `Model: ${data.model} on ${data.device}`;
+
+                diarizeAvailable = !!data.diarization_available;
+                updateDiarizeOptions(diarizeAvailable, !!data.diarize_default);
 
                 // GPU health details
                 const gpuHealthEl = document.getElementById('gpuHealthContent');
