@@ -389,6 +389,24 @@ python -m uvicorn app.main:app --host 0.0.0.0 --port $WHISPER_PORT
 docker compose up --build
 ```
 
+### Pre-built image (Docker Hub)
+
+Every push to `main` (a merged PR) that passes the tests builds the image and
+pushes it to Docker Hub as `<your-user>/speech-to-text`, tagged `latest` and
+`sha-<commit>`. It uses the repository secrets `DOCKERHUB_USERNAME` and
+`DOCKERHUB_TOKEN` (a Docker Hub personal access token with Read & Write access,
+added under *Settings → Secrets and variables → Actions*). Without them the
+publish job only prints a warning.
+
+To run the published image instead of building it:
+
+```bash
+# .env
+STT_IMAGE=<your-user>/speech-to-text:latest
+
+docker compose pull && docker compose up -d
+```
+
 ## Troubleshooting
 
 | Symptom | Cause and fix |
