@@ -1,6 +1,9 @@
 services:
   speech-to-text:
     build: .
+    # Set STT_IMAGE to the image CI publishes to Docker Hub (e.g. you/speech-to-text:latest)
+    # to "docker compose pull" instead of building it.
+    image: ${STT_IMAGE:-speech-to-text:latest}
     ports:
       - "8081:8081"
     environment:
