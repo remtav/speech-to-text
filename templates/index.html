@@ -9,6 +9,7 @@
 <body>
     <header>
         <h1>⚡ Speech to Text</h1>
+        <a class="version" href="{{build_url}}" target="_blank" rel="noopener" title="{{build_title}}">{{build_label}}</a>
         <p class="subtitle">Powered by WhisperX — transcription with speaker identification, runs locally on your machine</p>
     </header>
 
@@ -171,7 +172,7 @@
     </div>
 
     <footer>
-        Built with FastAPI + WhisperX · v{{version}} · <a href="/docs" target="_blank" rel="noopener">API docs</a> ·
+        Built with FastAPI + WhisperX · {{build_label}} · <a href="/docs" target="_blank" rel="noopener">API docs</a> ·
         <a href="https://github.com/m-bain/whisperX" target="_blank" rel="noopener">WhisperX on GitHub</a>
     </footer>
 

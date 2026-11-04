@@ -6,6 +6,7 @@ import re
 import tempfile
 import threading
 from contextlib import asynccontextmanager
+from html import escape
 from pathlib import Path
 from typing import Optional
 from urllib.parse import urlsplit
@@ -23,9 +24,8 @@ from app.formats import EXPORT_FORMATS, export
 from app.jobs import JobManager
 from app.languages import LANGUAGES
 from app.pipeline import Engine, model_cache_dir
+from app.version import __version__, build_info, build_label
 from app.worker import InlineBackend, ProcessBackend
-
-__version__ = "2.0.0"
 
 ROOT = Path(__file__).resolve().parent.parent
 TEMPLATES_DIR = ROOT / "templates"
@@ -165,7 +165,9 @@ def create_app(settings=None, backend=None):
         manager.start()
 
         log.info("=" * 60)
-        log.info("Speech-to-Text %s on http://%s:%s", __version__, settings.host, settings.port)
+        build = build_info()
+        log.info("Speech-to-Text %s (commit %s, %s) on http://%s:%s", __version__, build["commit_short"] or "unknown",
+                 build["date"] or "date unknown", settings.host, settings.port)
         log.info("Model: %s on %s (worker mode: %s)", settings.model, device, settings.worker_mode)
         log.info("Model cache dir: %s", model_cache_dir())
         log.info("ffmpeg: %s", ffmpeg_path or "NOT FOUND (install it or set FFMPEG_PATH)")
@@ -208,7 +210,13 @@ def create_app(settings=None, backend=None):
     @app.get("/", response_class=HTMLResponse)
     def index():
         html = (TEMPLATES_DIR / "index.html").read_text(encoding="utf-8")
-        return HTMLResponse(html.replace("{{version}}", __version__), headers={"Cache-Control": "no-cache"})
+        build = build_info()
+        html = (html.replace("{{version}}", escape(__version__))
+                .replace("{{build_label}}", escape(build_label()))
+                .replace("{{build_url}}", escape(build["url"]))
+                .replace("{{build_title}}", escape(f"Built from commit {build['commit']}" if build["commit"]
+                                                   else "Commit unknown (not built from a git checkout)")))
+        return HTMLResponse(html, headers={"Cache-Control": "no-cache"})
 
     # ---------------------------------------------------------- status
 
@@ -226,6 +234,7 @@ def create_app(settings=None, backend=None):
         return {
             "status": status,
             "version": __version__,
+            "build": build_info(),
             "device": state["device"],
             "model": state["model"],
             "model_loaded": state["model_loaded"],
