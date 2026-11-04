@@ -39,3 +39,6 @@ Thumbs.db
 *.tmp
 *.bak
 .venv/
+
+# Build stamp written by the Docker build
+app/build-info.json

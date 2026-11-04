@@ -1,4 +1,4 @@
-FROM python:3.12-slim-bookworm
+FROM python:3.12-slim-bookworm AS base
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ffmpeg \
@@ -7,6 +7,15 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
+
+# Build stamp: the git commit the image was built from, shown in the UI.  Only
+# this small stage sees .git; without it (a source archive) the commit is unknown.
+FROM base AS buildinfo
+COPY . /src
+RUN git config --global --add safe.directory /src \
+    && (git -C /src log -1 --format='{"commit": "%H", "date": "%cI"}' 2>/dev/null || echo '{}') > /build-info.json
+
+FROM base
 
 RUN python -m pip install --upgrade pip
 
@@ -18,6 +27,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 RUN python -m nltk.downloader -d /usr/local/share/nltk_data punkt_tab
 
 COPY app/ ./app/
+COPY --from=buildinfo /build-info.json ./app/build-info.json
 COPY templates/ ./templates/
 COPY static/ ./static/
 
