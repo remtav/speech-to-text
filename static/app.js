@@ -276,6 +276,7 @@ $('cancelBtn').addEventListener('click', async () => {
 let currentMode = 'microphone';
 let currentResult = null;
 let currentJobId = null;
+let resultView = 'polished';  // 'polished' or 'raw'; only matters when the result has a polished text
 
 function captureStatusEl() {
     return currentMode === 'microphone' ? $('micStatus') : $('fileStatus');
@@ -292,6 +293,8 @@ function transcriptionOptions() {
         if (max) form.append('max_speakers', max);
     }
     if ($('languageSelect').value) form.append('language', $('languageSelect').value);
+    // Always explicit: an unavailable endpoint means "don't try", whatever WHISPER_POLISH says
+    form.append('polish', $('polishToggle').checked && !$('polishToggle').disabled ? 'true' : 'false');
     return form;
 }
 
@@ -382,26 +385,37 @@ function showError(message) {
     $('resultActions').hidden = true;
 }
 
+/** True when the polished text is what the result card shows (and what Copy / TXT give). */
+function showingPolished() {
+    return !!(currentResult && currentResult.polished_text) && resultView === 'polished';
+}
+
 function showResult(job) {
     currentResult = job.result;
     currentJobId = job.id;
     store.set(LAST_RESULT_KEY, job.id);
+    resultView = 'polished';  // the polished text first when there is one; the raw one is a click away
     $('outputBox').className = 'output-box';
-    renderResult();
 
     const hasSegments = Array.isArray(currentResult.segments) && currentResult.segments.length > 0;
     for (const fmt of ['txt', 'srt', 'vtt', 'json']) {
         const link = $('dl' + fmt[0].toUpperCase() + fmt.slice(1));
-        link.href = `/jobs/${job.id}/export?format=${fmt}`;
+        link.href = `/jobs/${job.id}/export?format=${fmt}`;  // SRT / VTT stay raw: timestamps belong to the raw words
         link.hidden = (fmt === 'srt' || fmt === 'vtt') && !hasSegments;
     }
     $('timestampsToggle').parentElement.hidden = !hasSegments;
+    $('viewSwitch').hidden = !currentResult.polished_text;
     $('resultActions').hidden = false;
+    updateResultView();
 
     const meta = [];
     if (job.filename) meta.push(job.filename);
     if (job.started_at && job.finished_at) meta.push(`processed in ${formatTime(job.finished_at - job.started_at)}`);
     if (job.params && job.params.language) meta.push(`language forced to ${job.params.language}`);
+    const polish = currentResult.polish;
+    if (polish && polish.applied) {
+        meta.push(`polished by ${polish.model}${polish.latency_ms != null ? ` in ${polish.latency_ms} ms` : ''}`);
+    }
     setStatus($('resultMeta'), meta.join(' · '));
 
     const warnings = currentResult.warnings || [];
@@ -415,6 +429,30 @@ function showResult(job) {
     list.hidden = warnings.length === 0;
 }
 
+/** Apply the Raw / Polished choice to the switch, the TXT link and the timestamps option, then render. */
+function updateResultView() {
+    const polished = showingPolished();
+    document.querySelectorAll('#viewSwitch .view-btn').forEach((btn) => {
+        btn.setAttribute('aria-pressed', String(btn.dataset.view === (polished ? 'polished' : 'raw')));
+    });
+    if (currentJobId) {
+        $('dlTxt').href = `/jobs/${currentJobId}/export?format=txt${polished ? '&polished=true' : ''}`;
+    }
+    // The polished text has no timestamps: they are tied to the raw words
+    const times = $('timestampsToggle');
+    times.disabled = polished;
+    times.parentElement.classList.toggle('disabled', polished);
+    times.parentElement.title = polished ? 'Timestamps are only available on the raw transcript' : '';
+    renderResult();
+}
+
+document.querySelectorAll('#viewSwitch .view-btn').forEach((btn) => {
+    btn.addEventListener('click', () => {
+        resultView = btn.dataset.view;
+        updateResultView();
+    });
+});
+
 function renderResult() {
     const container = $('output');
     container.textContent = '';
@@ -422,7 +460,9 @@ function renderResult() {
     if (!r) return;
     const withTimes = $('timestampsToggle').checked;
 
-    if (r.speakers && r.segments) {
+    if (showingPolished()) {
+        container.textContent = r.polished_text;
+    } else if (r.speakers && r.segments) {
         // Merge consecutive segments from the same speaker into one turn
         const turns = [];
         for (const seg of r.segments) {
@@ -466,6 +506,7 @@ function renderResult() {
 
 function copyableText() {
     if (!currentResult) return $('output').textContent;
+    if (showingPolished()) return currentResult.polished_text;
     if (currentResult.text_with_speakers) return currentResult.text_with_speakers;
     if ($('timestampsToggle').checked && currentResult.segments) {
         return currentResult.segments
@@ -755,8 +796,13 @@ async function ejectModel() {
     progress.start('Ejecting models…');
     await runJob(response.job, {
         onDone(final) {
-            setStatus(status, final.result.ejected ? '✅ Models ejected — memory freed.' : '⚠️ No model was loaded',
-                final.result.ejected ? 'success' : 'warn');
+            const { ejected, polish_unloaded: polishUnloaded } = final.result;
+            if (ejected || polishUnloaded) {
+                const what = ejected && polishUnloaded ? 'Whisper and polish models' : ejected ? 'Whisper models' : 'Polish model';
+                setStatus(status, `✅ ${what} ejected — memory freed.`, 'success');
+            } else {
+                setStatus(status, '⚠️ No model was loaded', 'warn');
+            }
         },
         onError(e) {
             setStatus(status, '❌ Eject failed: ' + e.message, 'error');
@@ -809,6 +855,44 @@ function updateDiarizeOptions(available, isDefault) {
 
 $('diarizeToggle').addEventListener('change', () => {
     updateDiarizeOptions(diarizeAvailable);
+    updatePolishOptions(polishAvailable);
+    savePrefs();
+});
+
+// ============================================================
+// Transcript polish (optional local LLM)
+// ============================================================
+
+let polishInitialized = false;
+let polishAvailable = false;
+let polishModel = '';
+
+function updatePolishOptions(available, isDefault, model) {
+    const toggle = $('polishToggle');
+    polishAvailable = available;
+    if (model !== undefined) polishModel = model || '';
+    if (!polishInitialized) {
+        const prefs = store.get(PREFS_KEY, {});
+        toggle.checked = prefs.polish ?? !!isDefault;  // the choice is kept even while the LLM is down
+        polishInitialized = true;
+    }
+    toggle.disabled = !available;
+    $('polishLabel').classList.toggle('disabled', !available);
+    $('polishModel').textContent = polishModel ? `(${polishModel})` : '';
+
+    const status = $('polishStatus');
+    if (!available) {
+        setStatus(status, 'The polish model is not reachable: start the Ollama service and pull the model '
+            + '(see the README). Transcripts stay raw meanwhile.', 'warn');
+    } else if (toggle.checked && $('diarizeToggle').checked && !$('diarizeToggle').disabled) {
+        setStatus(status, 'Polish is skipped when identifying speakers: the raw transcript is shown.', 'warn');
+    } else {
+        setStatus(status, '');
+    }
+}
+
+$('polishToggle').addEventListener('change', () => {
+    updatePolishOptions(polishAvailable);
     savePrefs();
 });
 
@@ -905,9 +989,13 @@ $('hfRemoveBtn').addEventListener('click', async () => {
 // ============================================================
 
 function savePrefs() {
+    // Options set from /health keep their stored value until then: restoring the
+    // capture mode at startup saves the prefs before the first health answer.
+    const saved = store.get(PREFS_KEY, {});
     store.set(PREFS_KEY, {
-        language: $('languageSelect').value,
-        diarize: $('diarizeToggle').checked,
+        language: languagesLoaded ? $('languageSelect').value : saved.language,
+        diarize: diarizeInitialized ? $('diarizeToggle').checked : saved.diarize,
+        polish: polishInitialized ? $('polishToggle').checked : saved.polish,
         minSpeakers: $('minSpeakers').value,
         maxSpeakers: $('maxSpeakers').value,
         timestamps: $('timestampsToggle').checked,
@@ -1029,6 +1117,7 @@ async function refreshHealth() {
     }
     fillLanguages(data.languages);
     updateDiarizeOptions(!!data.diarization_available, !!data.diarize_default);
+    updatePolishOptions(!!data.polish_available, !!data.polish_default, data.polish_model);
     renderGpuHealth(data);
 }
 

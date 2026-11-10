@@ -12,6 +12,7 @@ Voice transcription powered by **[WhisperX](https://github.com/m-bain/whisperX)*
 - 📊 **Model selection** — choose from Tiny, Base, Small, Medium, Large models
 - 🌐 **Language choice** — auto-detect or force one of Whisper's ~100 languages
 - 📋 **Copy & export** — one-click copy, download as TXT, SRT, WebVTT or JSON
+- ✨ **Transcript polish (optional)** — a local LLM (Ollama) removes fillers, resolves self-corrections and fixes punctuation, in English and French, never translating; a strict safety check falls back to the raw transcript, which is always one click away
 - 🔑 **Hugging Face token from the UI** — add, test or remove the token needed for speaker identification
 - 🛡️ **Crash-proof worker** — models run in a separate process: a GPU/driver crash fails the job with a clear message instead of killing the server
 - ⏳ **Background jobs** — progress per job, cancel button, survives network hiccups and page reloads
@@ -48,6 +49,8 @@ Voice transcription powered by **[WhisperX](https://github.com/m-bain/whisperX)*
 6. A language-specific wav2vec2 model aligns the transcript to get word-level timestamps (if this fails, the transcript is still returned, with a warning)
 7. If `diarize=true`, pyannote finds speaker turns; each word gets the speaker that overlaps it most, and segments are split where the speaker changes
 8. Results (`text`, `language`, `segments`, plus `speakers` / `text_with_speakers` when diarizing) are stored on the job
+9. If `polish=true`, the server (not the worker) sends the raw text to the LLM endpoint and adds `polished_text` when the
+   output passes the safety check (see [Transcript polish](#transcript-polish-optional-llm)); `text` stays the raw transcript
 
 ### Robustness
 
@@ -78,6 +81,7 @@ Transcribe an audio file, optionally identifying speakers.
 | `num_speakers` | `int`   | Exact number of speakers, if known (optional)                      |
 | `min_speakers` | `int`   | Minimum number of speakers (optional)                              |
 | `max_speakers` | `int`   | Maximum number of speakers (optional)                              |
+| `polish`       | `bool`  | Also return an LLM-polished text (default: `WHISPER_POLISH`, i.e. `false`) |
 
 **Response (200), without diarization:**
 
@@ -121,6 +125,22 @@ Transcribe an audio file, optionally identifying speakers.
 
 Fields added in v2: `language` (form field, optional: a Whisper language code such as `fr`, or `auto`), and in the response `duration` (seconds) and `warnings` (e.g. word alignment skipped).
 
+**With `polish=true`:** `text` is still the raw Whisper transcript (SRT/VTT and existing clients are unaffected); the polished
+version is added next to it, with a status:
+
+```json
+{
+  "text": "euh donc on se voit lundi, non pardon, mardi",
+  "polished_text": "Donc on se voit mardi.",
+  "polish": {"applied": true, "model": "qwen2.5:7b-instruct-q4_K_M", "latency_ms": 412, "fallback_reason": null}
+}
+```
+
+When the polish is not applied, `polished_text` is absent, `polish.applied` is `false`, a line is added to `warnings`, and
+`polish.fallback_reason` says why: `error` (endpoint failed), `timeout` (over `POLISH_TIMEOUT`), `unsupported` (diarization
+on, or more than 400 words) or `safety_check:<rule>` (the output changed too much, see below). A polish problem never fails
+the transcription.
+
 **Errors:** `400` for undecodable audio, empty file, invalid language or speaker hints, `413` for files over `WHISPER_MAX_UPLOAD_MB`, `503` when diarization is requested but no Hugging Face token is configured or the pyannote model can't be loaded, `500` with a `detail` message otherwise (including a worker crash).
 
 `POST /transcribe` waits for the result, which is convenient for scripts. For long files, prefer the job API below.
@@ -151,7 +171,7 @@ Fast transcription with language detection, skipping alignment and diarization. 
 | `GET /jobs/{id}`                  | `status` (`queued`, `running`, `done`, `error`, `cancelled`), `progress` (0–1), `message`, `stage`, `result`, `error` (`code`, `message`) |
 | `GET /jobs`                       | Recent jobs (without results) |
 | `POST /jobs/{id}/cancel`          | Cancel a queued or running job |
-| `GET /jobs/{id}/export?format=…`  | Download the result as `txt`, `srt`, `vtt` or `json` |
+| `GET /jobs/{id}/export?format=…`  | Download the result as `txt`, `srt`, `vtt` or `json`; add `&polished=true` for the polished text (TXT, JSON; SRT/VTT stay raw) |
 
 ```bash
 JOB=$(curl -s -F "file=@meeting.mp3" -F language=fr http://localhost:8081/jobs | jq -r .id)
@@ -165,11 +185,11 @@ Jobs live in memory (the last `WHISPER_JOB_HISTORY` are kept) and are lost when 
 
 | Method & path            | Description |
 |--------------------------|-------------|
-| `GET /health`            | Model, device, GPU info, ffmpeg, diarization availability, queue state |
+| `GET /health`            | Model, device, GPU info, ffmpeg, diarization availability, queue state; `polish_available` (endpoint reachable and model present, probed every 30 s), `polish_default`, `polish_model` |
 | `GET /healthz`           | Liveness probe (`{"status": "ok"}`), used by the Docker healthcheck |
 | `GET /progress`          | Latest progress event of any job |
 | `POST /switch-model`     | `{"model": "small", "device": "cuda"}` — waits for the load; add `"wait": false` to get a job instead |
-| `POST /eject`            | Unload all models (`?wait=false` to get a job) |
+| `POST /eject`            | Unload all models, including the polish model in Ollama (`?wait=false` to get a job) |
 
 ### Hugging Face token endpoints
 
@@ -209,6 +229,97 @@ To check that the token can access the model:
 python -c "from huggingface_hub import model_info; print(model_info('pyannote/speaker-diarization-community-1').id)"
 ```
 
+## Transcript polish (optional LLM)
+
+An optional step after Whisper: a small instruction-tuned LLM rewrites the raw transcript into ready-to-send text. It
+removes fillers (*um, uh, euh, ben, du coup…*), resolves self-corrections (*"lundi, non pardon, mardi"* → *"mardi"*), fixes
+punctuation, capitalization and sentence boundaries, and formats clear enumerations as lists. It keeps the speaker's
+words and language (English and French are covered by the prompt; it never translates), and never answers a dictated
+question or follows a dictated instruction.
+
+The model is not trusted blindly: every output goes through a strict safety check against the raw transcript (length
+ratio, new words, numbers and dates, negations, assistant-style openers…). If any rule fails, or the endpoint errors or
+is slower than `POLISH_TIMEOUT`, the raw transcript is shown with a warning. The raw text is always kept, and the result
+card has a **Raw / Polished** switch.
+
+The endpoint is any OpenAI-compatible `/chat/completions` server. The default, and the setup described here, is a local
+[Ollama](https://ollama.com) on the same GPU as Whisper: nothing leaves the machine.
+
+### With Docker Compose
+
+The `ollama` service is behind the `polish` profile, so a plain `docker compose up` does not start it.
+
+```bash
+# 1. Start the app and Ollama (same NVIDIA GPU reservation as the app)
+docker compose --profile polish up -d
+
+# 2. Pull the model once (about 4.7 GB, kept in the ollama-models volume)
+docker compose exec ollama ollama pull qwen2.5:7b-instruct-q4_K_M
+
+# 3. Check that the app sees it: "polish_available": true
+curl -s http://localhost:8081/health | jq '{polish_available, polish_model}'
+```
+
+Then tick **✨ Polish transcript** in *Transcription Options* (the choice is remembered by the browser). Set
+`WHISPER_POLISH=true` to polish API requests that don't pass `polish`. Until the model is pulled, the toggle is greyed out
+with a hint, and transcription works as before.
+
+Ollama keeps the model loaded (`OLLAMA_KEEP_ALIVE=-1`), so only the first dictation after a start pays the model load
+(a few seconds). *Eject Model from Memory* in the UI unloads it too; it is loaded again on the next polished transcription.
+
+### Without Docker
+
+Install Ollama on the host, then:
+
+```bash
+ollama pull qwen2.5:7b-instruct-q4_K_M
+OLLAMA_KEEP_ALIVE=-1 OLLAMA_CONTEXT_LENGTH=4096 ollama serve   # or set these in the Ollama service
+```
+
+The default `POLISH_BASE_URL` (`http://localhost:11434/v1`) points at it; no other setting is needed.
+
+### GPU memory (one 24 GB card)
+
+Whisper and the polish model stay loaded side by side; the polish call runs after Whisper finishes, so they never
+compute at the same time. Rough figures:
+
+| What                                                    | VRAM       |
+|---------------------------------------------------------|------------|
+| Whisper `large-v3` (float16) + alignment + diarization  | ~5–8 GB    |
+| 7B–8B model at 4-bit, 4k context, one slot              | ~5–7 GB    |
+
+Both fit on a 24 GB card with room to spare. *GPU Health* in the UI shows the total, Ollama included. On a smaller card,
+use a smaller Whisper model or a smaller polish model (e.g. a 3B one), and expect more fallbacks.
+
+### Changing the model
+
+Any model the endpoint serves works: pull it, then set `POLISH_MODEL` and restart the app.
+
+```bash
+docker compose exec ollama ollama pull mistral:7b-instruct-q4_K_M
+POLISH_MODEL=mistral:7b-instruct-q4_K_M docker compose --profile polish up -d
+```
+
+The default is Qwen 2.5 7B instruct (`qwen2.5:7b-instruct-q4_K_M`). Mistral 7B instruct is the first alternative to try
+if French output keeps rephrasing. For a hosted OpenAI-compatible API instead, set `POLISH_BASE_URL`, `POLISH_MODEL` and
+`POLISH_API_KEY` (environment only; there is no UI for the key, and it does not belong in the tracked `.env`).
+
+### Names and jargon, tuning log
+
+- `POLISH_DICTIONARY`: path to a text file, one name or term per line (`#` comments allowed). The terms are given to the
+  model so it can fix misheard spellings, and the safety check accepts them as new words. In Docker, put the file in the
+  `model-cache` volume, e.g. `POLISH_DICTIONARY=/root/.cache/polish-dictionary.txt`.
+- `POLISH_LOG`: path to a local JSONL file. Each polish attempt appends one line (raw, polished, applied, fallback reason,
+  latency). Off by default; it contains your transcripts, so keep it local. Useful to see which safety rule rejects too
+  often. Fallback reasons are also logged at INFO, without the text.
+
+### Limits
+
+- Not applied when speaker identification is on, or above 400 words (`fallback_reason: "unsupported"`).
+- SRT/VTT exports always use the raw segments: their timestamps belong to the raw words.
+- Strict thresholds mean some fallbacks, mostly on very short dictations: the raw text is shown then.
+- No streaming: the polished text appears when the job finishes; `polish.latency_ms` is reported on every result.
+
 ## Web UI
 
 ```
@@ -221,6 +332,7 @@ The web interface provides:
 - **Model selector** — pick the desired Whisper model and device, with live download / load progress
 - **Language** — auto-detect, or force the language when detection gets it wrong (short or accented recordings)
 - **Identify speakers** — toggle diarization, optionally with a min/max speaker count; the transcript is grouped by color-coded speaker and "Copy" includes the speaker labels
+- **Polish transcript** — clean up the transcript with the local LLM (greyed out while the model is unavailable); the result card then has a Raw / Polished switch, and Copy and TXT follow it
 - **Hugging Face token** — add, test or remove the token used for speaker identification
 - **Progress & cancel** — upload percentage, stage, elapsed time, and a Cancel button
 - **Result** — copy, timestamps view, download as TXT / SRT / VTT / JSON, warnings when something was skipped
@@ -249,6 +361,13 @@ Set environment variables in `.env` or at startup:
 | `WHISPER_JOB_HISTORY` | `50`                                          | Finished jobs kept in memory |
 | `WHISPER_CORS_ORIGINS` | `*`                                          | Comma-separated allowed origins |
 | `WHISPER_LOG_LEVEL` | `INFO`                                          | Log level |
+| `WHISPER_POLISH`    | `false`                                         | Polish by default when the request doesn't say |
+| `POLISH_BASE_URL`   | `http://localhost:11434/v1` (`http://ollama:11434/v1` in compose) | OpenAI-compatible endpoint of the polish LLM |
+| `POLISH_MODEL`      | `qwen2.5:7b-instruct-q4_K_M`                    | Model name as the endpoint knows it |
+| `POLISH_API_KEY`    | *(unset)*                                       | Bearer key for a hosted endpoint; environment only, not needed for local Ollama |
+| `POLISH_TIMEOUT`    | `5`                                             | Seconds (0.5–120) before falling back to the raw transcript |
+| `POLISH_DICTIONARY` | *(unset)*                                       | Path to a newline-separated list of names / jargon |
+| `POLISH_LOG`        | *(unset)*                                       | Path to the local JSONL tuning log (contains transcripts) |
 
 Invalid values (e.g. a port above 65535) are logged as warnings and replaced by the default.
 
@@ -286,7 +405,7 @@ WHISPER_DEVICE=cuda
 WHISPER_MODEL=large
 ```
 
-2. **Stop any other GPU-consuming processes** (e.g., ollama, other ML models). Verify free VRAM:
+2. **Stop other GPU-consuming processes** (e.g. other ML models; the polish Ollama service fits alongside on a 24 GB card, see [GPU memory](#gpu-memory-one-24-gb-card)). Verify free VRAM:
 
 ```bash
 nvidia-smi
@@ -417,6 +536,9 @@ docker compose pull && docker compose up -d
 | Warning *Word timestamps skipped: … punkt_tab* | The NLTK sentence data is missing and couldn't be downloaded. Run `python -m nltk.downloader punkt_tab` once (already done in the Docker image). |
 | *Microphone needs HTTPS or localhost* | Browsers only allow the microphone on secure origins. Open the UI as `http://localhost:8081` on the server machine, put it behind HTTPS, or use Upload. |
 | Speaker identification disabled | No Hugging Face token: add one in the UI. If saving says *accept the model terms*, open the model page while logged in and accept them. |
+| *Polish transcript* greyed out | The app can't reach the endpoint or the model isn't pulled. Check `docker compose --profile polish ps`, run `docker compose exec ollama ollama list`, and that `POLISH_MODEL` matches a listed name. |
+| Warning *Transcript not polished (timeout)* | First call after a start loads the model; later ones should be fast. If it persists, check that Ollama runs on the GPU (`docker compose exec ollama ollama ps`) or raise `POLISH_TIMEOUT`. |
+| Warning *Transcript not polished (safety_check:…)* | The model's output changed the meaning or wording too much, so the raw text is shown. Occasional fallbacks are expected; `POLISH_LOG` helps see which rule fires. |
 | *Could not load diarization model* | The token can't access the gated model, or the download failed. Use *Test current token* in the UI. |
 
 ## File Structure
@@ -432,6 +554,7 @@ speech-to-text/
 │   ├── audio.py         # ffmpeg decoding
 │   ├── speakers.py      # Speaker post-processing (split segments, speaker transcript)
 │   ├── formats.py       # TXT / SRT / VTT / JSON export
+│   ├── polish.py        # Optional LLM polish: prompt, client, safety check, fallback
 │   ├── hf.py            # Hugging Face token storage and verification
 │   ├── system.py        # ffmpeg, NVIDIA GPU and CUDA detection
 │   ├── errors.py        # Error types with stable codes
@@ -476,7 +599,7 @@ source venv/bin/activate
 pytest tests/ -v
 ```
 
-The test suite covers the HTTP API (transcription, jobs, cancel, export, model switching, Hugging Face token settings, error handling), the WhisperX pipeline with mocked models (alignment, diarization, fallbacks), the worker process (including a real crash and restart), the job queue, configuration, exports and speaker post-processing. No model is downloaded: WhisperX is mocked, and a fake engine stands in for the worker tests.
+The test suite covers the HTTP API (transcription, jobs, cancel, export, model switching, Hugging Face token settings, polish, error handling), the polish safety check against hand-written English and French pairs (with a fake LLM client, no model needed), the WhisperX pipeline with mocked models (alignment, diarization, fallbacks), the worker process (including a real crash and restart), the job queue, configuration, exports and speaker post-processing. No model is downloaded: WhisperX is mocked, and a fake engine stands in for the worker tests.
 
 ## License
 
