@@ -80,6 +80,19 @@ GOOD_PAIRS = [
      "No, I don't think we should merge it before the release."),
     ("uh I can't make it on Friday so let's do Monday", "I can't make it on Friday, so let's do Monday."),
     ("non je ne pense pas qu'il viendra demain", "Non, je ne pense pas qu'il viendra demain."),
+    # Whisper-style input: already punctuated and capitalised, with names
+    ("Um, so I talked to Pierre yesterday and, uh, he said the Paris office is closed until Monday.",
+     "So I talked to Pierre yesterday and he said the Paris office is closed until Monday."),
+    ("Euh, du coup, on se voit avec Julie et Marc demain matin chez Google, tu vois.",
+     "On se voit avec Julie et Marc demain matin chez Google."),
+    ("Okay. So the first thing is the budget. The second thing is, um, the hiring plan for Q3.",
+     "Okay. So the first thing is the budget. The second thing is the hiring plan for Q3."),
+    ("Hey Sam, I will send you the deck tonight, no wait, tomorrow morning.",
+     "Hey Sam, I will send you the deck tomorrow morning."),
+    ("Bon, ben, j'ai parlé à Sophie, elle est d'accord pour la réunion de jeudi, voilà.",
+     "J'ai parlé à Sophie, elle est d'accord pour la réunion de jeudi."),
+    ("I think we should, you know, push the release to next week, right?",
+     "I think we should push the release to next week, right?"),
     # Mixed English / French, kept as spoken
     ("j'ai envoyé le pull request euh hier soir et le build est vert",
      "J'ai envoyé le pull request hier soir et le build est vert."),
@@ -147,6 +160,37 @@ BAD_PAIRS = [
      "The review is on Friday with the whole design team and the product managers from the other office."),
     ("la livraison est prévue en mars pour le client de Lyon et son équipe technique",
      "La livraison est prévue en avril pour le client de Lyon et son équipe technique."),
+    # short input: one-word answers, cognate translations, swapped names
+    ("what is the capital of France", "What is the capital of France? Paris."),
+    ("who wrote Hamlet", "Who wrote Hamlet? Shakespeare."),
+    ("c'est quoi la capitale du Canada", "C'est quoi la capitale du Canada ? Ottawa."),
+    ("the documentation is important", "La documentation est importante."),
+    ("c'est une question importante", "It's an important question."),
+    ("send it to Bob", "Send it to Alice."),
+    ("call Mom tonight", "Call Dad tonight."),
+    ("meet me at the office", "Meet me at the cafe."),
+    # long input: dropped names, days, digits, clauses, number words
+    ("we should invite Alice and Bob to the review meeting next week with the whole design team",
+     "We should invite Bob to the review meeting next week with the whole design team."),
+    ("the plumber can come on Monday and Thursday morning to fix the leak in the kitchen sink",
+     "The plumber can come on Thursday morning to fix the leak in the kitchen sink."),
+    ("my phone number is 06 12 34 56 78 call me", "My phone number is 06 12 34 56, call me."),
+    ("please send the invoice to the client by Friday and then call the bank about the loan",
+     "Please send the invoice to the client by Friday."),
+    ("on a essayé deux fois de le joindre au téléphone hier mais il ne répond jamais",
+     "On a essayé une fois de le joindre au téléphone hier mais il ne répond jamais."),
+    ("the meeting is in room 12 at 4 pm with the whole design team and the product managers",
+     "The meeting is in room 4 at 12 pm with the whole design team and the product managers."),
+    # long input: answer appended to a final question
+    ("so we got two quotes for the move next month one company is cheaper but they need three weeks "
+     "and the other one is faster but costs a lot more and they also want a deposit up front and "
+     "honestly I am not sure which one makes more sense for us given the budget we have left after "
+     "the renovation so what do you think should we take the cheaper movers or the faster ones",
+     "So we got two quotes for the move next month. One company is cheaper, but they need three weeks, "
+     "and the other one is faster but costs a lot more, and they also want a deposit up front. "
+     "Honestly, I am not sure which one makes more sense for us given the budget we have left after "
+     "the renovation. So what do you think, should we take the cheaper movers or the faster ones? "
+     "Take the cheaper movers."),
     # lead-in line
     ("we reviewed the quarterly numbers with finance and agreed on the plan for the next two quarters "
      "with the whole leadership team",
@@ -245,7 +289,7 @@ class TestSafetyRules:
             == (True, None)
 
     def test_length_ratio_bounds(self):
-        assert safety_check(LONG_RAW, "We deployed it.") == (False, "length_ratio")
+        assert safety_check(LONG_RAW, "We deployed it yesterday.") == (False, "length_ratio")
         longer = LONG_OK + " The team was really happy with the result."
         assert safety_check(LONG_RAW, longer) == (False, "length_ratio")
 
@@ -271,7 +315,7 @@ class TestSafetyRules:
     def test_dictionary_terms_are_exempt(self):
         raw = "we deployed the new pipeline on cube flow yesterday and it worked"
         polished = "We deployed the new pipeline on Kubeflow yesterday and it worked."
-        assert safety_check(raw, polished) == (False, "novel_words")
+        assert safety_check(raw, polished)[0] is False
         assert safety_check(raw, polished, dictionary=["Kubeflow"]) == (True, None)
 
     def test_dictionary_multi_word_terms(self):
@@ -371,9 +415,10 @@ class TestFrenchNormalization:
 
 
 class TestShortInputMode:
-    def test_one_changed_word_is_tolerated(self):
-        # Long mode would reject this (1 novel word out of 2 is far above the share)
-        assert safety_check("ok call jon later", "OK, call John later.") == (True, None)
+    def test_no_new_word_unless_in_the_dictionary(self):
+        # on a few words, one new word is an answer or a swapped name
+        assert safety_check("ok call jon later", "OK, call John later.") == (False, "novel_words")
+        assert safety_check("ok call jon later", "OK, call John later.", dictionary=["John"]) == (True, None)
 
     def test_two_changed_words_fail(self):
         assert safety_check("please call jon and mary later", "Please call John and Marie later.") \
@@ -487,7 +532,8 @@ class TestPolish:
         (None, "empty"),
         ("", "empty"),
         ("Sure! " + LONG_OK, "assistant_opener"),
-        ("We deployed it.", "length_ratio"),
+        ("We deployed it yesterday.", "length_ratio"),
+        ("We deployed it.", "dropped_fact"),
         (LONG_OK.replace("yesterday", "on 3 May"), "numbers"),
         ("<transcript>" + LONG_OK + "</transcript>", "delimiter"),
     ])
@@ -514,7 +560,7 @@ class TestPolish:
         raw = "we deployed the new pipeline on cube flow yesterday and it worked"
         polished = "We deployed the new pipeline on Kubeflow yesterday and it worked."
         client = FakeClient(polished)
-        assert polish.polish(raw, client).fallback_reason == "safety_check:novel_words"
+        assert polish.polish(raw, client).fallback_reason.startswith("safety_check:")
         result = polish.polish(raw, client, dictionary=("Kubeflow",))
         assert result.applied
         assert "Kubeflow" in client.calls[-1][0][0]["content"]
@@ -529,6 +575,13 @@ class TestPolish:
         with caplog.at_level(logging.INFO, logger="app.polish"):
             polish.polish(LONG_RAW, FakeClient(error=PolishError("HTTP 503")))
         assert "HTTP 503" in caplog.text and "pipeline" not in caplog.text
+
+
+    def test_unexpected_error_logs_type_only(self, caplog):
+        with caplog.at_level(logging.INFO, logger="app.polish"):
+            result = polish.polish(LONG_RAW, FakeClient(error=RuntimeError("echo: deployed the new pipeline")))
+        assert result.fallback_reason == "error"
+        assert "RuntimeError" in caplog.text and "pipeline" not in caplog.text
 
 
 class TestTuningLog:

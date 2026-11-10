@@ -39,9 +39,12 @@ MIN_LENGTH_RATIO = 0.5  # len(polished) / len(raw), in characters
 MAX_LENGTH_RATIO = 1.15
 MAX_NOVEL_SHARE = 0.08  # share of polished content words absent from the raw text
 MAX_NOVEL_WORDS = 3  # ... and their absolute number, so one added sentence fails
-SHORT_MAX_NOVEL_WORDS = 1
+SHORT_MAX_NOVEL_WORDS = 0  # on a few words, one new word is an answer or a swap
 SHORT_MAX_EXTRA_WORDS = 1  # short mode: polished may have at most this many more words
 SHORT_MIN_KEPT_SHARE = 0.5  # short mode: share of raw content words that must remain
+MIN_KEPT_SHARE = 0.85  # long mode: share of raw content words that must remain...
+MIN_KEPT_SHARE_CORRECTED = 0.6  # ... or this, when the speaker corrected themselves
+ENDING_WORDS = 2  # the output must end where the transcript ends (see _ending_rule)
 MAX_DICTIONARY_TERMS = 200
 
 FALLBACK_REASONS = ("error", "timeout", "unsupported")  # plus "safety_check:<rule>"
@@ -52,7 +55,7 @@ TRANSCRIPT_CLOSE = "</transcript>"
 # Fillers and verbal tics, used to recognise content words. Multi-word tics
 # ("you know", "du coup") are made of stopwords and are covered by those.
 FILLERS = frozenset("""
-    um umm uh uhh er erm ah hmm mm mhm like
+    um umm uh uhh er erm ah hmm mm mhm like basically literally
     euh heu ben bah bon hein genre voila quoi
 """.split())
 
@@ -228,12 +231,23 @@ NUMBER_WORDS = frozenset("""
     million millions milliard milliards demi demie quart douzaine premier premiere
     deuxieme troisieme
 """.split())  # French "un"/"une" are left out: they are mostly articles
+# Ordinals the speaker uses to enumerate: list formatting (rule 4) drops them.
+ENUMERATION_WORDS = frozenset("""
+    first second third fourth fifth firstly secondly thirdly lastly finally
+    premier premiere deuxieme troisieme quatrieme premierement deuxiemement troisiemement
+""".split())
+# Tics that can end a dictation and that the ending rule looks past.
+TRAILING_TICS = frozenset("know right yeah so voila quoi hein".split())
 DATE_WORDS = frozenset("""
     monday tuesday wednesday thursday friday saturday sunday today tomorrow yesterday
     january february march april june july august september october november december
     lundi mardi mercredi jeudi vendredi samedi dimanche aujourd hui demain hier
     janvier fevrier mars avril mai juin juillet aout septembre octobre novembre decembre
 """.split())  # English "may" is left out: it is mostly a verb
+
+# Speech that signals a self-correction; dropping facts is only allowed with one.
+_CORRECTION_MARKER = re.compile(
+    r"\b(?:wait|sorry|i mean|actually|rather|pardon|enfin|plutot|je veux dire|attends)\b")
 
 # A "no"/"non" that marks a self-correction ("Monday, no, Tuesday", "lundi non
 # pardon mardi") may be dropped; any other dropped "no" may flip the meaning.
@@ -262,8 +276,24 @@ def _adds(raw_counts, out_counts):
     return any(n > raw_counts.get(k, 0) for k, n in out_counts.items())
 
 
-def _fact_rule(raw, polished):
-    """Negations, yes/no, numbers and dates: the few tokens that change a fact."""
+def _is_subsequence(items, sequence):
+    remaining = iter(sequence)
+    return all(item in remaining for item in items)
+
+
+def _names(text):
+    """Capitalised words that do not start a sentence: names, places, products."""
+    names = []
+    for match in re.finditer(r"(?<![.!?:\n])\s+([^\W\d_][\w'-]*)", text):
+        word = match.group(1)
+        if word[0].isupper() and word.lower() not in ("i", "i'm", "i'll", "i've", "i'd"):
+            names.append(_normalize(word))
+    return names
+
+
+def _fact_rule(raw, polished, corrected):
+    """Negations, yes/no, numbers, dates and names: the few tokens that carry a
+    fact. They may not be added; they may only be dropped by a self-correction."""
     raw_tokens, out_tokens = _fact_tokens(raw), _fact_tokens(polished)
 
     if _counts(raw_tokens, NEGATORS) != _counts(out_tokens, NEGATORS):
@@ -277,12 +307,43 @@ def _fact_rule(raw, polished):
         return "answer_words"
 
     raw_digits, out_digits = re.findall(r"\d+", raw), re.findall(r"\d+", polished)
-    if _adds(_counts(raw_digits, set(raw_digits)), _counts(out_digits, set(out_digits))):
+    if not _is_subsequence(out_digits, raw_digits):  # added, changed or reordered
         return "numbers"
-    if _adds(_counts(raw_tokens, NUMBER_WORDS), _counts(out_tokens, NUMBER_WORDS)):
+    raw_numbers, out_numbers = _counts(raw_tokens, NUMBER_WORDS), _counts(out_tokens, NUMBER_WORDS)
+    if _adds(raw_numbers, out_numbers):
         return "numbers"
-    if _adds(_counts(raw_tokens, DATE_WORDS), _counts(out_tokens, DATE_WORDS)):
+    raw_dates, out_dates = _counts(raw_tokens, DATE_WORDS), _counts(out_tokens, DATE_WORDS)
+    if _adds(raw_dates, out_dates):
         return "dates"
+
+    if not corrected:
+        raw_numbers = {k: n for k, n in raw_numbers.items() if k not in ENUMERATION_WORDS}
+        if len(out_digits) < len(raw_digits) or _adds(out_numbers, raw_numbers) or _adds(out_dates, raw_dates):
+            return "dropped_fact"
+        out_words = set(_tokens(polished))
+        if any(name not in out_words for name in _names(raw)):
+            return "dropped_fact"
+    return None
+
+
+def _ending_rule(raw_content, out_content):
+    """The output must end where the transcript ends: nothing may follow the
+    last dictated words (an appended answer), and they may not be cut off."""
+    def strip_tics(tokens):
+        end = len(tokens)
+        while end and tokens[end - 1] in TRAILING_TICS:
+            end -= 1
+        return tokens[:end]
+
+    raw_content, out_content = strip_tics(raw_content), strip_tics(out_content)
+    tail = set(raw_content[-ENDING_WORDS:])
+    if not tail:
+        return None
+    last = max((i for i, t in enumerate(out_content) if t in tail), default=None)
+    if last is None:
+        return "ending"
+    if last < len(out_content) - 1:
+        return "ending"
     return None
 
 
@@ -293,9 +354,16 @@ def safety_check(raw, polished, dictionary=()):
     ``empty``, ``delimiter``, ``assistant_opener``, ``negation`` (a negation
     added or removed), ``answer_words`` (yes/no/oui/non added, or a "no"
     dropped outside a self-correction), ``numbers`` (a digit sequence or
-    number word not in the input), ``dates`` (a weekday, month or relative day
-    not in the input), ``length_ratio`` / ``short_length``, ``short_dropped``
+    number word not in the input, or digits reordered), ``dates`` (a weekday,
+    month or relative day not in the input), ``dropped_fact`` (a digit, number
+    word, date or capitalised name dropped without a self-correction),
+    ``ending`` (text appended after, or cut from, the end of the transcript),
+    ``length_ratio`` / ``short_length``, ``short_dropped`` / ``dropped_content``
     and ``novel_words``. Terms of ``dictionary`` are never counted as novel.
+
+    This is a word-level check: it cannot see a swapped function word
+    ("avec" -> "sans") or a single antonym in a long text. The raw transcript
+    stays one click away for those.
     """
     raw = (raw or "").strip()
     polished = (polished or "").strip()
@@ -320,13 +388,22 @@ def safety_check(raw, polished, dictionary=()):
     if first_line.endswith(":") and not set(_tokens(first_line)) <= set(raw_tokens):
         return False, "assistant_opener"
 
-    rule = _fact_rule(raw, polished)
+    normalized_raw = _normalize(raw)
+    corrected = bool(_CORRECTION_MARKER.search(normalized_raw) or _CORRECTION_NO.search(normalized_raw))
+    rule = _fact_rule(raw, polished, corrected)
     if rule:
         return False, rule
 
     raw_content = _content(raw_tokens)
     out_content = _content(out_tokens)
     short = len(raw_tokens) < SHORT_INPUT_WORDS
+    allowed = set(raw_tokens)
+    dictionary_tokens = set()
+    for term in dictionary:
+        dictionary_tokens.update(_tokens(term))
+    allowed |= dictionary_tokens
+    # a misheard term restored from the dictionary replaces the words it was heard as
+    restored = bool((set(out_tokens) & dictionary_tokens) - set(raw_tokens))
 
     if short:
         if len(out_tokens) > len(raw_tokens) + SHORT_MAX_EXTRA_WORDS:
@@ -339,10 +416,16 @@ def safety_check(raw, polished, dictionary=()):
         ratio = len(polished) / len(raw)
         if not MIN_LENGTH_RATIO <= ratio <= MAX_LENGTH_RATIO:
             return False, "length_ratio"
+        expected = set(raw_content) - ENUMERATION_WORDS - TRAILING_TICS
+        if expected:
+            kept = len(expected & set(out_content)) / len(expected)
+            if kept < (MIN_KEPT_SHARE_CORRECTED if corrected or restored else MIN_KEPT_SHARE):
+                return False, "dropped_content"
 
-    allowed = set(raw_tokens)
-    for term in dictionary:
-        allowed.update(_tokens(term))
+    rule = _ending_rule(raw_content, out_content)
+    if rule:
+        return False, rule
+
     novel = [t for t in out_content if t not in allowed]
     if short:
         if len(novel) > SHORT_MAX_NOVEL_WORDS:
@@ -381,7 +464,8 @@ class PolishClient:
     ``timeout`` is a hard cap on the whole call: the request runs on a helper
     thread and ``complete`` gives up after ``timeout`` seconds whatever the
     server does (slow DNS, slow connect, a body trickling in). The helper
-    thread stops reading at the same deadline, so it does not linger.
+    thread stops reading at the same deadline; only a slow DNS lookup, which
+    httpx cannot interrupt, can keep it alive a little longer.
     Requests to a local endpoint ignore ``HTTP(S)_PROXY``, so transcripts and
     the key never go to a proxy by accident.
     """
@@ -560,6 +644,9 @@ def polish(text, client, language=None, dictionary=(), log_path=None):
         return finish(polished=polished)
     except PolishTimeout:
         return finish(reason="timeout")
-    except Exception as exc:
+    except PolishError as exc:  # our own messages: never contain transcript text
         log.warning("Polish request failed: %s", exc)
+        return finish(reason="error")
+    except Exception as exc:  # anything else: log the type only, the message could quote the text
+        log.warning("Polish request failed: %s", type(exc).__name__)
         return finish(reason="error")
