@@ -5,6 +5,12 @@ time, in submission order, on a single dispatcher thread, so a model switch
 never happens in the middle of a transcription and two uploads never compete
 for the GPU. Each job keeps its own progress and result, which clients poll
 with short requests instead of holding one HTTP request open for minutes.
+
+A transcription can end with an optional LLM "polish" post-step (see
+``app/polish.py``). It runs here, in the server process, after the worker
+returns, so Whisper and the LLM never compute at the same time. It adds
+``polished_text`` and ``polish`` to the result and never fails the job:
+``text`` always stays the raw Whisper transcript.
 """
 import logging
 import os
@@ -17,6 +23,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from app.errors import Cancelled, PipelineError
+from app.polish import PolishResult
 
 log = logging.getLogger(__name__)
 
@@ -40,6 +47,7 @@ class Job:
     finished_at: float | None = None
     result: Any = None
     error: dict | None = None
+    cancel_requested: threading.Event = field(default_factory=threading.Event, repr=False, compare=False)
 
     @property
     def finished(self):
@@ -66,9 +74,16 @@ class Job:
         return data
 
 
+# Share of a polished transcription's progress bar given to the Whisper part;
+# the polish stage fills the rest.
+POLISH_PROGRESS_START = 0.97
+POLISH_CANCEL_POLL = 0.05  # seconds
+
+
 class JobManager:
-    def __init__(self, backend, model, device, history=50):
+    def __init__(self, backend, model, device, history=50, polisher=None):
         self.backend = backend
+        self.polisher = polisher  # app.polish.Polisher, or None when polishing is impossible
         self.model = model  # model / device used for transcriptions
         self.device = device
         self.history = history
@@ -128,6 +143,7 @@ class JobManager:
                 self._finish(job, "cancelled", "Cancelled")
             else:
                 job.message = "Cancelling…"
+                job.cancel_requested.set()  # seen by the polish step, which runs outside the backend
                 self.backend.cancel()
             return job
 
@@ -224,8 +240,23 @@ class JobManager:
 
         try:
             if job.kind == "transcribe":
-                options = dict(job.params, model=self.model, device=self.device)
-                result = self.backend.call("transcribe", {"audio_path": job.audio_path, "options": options}, progress)
+                polishing = bool(job.params.get("polish"))
+                options = {k: v for k, v in job.params.items() if k != "polish"}
+                options.update(model=self.model, device=self.device)
+                whisper_progress = progress
+                if polishing:  # leave the end of the bar to the polish stage
+                    def whisper_progress(fraction, message, stage):
+                        progress(fraction * POLISH_PROGRESS_START, message, stage)
+                result = self.backend.call("transcribe", {"audio_path": job.audio_path, "options": options},
+                                           whisper_progress)
+                if polishing:
+                    try:
+                        self._polish(job, result, progress)
+                    except Cancelled:
+                        raise
+                    except Exception as e:  # a polish problem must never fail the transcription
+                        log.warning("Polish step failed: %s", type(e).__name__)
+                        self._polish_failed(result)
                 message = "Transcription complete!"
             elif job.kind == "load":
                 model, device = job.params["model"], job.params["device"]
@@ -236,12 +267,15 @@ class JobManager:
                 message = f"Model '{model}' ready on {device}"
             elif job.kind == "eject":
                 ejected = bool(self.backend.call("eject", {}, progress))
-                result = {"ejected": ejected}
-                message = "Models ejected — memory freed" if ejected else "No model was loaded"
+                # Whisper's memory is the worker's; the polish model lives in the LLM server
+                polish_unloaded = bool(self.polisher and self.polisher.unload())
+                result = {"ejected": ejected, "polish_unloaded": polish_unloaded}
+                message = "Models ejected — memory freed" if ejected or polish_unloaded else "No model was loaded"
             else:
                 raise ValueError(f"Unknown job kind {job.kind!r}")
         except Cancelled:
-            self._finish(job, "cancelled", "Cancelled")
+            if not job.finished:  # the polish step finishes a cancelled job itself
+                self._finish(job, "cancelled", "Cancelled")
         except PipelineError as e:
             log.warning("Job %s (%s) failed: %s", job.id, job.kind, e)
             self._finish(job, "error", f"Error: {e}", error={"code": e.code, "message": str(e)})
@@ -251,3 +285,59 @@ class JobManager:
             self._finish(job, "error", f"Error: {text}", error={"code": "internal", "message": text})
         else:
             self._finish(job, "done", message, result=result)
+
+    def _polish(self, job, result, progress):
+        """Add the polished text to ``result``, in place. Raises only ``Cancelled``.
+
+        The LLM call runs on a helper thread so a cancel is answered at once;
+        the dispatcher still waits for that thread (bounded by the polish
+        timeout) before the next job, so it never overlaps with Whisper.
+        """
+        if job.cancel_requested.is_set():
+            raise Cancelled("Cancelled")
+        text = result.get("text") or ""
+        progress(POLISH_PROGRESS_START, "Polishing transcript…", "polish")
+
+        if self.polisher is None:
+            outcome = PolishResult(text, None, None, None, "error")
+            warning = outcome.warning()
+        elif job.params.get("diarize"):
+            # per-speaker polishing is a follow-up; timestamps stay tied to the raw words anyway
+            outcome = self.polisher.skipped(text, "unsupported")
+            warning = ("Polish is not available with speaker identification yet; "
+                       "showing the raw transcript.")
+        else:
+            box = {}
+
+            def run():
+                try:
+                    box["result"] = self.polisher.run(text, result.get("language"))
+                except Exception as e:  # Polisher.run never raises; belt and braces
+                    log.warning("Polish step failed: %s", type(e).__name__)
+
+            thread = threading.Thread(target=run, name="stt-polish", daemon=True)
+            thread.start()
+            while thread.is_alive():
+                if job.cancel_requested.wait(POLISH_CANCEL_POLL):
+                    self._finish(job, "cancelled", "Cancelled")
+                    thread.join()
+                    raise Cancelled("Cancelled")
+            outcome = box.get("result")
+            if outcome is None:
+                outcome = PolishResult(text, None, self.polisher.model, None, "error")
+            warning = outcome.warning()
+
+        result.update(outcome.to_fields())
+        if warning:
+            result.setdefault("warnings", []).append(warning)
+        progress(1.0, "Transcript polished" if outcome.applied else "Polish skipped", "polish")
+
+    def _polish_failed(self, result):
+        """Last resort when the polish step itself broke: built by hand, no shared code."""
+        result.pop("polished_text", None)
+        result["polish"] = {"applied": False, "model": getattr(self.polisher, "model", None),
+                            "latency_ms": None, "fallback_reason": "error"}
+        warnings = result.get("warnings")
+        if not isinstance(warnings, list):
+            warnings = result["warnings"] = []
+        warnings.append("Transcript not polished (error); showing the raw transcript.")

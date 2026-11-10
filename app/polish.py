@@ -537,6 +537,67 @@ class PolishClient:
             raise PolishError("output truncated")
         return content
 
+    # Small side requests (availability probe, unload). Short timeouts, and
+    # they never raise: a missing endpoint just reads as "not available".
+
+    def _side_request(self, method, url, payload=None):
+        import httpx
+
+        headers = {"Authorization": f"Bearer {self.api_key}"} if self.api_key else {}
+        try:
+            with httpx.Client(timeout=PROBE_TIMEOUT, transport=self.transport,
+                              trust_env=not _is_local(url)) as http:
+                response = http.request(method, url, json=payload, headers=headers)
+            if response.status_code != 200:
+                return None
+            return response.json()
+        except Exception as exc:  # unreachable, not this kind of server, bad JSON...
+            log.debug("Polish endpoint %s %s failed: %s", method, url, type(exc).__name__)
+            return None
+
+    def available(self):
+        """True when the endpoint answers and lists ``model`` (``GET /models``)."""
+        body = self._side_request("GET", f"{self.base_url}/models")
+        try:
+            ids = {_model_key(item["id"]) for item in body["data"]}
+        except (TypeError, LookupError):
+            return False
+        return _model_key(self.model) in ids
+
+    def _ollama_root(self):
+        """Ollama's native API root, or None when the URL is not Ollama-shaped."""
+        return self.base_url[:-len("/v1")] if self.base_url.endswith("/v1") else None
+
+    def unload(self):
+        """Ask an Ollama server to free the model's memory now.
+
+        Only when the model is loaded (``GET /api/ps``); then an empty
+        ``/api/generate`` with ``keep_alive: 0`` unloads it. Other servers do
+        not have these routes, so this is a no-op for them. Returns True when
+        the model was unloaded; never raises.
+        """
+        root = self._ollama_root()
+        if root is None:
+            return False
+        body = self._side_request("GET", f"{root}/api/ps")
+        try:
+            loaded = {_model_key(m.get("model") or m.get("name") or "") for m in body["models"]}
+        except (TypeError, LookupError, AttributeError):
+            return False
+        if _model_key(self.model) not in loaded:
+            return False
+        return self._side_request("POST", f"{root}/api/generate", {"model": self.model, "keep_alive": 0}) is not None
+
+
+PROBE_TIMEOUT = 1.5  # seconds, for the availability probe and the unload call
+PROBE_TTL = 30.0  # seconds a probe result is reused (/health is polled every 10 s)
+
+
+def _model_key(name):
+    """Compare model names the way Ollama resolves them: no tag means ``:latest``."""
+    name = str(name).strip()
+    return name if ":" in name else f"{name}:latest"
+
 
 def client_from_settings(settings):
     return PolishClient(settings.polish_base_url, settings.polish_model,
@@ -650,3 +711,60 @@ def polish(text, client, language=None, dictionary=(), log_path=None):
     except Exception as exc:  # anything else: log the type only, the message could quote the text
         log.warning("Polish request failed: %s", type(exc).__name__)
         return finish(reason="error")
+
+
+class Polisher:
+    """What the job queue needs from this module: polish a transcript, tell
+    whether the endpoint is usable (cached), and free the model on eject.
+
+    ``client`` is a ``PolishClient`` or a stand-in with the same methods
+    (``complete``; optionally ``available`` and ``unload``). No method raises.
+    """
+
+    def __init__(self, client, dictionary=(), log_path=None, probe_ttl=PROBE_TTL):
+        self.client = client
+        self.dictionary = tuple(dictionary)
+        self.log_path = log_path
+        self.probe_ttl = probe_ttl
+        self._probe_lock = threading.Lock()
+        self._probe = None  # (checked_at, available)
+
+    @property
+    def model(self):
+        return getattr(self.client, "model", None)
+
+    def run(self, text, language=None):
+        return polish(text, self.client, language, self.dictionary, self.log_path)
+
+    def skipped(self, text, reason):
+        """A fallback result for a transcript that is not sent to the model."""
+        result = PolishResult(text or "", None, self.model, None, reason)
+        log.info("Polish fell back to the raw transcript: %s", reason)
+        if self.log_path:
+            _append_log(self.log_path, result, None)
+        return result
+
+    def available(self):
+        with self._probe_lock:
+            now = time.monotonic()
+            if self._probe is None or now - self._probe[0] >= self.probe_ttl:
+                try:
+                    ok = bool(self.client.available())
+                except Exception as exc:
+                    log.debug("Polish availability probe failed: %s", type(exc).__name__)
+                    ok = False
+                self._probe = (time.monotonic(), ok)
+            return self._probe[1]
+
+    def unload(self):
+        try:
+            unload = getattr(self.client, "unload", None)
+            return bool(unload()) if unload else False
+        except Exception as exc:
+            log.warning("Could not unload the polish model: %s", type(exc).__name__)
+            return False
+
+
+def polisher_from_settings(settings, client=None):
+    return Polisher(client or client_from_settings(settings), load_dictionary(settings.polish_dictionary),
+                    settings.polish_log)

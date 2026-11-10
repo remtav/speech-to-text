@@ -1,4 +1,9 @@
-"""Export a transcription result as plain text, SRT or WebVTT subtitles, or JSON."""
+"""Export a transcription result as plain text, SRT or WebVTT subtitles, or JSON.
+
+``polished=True`` uses the LLM-polished text when the result has one (TXT and
+JSON); subtitles always use the raw segments, whose timestamps belong to the
+raw words. Without a polished text, the raw transcript is exported.
+"""
 import json
 
 EXPORT_FORMATS = {
@@ -36,8 +41,8 @@ def _cues(result):
     return cues
 
 
-def to_txt(result):
-    text = result.get("text_with_speakers") or result.get("text") or ""
+def to_txt(result, polished=False):
+    text = (polished and result.get("polished_text")) or result.get("text_with_speakers") or result.get("text") or ""
     return text.strip() + "\n"
 
 
@@ -54,9 +59,16 @@ def to_vtt(result):
     return "WEBVTT\n\n" + "\n".join(blocks)
 
 
-def to_json(result):
+def to_json(result, polished=False):
+    if polished and result.get("polished_text"):
+        # the polished text in "text", for tools that read only that; the raw one stays alongside
+        result = {**result, "text": result["polished_text"], "raw_text": result["text"]}
     return json.dumps(result, ensure_ascii=False, indent=2)
 
 
-def export(result, fmt):
-    return {"txt": to_txt, "srt": to_srt, "vtt": to_vtt, "json": to_json}[fmt](result)
+def export(result, fmt, polished=False):
+    if fmt == "txt":
+        return to_txt(result, polished)
+    if fmt == "json":
+        return to_json(result, polished)
+    return {"srt": to_srt, "vtt": to_vtt}[fmt](result)

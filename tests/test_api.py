@@ -427,3 +427,335 @@ class TestHfTokenSettings:
             same = client.put("/settings/hf-token", json={"token": "hf_abcdefghijklmnop"},
                               headers={"Origin": "http://testserver"})
         assert same.status_code == 200
+
+
+# ============================================================
+# LLM polish post-step (issue #6, phase 2)
+# ============================================================
+
+# A raw transcript and a polish the safety check accepts (a prompt few-shot pair)
+RAW = "um so I was thinking we could uh meet on Monday, no wait, Tuesday at the office"
+POLISHED = "I was thinking we could meet on Tuesday at the office."
+
+
+def _fake(**kwargs):
+    from tests.fake_polish import FakePolishClient
+    return FakePolishClient(**kwargs)
+
+
+def _polish_job(client, content=RAW, data=None):
+    response = _post_audio(client, "/jobs", content=content.encode(), data={"polish": "true", **(data or {})})
+    assert response.status_code == 202
+    return _wait_job(client, response.json()["id"])
+
+
+class TestPolish:
+    def test_off_by_default(self, client):
+        data = _post_audio(client, content=RAW.encode()).json()
+        assert data["text"] == RAW
+        assert "polish" not in data and "polished_text" not in data
+        assert client.polish_client.calls == []
+
+    def test_polished(self, make_client):
+        client = make_client(polish_client=_fake(reply=POLISHED))
+        data = _post_audio(client, content=RAW.encode(), data={"polish": "true"}).json()
+        assert data["text"] == RAW  # always the raw Whisper transcript
+        assert data["polished_text"] == POLISHED
+        assert data["polish"]["applied"] is True
+        assert data["polish"]["model"] == "fake-polish:7b"
+        assert data["polish"]["fallback_reason"] is None
+        assert isinstance(data["polish"]["latency_ms"], int)
+        assert data["warnings"] == []
+        assert client.polish_client.calls == [RAW]
+        assert data["segments"][0]["text"] == RAW  # subtitles stay raw
+
+    def test_language_passed_to_prompt(self, make_client):
+        client = make_client(polish_client=_fake(reply=POLISHED))
+        _post_audio(client, content=RAW.encode(), data={"polish": "true", "language": "fr"})
+        assert "Detected language: French" in client.polish_client.messages[-1]["content"]
+
+    def test_default_from_settings(self, make_client):
+        client = make_client(polish_default=True, polish_client=_fake(reply=POLISHED))
+        assert _post_audio(client, content=RAW.encode()).json()["polished_text"] == POLISHED
+        data = _post_audio(client, content=RAW.encode(), data={"polish": "false"}).json()
+        assert "polished_text" not in data
+        assert len(client.polish_client.calls) == 1
+
+    def test_polish_param_not_forwarded_to_engine(self, make_client):
+        client = make_client(polish_client=_fake(reply=POLISHED))
+        job = _polish_job(client)
+        assert job["params"]["polish"] is True
+        options = client.engine.calls[-1][2]
+        assert "polish" not in options
+
+    def test_streaming(self, make_client):
+        client = make_client(polish_client=_fake(reply=POLISHED))
+        data = _post_audio(client, "/transcribe/streaming", content=RAW.encode(), data={"polish": "true"}).json()
+        assert data["text"] == RAW
+        assert data["polished_text"] == POLISHED
+
+    def test_quick_job(self, make_client):
+        client = make_client(polish_client=_fake(reply=POLISHED))
+        job = _polish_job(client, data={"quick": "true"})
+        assert job["status"] == "done"
+        assert job["result"]["polished_text"] == POLISHED
+
+    def test_polish_stage_reported(self, make_client):
+        client = make_client(polish_client=_fake(reply=POLISHED, delay=0.5))
+        job_id = _post_audio(client, "/jobs", content=RAW.encode(), data={"polish": "true"}).json()["id"]
+        assert client.polish_client.started.wait(5)
+        job = client.get(f"/jobs/{job_id}").json()
+        assert job["status"] == "running"
+        assert job["stage"] == "polish"
+        assert 0.97 <= job["progress"] < 1.0
+        assert client.get("/progress").json()["stage"] == "polish"
+        assert _wait_job(client, job_id)["status"] == "done"
+
+
+class TestPolishNeverFailsTheJob:
+    """Whatever the LLM does, the job succeeds with the raw text."""
+
+    @pytest.mark.parametrize("reply, reason", [
+        (RuntimeError("model crashed"), "error"),
+        (ConnectionError("refused"), "error"),
+        ("__polish_error__", "error"),
+        ("__polish_timeout__", "timeout"),
+        ("The meeting starts at nine.", "safety_check:"),  # an answer, not the text
+        ("Je pensais qu'on pourrait se voir mardi au bureau.", "safety_check:"),  # a translation
+        ("", "safety_check:empty"),
+    ])
+    def test_fallbacks(self, make_client, reply, reason):
+        from app.polish import PolishError, PolishTimeout
+        reply = {"__polish_error__": PolishError("HTTP 500"),
+                 "__polish_timeout__": PolishTimeout("no answer within 5s")}.get(reply, reply)
+        client = make_client(polish_client=_fake(reply=reply))
+        for path in ("/transcribe", "/transcribe/streaming"):
+            response = _post_audio(client, path, content=RAW.encode(), data={"polish": "true"})
+            assert response.status_code == 200
+            data = response.json()
+            assert data["text"] == RAW
+            assert "polished_text" not in data
+            assert data["polish"]["applied"] is False
+            assert data["polish"]["fallback_reason"].startswith(reason)
+            assert any("not polished" in w for w in data["warnings"])
+
+    def test_slow_llm_times_out_with_the_real_client(self, make_client):
+        """The real PolishClient's hard timeout, inside a job: done with the raw text."""
+        import httpx
+
+        from app.polish import PolishClient
+
+        def handler(request):
+            time.sleep(3)
+            return httpx.Response(200, json={"choices": [{"message": {"content": POLISHED}}]})
+
+        llm = PolishClient("http://llm.test/v1", "m", timeout=0.5, transport=httpx.MockTransport(handler))
+        client = make_client(polish_client=llm)
+        started = time.monotonic()
+        job = _polish_job(client)
+        assert time.monotonic() - started < 2.5
+        assert job["status"] == "done"
+        assert job["result"]["text"] == RAW
+        assert job["result"]["polish"]["fallback_reason"] == "timeout"
+
+    def test_unreachable_endpoint_with_the_real_client(self, make_client):
+        import httpx
+
+        from app.polish import PolishClient
+
+        def handler(request):
+            raise httpx.ConnectError("connection refused")
+
+        client = make_client(polish_client=PolishClient("http://llm.test/v1", transport=httpx.MockTransport(handler)))
+        job = _polish_job(client)
+        assert job["status"] == "done"
+        assert job["result"]["polish"]["fallback_reason"] == "error"
+        assert client.get("/health").json()["polish_available"] is False
+
+    def test_bug_in_polish_step(self, make_client):
+        client = make_client(polish_client=_fake(reply=POLISHED))
+        with patch("app.polish.polish", side_effect=ValueError("bug")):
+            job = _polish_job(client)
+        assert job["status"] == "done"
+        assert job["result"]["text"] == RAW
+        assert job["result"]["polish"]["fallback_reason"] == "error"
+
+    def test_bug_outside_the_helper_thread(self, make_client, monkeypatch):
+        client = make_client(polish_client=_fake(reply=POLISHED))
+        monkeypatch.setattr("app.polish.PolishResult.to_fields", lambda self: 1 / 0, raising=True)
+        job = _polish_job(client)
+        assert job["status"] == "done"
+        assert job["result"]["text"] == RAW
+        assert job["result"]["polish"]["fallback_reason"] == "error"
+        assert "polished_text" not in job["result"]
+
+    def test_whisper_errors_are_still_errors(self, make_client):
+        client = make_client(polish_client=_fake(reply=POLISHED))
+        job = _polish_job(client, content="bad")
+        assert job["status"] == "error"
+        assert job["error"]["code"] == "bad_audio"
+        assert client.polish_client.calls == []
+
+
+class TestPolishUnsupported:
+    def test_diarization_not_polished(self, make_client, monkeypatch):
+        monkeypatch.setenv("HF_TOKEN", "hf_test")
+        client = make_client(polish_client=_fake(reply=POLISHED))
+        data = _post_audio(client, content=RAW.encode(), data={"polish": "true", "diarize": "true"}).json()
+        assert data["text"] == RAW
+        assert data["polish"] == {"applied": False, "model": "fake-polish:7b", "latency_ms": None,
+                                  "fallback_reason": "unsupported"}
+        assert any("speaker identification" in w for w in data["warnings"])
+        assert client.polish_client.calls == []
+
+    def test_long_transcript_not_polished(self, make_client):
+        client = make_client(polish_client=_fake(reply=POLISHED))
+        long_text = " ".join(["word"] * 401)
+        job = _polish_job(client, content=long_text)
+        assert job["status"] == "done"
+        assert job["result"]["polish"]["fallback_reason"] == "unsupported"
+        assert client.polish_client.calls == []
+
+
+class TestPolishCancel:
+    def test_cancel_during_polish(self, make_client):
+        client = make_client(polish_client=_fake(reply=POLISHED, delay=1.0))
+        job_id = _post_audio(client, "/jobs", content=RAW.encode(), data={"polish": "true"}).json()["id"]
+        assert client.polish_client.started.wait(5)
+        started = time.monotonic()
+        client.post(f"/jobs/{job_id}/cancel")
+        job = _wait_job(client, job_id)
+        assert job["status"] == "cancelled"
+        assert job["result"] is None
+        assert time.monotonic() - started < 0.8  # answered before the LLM finishes
+
+        # the next job waits for the abandoned LLM call, then runs normally
+        follow_up = _polish_job(client)
+        assert follow_up["status"] == "done"
+        assert follow_up["result"]["polished_text"] == POLISHED
+
+    def test_cancel_before_polish(self, make_client):
+        client = make_client(polish_client=_fake(reply=POLISHED))
+        job_id = _post_audio(client, "/jobs", content=b"slow", data={"polish": "true"}).json()["id"]
+        time.sleep(0.2)
+        client.post(f"/jobs/{job_id}/cancel")
+        assert _wait_job(client, job_id)["status"] == "cancelled"
+        assert client.polish_client.calls == []
+
+
+class TestPolishHealth:
+    def test_fields(self, make_client):
+        client = make_client(polish_default=True, polish_model="qwen2.5:7b-instruct-q4_K_M")
+        data = client.get("/health").json()
+        assert data["polish_available"] is True
+        assert data["polish_default"] is True
+        assert data["polish_model"] == "qwen2.5:7b-instruct-q4_K_M"
+
+    def test_defaults(self, client):
+        data = client.get("/health").json()
+        assert data["polish_default"] is False
+        assert data["polish_model"] == "qwen2.5:7b-instruct-q4_K_M"
+
+    @pytest.mark.parametrize("available", [False, RuntimeError("probe exploded")])
+    def test_unavailable(self, make_client, available):
+        client = make_client(polish_client=_fake(available=available))
+        assert client.get("/health").json()["polish_available"] is False
+
+    def test_probe_is_cached(self, client):
+        for _ in range(3):
+            client.get("/health")
+        assert client.polish_client.probes == 1
+
+    def test_api_key_never_reported(self, make_client):
+        client = make_client(polish_api_key="sk-secret-value")
+        assert "sk-secret-value" not in client.get("/health").text
+
+
+class TestPolishExport:
+    def _job(self, client, **data):
+        return _polish_job(client, data=data)["id"]
+
+    def test_txt(self, make_client):
+        client = make_client(polish_client=_fake(reply=POLISHED))
+        job_id = self._job(client)
+        assert client.get(f"/jobs/{job_id}/export?format=txt").text == RAW + "\n"
+        assert client.get(f"/jobs/{job_id}/export?format=txt&polished=true").text == POLISHED + "\n"
+
+    def test_json(self, make_client):
+        client = make_client(polish_client=_fake(reply=POLISHED))
+        job_id = self._job(client)
+        raw = client.get(f"/jobs/{job_id}/export?format=json").json()
+        assert raw["text"] == RAW and raw["polished_text"] == POLISHED
+        polished = client.get(f"/jobs/{job_id}/export?format=json&polished=true").json()
+        assert polished["text"] == POLISHED
+        assert polished["raw_text"] == RAW
+        assert polished["segments"] == raw["segments"]
+
+    def test_subtitles_stay_raw(self, make_client):
+        client = make_client(polish_client=_fake(reply=POLISHED))
+        job_id = self._job(client)
+        for fmt in ("srt", "vtt"):
+            raw = client.get(f"/jobs/{job_id}/export?format={fmt}").text
+            assert client.get(f"/jobs/{job_id}/export?format={fmt}&polished=true").text == raw
+            assert RAW in raw
+
+    def test_falls_back_to_raw_without_polished_text(self, make_client):
+        client = make_client(polish_client=_fake(reply=RuntimeError("down")))
+        job_id = self._job(client)
+        assert client.get(f"/jobs/{job_id}/export?format=txt&polished=true").text == RAW + "\n"
+        data = client.get(f"/jobs/{job_id}/export?format=json&polished=true").json()
+        assert data["text"] == RAW and "raw_text" not in data
+
+
+class TestPolishEject:
+    def test_eject_unloads_polish_model(self, client):
+        _post_audio(client)  # loads Whisper
+        data = client.post("/eject").json()
+        assert data["status"] == "success"
+        assert data["polish_unloaded"] is True
+        assert client.polish_client.unloads == 1
+
+    def test_eject_with_only_the_polish_model_loaded(self, client):
+        data = client.post("/eject").json()
+        assert data["status"] == "success"
+        assert data["polish_unloaded"] is True
+
+    def test_nothing_loaded(self, make_client):
+        client = make_client(polish_client=_fake(loaded=False))
+        data = client.post("/eject").json()
+        assert data["status"] == "no model was loaded"
+        assert data["polish_unloaded"] is False
+
+    def test_unload_failure_does_not_fail_eject(self, make_client):
+        llm = _fake()
+        llm.unload = lambda: 1 / 0
+        client = make_client(polish_client=llm)
+        _post_audio(client)
+        response = client.post("/eject")
+        assert response.status_code == 200
+        assert response.json()["polish_unloaded"] is False
+
+
+class TestPolishSettingsWiring:
+    def test_dictionary_and_log(self, make_client, tmp_path):
+        import json
+
+        dictionary = tmp_path / "dict.txt"
+        dictionary.write_text("Kubernetes\n# comment\nRémi\n", encoding="utf-8")
+        log_path = tmp_path / "polish.jsonl"
+        client = make_client(polish_dictionary=str(dictionary), polish_log=str(log_path),
+                             polish_client=_fake(reply=POLISHED))
+        _polish_job(client)
+        assert "Kubernetes, Rémi" in client.polish_client.messages[0]["content"]
+        record = json.loads(log_path.read_text(encoding="utf-8").splitlines()[-1])
+        assert record["raw"] == RAW and record["polished"] == POLISHED and record["applied"] is True
+
+    def test_real_client_built_from_settings(self):
+        from app.config import Settings
+        from app.polish import PolishClient, polisher_from_settings
+
+        polisher = polisher_from_settings(Settings(polish_base_url="http://ollama:11434/v1", polish_model="m:1",
+                                                   polish_api_key="k", polish_timeout=7.0))
+        assert isinstance(polisher.client, PolishClient)
+        assert (polisher.client.base_url, polisher.client.model, polisher.client.api_key,
+                polisher.client.timeout) == ("http://ollama:11434/v1", "m:1", "k", 7.0)

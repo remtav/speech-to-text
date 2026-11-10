@@ -23,6 +23,7 @@ from app.errors import http_status_for
 from app.formats import EXPORT_FORMATS, export
 from app.jobs import JobManager
 from app.languages import LANGUAGES
+from app.polish import polisher_from_settings
 from app.pipeline import Engine, model_cache_dir
 from app.version import __version__, build_info, build_label
 from app.worker import InlineBackend, ProcessBackend
@@ -145,10 +146,12 @@ def _hf_token_status(settings):
 # Application
 # ============================================================
 
-def create_app(settings=None, backend=None):
+def create_app(settings=None, backend=None, polish_client=None):
+    """``backend`` and ``polish_client`` replace the real engine / LLM client (tests)."""
     settings = settings or load_settings()
     ffmpeg_path = system.find_ffmpeg(settings.ffmpeg_path)
     max_upload_bytes = settings.max_upload_mb * 1024 * 1024
+    polisher = polisher_from_settings(settings, polish_client)
 
     @asynccontextmanager
     async def lifespan(app):
@@ -160,7 +163,7 @@ def create_app(settings=None, backend=None):
             threading.Thread(target=system.torch_cuda_info, daemon=True).start()  # warm the cache
 
         manager = JobManager(backend or create_backend(settings, ffmpeg_path), settings.model, device,
-                             settings.job_history)
+                             settings.job_history, polisher=polisher)
         app.state.jobs = manager
         manager.start()
 
@@ -174,6 +177,8 @@ def create_app(settings=None, backend=None):
         source = hf.token_source()
         log.info("Speaker diarization: %s", f"available (token from {source})" if source
                  else "disabled until a Hugging Face token is added")
+        log.info("Transcript polish: model %s at %s (%s by default)", settings.polish_model,
+                 settings.polish_base_url, "on" if settings.polish_default else "off")
         log.info("=" * 60)
 
         if settings.preload:
@@ -252,6 +257,9 @@ def create_app(settings=None, backend=None):
             "diarization_loaded": state["diarization_loaded"],
             "diarize_default": settings.diarize_default,
             "hf_token_source": source,
+            "polish_available": polisher.available(),  # endpoint reachable and model present (cached probe)
+            "polish_default": settings.polish_default,
+            "polish_model": settings.polish_model,
             "valid_models": VALID_MODELS,
             "valid_devices": VALID_DEVICES,
             "languages": LANGUAGES,
@@ -268,15 +276,19 @@ def create_app(settings=None, backend=None):
 
     @app.post("/eject")
     async def eject(request: Request, wait: bool = True):
-        """Unload all models to free GPU / RAM memory (after the running job, if any)."""
+        """Unload all models to free GPU / RAM memory (after the running job, if any).
+
+        Also asks the Ollama polish endpoint to unload its model, so the whole GPU is given back.
+        """
         job = request.app.state.jobs.submit("eject")
         if not wait:
             return JSONResponse(status_code=202, content={"status": "queued", "job": job.to_dict()})
         await _wait(job)
         _raise_for_job(job)
-        ejected = job.result["ejected"]
+        ejected = job.result["ejected"] or job.result["polish_unloaded"]
         return {"status": "success" if ejected else "no model was loaded",
-                "message": "Models ejected from memory" if ejected else "No model was loaded"}
+                "message": "Models ejected from memory" if ejected else "No model was loaded",
+                "polish_unloaded": job.result["polish_unloaded"]}
 
     @app.post("/switch-model")
     async def switch_model(request: Request, body: dict = Body(...)):
@@ -307,8 +319,9 @@ def create_app(settings=None, backend=None):
     # --------------------------------------------------- transcription
 
     async def submit_transcription(request, file, diarize, num_speakers, min_speakers, max_speakers,
-                                   language, quick=False):
-        params = {"quick": quick, "language": _validate_language(language)}
+                                   language, quick=False, polish=None):
+        params = {"quick": quick, "language": _validate_language(language),
+                  "polish": settings.polish_default if polish is None else bool(polish)}
         if not quick:
             diarize = settings.diarize_default if diarize is None else diarize
             _validate_speaker_hints(num_speakers, min_speakers, max_speakers)
@@ -329,18 +342,25 @@ def create_app(settings=None, backend=None):
         min_speakers: Optional[int] = Form(None),
         max_speakers: Optional[int] = Form(None),
         language: Optional[str] = Form(None),
+        polish: Optional[bool] = Form(None),
     ):
-        """Transcribe audio with word timestamps, optionally labelling speakers. Waits for the result."""
-        job = await submit_transcription(request, file, diarize, num_speakers, min_speakers, max_speakers, language)
+        """Transcribe audio with word timestamps, optionally labelling speakers. Waits for the result.
+
+        With ``polish`` (default: WHISPER_POLISH), the result also has ``polished_text`` when the LLM
+        polish step succeeded, and a ``polish`` status; ``text`` is always the raw transcript.
+        """
+        job = await submit_transcription(request, file, diarize, num_speakers, min_speakers, max_speakers, language,
+                                         polish=polish)
         await _wait(job)
         _raise_for_job(job)
         return job.result
 
     @app.post("/transcribe/streaming")
     async def transcribe_streaming(request: Request, file: UploadFile = File(...),
-                                   language: Optional[str] = Form(None)):
+                                   language: Optional[str] = Form(None),
+                                   polish: Optional[bool] = Form(None)):
         """Fast transcription with language detection, skipping alignment and diarization."""
-        job = await submit_transcription(request, file, None, None, None, None, language, quick=True)
+        job = await submit_transcription(request, file, None, None, None, None, language, quick=True, polish=polish)
         await _wait(job)
         _raise_for_job(job)
         return job.result
@@ -357,10 +377,11 @@ def create_app(settings=None, backend=None):
         max_speakers: Optional[int] = Form(None),
         language: Optional[str] = Form(None),
         quick: bool = Form(False),
+        polish: Optional[bool] = Form(None),
     ):
         """Queue a transcription and return immediately; poll GET /jobs/{id} for progress and result."""
         job = await submit_transcription(request, file, diarize, num_speakers, min_speakers, max_speakers,
-                                         language, quick)
+                                         language, quick, polish)
         return job.to_dict()
 
     @app.get("/jobs")
@@ -377,7 +398,8 @@ def create_app(settings=None, backend=None):
         return request.app.state.jobs.cancel(job_id).to_dict()
 
     @app.get("/jobs/{job_id}/export")
-    def export_job(request: Request, job_id: str, format: str = Query("txt")):
+    def export_job(request: Request, job_id: str, format: str = Query("txt"), polished: bool = Query(False)):
+        """``polished=true`` exports the polished text (TXT, JSON) when there is one; SRT/VTT stay raw."""
         job = _get_job(request, job_id)
         if format not in EXPORT_FORMATS:
             raise HTTPException(status_code=400, detail=f"Unknown format. Choose from: {list(EXPORT_FORMATS)}")
@@ -387,7 +409,7 @@ def create_app(settings=None, backend=None):
             raise HTTPException(status_code=409, detail="Quick transcriptions have no timestamps to export")
         stem = re.sub(r"[^\w.-]+", "_", Path(job.filename or "transcription").stem)[:80] or "transcription"
         return Response(
-            export(job.result, format),
+            export(job.result, format, polished=polished),
             media_type=EXPORT_FORMATS[format],
             headers={"Content-Disposition": f'attachment; filename="{stem}.{format}"'},
         )
