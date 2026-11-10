@@ -4,8 +4,9 @@ Invalid values never stop the server: they are logged and replaced by the
 default, so a typo in ``.env`` shows up as a warning instead of a crash.
 """
 import logging
+import math
 import os
-from dataclasses import dataclass, replace
+from dataclasses import dataclass, field, replace
 
 log = logging.getLogger(__name__)
 
@@ -13,6 +14,9 @@ VALID_MODELS = ["tiny", "base", "small", "medium", "large", "large-v2", "large-v
 VALID_DEVICES = ["cpu", "cuda"]
 DEFAULT_DIARIZE_MODEL = "pyannote/speaker-diarization-community-1"
 WORKER_MODES = ["process", "inline"]
+# Default LLM for the optional polish step (see app/polish.py)
+DEFAULT_POLISH_MODEL = "qwen2.5:7b-instruct-q4_K_M"
+DEFAULT_POLISH_BASE_URL = "http://localhost:11434/v1"
 
 
 def env_bool(name, default=False):
@@ -35,6 +39,31 @@ def env_int(name, default, minimum=None, maximum=None):
         log.warning("Ignoring %s=%s: must be between %s and %s, using %s", name, value, minimum, maximum, default)
         return default
     return value
+
+
+def env_float(name, default, minimum=None, maximum=None):
+    raw = os.getenv(name)
+    if raw is None or not raw.strip():
+        return default
+    try:
+        value = float(raw)
+    except ValueError:
+        log.warning("Ignoring %s=%r: not a number, using %s", name, raw, default)
+        return default
+    if math.isnan(value) or (minimum is not None and value < minimum) or (maximum is not None and value > maximum):
+        log.warning("Ignoring %s=%s: must be between %s and %s, using %s", name, value, minimum, maximum, default)
+        return default
+    return value
+
+
+def env_url(name, default):
+    raw = (os.getenv(name) or "").strip()
+    if not raw:
+        return default
+    if not raw.startswith(("http://", "https://")):
+        log.warning("Ignoring %s=%r: expected an http:// or https:// URL, using %r", name, raw, default)
+        return default
+    return raw.rstrip("/")
 
 
 def env_choice(name, choices, default):
@@ -64,6 +93,13 @@ class Settings:
     ffmpeg_timeout: int = 1800
     cors_origins: tuple = ("*",)
     job_history: int = 50
+    polish_default: bool = False
+    polish_base_url: str = DEFAULT_POLISH_BASE_URL
+    polish_model: str = DEFAULT_POLISH_MODEL
+    polish_api_key: str | None = field(default=None, repr=False)  # environment only, never in the UI
+    polish_timeout: float = 5.0
+    polish_dictionary: str | None = None  # path to a newline-separated list of names/jargon
+    polish_log: str | None = None  # path to the local JSONL tuning log
 
     @property
     def diarize_model_name(self):
@@ -91,4 +127,11 @@ def load_settings():
         ffmpeg_timeout=env_int("WHISPER_FFMPEG_TIMEOUT", 1800, 10),
         cors_origins=origins or ("*",),
         job_history=env_int("WHISPER_JOB_HISTORY", 50, 1, 10000),
+        polish_default=env_bool("WHISPER_POLISH", False),
+        polish_base_url=env_url("POLISH_BASE_URL", DEFAULT_POLISH_BASE_URL),
+        polish_model=(os.getenv("POLISH_MODEL") or "").strip() or DEFAULT_POLISH_MODEL,
+        polish_api_key=(os.getenv("POLISH_API_KEY") or "").strip() or None,
+        polish_timeout=env_float("POLISH_TIMEOUT", 5.0, 0.5, 120),
+        polish_dictionary=(os.getenv("POLISH_DICTIONARY") or "").strip() or None,
+        polish_log=(os.getenv("POLISH_LOG") or "").strip() or None,
     )
