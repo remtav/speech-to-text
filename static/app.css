@@ -258,6 +258,12 @@ header .version:hover { text-decoration: underline; }
 .result-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 1rem; flex-wrap: wrap; }
 .result-actions { display: flex; align-items: center; gap: .4rem; flex-wrap: wrap; margin-bottom: .8rem; }
 .result-actions label { display: flex; align-items: center; gap: .3rem; margin-right: .3rem; cursor: pointer; }
+.result-actions label.disabled { opacity: .5; cursor: not-allowed; }
+.view-switch { display: inline-flex; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; margin-right: .3rem; }
+.view-btn { background: var(--surface-2); color: var(--text-muted); border: none; padding: .3rem .7rem; font: inherit; font-size: .8rem; cursor: pointer; }
+.view-btn + .view-btn { border-left: 1px solid var(--border); }
+.view-btn[aria-pressed="true"] { background: var(--primary); color: #fff; }
+.view-btn:hover:not([aria-pressed="true"]) { color: var(--text); }
 .warnings { list-style: none; margin: .5rem 0 .8rem; }
 .warnings li { color: var(--warn); font-size: .85rem; padding: .4rem .7rem; border-left: 3px solid var(--warn); background: rgba(250,204,21,.06); margin-bottom: .3rem; }
 .output-box {

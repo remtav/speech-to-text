@@ -76,6 +76,14 @@
                 </label>
             </div>
             <p class="status" id="diarizeStatus"></p>
+            <div class="speaker-options">
+                <label id="polishLabel" title="A local LLM removes fillers, resolves self-corrections and fixes punctuation. The raw transcript is always kept.">
+                    <input type="checkbox" id="polishToggle">
+                    ✨ Polish transcript
+                </label>
+                <span class="muted small" id="polishModel"></span>
+            </div>
+            <p class="status" id="polishStatus"></p>
 
             <details class="hf-panel" id="hfPanel">
                 <summary>🔑 Hugging Face token <span class="badge" id="hfBadge">checking…</span></summary>
@@ -155,6 +163,10 @@
             <div class="result-header">
                 <h2>✍️ Transcription Result</h2>
                 <div class="result-actions" id="resultActions" hidden>
+                    <div class="view-switch" id="viewSwitch" role="group" aria-label="Transcript version" hidden>
+                        <button class="view-btn" type="button" data-view="polished" aria-pressed="true">Polished</button>
+                        <button class="view-btn" type="button" data-view="raw" aria-pressed="false">Raw</button>
+                    </div>
                     <label class="small muted"><input type="checkbox" id="timestampsToggle"> Timestamps</label>
                     <button class="btn small-btn" type="button" id="copyBtn">📋 Copy</button>
                     <a class="btn small-btn" id="dlTxt" download>TXT</a>
