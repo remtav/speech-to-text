@@ -904,3 +904,153 @@ class TestPolishConfig:
     def test_api_key_not_in_repr(self, monkeypatch):
         monkeypatch.setenv("POLISH_API_KEY", "sk-secret")
         assert "sk-secret" not in repr(config.load_settings())
+
+
+class TestAvailabilityProbe:
+    def _models(self, *ids, status=200):
+        seen = []
+
+        def handler(request):
+            seen.append(request)
+            return httpx.Response(status, json={"object": "list", "data": [{"id": i} for i in ids]})
+        return handler, seen
+
+    def test_model_listed(self):
+        handler, seen = self._models("llama3:8b", "qwen2.5:7b-instruct-q4_K_M")
+        client = _client(handler, base_url="http://ollama:11434/v1", model="qwen2.5:7b-instruct-q4_K_M")
+        assert client.available() is True
+        assert str(seen[0].url) == "http://ollama:11434/v1/models"
+
+    def test_model_missing(self):
+        handler, _ = self._models("llama3:8b")
+        assert _client(handler, model="qwen2.5:7b-instruct-q4_K_M").available() is False
+
+    def test_untagged_name_means_latest(self):
+        handler, _ = self._models("qwen2.5:latest")
+        assert _client(handler, model="qwen2.5").available() is True
+        handler, _ = self._models("qwen2.5")
+        assert _client(handler, model="qwen2.5:latest").available() is True
+
+    def test_other_tag_does_not_match(self):
+        handler, _ = self._models("qwen2.5:latest")
+        assert _client(handler, model="qwen2.5:7b-instruct-q4_K_M").available() is False
+
+    @pytest.mark.parametrize("handler", [
+        lambda request: httpx.Response(500, json={}),
+        lambda request: httpx.Response(200, text="not json"),
+        lambda request: httpx.Response(200, json={"models": []}),
+        lambda request: httpx.Response(200, json={"data": [{"name": "x"}]}),
+    ])
+    def test_bad_answers(self, handler):
+        assert _client(handler).available() is False
+
+    def test_unreachable(self):
+        def handler(request):
+            raise httpx.ConnectError("refused")
+        assert _client(handler).available() is False
+
+    def test_sends_the_api_key(self):
+        handler, seen = self._models("m")
+        _client(handler, model="m", api_key="sk-1").available()
+        assert seen[0].headers["Authorization"] == "Bearer sk-1"
+
+
+class TestOllamaUnload:
+    def _ollama(self, loaded, generate_status=200):
+        seen = []
+
+        def handler(request):
+            seen.append((request.method, request.url.path, json.loads(request.content or b"null")))
+            if request.url.path == "/api/ps":
+                return httpx.Response(200, json={"models": [{"name": n, "model": n} for n in loaded]})
+            if request.url.path == "/api/generate":
+                return httpx.Response(generate_status, json={"done": True, "done_reason": "unload"})
+            return httpx.Response(404)
+        return handler, seen
+
+    def test_unloads_a_loaded_model(self):
+        handler, seen = self._ollama(["qwen2.5:7b-instruct-q4_K_M"])
+        client = _client(handler, base_url="http://ollama:11434/v1", model="qwen2.5:7b-instruct-q4_K_M")
+        assert client.unload() is True
+        assert seen == [("GET", "/api/ps", None),
+                        ("POST", "/api/generate", {"model": "qwen2.5:7b-instruct-q4_K_M", "keep_alive": 0})]
+
+    def test_not_loaded(self):
+        handler, seen = self._ollama(["llama3:8b"])
+        assert _client(handler, model="qwen2.5:7b-instruct-q4_K_M").unload() is False
+        assert [path for _, path, _ in seen] == ["/api/ps"]  # never loads it just to unload it
+
+    def test_generate_fails(self):
+        handler, _ = self._ollama(["m:latest"], generate_status=500)
+        assert _client(handler, model="m").unload() is False
+
+    def test_not_an_ollama_url(self):
+        seen = []
+
+        def handler(request):
+            seen.append(request)
+            return httpx.Response(200, json={})
+        assert _client(handler, base_url="http://llama.local:8080/openai", model="m").unload() is False
+        assert seen == []
+
+    def test_not_an_ollama_server(self):
+        def handler(request):
+            return httpx.Response(404, json={"error": "not found"})
+        assert _client(handler, base_url="https://api.example.com/v1").unload() is False
+
+    def test_unreachable(self):
+        def handler(request):
+            raise httpx.ConnectError("refused")
+        assert _client(handler).unload() is False
+
+
+class TestPolisher:
+    def test_run_never_raises(self):
+        polisher = polish.Polisher(FakeClient(error=RuntimeError("boom")))
+        result = polisher.run("um so we could meet on Tuesday at the office", "en")
+        assert result.applied is False and result.fallback_reason == "error"
+
+    def test_probe_cached_then_refreshed(self):
+        class Probe:
+            model = "m"
+            calls = 0
+
+            def available(self):
+                Probe.calls += 1
+                return True
+
+        polisher = polish.Polisher(Probe(), probe_ttl=60)
+        assert polisher.available() and polisher.available()
+        assert Probe.calls == 1
+        polisher.probe_ttl = 0
+        assert polisher.available()
+        assert Probe.calls == 2
+
+    def test_probe_errors_read_as_unavailable(self):
+        class Broken:
+            model = "m"
+
+            def available(self):
+                raise RuntimeError("boom")
+        assert polish.Polisher(Broken()).available() is False
+
+    def test_client_without_optional_methods(self):
+        polisher = polish.Polisher(FakeClient(answer="x"))
+        assert polisher.available() is False
+        assert polisher.unload() is False
+
+    def test_unload_errors_are_swallowed(self):
+        class Broken:
+            model = "m"
+
+            def unload(self):
+                raise RuntimeError("boom")
+        assert polish.Polisher(Broken()).unload() is False
+
+    def test_skipped_is_logged(self, tmp_path):
+        log_path = tmp_path / "log.jsonl"
+        polisher = polish.Polisher(FakeClient(answer="x"), log_path=str(log_path))
+        result = polisher.skipped("raw words", "unsupported")
+        assert (result.applied, result.fallback_reason, result.latency_ms) == (False, "unsupported", None)
+        record = json.loads(log_path.read_text(encoding="utf-8"))
+        assert record["raw"] == "raw words" and record["fallback_reason"] == "unsupported"

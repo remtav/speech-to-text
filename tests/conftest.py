@@ -10,6 +10,7 @@ from app.config import Settings  # noqa: E402
 from app.main import create_app  # noqa: E402
 from app.worker import InlineBackend  # noqa: E402
 from tests.fake_engine import FakeEngine  # noqa: E402
+from tests.fake_polish import FakePolishClient  # noqa: E402
 
 
 @pytest.fixture(autouse=True)
@@ -25,16 +26,18 @@ def isolated_hf_token(monkeypatch, tmp_path):
 
 @pytest.fixture
 def make_client():
-    """Build a test client around a model-free engine, with lifespan started."""
+    """Build a test client around a model-free engine and a fake LLM, with lifespan started."""
     clients = []
 
-    def factory(raise_server_exceptions=True, **overrides):
+    def factory(raise_server_exceptions=True, polish_client=None, **overrides):
         settings = Settings(**{"preload": False, "worker_mode": "inline", **overrides})
         engine = FakeEngine()
-        client = TestClient(create_app(settings, backend=InlineBackend(engine)),
+        polish_client = polish_client or FakePolishClient()
+        client = TestClient(create_app(settings, backend=InlineBackend(engine), polish_client=polish_client),
                             raise_server_exceptions=raise_server_exceptions)
         client.__enter__()
         client.engine = engine
+        client.polish_client = polish_client
         clients.append(client)
         return client
 
