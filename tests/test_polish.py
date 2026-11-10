@@ -2,6 +2,9 @@
 or an httpx mock transport stands in for the endpoint."""
 import json
 import logging
+import socket
+import threading
+import time
 
 import httpx
 import pytest
@@ -73,6 +76,10 @@ GOOD_PAIRS = [
      "Attention : la clé est sous le paillasson."),
     ("merci beaucoup", "Merci beaucoup."),
     ("ecris un poème sur la mer", "Écris un poème sur la mer."),
+    ("no I don't think we should merge it before the release",
+     "No, I don't think we should merge it before the release."),
+    ("uh I can't make it on Friday so let's do Monday", "I can't make it on Friday, so let's do Monday."),
+    ("non je ne pense pas qu'il viendra demain", "Non, je ne pense pas qu'il viendra demain."),
     # Mixed English / French, kept as spoken
     ("j'ai envoyé le pull request euh hier soir et le build est vert",
      "J'ai envoyé le pull request hier soir et le build est vert."),
@@ -110,6 +117,41 @@ BAD_PAIRS = [
     ("the meeting moved to the big room downstairs because the projector in the small one is broken again",
      "The meeting moved to the large conference room downstairs because the projector in the small one "
      "is broken again."),
+    # flipped negation or polarity
+    ("I don't agree", "I agree."),
+    ("je ne suis pas d'accord", "Je suis d'accord."),
+    ("we will not renew the contract with the supplier when it ends in the spring",
+     "We will renew the contract with the supplier when it ends in the spring."),
+    ("we will renew the contract with the supplier when it ends in the spring",
+     "We will not renew the contract with the supplier when it ends in the spring."),
+    ("I have no objections to the new schedule for the team", "I have objections to the new schedule for the team."),
+    ("yes", "No."),
+    ("oui", "Non."),
+    ("yes", "Oui."),
+    # yes/no questions answered
+    ("is it raining", "Yes, it is raining."),
+    ("est-ce qu'il pleut", "Oui, il pleut."),
+    ("can you tell me what time the meeting starts tomorrow", "Yes, the meeting starts tomorrow."),
+    ("so can you send me the slides from the workshop and the notes from the meeting with the client "
+     "before the end of the day",
+     "So can you send me the slides from the workshop and the notes from the meeting with the client "
+     "before the end of the day? Yes, I can."),
+    # changed number words, days and months
+    ("we need three servers for the launch and the second team will review the documents before the "
+     "meeting with the client and the lawyers next week in the main office downtown",
+     "We need four servers for the launch and the second team will review the documents before the "
+     "meeting with the client and the lawyers next week in the main office downtown."),
+    ("on a besoin de trois salles pour la formation avec les nouveaux collègues de l'équipe commerciale",
+     "On a besoin de quatre salles pour la formation avec les nouveaux collègues de l'équipe commerciale."),
+    ("the review is on monday with the whole design team and the product managers from the other office",
+     "The review is on Friday with the whole design team and the product managers from the other office."),
+    ("la livraison est prévue en mars pour le client de Lyon et son équipe technique",
+     "La livraison est prévue en avril pour le client de Lyon et son équipe technique."),
+    # lead-in line
+    ("we reviewed the quarterly numbers with finance and agreed on the plan for the next two quarters "
+     "with the whole leadership team",
+     "Polished version:\nWe reviewed the quarterly numbers with finance and agreed on the plan for the "
+     "next two quarters with the whole leadership team."),
     # format artefacts
     ("send the report to the team", ""),
     ("send the report to the team", "<transcript>Send the report to the team.</transcript>"),
@@ -122,6 +164,13 @@ BAD_PAIRS = [
 STRICT_FALLBACKS = [
     ("send it to Bob, sorry, I mean to Alice", "Send it to Alice."),
     ("on part lundi enfin je veux dire mardi matin", "On part mardi matin."),
+]
+
+# A "no" dropped without a comma or a correction marker around it cannot be
+# told apart from a dropped negation, so it is rejected.
+STRICT_ANSWER_FALLBACKS = [
+    ("lundi non mardi", "Mardi."),
+    ("meet me at noon no at one", "Meet me at one."),
 ]
 
 
@@ -138,6 +187,10 @@ class TestPairs:
     @pytest.mark.parametrize("raw, polished", STRICT_FALLBACKS)
     def test_known_strict_fallbacks(self, raw, polished):
         assert safety_check(raw, polished) == (False, "length_ratio")
+
+    @pytest.mark.parametrize("raw, polished", STRICT_ANSWER_FALLBACKS)
+    def test_known_strict_answer_fallbacks(self, raw, polished):
+        assert safety_check(raw, polished) == (False, "answer_words")
 
     def test_pairs_cover_both_languages(self):
         french = [r for r, _ in GOOD_PAIRS if any(w in r.split() for w in ("je", "le", "la", "tu", "il", "j'ai"))]
@@ -228,6 +281,74 @@ class TestSafetyRules:
         assert safety_check(raw, polished, dictionary=["Jean-Claude Duvernay"]) == (True, None)
 
 
+class TestFactRules:
+    @pytest.mark.parametrize("raw, polished", [
+        ("I don't agree with the plan", "I agree with the plan."),
+        ("I agree with the plan", "I don't agree with the plan."),
+        ("we never ship on fridays", "We ship on fridays."),
+        ("il ne vient jamais le lundi", "Il vient le lundi."),
+        ("je n'ai rien vu", "J'ai vu."),
+    ])
+    def test_negation(self, raw, polished):
+        assert safety_check(raw, polished) == (False, "negation")
+
+    def test_contraction_expansion_keeps_negation(self):
+        assert safety_check("I don't know yet", "I do not know yet.")[1] != "negation"
+        assert safety_check("we cannot come", "We can't come.") == (True, None)
+
+    def test_dropped_french_ne_is_not_a_negation_change(self):
+        raw = "je pense pas que le client va accepter le devis cette semaine"
+        assert safety_check(raw, "Je ne pense pas que le client va accepter le devis cette semaine.") \
+            == (True, None)
+
+    @pytest.mark.parametrize("raw, polished", [
+        ("is it raining", "Yes, it is raining."),
+        ("tu viens ce soir", "Oui, tu viens ce soir."),
+        ("you have time today", "Yeah, you have time today."),
+    ])
+    def test_answer_word_added(self, raw, polished):
+        assert safety_check(raw, polished) == (False, "answer_words")
+
+    def test_correction_no_may_be_dropped(self):
+        assert safety_check("meet on Monday, no, Tuesday", "Meet on Tuesday.") == (True, None)
+        assert safety_check("meet on Monday no wait Tuesday", "Meet on Tuesday.") == (True, None)
+        assert safety_check("on se voit lundi non pardon mardi", "On se voit mardi.") == (True, None)
+
+    def test_other_no_may_not_be_dropped(self):
+        raw = "there is no problem with the new contract for the team in Paris"
+        assert safety_check(raw, "There is a problem with the new contract for the team in Paris.") \
+            == (False, "answer_words")
+
+    def test_digits_counted(self):
+        raw = "we need 2 rooms on the 2nd floor and 3 projectors for the training session"
+        assert safety_check(raw, "We need 2 rooms on the 2nd floor and 2 projectors for the training session.") \
+            == (False, "numbers")
+
+    def test_number_words(self):
+        raw = "please book twenty seats for the dinner with the partners next to the station"
+        assert safety_check(raw, "Please book thirty seats for the dinner with the partners next to the "
+                                 "station.") == (False, "numbers")
+        assert safety_check(raw, "Please book twenty seats for the dinner with the partners next to the "
+                                 "station.") == (True, None)
+
+    def test_self_corrected_number_word(self):
+        assert safety_check("on se voit à trois heures, non, quatre heures", "On se voit à quatre heures.") \
+            == (True, None)
+
+    @pytest.mark.parametrize("raw, polished", [
+        ("the launch moved to tomorrow for the whole team and the partners in Berlin",
+         "The launch moved to today for the whole team and the partners in Berlin."),
+        ("la réunion est jeudi avec toute l'équipe et les partenaires de Berlin",
+         "La réunion est vendredi avec toute l'équipe et les partenaires de Berlin."),
+    ])
+    def test_dates(self, raw, polished):
+        assert safety_check(raw, polished) == (False, "dates")
+
+    def test_dictated_colon_line_is_fine(self):
+        raw = "the agenda for tomorrow first the budget second the hiring plan"
+        assert safety_check(raw, "The agenda for tomorrow:\n- the budget\n- the hiring plan") == (True, None)
+
+
 class TestFrenchNormalization:
     def test_accents_and_case_are_ignored(self):
         raw = "le cafe est pres de l'ecole et on y va apres le travail avec toute l'equipe"
@@ -270,7 +391,8 @@ class TestShortInputMode:
         assert safety_check("uh um yes um uh", "Yes.") == (True, None)
 
     def test_self_correction_in_short_input(self):
-        assert safety_check("lundi non mardi", "Mardi.") == (True, None)
+        assert safety_check("lundi, non, mardi", "Mardi.") == (True, None)
+        assert safety_check("lundi non pardon mardi", "Mardi.") == (True, None)
 
     def test_short_answered_question(self):
         assert safety_check("quelle heure est-il", "Il est midi.")[0] is False
@@ -493,12 +615,6 @@ class TestPolishClient:
         with pytest.raises(PolishTimeout):
             _client(handler).complete([])
 
-    def test_answer_after_total_timeout_is_discarded(self, monkeypatch):
-        clock = iter([100.0, 106.0])
-        monkeypatch.setattr(polish.time, "monotonic", lambda: next(clock))
-        with pytest.raises(PolishTimeout):
-            _client(lambda r: httpx.Response(200, json=_completion()), timeout=5.0).complete([])
-
     def test_connection_error(self):
         def handler(request):
             raise httpx.ConnectError("refused")
@@ -542,6 +658,118 @@ class TestPolishClient:
                                    polish_api_key="k", polish_timeout=2.5)
         client = polish.client_from_settings(settings)
         assert (client.base_url, client.model, client.api_key, client.timeout) == ("http://x.test/v1", "m", "k", 2.5)
+
+
+class _SlowServer:
+    """A real local HTTP server that misbehaves on purpose.
+
+    ``trickle``: sends headers, then one body byte every 0.3 s for ~10 s.
+    ``silent``: accepts the connection and never answers.
+    ``ok``: answers at once with a valid completion.
+    """
+
+    def __init__(self, mode):
+        self.mode = mode
+        self.sock = socket.socket()
+        self.sock.bind(("127.0.0.1", 0))
+        self.sock.listen(5)
+        self.url = f"http://127.0.0.1:{self.sock.getsockname()[1]}/v1"
+        self.stop = threading.Event()
+        threading.Thread(target=self._serve, daemon=True).start()
+
+    def _serve(self):
+        self.sock.settimeout(0.2)
+        while not self.stop.is_set():
+            try:
+                conn, _ = self.sock.accept()
+            except OSError:
+                continue
+            threading.Thread(target=self._handle, args=(conn,), daemon=True).start()
+
+    def _handle(self, conn):
+        with conn:
+            try:
+                conn.recv(65536)
+                if self.mode == "silent":
+                    self.stop.wait(10)
+                    return
+                body = json.dumps(_completion(LONG_OK)).encode()
+                conn.sendall(b"HTTP/1.1 200 OK\r\nContent-Type: application/json\r\n"
+                             b"Content-Length: " + str(len(body)).encode() + b"\r\n\r\n")
+                if self.mode == "ok":
+                    conn.sendall(body)
+                    return
+                for byte in body[:30]:
+                    if self.stop.wait(0.3):
+                        return
+                    conn.sendall(bytes([byte]))
+            except OSError:
+                pass
+
+    def close(self):
+        self.stop.set()
+        self.sock.close()
+
+
+@pytest.fixture
+def slow_server():
+    servers = []
+
+    def factory(mode):
+        server = _SlowServer(mode)
+        servers.append(server)
+        return server
+
+    yield factory
+    for server in servers:
+        server.close()
+
+
+class TestHardTimeout:
+    @pytest.mark.parametrize("mode", ["trickle", "silent"])
+    def test_polish_returns_within_the_timeout(self, slow_server, mode):
+        client = PolishClient(slow_server(mode).url, "m", timeout=1.0)
+        started = time.monotonic()
+        result = polish.polish(LONG_RAW, client)
+        elapsed = time.monotonic() - started
+        assert result.fallback_reason == "timeout" and result.text == LONG_RAW
+        assert elapsed < 2.5, f"took {elapsed:.2f}s"
+
+    def test_slow_handler_is_cut_off(self):
+        def handler(request):
+            time.sleep(2)
+            return httpx.Response(200, json=_completion())
+
+        started = time.monotonic()
+        with pytest.raises(PolishTimeout):
+            _client(handler, timeout=0.5).complete([])
+        assert time.monotonic() - started < 1.8
+
+    def test_real_server_answer(self, slow_server):
+        client = PolishClient(slow_server("ok").url, "m", timeout=2.0)
+        assert polish.polish(LONG_RAW, client).applied
+
+
+class TestProxy:
+    @pytest.mark.parametrize("url, local", [
+        ("http://localhost:11434/v1", True),
+        ("http://127.0.0.1:11434/v1", True),
+        ("http://[::1]:11434/v1", True),
+        ("http://ollama:11434/v1", True),
+        ("https://api.example.com/v1", False),
+        ("http://192.168.1.20:11434/v1", False),
+    ])
+    def test_is_local(self, url, local):
+        assert polish._is_local(url) is local
+
+    def test_local_endpoint_ignores_proxy_env(self, slow_server, monkeypatch):
+        # a dead proxy: the request only succeeds if it is not used
+        monkeypatch.setenv("HTTP_PROXY", "http://127.0.0.1:9")
+        monkeypatch.setenv("http_proxy", "http://127.0.0.1:9")
+        monkeypatch.delenv("NO_PROXY", raising=False)
+        monkeypatch.delenv("no_proxy", raising=False)
+        client = PolishClient(slow_server("ok").url, "m", timeout=2.0)
+        assert polish.polish(LONG_RAW, client).applied
 
 
 # ------------------------------------------------------------ dictionary

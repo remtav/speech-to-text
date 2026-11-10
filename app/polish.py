@@ -81,9 +81,11 @@ STOPWORDS = frozenset("""
 # fail the check only when the raw transcript does not itself start with them.
 ASSISTANT_OPENERS = (
     "sure", "certainly", "of course", "absolutely", "here is", "here s", "here are",
-    "the cleaned", "cleaned text", "the corrected", "corrected text", "i can t", "i cannot",
-    "as an ai", "voici", "bien sur", "certainement", "absolument", "le texte",
-    "texte corrige", "texte nettoye", "je ne peux pas",
+    "the cleaned", "cleaned text", "cleaned transcript", "cleaned up", "the corrected",
+    "corrected text", "corrected transcript", "the transcript", "transcript", "transcription",
+    "polished text", "i can t", "i cannot", "as an ai", "voici", "bien sur", "certainement",
+    "absolument", "le texte", "la transcription", "texte corrige", "texte nettoye",
+    "transcription corrigee", "transcription nettoyee", "je ne peux pas",
 )
 
 # --------------------------------------------------------------- prompt
@@ -208,13 +210,92 @@ def _starts_with(tokens, phrase):
     return tokens[:len(phrase)] == phrase
 
 
+# Words where one token flips or fixes the meaning. Content-word overlap does
+# not see them (most are stopwords, or one novel word among many), so they
+# get rules of their own.
+NEGATORS = frozenset("""
+    not never nothing nobody none nor neither nowhere cannot
+    pas jamais rien aucun aucune ni nul nulle personne
+""".split())  # "n't" is counted as "not"; French "ne" is redundant with pas/jamais/rien
+ANSWER_WORDS = frozenset("yes yeah yep nope no oui ouais non".split())
+NUMBER_WORDS = frozenset("""
+    zero one two three four five six seven eight nine ten eleven twelve thirteen
+    fourteen fifteen sixteen seventeen eighteen nineteen twenty thirty forty fifty
+    sixty seventy eighty ninety hundred thousand million billion half quarter
+    dozen first second third fourth fifth
+    deux trois quatre cinq six sept huit neuf dix onze douze treize quatorze
+    quinze seize vingt vingts trente quarante cinquante soixante cent cents mille
+    million millions milliard milliards demi demie quart douzaine premier premiere
+    deuxieme troisieme
+""".split())  # French "un"/"une" are left out: they are mostly articles
+DATE_WORDS = frozenset("""
+    monday tuesday wednesday thursday friday saturday sunday today tomorrow yesterday
+    january february march april june july august september october november december
+    lundi mardi mercredi jeudi vendredi samedi dimanche aujourd hui demain hier
+    janvier fevrier mars avril mai juin juillet aout septembre octobre novembre decembre
+""".split())  # English "may" is left out: it is mostly a verb
+
+# A "no"/"non" that marks a self-correction ("Monday, no, Tuesday", "lundi non
+# pardon mardi") may be dropped; any other dropped "no" may flip the meaning.
+_CORRECTION_NO = re.compile(
+    r"(?:[,;.—-]\s*\b(?:no|non)\b)"
+    r"|(?:\b(?:no|non)\b(?=\s*[,;.!—-]|\s+(?:wait|sorry|actually|i mean|pardon|enfin|plutot"
+    r"|je veux dire|attends)\b))")
+
+
+def _fact_tokens(text):
+    """Tokens for the negation, answer, number and date rules ("n't" -> "not")."""
+    normalized = re.sub(r"n't\b", " not", _normalize(text))
+    return ["not" if t == "cannot" else t for t in re.findall(r"[^\W_]+", normalized)]
+
+
+def _counts(tokens, vocabulary):
+    counts = {}
+    for t in tokens:
+        if t in vocabulary:
+            counts[t] = counts.get(t, 0) + 1
+    return counts
+
+
+def _adds(raw_counts, out_counts):
+    """True when the output has an item more often than the raw text."""
+    return any(n > raw_counts.get(k, 0) for k, n in out_counts.items())
+
+
+def _fact_rule(raw, polished):
+    """Negations, yes/no, numbers and dates: the few tokens that change a fact."""
+    raw_tokens, out_tokens = _fact_tokens(raw), _fact_tokens(polished)
+
+    if _counts(raw_tokens, NEGATORS) != _counts(out_tokens, NEGATORS):
+        return "negation"
+
+    raw_answers, out_answers = _counts(raw_tokens, ANSWER_WORDS), _counts(out_tokens, ANSWER_WORDS)
+    if _adds(raw_answers, out_answers):
+        return "answer_words"
+    dropped_no = sum(raw_answers.get(k, 0) - out_answers.get(k, 0) for k in ("no", "non"))
+    if dropped_no > len(_CORRECTION_NO.findall(_normalize(raw))):
+        return "answer_words"
+
+    raw_digits, out_digits = re.findall(r"\d+", raw), re.findall(r"\d+", polished)
+    if _adds(_counts(raw_digits, set(raw_digits)), _counts(out_digits, set(out_digits))):
+        return "numbers"
+    if _adds(_counts(raw_tokens, NUMBER_WORDS), _counts(out_tokens, NUMBER_WORDS)):
+        return "numbers"
+    if _adds(_counts(raw_tokens, DATE_WORDS), _counts(out_tokens, DATE_WORDS)):
+        return "dates"
+    return None
+
+
 def safety_check(raw, polished, dictionary=()):
     """Decide whether ``polished`` may replace ``raw``. Returns ``(ok, rule)``.
 
     ``rule`` names the first rule that failed (``None`` when ok). Rules:
-    ``empty``, ``delimiter``, ``assistant_opener``, ``numbers``,
-    ``length_ratio`` / ``short_length``, ``short_dropped`` and ``novel_words``.
-    Terms of ``dictionary`` are never counted as novel words.
+    ``empty``, ``delimiter``, ``assistant_opener``, ``negation`` (a negation
+    added or removed), ``answer_words`` (yes/no/oui/non added, or a "no"
+    dropped outside a self-correction), ``numbers`` (a digit sequence or
+    number word not in the input), ``dates`` (a weekday, month or relative day
+    not in the input), ``length_ratio`` / ``short_length``, ``short_dropped``
+    and ``novel_words``. Terms of ``dictionary`` are never counted as novel.
     """
     raw = (raw or "").strip()
     polished = (polished or "").strip()
@@ -233,9 +314,15 @@ def safety_check(raw, polished, dictionary=()):
         phrase = opener.split()
         if _starts_with(out_tokens, phrase) and not _starts_with(raw_spoken, phrase):
             return False, "assistant_opener"
+    # "Here is the text:" style lead-in: a first line ending with a colon whose
+    # words were not dictated (a dictated "we need three things:" is fine)
+    first_line = polished.splitlines()[0].strip()
+    if first_line.endswith(":") and not set(_tokens(first_line)) <= set(raw_tokens):
+        return False, "assistant_opener"
 
-    if not set(re.findall(r"\d+", polished)) <= set(re.findall(r"\d+", raw)):
-        return False, "numbers"
+    rule = _fact_rule(raw, polished)
+    if rule:
+        return False, rule
 
     raw_content = _content(raw_tokens)
     out_content = _content(out_tokens)
@@ -277,12 +364,26 @@ class PolishTimeout(PolishError):
     """The endpoint did not answer within the timeout."""
 
 
+_LOCAL_HOSTS = ("localhost", "127.0.0.1", "::1", "[::1]")
+
+
+def _is_local(url):
+    """Loopback or a bare service name (``ollama`` in compose): never via a proxy."""
+    from urllib.parse import urlsplit
+
+    host = (urlsplit(url).hostname or "").lower()
+    return host in _LOCAL_HOSTS or host.endswith(".localhost") or (host and "." not in host and ":" not in host)
+
+
 class PolishClient:
     """Minimal client for an OpenAI-compatible ``/chat/completions`` endpoint.
 
-    ``timeout`` applies to each phase of the request (connect, write, read);
-    an answer that still arrives after ``timeout`` seconds in total is
-    discarded as a timeout, so the cap holds for what gets shown.
+    ``timeout`` is a hard cap on the whole call: the request runs on a helper
+    thread and ``complete`` gives up after ``timeout`` seconds whatever the
+    server does (slow DNS, slow connect, a body trickling in). The helper
+    thread stops reading at the same deadline, so it does not linger.
+    Requests to a local endpoint ignore ``HTTP(S)_PROXY``, so transcripts and
+    the key never go to a proxy by accident.
     """
 
     def __init__(self, base_url=DEFAULT_BASE_URL, model=DEFAULT_MODEL, api_key=None,
@@ -294,26 +395,55 @@ class PolishClient:
         self.transport = transport  # httpx transport, for tests
 
     def complete(self, messages, max_tokens=None):
-        import httpx
-
-        headers = {"Authorization": f"Bearer {self.api_key}"} if self.api_key else {}
         payload = {"model": self.model, "messages": messages, "temperature": 0, "stream": False}
         if max_tokens:
             payload["max_tokens"] = max_tokens
-        started = time.monotonic()
+        deadline = time.monotonic() + self.timeout
+        outcome = {}
+
+        def run():
+            try:
+                outcome["body"] = self._post(payload, deadline)
+            except BaseException as exc:  # handed to the caller below
+                outcome["error"] = exc
+
+        worker = threading.Thread(target=run, name="polish-request", daemon=True)
+        worker.start()
+        worker.join(self.timeout)
+        if worker.is_alive() or "body" not in outcome and "error" not in outcome:
+            raise PolishTimeout(f"no answer within {self.timeout}s")
+        if "error" in outcome:
+            raise outcome["error"]
+        return self._parse(outcome["body"])
+
+    def _post(self, payload, deadline):
+        import httpx
+
+        url = f"{self.base_url}/chat/completions"
+        headers = {"Authorization": f"Bearer {self.api_key}"} if self.api_key else {}
         try:
-            with httpx.Client(timeout=self.timeout, transport=self.transport) as http:
-                response = http.post(f"{self.base_url}/chat/completions", json=payload, headers=headers)
+            with httpx.Client(timeout=self.timeout, transport=self.transport,
+                              trust_env=not _is_local(url)) as http:
+                with http.stream("POST", url, json=payload, headers=headers) as response:
+                    if response.status_code != 200:
+                        raise PolishError(f"HTTP {response.status_code}")
+                    body = bytearray()
+                    for chunk in response.iter_bytes():
+                        if time.monotonic() > deadline:
+                            raise PolishTimeout(f"no answer within {self.timeout}s")
+                        body.extend(chunk)
         except httpx.TimeoutException as exc:
             raise PolishTimeout(f"no answer within {self.timeout}s") from exc
         except httpx.HTTPError as exc:
             raise PolishError(f"request failed: {type(exc).__name__}") from exc
-        if time.monotonic() - started > self.timeout:
-            raise PolishTimeout(f"answer took longer than {self.timeout}s")
-        if response.status_code != 200:
-            raise PolishError(f"HTTP {response.status_code}")
+        if time.monotonic() > deadline:
+            raise PolishTimeout(f"no answer within {self.timeout}s")
+        return bytes(body)
+
+    @staticmethod
+    def _parse(body):
         try:
-            choice = response.json()["choices"][0]
+            choice = json.loads(body)["choices"][0]
             content = choice["message"]["content"]
         except (ValueError, LookupError, TypeError) as exc:
             raise PolishError("malformed response") from exc
