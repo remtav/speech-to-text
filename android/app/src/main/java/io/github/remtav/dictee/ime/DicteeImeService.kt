@@ -160,7 +160,11 @@ class DicteeImeService : InputMethodService(), DictationListener, EngineManager.
         currentField = field
         passwordField = attribute != null && isPassword(attribute)
         currentInputConnection?.let { sink = ImeTextSink(it) } ?: run { sink = null }
-        if (controller.isActive && field != dictationField) {
+        // While an activity is recreated (rotation) the system briefly starts a placeholder
+        // input with no editor (TYPE_NULL): not a field change. Results are only delivered
+        // to the dictation's own field anyway (see currentSink).
+        val realEditor = attribute != null && attribute.inputType != InputType.TYPE_NULL
+        if (controller.isActive && realEditor && field != dictationField) {
             // Focus moved to another field mid-dictation: never type into the wrong one.
             controller.cancel()
             showMessage(getString(R.string.msg_field_changed), error = false)
