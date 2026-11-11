@@ -114,7 +114,9 @@ sont pas répétées ; chaque entrée ci-dessous donne le choix et sa raison.
     micro coupé par le système (`isClientSilenced`) → arrêt avec message ;
   - rotation : la dictée vit dans le service, pas dans la vue ; masquer le
     clavier n'arrête la dictée qu'après 4 s, car une rotation le masque et le
-    réaffiche sur le même champ ;
+    réaffiche sur le même champ (si l'application ne réaffiche pas le clavier dans ce délai —
+    constaté sur l'émulateur — la dictée s'arrête proprement, ce qui a été dit est
+    inséré ; le test de rotation retouche le champ comme le ferait l'utilisateur) ;
   - changement de champ en cours de dictée → arrêt immédiat et abandon de ce
     qui n'est pas encore inséré : un numéro de session garantit qu'aucun texte
     n'est jamais tapé dans un autre champ que celui de départ ;
