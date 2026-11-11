@@ -117,8 +117,16 @@ class LlmCleaner private constructor(
             timeoutMillis: Long = 4000,
         ): LlmCleaner? {
             if (!store.isInstalled(spec)) return null
+            return createFromPath(context, File(store.dirFor(spec.id), spec.file.path).absolutePath, dictionary, timeoutMillis)
+        }
+
+        fun createFromPath(
+            context: Context,
+            path: String,
+            dictionary: Collection<String> = emptyList(),
+            timeoutMillis: Long = 4000,
+        ): LlmCleaner? {
             return try {
-                val path = File(store.dirFor(spec.id), spec.file.path).absolutePath
                 val options = LlmInference.LlmInferenceOptions.builder()
                     .setModelPath(path)
                     .setMaxTokens(512)

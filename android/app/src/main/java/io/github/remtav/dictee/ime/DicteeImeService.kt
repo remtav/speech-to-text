@@ -78,6 +78,8 @@ class DicteeImeService : InputMethodService(), DictationListener, EngineManager.
         }
     }
 
+    private val stopIfHidden = Runnable { if (!app.keyboardVisible) controller.stop() }
+
     override fun onCreate() {
         super.onCreate()
         app = DicteeApp.from(this)
@@ -169,6 +171,7 @@ class DicteeImeService : InputMethodService(), DictationListener, EngineManager.
         super.onStartInputView(info, restarting)
         app.keyboardVisible = true
         main.removeCallbacks(idleRelease)
+        main.removeCallbacks(stopIfHidden)
         if (passwordField && controller.isActive) controller.cancel()
         // Preload the model so the first tap is fast.
         val spec = app.settings.activeModel
@@ -182,8 +185,10 @@ class DicteeImeService : InputMethodService(), DictationListener, EngineManager.
     override fun onFinishInputView(finishingInput: Boolean) {
         super.onFinishInputView(finishingInput)
         app.keyboardVisible = false
-        // Hidden keyboard: stop listening; what was said is still inserted if the field stays.
-        controller.stop()
+        // Hidden keyboard: stop listening (what was said is still inserted if the field stays).
+        // Delayed, because a rotation hides and re-shows the keyboard on the same field.
+        main.removeCallbacks(stopIfHidden)
+        main.postDelayed(stopIfHidden, 1500)
         val minutes = app.settings.keepLoadedMinutes
         main.removeCallbacks(idleRelease)
         main.postDelayed(idleRelease, minutes * 60_000L)
@@ -309,7 +314,8 @@ class DicteeImeService : InputMethodService(), DictationListener, EngineManager.
         }
     }
 
-    private fun onAudioModeChanged(mode: Int) {
+    /** Telephony audio mode (incoming or ongoing call): stop and keep what was said. */
+    fun onAudioModeChanged(mode: Int) {
         if (mode == AudioManager.MODE_IN_CALL || mode == AudioManager.MODE_IN_COMMUNICATION ||
             mode == AudioManager.MODE_RINGTONE || mode == AudioManager.MODE_CALL_SCREENING
         ) {

@@ -1,0 +1,142 @@
+name: Android
+
+# Voice keyboard APK (android/, issue #10). Every check here is what a lot is
+# accepted on: build, JVM unit tests, real-model tests on the CI host, and
+# instrumented tests of the keyboard on an emulator. A push to main also
+# publishes the APK as a GitHub release.
+
+on:
+  push:
+    paths:
+      - "android/**"
+      - ".github/workflows/android.yml"
+  pull_request:
+    paths:
+      - "android/**"
+      - ".github/workflows/android.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: android-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    working-directory: android
+
+env:
+  VERSION_CODE: ${{ github.run_number }}
+  VERSION_NAME: 0.1.${{ github.run_number }}
+
+jobs:
+  build:
+    name: Build and unit tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Unit tests (includes the real sherpa-onnx VAD on the host)
+        run: ./gradlew --no-daemon testDebugUnitTest -PversionCode=$VERSION_CODE -PversionName=$VERSION_NAME
+      - name: Build APKs
+        run: ./gradlew --no-daemon assembleDebug assembleRelease assembleDebugAndroidTest -PversionCode=$VERSION_CODE -PversionName=$VERSION_NAME
+      - name: Rename release APK
+        run: cp app/build/outputs/apk/release/app-release.apk dictee-$VERSION_NAME.apk
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dictee-apk
+          path: android/dictee-*.apk
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: unit-test-reports
+          path: android/app/build/reports/tests/
+
+  models:
+    name: Model tests on the CI host (3 models, FR + EN)
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Model cache (keyed on the catalog checksums)
+        uses: actions/cache@v4
+        with:
+          path: ~/dictee-models
+          key: dictee-models-${{ hashFiles('android/app/src/main/java/io/github/remtav/dictee/stt/ModelCatalog.kt') }}
+      - name: Download (via the app's downloader, SHA-256 checked), load and transcribe
+        run: >
+          ./gradlew --no-daemon testDebugUnitTest
+          --tests '*ModelAccuracyHostTest*' --tests '*EndToEndHostTest*'
+          -PmodelsDir=$HOME/dictee-models
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: model-test-reports
+          path: android/app/build/reports/tests/
+
+  emulator:
+    name: Instrumented keyboard tests (emulator)
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Enable KVM
+        working-directory: .
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: Build test APKs
+        run: ./gradlew --no-daemon assembleDebug assembleDebugAndroidTest
+      - name: Run instrumented tests
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 34
+          arch: x86_64
+          target: google_apis
+          ram-size: 4096M
+          disable-animations: true
+          emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -no-boot-anim -camera-back none
+          working-directory: android
+          script: ./gradlew --no-daemon connectedDebugAndroidTest
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: instrumented-test-reports
+          path: android/app/build/reports/androidTests/
+
+  release:
+    name: Publish APK
+    needs: [build, models, emulator]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: dictee-apk
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: android-v${{ env.VERSION_NAME }}
+          name: Dictée locale ${{ env.VERSION_NAME }}
+          target_commitish: ${{ github.sha }}
+          files: dictee-*.apk
+          body: |
+            Voice keyboard APK (issue #10), built from ${{ github.sha }}.
+            Signed with the debug key committed in the repository, so it installs over any previous release.
+            Install: download the APK on the phone, allow installs from this source, then open "Dictée locale" to enable the keyboard and download a model.
