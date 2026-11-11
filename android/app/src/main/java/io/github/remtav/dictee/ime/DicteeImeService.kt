@@ -188,7 +188,7 @@ class DicteeImeService : InputMethodService(), DictationListener, EngineManager.
         // Hidden keyboard: stop listening (what was said is still inserted if the field stays).
         // Delayed, because a rotation hides and re-shows the keyboard on the same field.
         main.removeCallbacks(stopIfHidden)
-        main.postDelayed(stopIfHidden, 1500)
+        main.postDelayed(stopIfHidden, HIDE_GRACE_MS)
         val minutes = app.settings.keepLoadedMinutes
         main.removeCallbacks(idleRelease)
         main.postDelayed(idleRelease, minutes * 60_000L)
@@ -464,6 +464,8 @@ class DicteeImeService : InputMethodService(), DictationListener, EngineManager.
     }
 
     companion object {
+        /** A rotation recreates the activity: the keyboard comes back on the same field within this delay. */
+        const val HIDE_GRACE_MS = 4000L
         @Volatile var instance: WeakReference<DicteeImeService>? = null
     }
 }

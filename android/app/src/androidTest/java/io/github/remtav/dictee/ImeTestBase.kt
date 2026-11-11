@@ -85,10 +85,21 @@ abstract class ImeTestBase {
 
     protected fun launchFields() {
         scenario = ActivityScenario.launch(TestFieldActivity::class.java)
-        waitFor("keyboard shown", 15_000) {
+        val shown = {
             val svc = DicteeImeService.instance?.get()
             svc != null && onMain { svc.isInputViewShown }
         }
+        val end = SystemClock.uptimeMillis() + 30_000
+        var tapped = SystemClock.uptimeMillis()
+        while (!shown() && SystemClock.uptimeMillis() < end) {
+            // A cold emulator sometimes ignores stateAlwaysVisible: tap the field like a user.
+            if (SystemClock.uptimeMillis() - tapped > 4_000) {
+                device.findObject(By.res(BuildConfig.APPLICATION_ID, "test_field1"))?.click()
+                tapped = SystemClock.uptimeMillis()
+            }
+            SystemClock.sleep(100)
+        }
+        assertTrue("keyboard not shown", shown())
     }
 
     protected val service: DicteeImeService get() = DicteeImeService.instance!!.get()!!
@@ -128,7 +139,9 @@ abstract class ImeTestBase {
             if (runCatching(condition).getOrDefault(false)) return
             SystemClock.sleep(100)
         }
-        fail("timed out waiting for: $what")
+        val fields = if (::scenario.isInitialized) runCatching { "field1=\"${field1()}\" field2=\"${field2()}\"" }.getOrDefault("") else ""
+        val st = runCatching { "state=${state()} engine=${app.engines.state}" }.getOrDefault("")
+        fail("timed out waiting for: $what ($fields $st)")
     }
 
     protected fun assertWithin(actual: Float, expected: Float, tolerance: Float) =

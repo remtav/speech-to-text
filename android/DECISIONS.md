@@ -113,7 +113,7 @@ sont pas répétées ; chaque entrée ci-dessous donne le choix et sa raison.
   - mode audio « sonnerie / appel / communication » (API 31+) → arrêt ; le
     micro coupé par le système (`isClientSilenced`) → arrêt avec message ;
   - rotation : la dictée vit dans le service, pas dans la vue ; masquer le
-    clavier n'arrête la dictée qu'après 1,5 s, car une rotation le masque et le
+    clavier n'arrête la dictée qu'après 4 s, car une rotation le masque et le
     réaffiche sur le même champ ;
   - changement de champ en cours de dictée → arrêt immédiat et abandon de ce
     qui n'est pas encore inséré : un numéro de session garantit qu'aucun texte
