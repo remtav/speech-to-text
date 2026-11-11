@@ -42,3 +42,6 @@ Thumbs.db
 
 # Build stamp written by the Docker build
 app/build-info.json
+
+# Android reference audio is part of the app
+!android/**/*.wav

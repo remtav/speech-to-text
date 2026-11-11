@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <item name="test_field1" type="id" />
+    <item name="test_field2" type="id" />
+    <item name="test_password" type="id" />
+</resources>

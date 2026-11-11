@@ -1,0 +1,9 @@
+.gradle/
+build/
+local.properties
+app/libs/
+app/src/main/assets/silero_vad.onnx
+.idea/
+*.iml
+captures/
+.cxx/
