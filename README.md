@@ -590,6 +590,15 @@ speech-to-text/
 - Whisper weights are cached in `~/.cache/whisper/`, alignment and pyannote models in `~/.cache/huggingface/` — no re-download needed between restarts
 - **Known limitations:** overlapping speech is attributed to a single speaker per word; words at a speaker boundary can occasionally be mislabelled
 
+## Android voice keyboard
+
+`android/` holds a separate component: an Android keyboard (IME) for voice
+dictation that runs speech-to-text entirely on the phone with sherpa-onnx
+(Parakeet TDT 0.6b v3, Qwen3-ASR 0.6B, Whisper large-v3-turbo). It shares no
+code with the server. See [android/README.md](android/README.md) and
+[android/DECISIONS.md](android/DECISIONS.md); APKs are published as
+`android-v*` GitHub releases.
+
 ## Testing
 
 Run the test suite with pytest:
