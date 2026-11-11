@@ -143,6 +143,7 @@ class RobustnessInstrumentedTest : ImeTestBase() {
         tapMic()
         waitFor("first segment", 20_000) { field1() == "First part." }
         device.setOrientationLeft()
+        ensureKeyboardShown()
         waitFor("second segment after rotation", 25_000) { field1() == "First part. Second part." }
         awaitIdle()
     }

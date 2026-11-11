@@ -45,6 +45,7 @@ abstract class ImeTestBase {
 
     @Before
     fun setUpIme() {
+        shell("logcat -c")
         app.settings.prefs.edit().clear().commit()
         app.settings.partials = false
         app.settings.haptics = false
@@ -128,6 +129,16 @@ abstract class ImeTestBase {
         if (mic != null) mic.click() else onMain { service.onMicTapped() }
     }
 
+    /** Waits for the keyboard to be back (tapping the field if needed, as a user would). */
+    protected fun ensureKeyboardShown(timeout: Long = 3_000) {
+        val end = SystemClock.uptimeMillis() + timeout
+        while (SystemClock.uptimeMillis() < end) {
+            if (onMain { DicteeImeService.instance?.get()?.isInputViewShown == true }) return
+            SystemClock.sleep(100)
+        }
+        device.findObject(By.res(BuildConfig.APPLICATION_ID, "test_field1"))?.click()
+    }
+
     protected fun state(): DictationState = service.controller.state
 
     protected fun awaitIdle(timeout: Long = 30_000) =
@@ -141,7 +152,8 @@ abstract class ImeTestBase {
         }
         val fields = if (::scenario.isInitialized) runCatching { "field1=\"${field1()}\" field2=\"${field2()}\"" }.getOrDefault("") else ""
         val st = runCatching { "state=${state()} engine=${app.engines.state}" }.getOrDefault("")
-        fail("timed out waiting for: $what ($fields $st)")
+        val log = runCatching { shell("logcat -d -t 60 -s DicteeIme:I") }.getOrDefault("")
+        fail("timed out waiting for: $what ($fields $st)\n$log")
     }
 
     protected fun assertWithin(actual: Float, expected: Float, tolerance: Float) =

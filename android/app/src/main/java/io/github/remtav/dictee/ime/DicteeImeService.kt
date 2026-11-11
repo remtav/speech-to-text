@@ -13,6 +13,7 @@ import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.text.InputType
+import android.util.Log
 import android.view.ContextThemeWrapper
 import android.view.HapticFeedbackConstants
 import android.view.KeyEvent
@@ -78,7 +79,12 @@ class DicteeImeService : InputMethodService(), DictationListener, EngineManager.
         }
     }
 
-    private val stopIfHidden = Runnable { if (!app.keyboardVisible) controller.stop() }
+    private val stopIfHidden = Runnable {
+        if (!app.keyboardVisible) {
+            Log.i(TAG, "keyboard still hidden: stop")
+            controller.stop()
+        }
+    }
 
     override fun onCreate() {
         super.onCreate()
@@ -158,6 +164,7 @@ class DicteeImeService : InputMethodService(), DictationListener, EngineManager.
         super.onStartInput(attribute, restarting)
         val field = attribute?.let { "${it.packageName}#${it.fieldId}" }
         currentField = field
+        Log.i(TAG, "startInput field=$field type=${attribute?.inputType} restarting=$restarting dictation=$dictationField")
         passwordField = attribute != null && isPassword(attribute)
         currentInputConnection?.let { sink = ImeTextSink(it) } ?: run { sink = null }
         // While an activity is recreated (rotation) the system briefly starts a placeholder
@@ -166,6 +173,7 @@ class DicteeImeService : InputMethodService(), DictationListener, EngineManager.
         val realEditor = attribute != null && attribute.inputType != InputType.TYPE_NULL
         if (controller.isActive && realEditor && field != dictationField) {
             // Focus moved to another field mid-dictation: never type into the wrong one.
+            Log.i(TAG, "field changed: cancel")
             controller.cancel()
             showMessage(getString(R.string.msg_field_changed), error = false)
         }
@@ -174,6 +182,7 @@ class DicteeImeService : InputMethodService(), DictationListener, EngineManager.
     override fun onStartInputView(info: EditorInfo?, restarting: Boolean) {
         super.onStartInputView(info, restarting)
         app.keyboardVisible = true
+        Log.i(TAG, "startInputView")
         main.removeCallbacks(idleRelease)
         main.removeCallbacks(stopIfHidden)
         if (passwordField && controller.isActive) controller.cancel()
@@ -189,6 +198,7 @@ class DicteeImeService : InputMethodService(), DictationListener, EngineManager.
     override fun onFinishInputView(finishingInput: Boolean) {
         super.onFinishInputView(finishingInput)
         app.keyboardVisible = false
+        Log.i(TAG, "finishInputView finishing=$finishingInput")
         // Hidden keyboard: stop listening (what was said is still inserted if the field stays).
         // Delayed, because a rotation hides and re-shows the keyboard on the same field.
         main.removeCallbacks(stopIfHidden)
@@ -250,6 +260,7 @@ class DicteeImeService : InputMethodService(), DictationListener, EngineManager.
     }
 
     override fun onState(state: DictationState, message: String?) {
+        Log.i(TAG, "dictation $state ${message ?: ""}")
         when (state) {
             DictationState.LISTENING -> lastMessage = null
             DictationState.IDLE, DictationState.ERROR -> {
@@ -310,6 +321,7 @@ class DicteeImeService : InputMethodService(), DictationListener, EngineManager.
 
     /** Another app (a call, an alarm, a voice assistant) took the audio: stop and keep what was said. */
     fun onAudioFocusChange(change: Int) {
+        Log.i(TAG, "audio focus $change")
         if (change == AudioManager.AUDIOFOCUS_LOSS || change == AudioManager.AUDIOFOCUS_LOSS_TRANSIENT) {
             if (controller.state == DictationState.LISTENING) {
                 controller.stop()
@@ -320,6 +332,7 @@ class DicteeImeService : InputMethodService(), DictationListener, EngineManager.
 
     /** Telephony audio mode (incoming or ongoing call): stop and keep what was said. */
     fun onAudioModeChanged(mode: Int) {
+        Log.i(TAG, "audio mode $mode")
         if (mode == AudioManager.MODE_IN_CALL || mode == AudioManager.MODE_IN_COMMUNICATION ||
             mode == AudioManager.MODE_RINGTONE || mode == AudioManager.MODE_CALL_SCREENING
         ) {
@@ -470,6 +483,7 @@ class DicteeImeService : InputMethodService(), DictationListener, EngineManager.
     companion object {
         /** A rotation recreates the activity: the keyboard comes back on the same field within this delay. */
         const val HIDE_GRACE_MS = 4000L
+        const val TAG = "DicteeIme"
         @Volatile var instance: WeakReference<DicteeImeService>? = null
     }
 }
