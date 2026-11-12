@@ -41,6 +41,7 @@ import io.github.remtav.dictee.stt.DictationResult
 import io.github.remtav.dictee.stt.ModelFamily
 import io.github.remtav.dictee.stt.RemoteApi
 import io.github.remtav.dictee.stt.Transcription
+import io.github.remtav.dictee.ui.HowToActivity
 import io.github.remtav.dictee.ui.SetupActivity
 import java.lang.ref.WeakReference
 
@@ -148,6 +149,7 @@ class DicteeImeService : InputMethodService(), DictationListener, EngineManager.
             setOnClickListener { haptic(it); onCancelWaitTapped() }
         }
         v.findViewById<ImageButton>(R.id.settings).setOnClickListener { openSettings() }
+        v.findViewById<ImageButton>(R.id.help).setOnClickListener { haptic(it); openHowTo() }
         v.findViewById<View>(R.id.key_switch).setOnClickListener {
             haptic(it)
             if (!switchToPreviousInputMethod()) {
@@ -500,6 +502,11 @@ class DicteeImeService : InputMethodService(), DictationListener, EngineManager.
         app.engines.factory = app.engineFactory()
         app.engines.load(spec, app.engineOptions(spec))
         render()
+    }
+
+    /** The "Comment dicter" screen; from a service the activity needs its own task. */
+    private fun openHowTo() {
+        startActivity(Intent(this, HowToActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
     }
 
     private fun openSettings() {

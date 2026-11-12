@@ -1643,3 +1643,106 @@ guillemets bonjour fermer les guillemets » ; (b) une phrase longue avec « poin
 d'exclamation » au milieu ; (c) « nouvelle ligne » au milieu d'une dictée longue ;
 comparer l'état « polissage appliqué » du diagnostic avec le texte inséré, et voir si les
 espaces avant `? ! :` sont celles du Québec.
+
+## Issue #15, lot 2 — étape 2.3 : écran « Comment dicter »
+
+Écran `ui/HowToActivity.kt` (au thème Kalmia, déclaré au manifeste), logique pure dans
+`ui/HowTo.kt` (testée sur la JVM). Rien du contenu des commandes n'est écrit à la main :
+l'écran lit `CommandTable.active(settings.languages)`, et un test vérifie qu'aucun exemple
+de la table n'est recopié dans `HowToActivity.kt` ni dans les chaînes de l'écran.
+
+### Contenu et ordre de l'écran
+
+1. Titre, puis une ligne de rappel : « Tout se passe sur votre téléphone : votre voix y est
+   transcrite et n'est envoyée à personne, sauf si vous choisissez vous-même un serveur
+   distant. » Exacte dans les deux cas (par défaut, ou serveur facultatif choisi par
+   l'utilisateur) ; la phrase ne dit rien du serveur au-delà de l'exception, car le
+   comportement des commandes en mode serveur est l'objet de l'étape 2.4.
+2. Si les commandes vocales sont désactivées (Réglages), un paragraphe le dit et un bouton
+   ouvre les Réglages ; les exemples restent affichés, car ils décrivent ce qui marche une
+   fois l'option remise.
+3. Les exemples « Dites ceci / Vous obtenez » : la phrase dite en IBM Plex Mono
+   (`TextAppearance.Kalmia.Value`), le résultat en Newsreader (`Body`), une ligne de
+   commandes enseignées.
+4. « Toutes les commandes » : une ligne par entrée de `CommandTable.active` (formulation
+   principale en Plex Mono, ce qu'elle donne, les autres formulations acceptées).
+5. Zone d'essai : un `EditText` (touchez, le clavier apparaît ; pas de focus automatique, qui
+   cacherait le haut de l'écran), puis le modèle recommandé (`ModelRecommendations.recommend`)
+   avec sa raison, son état installé ou non et un bouton vers la configuration, puis le
+   lien vers le vocabulaire personnalisé des Réglages (qui s'ouvrent déjà défilés à cette
+   section, extra `EXTRA_SCROLL_TO_VOCABULARY`) pour « GitHub » et les noms propres.
+
+L'écran est redessiné à chaque reprise (`onResume`) : langues, commandes vocales ou
+modèle ont pu changer dans les Réglages ; le texte de la zone d'essai est conservé.
+
+### Choix des exemples (plus de 8 entrées dans la table)
+
+- Les entrées qui partagent un exemple sont fusionnées : les guillemets ouvrant et fermant et
+  le deux-points montrent la même phrase (« il a dit deux-points ouvrir les guillemets
+  bonjour fermer les guillemets »), les parenthèses de même. Une seule carte, qui liste les
+  commandes qu'elle enseigne.
+- Après fusion, le français seul compte 9 exemples (guillemets + deux-points, point-virgule,
+  parenthèses, ?, !, nouvelle ligne, nouveau paragraphe, effacer la phrase, effacer le mot) :
+  on en montre **8 au plus** (`HowToExamples.MAX_FEATURED`), les 8 premiers dans l'ordre de la
+  table, qui est celui de la liste de l'issue (signes d'abord). Le neuvième (« efface le
+  dernier mot ») reste dans « Toutes les commandes ».
+- Avec deux langues (français et anglais), les places sont partagées à parts égales, le
+  français d'abord : **4 exemples français puis 4 anglais**. Une langue qui en a moins que sa
+  part cède ses places aux autres. Avec l'anglais seul : 8 exemples anglais. Avec une langue
+  sans commande de ponctuation (espagnol seul), la table ne garde que les retours à la
+  ligne et les effacements des deux langues : 4 + 4 exemples, ce que `CommandTable.active`
+  décide déjà.
+- Les résultats des exemples sont ceux de la table, donc en typographie du Québec pour le
+  français (espace insécable avant `:` seulement) : une personne en « Français (France) »
+  seul verra, dans ses dictées, une espace insécable de plus devant `;` `?` `!` que dans
+  l'aide. Écart assumé, relevé pour la vérification finale.
+
+### Ouvertures
+
+- **Fin de la première configuration** (`SetupProgress.isComplete`) : clavier **activé**
+  (pas forcément sélectionné : on le choisit en tout temps depuis un autre clavier), micro
+  **autorisé**, et **un modèle prêt** (un modèle téléchargé, ou le serveur de l'utilisateur
+  une fois configuré). Les trois ensemble : c'est à ce moment seulement que le téléphone dicte
+  vraiment. La condition est revérifiée à chaque reprise, au retour du focus (retour du
+  sélecteur de clavier) et à la fin d'un téléchargement (écouteur de `Downloads`). **Une seule
+  fois** : le drapeau `AppSettings.howToShown` est posé avant le démarrage de l'écran, et par
+  toute ouverture de l'écran (l'ouvrir à la main avant la fin de la configuration compte
+  comme l'avoir vu).
+- **Écran principal** : un bouton « Comment dicter » juste sous le texte d'accueil, donc visible
+  sans défiler (`SetupActivity.HOWTO_BUTTON_TAG`).
+- **Clavier** : bouton d'aide (`R.id.help`, icône vectorielle `ic_help` teintée par
+  `colorControlNormal` comme celle des Réglages, zone tactile 48 × 48 dp, description
+  « Comment dicter »), placé **sur la ligne d'état, entre l'état et le bouton de réglages**.
+  La rangée des touches n'est pas touchée : les touches gardent leur largeur. C'est le texte
+  d'état (poids 1, deux lignes au plus, points de suspension) qui cède 48 dp. Depuis le
+  service : `FLAG_ACTIVITY_NEW_TASK`.
+
+### Tailles en français
+
+Les tailles de modèle venaient de `Formatter.formatShortFileSize`, qui écrit « MB » et « GB »
+sous un système en anglais. Remplacé par `ui/SizeFormat.kt` (octets décimaux, unités o, ko, Mo,
+Go, virgule décimale, indépendant de la langue du téléphone) ; `Context.size()` y renvoie, donc
+les cartes de modèles, les Réglages et les téléchargements en profitent. Exemples : 671 Mo,
+987 Mo, 1,04 Go. Le texte de recommandation écrit encore « 1 037 Mo » pour Whisper : même
+quantité, deux écritures ; à uniformiser si le lot 2 est revu.
+
+### Tests
+
+- JVM (`HowToTest.kt`) : fusion des exemples partagés, chaque commande enseignée par une
+  carte, chaque exemple issu de la table active, 5 à 8 exemples pour plusieurs jeux de langues,
+  partage 4 + 4 et français d'abord, langue sans ponctuation, aucun exemple recopié à la main
+  dans l'écran ni les chaînes ; table de vérité de « fin de configuration » et « une seule
+  fois » ; formatage des tailles.
+- Instrumentés (`HowToInstrumentedTest.kt`, moteur scripté, scénarios enchaînés et jamais
+  imbriqués, un moniteur d'activité dit quand l'écran démarre) : pas d'ouverture sans modèle ;
+  ouverture à la fin de la première configuration ; pas la deuxième fois ; réouverture depuis
+  l'écran principal ; depuis le bouton d'aide du clavier (zone ≥ 48 dp, description) ; chaque
+  exemple affiché vient de la table, mêmes cartes et même ordre que la logique pure ; rappel,
+  modèle recommandé, lien du vocabulaire, zone d'essai ; avertissement quand les commandes
+  sont désactivées. `ScreenshotTest` : `howto-light.png` et `howto-dark.png`.
+- Non exécutés ici (pas d'émulateur) : les tests instrumentés sont compilés et relus.
+
+À juger à l'écran (vérification humaine) : la longueur de l'écran (les 8 cartes plus la liste
+complète) ; la place laissée au texte d'état du clavier par le nouveau bouton, sur un
+téléphone étroit ; la lisibilité des phrases dites en Plex Mono sur plusieurs lignes ; le
+moment de l'ouverture automatique après le dernier téléchargement.
