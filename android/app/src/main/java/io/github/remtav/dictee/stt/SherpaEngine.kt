@@ -85,7 +85,8 @@ class SherpaEngine(
                     whisper = OfflineWhisperModelConfig(
                         encoder = path("turbo-encoder.int8.onnx"),
                         decoder = path("turbo-decoder.int8.onnx"),
-                        // Empty language: Whisper detects it for each segment.
+                        // Empty language: Whisper detects it for each segment; otherwise the single
+                        // language chosen by the user is forced (AppSettings.engineOptions).
                         language = options.language,
                         task = "transcribe",
                     ),

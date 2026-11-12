@@ -35,6 +35,10 @@ class NoHardcodedStyleTest {
             "ARGB integer literal" to Regex("\\b0x[0-9A-Fa-f]{8}\\b"),
             "Typeface built in code" to Regex("\\bTypeface\\s*\\.\\s*(create|createFromAsset|createFromFile|DEFAULT|DEFAULT_BOLD|SANS_SERIF|SERIF|MONOSPACE)\\b"),
             "android.R.color framework colour" to Regex("android\\.R\\.color\\."),
+            "RGB integer literal" to Regex("\\b0x[0-9A-Fa-f]{6}\\b"),
+            "Typeface built in code" to Regex("\\bTypeface\\s*\\.\\s*Builder\\b"),
+            "system text appearance" to Regex("android\\.R\\.style\\.TextAppearance"),
+            "font family by name" to Regex("\\bsetTypeface\\s*\\(|\\bfontFamily\\s*="),
         )
         val problems = ArrayList<String>()
         for (f in files(main.resolve("java"), "kt")) {
@@ -51,12 +55,21 @@ class NoHardcodedStyleTest {
             if (f.name == "colors.xml") continue // the palette: the only place for a hexadecimal colour
             val text = stripXmlComments(f.readText())
             hexColour.findAll(text).forEach { problems += "${relative(f)} : couleur en dur « ${it.value} »" }
-            if (f.parentFile.name.startsWith("layout")) {
-                Regex("android:(textColor|background|tint|fontFamily|typeface)=\"([^\"]*)\"").findAll(text).forEach { m ->
-                    val v = m.groupValues[2]
+            val dir = f.parentFile.name
+            if (dir.startsWith("layout")) {
+                // Any colour, tint, background or font attribute (android: or app:) must come from the theme or the palette.
+                Regex("(android|app):([A-Za-z]*(Color|Tint|tint|background|Background|fontFamily|typeface))=\"([^\"]*)\"").findAll(text).forEach { m ->
+                    val v = m.groupValues[4]
                     val ok = v.startsWith("?") || v.startsWith("@") && !v.startsWith("@android:color/")
                     if (!ok) problems += "${relative(f)} : ${m.value}"
                 }
+            }
+            // Framework colours bypass the palette; system text appearances bring the system font.
+            // A vector drawable may fill with @android:color/white only if its root is tinted from the theme.
+            val tintedDrawable = dir.startsWith("drawable") && Regex("<vector[^>]*android:tint=\"\\?").containsMatchIn(text)
+            if (!tintedDrawable && text.contains("@android:color/")) problems += "${relative(f)} : couleur du système « @android:color/ »"
+            Regex("@android:style/TextAppearance|\\?android:(attr/)?textAppearance").findAll(text).forEach {
+                problems += "${relative(f)} : apparence de texte du système « ${it.value} »"
             }
         }
         assertTrue("couleur en dur dans les ressources :\n" + problems.joinToString("\n"), problems.isEmpty())
@@ -69,7 +82,6 @@ class NoHardcodedStyleTest {
         val problems = ArrayList<String>()
         for (f in files(res, "xml")) {
             val text = stripXmlComments(f.readText())
-            Regex("android:fontFamily\">?\"?([^<\"]*)").findAll(text).forEach { }
             Regex("name=\"(android:)?fontFamily\">([^<]*)<").findAll(text).forEach { m ->
                 if (!m.groupValues[2].trim().startsWith("@font/") && !m.groupValues[2].trim().startsWith("?")) {
                     problems += "${relative(f)} : fontFamily « ${m.groupValues[2]} » ne vient pas de res/font"

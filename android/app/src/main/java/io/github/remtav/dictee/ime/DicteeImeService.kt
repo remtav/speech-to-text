@@ -119,7 +119,11 @@ class DicteeImeService : InputMethodService(), DictationListener, EngineManager.
 
     // ------------------------------------------------------------------ views
 
+    /** Theme setting the current keyboard view was inflated with (null before the first one). */
+    private var inflatedTheme: ThemeMode? = null
+
     private fun themedInflater(): LayoutInflater {
+        inflatedTheme = app.settings.theme
         val night = when (app.settings.theme) {
             ThemeMode.SYSTEM -> resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK
             ThemeMode.LIGHT -> Configuration.UI_MODE_NIGHT_NO
@@ -217,6 +221,9 @@ class DicteeImeService : InputMethodService(), DictationListener, EngineManager.
         Log.i(TAG, "startInputView")
         main.removeCallbacks(idleRelease)
         main.removeCallbacks(stopIfHidden)
+        // The System / Light / Dark setting was changed in the app since this view was built:
+        // rebuild it, so the keyboard follows the setting like the screens do.
+        if (inflatedTheme != null && inflatedTheme != app.settings.theme) rebuildInputView()
         if (passwordField && controller.isActive) controller.cancel()
         // Preload the model so the first tap is fast.
         val spec = app.settings.activeModel

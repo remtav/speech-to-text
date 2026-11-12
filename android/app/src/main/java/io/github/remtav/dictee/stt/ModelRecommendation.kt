@@ -26,6 +26,9 @@ enum class DictationLanguage(
     RUSSIAN("ru", "Russe"),
     URDU("ur", "Ourdou");
 
+    /** The name inside a sentence: first letter in lower case only, so « (Québec) » keeps its capital. */
+    val inSentence: String get() = label.replaceFirstChar { it.lowercase() }
+
     companion object {
         /** Preselected at first launch. */
         val default = FRENCH_QUEBEC
@@ -36,7 +39,7 @@ enum class DictationLanguage(
 enum class RecommendationBasis(val word: String, val phrase: String) {
     OBSERVATION("observation", "d'après une observation"),
     /** Six short Common Voice excerpts, 59 words (DECISIONS.md, step 1.2): said as such. */
-    MESURE("mesure", "mesuré sur six courts extraits"),
+    MESURE("mesure", "mesuré sur six courts extraits (59 mots)"),
 }
 
 /** A model to put forward, with the sentence that justifies it. */
@@ -110,15 +113,18 @@ object ModelRecommendations {
         val outsideParakeet = uncovered(ModelCatalog.parakeet, chosen)
         if (outsideParakeet.isEmpty()) {
             val quebec = DictationLanguage.FRENCH_QUEBEC in chosen
+            // Worded to the scope of the evidence: fewest errors on 59 words, not an established superiority
+            // (DECISIONS.md, step 1.2: Whisper is one error away once a notation artefact is removed).
             val reason = if (quebec) {
-                "Parakeet couvre vos langues et, ${quebecFrenchBasis.phrase}, " +
-                    "transcrit mieux le français québécois (671 Mo, le plus léger)."
+                "Parakeet couvre vos langues et c'est le plus léger des trois (671 Mo). " +
+                    "En français québécois, il a fait le moins d'erreurs des trois, ${quebecFrenchBasis.phrase} : " +
+                    "un indice, pas une preuve."
             } else {
                 "Parakeet couvre vos langues et c'est le plus léger des trois (671 Mo)."
             }
             return ModelRecommendation(ModelCatalog.parakeet, reason)
         }
-        val missing = outsideParakeet.joinToString(", ") { it.label.lowercase() }
+        val missing = outsideParakeet.joinToString(", ") { it.inSentence }
         val parakeetNote = "Parakeet ne couvre pas : $missing."
         if (uncovered(ModelCatalog.qwen3, chosen).isEmpty()) {
             return ModelRecommendation(
@@ -126,7 +132,7 @@ object ModelRecommendations {
                 "$parakeetNote Qwen3-ASR couvre toutes vos langues (987 Mo, plus léger que Whisper).",
             )
         }
-        val qwenMissing = uncovered(ModelCatalog.qwen3, chosen).joinToString(", ") { it.label.lowercase() }
+        val qwenMissing = uncovered(ModelCatalog.qwen3, chosen).joinToString(", ") { it.inSentence }
         return ModelRecommendation(
             ModelCatalog.whisperTurbo,
             "$parakeetNote Qwen3-ASR ne couvre pas : $qwenMissing. " +

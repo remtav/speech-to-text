@@ -2,8 +2,8 @@
 
 > **Kalmia Blabla** — un clavier vocal conçu au Québec, pour le français d'ici.
 > Votre voix est transcrite sur votre téléphone : elle n'est envoyée à personne.
-> Pas de compte, pas de publicité, pas de télémétrie, et un code source ouvert
-> que chacun peut vérifier.
+> Pas de compte, pas de publicité, pas de télémétrie, et un code source public
+> que chacun peut lire et vérifier.
 
 Kalmia Blabla est un clavier Android (IME) dont la seule fonction est la
 dictée vocale. Il est développé au Québec. La transcription tourne
@@ -25,7 +25,7 @@ bascule vers celui-ci pour dicter.
 | **La voix reste sur le téléphone** | La transcription est faite par un modèle exécuté sur l'appareil ; le réseau ne sert qu'à télécharger les modèles. Fonctionne hors ligne une fois un modèle installé. |
 | **Aucun compte, aucune collecte** | L'application ne demande aucun compte et n'a ni publicité ni télémétrie. Rien n'est envoyé par défaut. |
 | **Pensée pour le français québécois** | « Français (Québec) » est présélectionné ; le modèle recommandé a été mesuré sur des voix « Français du Canada » (voir « Vos langues et le modèle recommandé »). |
-| **Transparente et vérifiable** | Code source dans ce dépôt ; chaque modèle est nommé avec son éditeur et sa licence ; chaque fichier téléchargé est vérifié par somme de contrôle SHA-256. |
+| **Transparente et vérifiable** | Code source public dans ce dépôt (sans fichier de licence pour l'instant : chacun peut le lire, mais ce n'est pas encore un logiciel libre au sens juridique) ; chaque modèle est nommé avec son éditeur et sa licence ; chaque fichier téléchargé est vérifié par somme de contrôle SHA-256. |
 | **Sous votre contrôle** | Vous choisissez le modèle, les langues et, si vous le voulez, un serveur personnel. |
 | **Développée au Québec** | Affirmation de l'auteur. |
 
@@ -33,7 +33,7 @@ bascule vers celui-ci pour dicter.
 NVIDIA, Qwen3-ASR d'Alibaba, Whisper d'OpenAI, et le petit LLM facultatif de
 nettoyage du texte (désactivé par défaut) passe par MediaPipe, une
 bibliothèque de Google. La souveraineté offerte porte sur les **données** (la
-voix reste sur le téléphone par défaut) et sur le **logiciel** (ouvert,
+voix reste sur le téléphone par défaut) et sur le **logiciel** (code public,
 conçu ici), pas sur l'origine des modèles. Ce n'est pas une application
 « 100 % québécoise ».
 
@@ -62,7 +62,7 @@ portent un lien vers une source officielle, lue le 2026-11-12.
   [policies.google.com/privacy](https://policies.google.com/privacy?hl=fr),
   version « À compter du 16 octobre 2026 ») est celle de ses services en
   général : sous « Informations collectées par Google », « Votre activité », elle
-  cite parmi les informations recueillies les « contenus multimédias (comme des
+  cite parmi les informations recueillies les « Contenus multimédias (comme des
   images, des fichiers, des contenus audio et des vidéos) issus de vos
   interactions ». Elle ne dit pas, à cet endroit, que la saisie vocale en
   fait partie ; lisez-la pour savoir ce qui s'applique à votre usage.
@@ -112,7 +112,7 @@ Canada » ne distingue pas le Québec des autres provinces ; **personne n'a
 encore écouté ces six extraits** ; les phrases viennent de Wikipédia et de
 romans, donc la mesure porte sur l'accent et non sur le vocabulaire d'ici ; et
 elle n'a pas été faite sur un téléphone. La recommandation le dit : « mesuré
-sur six courts extraits ». Vous pouvez refaire la mesure avec votre propre voix
+sur six courts extraits (59 mots) : un indice, pas une preuve ». Vous pouvez refaire la mesure avec votre propre voix
 dans **Comparer les modèles**.
 
 ## Apparence

@@ -147,6 +147,9 @@ class ThemeContrastTest {
             "colorSurfaceDim", "colorSurfaceBright", "colorSurfaceContainerLowest", "colorSurfaceContainerLow",
             "colorSurfaceContainer", "colorSurfaceContainerHigh", "colorSurfaceContainerHighest",
             "colorOutline", "colorOutlineVariant",
+            "colorPrimaryFixed", "colorPrimaryFixedDim", "colorOnPrimaryFixed", "colorOnPrimaryFixedVariant",
+            "colorSecondaryFixed", "colorSecondaryFixedDim", "colorOnSecondaryFixed", "colorOnSecondaryFixedVariant",
+            "colorTertiaryFixed", "colorTertiaryFixedDim", "colorOnTertiaryFixed", "colorOnTertiaryFixedVariant",
         )
         for (role in roles) {
             val ref = theme[role]
@@ -154,6 +157,90 @@ class ThemeContrastTest {
             assertTrue("$role doit renvoyer à la palette, pas à une valeur écrite ici : $ref", ref!!.startsWith("@color/kalmia_"))
             assertTrue("$role : couleur absente en clair", light.containsKey(ref.removePrefix("@color/")))
         }
+    }
+
+    /** `res/color/<name>.xml` -> the colour of its last (default) item, e.g. "?attr/colorOnSurface". */
+    private fun selectorDefault(name: String): String {
+        val items = parse(res.resolve("color/$name.xml")).getElementsByTagName("item")
+        return (items.item(items.length - 1) as Element).getAttribute("android:color")
+    }
+
+    @Test
+    fun frameworkTextColoursAreKalmiaOnesNotTheMaterialDefaults() {
+        // Without these, a TextView, CheckBox or RadioButton with no explicit colour takes the
+        // default Material ink (m3_default_color_primary_text), not the Kalmia one.
+        val expected = mapOf(
+            "android:textColorPrimary" to "?attr/colorOnSurface",
+            "android:textColorSecondary" to "?attr/colorOnSurfaceVariant",
+            "android:textColorTertiary" to "?attr/colorOnSurfaceVariant",
+            "android:textColorPrimaryDisableOnly" to "?attr/colorOnSurface",
+            "android:textColorHint" to "?attr/colorOnSurfaceVariant",
+        )
+        for ((item, attr) in expected) {
+            val ref = theme[item] ?: error("$item absent du thème")
+            assertTrue("$item doit renvoyer à res/color : $ref", ref.startsWith("@color/kalmia_text_"))
+            assertEquals(item, attr, selectorDefault(ref.removePrefix("@color/")))
+        }
+        for (item in listOf("android:textColorHighlight", "android:textColorPrimaryInverse", "android:textColorHintInverse")) {
+            assertTrue("$item absent du thème", theme[item]?.startsWith("@color/kalmia_") == true)
+        }
+    }
+
+    @Test
+    fun colourStateListsUseOnlyThemeRolesOrThePalette() {
+        for (f in res.resolve("color").listFiles()!!.filter { it.extension == "xml" }) {
+            val items = parse(f).getElementsByTagName("item")
+            for (i in 0 until items.length) {
+                val c = (items.item(i) as Element).getAttribute("android:color")
+                assertTrue("${f.name} : $c", c.startsWith("?attr/color") || c.startsWith("@color/kalmia_"))
+            }
+        }
+    }
+
+    @Test
+    fun selectorsOfButtonsKeysAndMicMatchTheTestedPairs() {
+        // The foreground/background of each component, as drawn, is one of the pairs measured above.
+        val tested = pairs.map { it.first to it.second }.toSet()
+        val components = listOf(
+            "kalmia_button_text" to "kalmia_button_bg", // action buttons
+            "kalmia_mic_icon" to "kalmia_mic_bg",       // mic at rest
+        )
+        for ((fg, bg) in components) {
+            val pair = selectorDefault(fg).removePrefix("?attr/") to selectorDefault(bg).removePrefix("?attr/")
+            assertTrue("$fg sur $bg = $pair, paire non mesurée", pair in tested)
+        }
+        // Mic while listening (activated state: first non-disabled item).
+        fun activated(name: String): String {
+            val items = parse(res.resolve("color/$name.xml")).getElementsByTagName("item")
+            return (0 until items.length).map { items.item(it) as Element }
+                .first { it.getAttribute("android:state_activated") == "true" }
+                .getAttribute("android:color").removePrefix("?attr/")
+        }
+        assertTrue(activated("kalmia_mic_icon") to activated("kalmia_mic_bg") in tested)
+        // Keys and outlined buttons: ink text on paper 2 (keys) or paper (outlined buttons).
+        val key = selectorDefault("kalmia_key_text").removePrefix("?attr/")
+        assertTrue(key to "colorSurfaceContainer" in tested)
+        assertTrue(key to "colorSurface" in tested)
+    }
+
+    /** Items of the style [name] in themes.xml. */
+    private fun style(name: String): Map<String, String> {
+        val styles = parse(res.resolve("values/themes.xml")).getElementsByTagName("style")
+        val style = (0 until styles.length).map { styles.item(it) as Element }.first { it.getAttribute("name") == name }
+        val items = style.getElementsByTagName("item")
+        return (0 until items.length).map { items.item(it) as Element }.associate { it.getAttribute("name") to it.textContent.trim() }
+    }
+
+    @Test
+    fun keySymbolsAreAtLeast20spAndKeysAtLeast48dpHigh() {
+        val key = style("KeyButton")
+        assertTrue(key["android:layout_height"]!!.removeSuffix("dp").toFloat() >= 48f)
+        // The gap between keys is an inset (inside the touch area), never an outer margin.
+        assertTrue("marge externe sur les touches", key.keys.none { it.startsWith("android:layout_margin") })
+        assertEquals("@style/TextAppearance.Kalmia.Key", key["android:textAppearance"])
+        assertTrue(style("TextAppearance.Kalmia.Key")["android:textSize"]!!.removeSuffix("sp").toFloat() >= 20f)
+        assertTrue(style("Widget.Kalmia.Button")["android:minHeight"]!!.removeSuffix("dp").toFloat() >= 48f)
+        assertTrue(style("Widget.Kalmia.OutlinedButton")["android:minHeight"]!!.removeSuffix("dp").toFloat() >= 48f)
     }
 
     @Test

@@ -180,13 +180,14 @@ class SetupActivity : AppCompatActivity() {
         val uncovered = ModelRecommendations.uncovered(spec, chosen)
         if (uncovered.isNotEmpty()) {
             card.warning(
-                getString(R.string.model_warning_uncovered, uncovered.joinToString(", ") { it.label.lowercase() }),
+                getString(R.string.model_warning_uncovered, uncovered.joinToString(", ") { it.inSentence }),
                 WARNING_TAG,
             )
         }
         card.body("${spec.publisher} · ${spec.description}", small = true)
         card.body(getString(R.string.model_license_runs_local, spec.license), small = true)
         val status = Downloads.status[spec.id]
+        val failed = !Downloads.isBusy(spec.id) && status?.error != null
         card.value(
             when {
                 Downloads.isBusy(spec.id) && status != null ->
@@ -195,7 +196,7 @@ class SetupActivity : AppCompatActivity() {
                 installed -> getString(R.string.setup_installed, size(app.store.installedBytes(spec.asDownloadable())))
                 else -> getString(R.string.setup_not_installed, size(spec.totalBytes))
             },
-        )
+        ).apply { if (failed) markError() }
         card.row().apply {
             when {
                 Downloads.isBusy(spec.id) -> button(getString(R.string.cancel), outlined = true) { Downloads.cancel(spec.id) }

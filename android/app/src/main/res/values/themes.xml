@@ -49,6 +49,37 @@
         <!-- Contour : atténué pour les contrôles (contraste 3:1 exigé), filet pour les séparateurs -->
         <item name="colorOutline">@color/kalmia_muted</item>
         <item name="colorOutlineVariant">@color/kalmia_rule</item>
+        <!-- Rôles « fixes » (identiques en clair et en sombre chez Material) : mêmes correspondances
+             que leurs équivalents, pour qu'aucun ne retombe sur la palette Material par défaut. -->
+        <item name="colorPrimaryFixed">@color/kalmia_button</item>
+        <item name="colorPrimaryFixedDim">@color/kalmia_button</item>
+        <item name="colorOnPrimaryFixed">@color/kalmia_on_button</item>
+        <item name="colorOnPrimaryFixedVariant">@color/kalmia_on_button</item>
+        <item name="colorSecondaryFixed">@color/kalmia_paper_2</item>
+        <item name="colorSecondaryFixedDim">@color/kalmia_paper_2</item>
+        <item name="colorOnSecondaryFixed">@color/kalmia_ink</item>
+        <item name="colorOnSecondaryFixedVariant">@color/kalmia_muted</item>
+        <item name="colorTertiaryFixed">@color/kalmia_flower</item>
+        <item name="colorTertiaryFixedDim">@color/kalmia_flower</item>
+        <item name="colorOnTertiaryFixed">@color/kalmia_on_flower</item>
+        <item name="colorOnTertiaryFixedVariant">@color/kalmia_on_flower</item>
+
+        <!-- Couleurs de texte du cadre Android : sans elles, tout TextView, case à cocher ou bouton
+             radio sans couleur explicite prend l'encre violette de la palette Material par défaut
+             (m3_default_color_primary_text). Elles renvoient aux rôles ci-dessus (res/color). -->
+        <item name="android:textColorPrimary">@color/kalmia_text_primary</item>
+        <item name="android:textColorSecondary">@color/kalmia_text_secondary</item>
+        <item name="android:textColorTertiary">@color/kalmia_text_secondary</item>
+        <item name="android:textColorPrimaryDisableOnly">@color/kalmia_text_primary</item>
+        <item name="android:textColorAlertDialogListItem">@color/kalmia_text_primary</item>
+        <item name="android:textColorHint">@color/kalmia_text_secondary</item>
+        <item name="android:textColorHighlight">@color/kalmia_text_highlight</item>
+        <item name="android:textColorPrimaryInverse">@color/kalmia_on_inverse_surface</item>
+        <item name="android:textColorSecondaryInverse">@color/kalmia_on_inverse_surface</item>
+        <item name="android:textColorTertiaryInverse">@color/kalmia_on_inverse_surface</item>
+        <item name="android:textColorPrimaryInverseDisableOnly">@color/kalmia_on_inverse_surface</item>
+        <item name="android:textColorHintInverse">@color/kalmia_on_inverse_surface</item>
+        <item name="android:textColorHighlightInverse">@color/kalmia_inverse_primary</item>
 
         <item name="android:statusBarColor">?attr/colorSurface</item>
         <item name="android:navigationBarColor">?attr/colorSurface</item>
@@ -196,13 +227,15 @@
         <item name="iconPadding">0dp</item>
         <item name="android:padding">0dp</item>
     </style>
-    <!-- Touche du clavier : papier 2, filet atténué (3:1 sur le papier), pas d'ombre, symbole Plex Mono 24 sp. -->
+    <!-- Touche du clavier : papier 2, filet atténué (3:1 sur le papier), pas d'ombre, symbole Plex Mono 24 sp.
+         L'écart entre deux touches est une marge interne (insetLeft/insetRight), pas une marge externe :
+         la zone tactile couvre ainsi toute la largeur de la case, écart compris. -->
     <style name="KeyButton" parent="Widget.Kalmia.OutlinedButton">
         <item name="android:layout_width">0dp</item>
         <item name="android:layout_height">52dp</item>
         <item name="android:layout_weight">1</item>
-        <item name="android:layout_marginStart">3dp</item>
-        <item name="android:layout_marginEnd">3dp</item>
+        <item name="android:insetLeft">3dp</item>
+        <item name="android:insetRight">3dp</item>
         <item name="android:insetTop">0dp</item>
         <item name="android:insetBottom">0dp</item>
         <item name="android:minWidth">0dp</item>

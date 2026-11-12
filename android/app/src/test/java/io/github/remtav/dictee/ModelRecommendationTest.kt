@@ -97,6 +97,20 @@ class ModelRecommendationTest {
         assertEquals(DictationLanguage.FRENCH_QUEBEC, DictationLanguage.default)
     }
 
+    @Test fun quebecReasonStatesTheScopeOfTheMeasure() {
+        val reason = ModelRecommendations.recommend(setOf(DictationLanguage.FRENCH_QUEBEC)).reason
+        assertTrue(reason, reason.contains("59 mots"))
+        assertTrue(reason, reason.contains("pas une preuve"))
+        assertTrue(reason, !reason.contains("transcrit mieux"))
+    }
+
+    @Test fun languageNamesInSentencesKeepTheirProperNouns() {
+        assertEquals("français (Québec)", DictationLanguage.FRENCH_QUEBEC.inSentence)
+        assertEquals("mandarin", DictationLanguage.MANDARIN.inSentence)
+        val reason = ModelRecommendations.recommend(setOf(DictationLanguage.FRENCH_QUEBEC, DictationLanguage.URDU)).reason
+        assertTrue(reason, reason.contains("ourdou") && !reason.contains("Ourdou"))
+    }
+
     @Test fun parakeetCoversExactlySixOfTheEleven() {
         assertEquals(6, langs.count { ModelRecommendations.covers(ModelCatalog.parakeet, it) })
     }

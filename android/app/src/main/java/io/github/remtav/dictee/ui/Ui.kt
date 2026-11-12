@@ -146,14 +146,26 @@ internal fun ViewGroup.badge(text: CharSequence, viewId: Int = View.NO_ID) = Tex
     setPadding(0, context.dp(2), 0, context.dp(2))
 }.also { addView(it) }
 
+/**
+ * Shows this text as an error (theme error colour, red, plus the error icon: never the colour
+ * alone) or, with [isError] false, back in the normal text colour without the icon.
+ */
+internal fun TextView.markError(isError: Boolean = true) {
+    setTextColor(
+        context.attrColor(
+            if (isError) androidx.appcompat.R.attr.colorError else com.google.android.material.R.attr.colorOnSurface,
+        ),
+    )
+    setCompoundDrawablesRelativeWithIntrinsicBounds(if (isError) R.drawable.ic_error else 0, 0, 0, 0)
+    compoundDrawablePadding = context.dp(8)
+}
+
 /** A warning line: always text and an icon (never only a colour), in the theme's error colour. */
 internal fun ViewGroup.warning(text: CharSequence, tagValue: String) = TextView(context).apply {
     this.text = text
     tag = tagValue
     setTextAppearance(R.style.TextAppearance_Kalmia_BodySmall)
-    setTextColor(context.attrColor(androidx.appcompat.R.attr.colorError))
-    setCompoundDrawablesRelativeWithIntrinsicBounds(R.drawable.ic_error, 0, 0, 0)
-    compoundDrawablePadding = context.dp(8)
+    markError()
     setPadding(0, context.dp(2), 0, context.dp(2))
 }.also { addView(it) }
 

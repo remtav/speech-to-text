@@ -1018,3 +1018,138 @@ français québécois (671 Mo, le plus léger). » (`RecommendationBasis.phrase`
 Dans `.github/workflows/android.yml`, seuls le nom et le texte de la release
 changent (« Kalmia Blabla », phrase de positionnement) ; commit séparé, car un
 workflow peut être refusé au push.
+
+## Issue #15, lot 1 — revue indépendante (1.R)
+
+Revue faite sur le diff du lot (`origin/main...HEAD`) et les critères
+d'acceptation de l'issue, sans les comptes rendus des étapes. Chaque problème
+trouvé est corrigé dans le même commit, avec un test quand c'est vérifiable sur
+la JVM.
+
+### Critères d'acceptation du lot 1
+
+| Critère | État | Preuve |
+| --- | --- | --- |
+| Compilation et CI vertes | rempli (local) ; CI : voir le rapport de la PR #16 | `./gradlew testDebugUnitTest assembleDebug assembleDebugAndroidTest lintDebug` |
+| Plus de « Dictée locale » dans les chaînes affichées ni le README | rempli | `grep` : restent seulement `DECISIONS.md` (historique), la vérification de `SetupLanguageTest` et le `-dname "CN=Dictee locale"` d'une commande `keytool` du README (nom interne d'un certificat, jamais affiché) |
+| Tests de la table : couverture de chaque combinaison, Québec seul → Parakeet, jamais Parakeet hors de ses langues | rempli | `ModelRecommendationTest` (2 047 combinaisons) |
+| Test instrumenté : accueil → langue → modèle marqué ; Réglages → recommandation changée | rempli (exécuté en CI seulement) | `SetupLanguageTest` |
+| WER par modèle sur les extraits québécois dans `DECISIONS.md` | rempli | section « étape 1.2 » |
+| Affirmations de l'accueil et du README vérifiables ; Google : lien officiel | rempli après correction (« code source ouvert », voir plus bas) | citations Google relues le 2026-11-12 |
+| Couleurs = source Kalmia | rempli | `ThemeContrastTest.paletteIsTheKalmiaOneFromTheSource`, comparé à `design/marque/tokens.css` |
+| Contraste ≥ 4,5 : 1 des paires utilisées, deux thèmes | rempli, couverture élargie | `ThemeContrastTest` |
+| Aucune couleur hexadécimale ni police en dur (recherche en CI) | rempli, garde renforcée | `NoHardcodedStyleTest` (job « Build and unit tests ») |
+| Aucune police téléchargeable | rempli | `NoHardcodedStyleTest.noDownloadableFontIsDeclared` |
+| Captures claires et sombres régénérées | en CI (`ScreenshotTest`, artefact du job émulateur) | non vérifiable sans émulateur ici |
+
+### Problèmes trouvés et corrigés
+
+1. **Texte de toutes les vues sans couleur explicite dans la palette Material
+   par défaut.** Le thème ne redéfinissait pas `android:textColorPrimary`,
+   `textColorSecondary`, `textColorHint`, etc. : Material 3 les fait pointer vers
+   `m3_default_color_primary_text` (encre violacée `#1D1B20` en clair, `#E6E0E9`
+   en sombre). Or le corps de texte des écrans (`body()`), les cases à cocher
+   des langues et les boutons radio ne fixent pas de couleur : ils n'étaient
+   donc pas en encre Kalmia. Corrigé : ces rôles du cadre pointent vers
+   `res/color/kalmia_text_primary.xml`, `kalmia_text_secondary.xml`,
+   `kalmia_text_highlight.xml` (encre, atténué, vert translucide). Les douze
+   rôles « fixes » de Material 1.12 (`colorPrimaryFixed`…) manquaient aussi ;
+   ajoutés. Tests : `frameworkTextColoursAreKalmiaOnesNotTheMaterialDefaults`,
+   liste des rôles complétée.
+2. **« Le code source est ouvert »** (accueil, README, release) : le dépôt est
+   public mais n'a **aucun fichier de licence** ; sans licence, le code se lit
+   mais n'est pas un logiciel libre au sens juridique. Reformulé en « code
+   source public : chacun peut le lire et le vérifier » ; le README le dit. Le
+   choix d'une licence est remis à l'humain (ajouter un `LICENSE` rendrait
+   « ouvert » exact).
+3. **Raison de la recommandation plus forte que la mesure.** « transcrit
+   mieux le français québécois » alors que l'étape 1.2 conclut que Whisper est à
+   une erreur de Parakeet une fois l'artefact « 18 » retiré. Nouvelle raison :
+   « … En français québécois, il a fait le moins d'erreurs des trois, mesuré sur
+   six courts extraits (59 mots) : un indice, pas une preuve. » Test
+   `quebecReasonStatesTheScopeOfTheMeasure`. Le README cite cette phrase.
+4. **Nom de langue mis en minuscules en entier** (`label.lowercase()`) : aurait
+   donné « français (québec) ». Remplacé par `DictationLanguage.inSentence`
+   (première lettre seulement). Test `languageNamesInSentencesKeepTheirProperNouns`.
+5. **« L'erreur reste rouge »** n'était vrai qu'au clavier, dans les
+   avertissements et le diagnostic : l'échec d'un téléchargement (accueil,
+   modèles LLM des Réglages), l'erreur de la comparaison et l'échec du test de
+   connexion au serveur restaient en couleur de texte normale. Nouvel
+   utilitaire `TextView.markError()` (`ui/Ui.kt`) : couleur d'erreur + icône
+   `ic_error`, ou retour à l'encre sans icône ; utilisé partout où un échec
+   s'affiche.
+6. **Le clavier ne suivait pas le réglage Système / Clair / Sombre de
+   l'application** : la vue n'était reconstruite qu'au changement de
+   configuration du système (ou par les tests). `DicteeImeService` mémorise le
+   réglage de la vue construite et la reconstruit dans `onStartInputView` s'il
+   a changé.
+7. **Zones tactiles des touches** : l'écart entre touches était une marge
+   externe (3 dp de chaque côté), donc hors de la zone tactile. Il devient une
+   marge interne (`insetLeft`/`insetRight`) : la zone tactile couvre toute la
+   case. Test `keySymbolsAreAtLeast20spAndKeysAtLeast48dpHigh` (hauteur ≥ 48 dp,
+   symboles ≥ 20 sp, pas de marge externe). **Limite non corrigée** : huit
+   touches sur une rangée ne peuvent pas faire 48 dp de large sur un téléphone
+   de 360 à 412 dp (une case simple fait environ 36 à 40 dp, espace et
+   effacement plus) ; tenir 48 dp exigerait deux rangées ou moins de touches,
+   un changement de disposition hors de la portée d'une revue. Remis à l'humain.
+8. **Langue du serveur affichée en retard dans les Réglages** : cocher une
+   langue en haut de l'écran changeait la valeur par défaut de la langue du
+   serveur sans mettre à jour son bouton radio. Le bouton suit maintenant
+   (`checkSilently`, sans enregistrer la valeur comme choix explicite).
+9. **Garde `NoHardcodedStyleTest` contournable** : seuls `textColor`,
+   `background`, `tint`, `fontFamily`, `typeface` en `android:` étaient
+   contrôlés dans les mises en page (`app:backgroundTint="@android:color/black"`
+   passait) ; aucune vérification de `@android:color/` hors des mises en page,
+   ni des apparences de texte du système (police du système), ni de
+   `0xRRGGBB`, `Typeface.Builder`, `setTypeface`. Élargi ; une ligne morte
+   retirée. Vérifié en injectant `app:backgroundTint="@android:color/black"`
+   dans `keyboard_view.xml` : le test échoue, puis passe une fois retiré.
+10. **`ThemeContrastTest` ne reliait pas les paires mesurées aux composants.**
+    Ajouts : chaque liste d'états de `res/color` n'emploie que des rôles du
+    thème ou la palette ; le texte des boutons d'action, l'icône du micro au
+    repos et à l'écoute, et le texte des touches et boutons à contour
+    correspondent à des paires mesurées.
+11. Citation de la politique de Google : majuscule rétablie (« Contenus
+    multimédias… », mot pour mot). Commentaire de `SherpaEngine` mis à jour
+    (la langue de Whisper n'est plus toujours vide).
+
+### Vérifié sans changement
+
+- **Citations Google** relues le 2026-11-12 : « Le texte dicté est conservé sur
+  votre appareil. », « la transcription de votre commande vocale et le texte du
+  champ de saisie sont envoyés aux serveurs Google » et « Aucune donnée audio
+  n'est envoyée. » figurent mot pour mot sur la page Gboard 11197787 ; « À
+  compter du 16 octobre 2026 » et l'élément « Contenus multimédias (…) issus de
+  vos interactions » sur policies.google.com/privacy.
+- **Langues** : la sélection n'est jamais vide (`parse` retombe sur le Québec,
+  l'écran refuse de décocher la dernière) ; Whisper reçoit la langue seulement
+  si un seul code est choisi (Québec + France = `fr`) ; `remoteLanguage` suit
+  les langues tant qu'aucune valeur n'est enregistrée, et une valeur explicite
+  (même « détection automatique ») n'est jamais écrasée ; l'ouverture des
+  Réglages n'enregistre rien (l'écouteur du bouton radio est posé après le
+  premier `check`). Le moteur est rechargé quand la langue change, parce que
+  `EngineOptions` (qui porte la langue) fait partie de la clé de
+  `EngineManager`. Seul Whisper la reçoit : changer de langue ne recharge pas
+  Parakeet ni Qwen3.
+- **Comparer les modèles** mesure Whisper en détection automatique
+  (`engineOptions(remote)`, langue vide) : voulu, les extraits mêlent anglais et
+  français ; le WER de la comparaison n'est donc pas celui de Whisper à langue
+  forcée.
+- **Vie privée** : aucune permission ajoutée au manifeste, aucune nouvelle
+  requête réseau (polices embarquées, aucun fournisseur de polices).
+- **Risques de plantage relus** (personne n'a lancé l'application) : tous les
+  attributs du thème existent dans Material 1.12 (l'assemblage échouerait
+  sinon) ; styles parents existants ; `textFontWeight` et
+  `fontVariationSettings` disponibles (minSdk 29) ; axes `wght` et `opsz` de
+  Newsreader présents ; vecteurs valides (lint et AAPT passent) ; les icônes à
+  `@android:color/white` sont teintées par le thème ou par `iconTint`.
+
+### À vérifier par un humain
+
+- Rendu réel du texte en encre Kalmia après la correction 1 (captures de la
+  CI, puis téléphone), clair et sombre.
+- Changer Clair / Sombre dans les Réglages, puis rouvrir le clavier dans une
+  autre application : il doit suivre (correction 6).
+- Largeur des touches (environ 40 dp) : assez confortable au pouce ? Sinon,
+  passer à deux rangées.
+- Choisir une licence pour le dépôt si « code source ouvert » doit être écrit.

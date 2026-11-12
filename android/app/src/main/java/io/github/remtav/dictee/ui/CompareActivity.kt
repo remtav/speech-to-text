@@ -166,7 +166,7 @@ class CompareActivity : AppCompatActivity() {
         val card = resultsBox.card()
         card.heading(r.spec.displayName).setPadding(0, 0, 0, dp(4))
         if (r.error != null) {
-            card.body(getString(R.string.compare_error, r.error))
+            card.body(getString(R.string.compare_error, r.error)).markError()
             return
         }
         card.value(

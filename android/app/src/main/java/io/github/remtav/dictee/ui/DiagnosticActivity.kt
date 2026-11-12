@@ -73,11 +73,7 @@ class DiagnosticActivity : AppCompatActivity() {
         val card = results.card()
         card.body("Essai $n — ${t.name} (%.1f s)".format(Locale.ROOT, t.audioSeconds))
         if (t.error != null) {
-            card.body("Échec : ${t.error}", small = true).apply {
-                setTextColor(attrColor(androidx.appcompat.R.attr.colorError))
-                setCompoundDrawablesRelativeWithIntrinsicBounds(R.drawable.ic_error, 0, 0, 0)
-                compoundDrawablePadding = dp(8)
-            }
+            card.body("Échec : ${t.error}", small = true).markError()
             return
         }
         card.value("Envoi ${t.uploadMillis} ms · total ${t.totalMillis} ms · ${t.transport} · polissage : ${t.polishStatus}")

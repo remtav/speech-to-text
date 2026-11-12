@@ -44,7 +44,7 @@
     <string name="download_running">Téléchargement des modèles…</string>
     <string name="download_channel">Téléchargements</string>
 
-    <string name="setup_intro">Un clavier vocal conçu au Québec, pour le français d\'ici.\nVotre voix est transcrite sur votre téléphone : elle n\'est envoyée à personne, sauf si vous choisissez vous-même un serveur distant. Le réseau sert à télécharger les modèles.\nPas de compte, pas de publicité, pas de télémétrie.\nLe code source est ouvert : chacun peut le vérifier. Les modèles de transcription, eux, viennent d\'éditeurs étrangers, nommés plus bas.</string>
+    <string name="setup_intro">Un clavier vocal conçu au Québec, pour le français d\'ici.\nVotre voix est transcrite sur votre téléphone : elle n\'est envoyée à personne, sauf si vous choisissez vous-même un serveur distant. Le réseau sert à télécharger les modèles.\nPas de compte, pas de publicité, pas de télémétrie.\nLe code source est public : chacun peut le lire et le vérifier. Les modèles de transcription, eux, viennent d\'éditeurs étrangers, nommés plus bas.</string>
     <string name="setup_step_keyboard">1. Activer le clavier</string>
     <string name="setup_open_ime_settings">Activer</string>
     <string name="setup_pick_ime">Choisir le clavier</string>
