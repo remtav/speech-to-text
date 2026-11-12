@@ -2,8 +2,12 @@ package io.github.remtav.dictee
 
 import io.github.remtav.dictee.dictation.StringSink
 import io.github.remtav.dictee.dictation.TextPipeline
+import io.github.remtav.dictee.stt.DictationLanguage
 import io.github.remtav.dictee.stt.ModelFamily
 import io.github.remtav.dictee.text.Command
+import io.github.remtav.dictee.text.CommandLanguage
+import io.github.remtav.dictee.text.CommandTable
+import io.github.remtav.dictee.text.Typography
 import io.github.remtav.dictee.text.HallucinationFilter
 import io.github.remtav.dictee.text.Piece
 import io.github.remtav.dictee.text.RuleCleaner
@@ -209,5 +213,339 @@ class WerTest {
 
     @Test fun frenchApostrophes() {
         assertEquals(0.0, Wer.compute("c'était très amusant", "C’était très amusant.").rate, 1e-9)
+    }
+}
+
+// ---- Issue #15, step 2.2: dictated punctuation, false positives, duplicates, typography ----
+
+private const val NB = ' '
+private val QC = setOf(DictationLanguage.FRENCH_QUEBEC)
+private val FR = setOf(DictationLanguage.FRENCH_FRANCE)
+private val EN = setOf(DictationLanguage.ENGLISH)
+private val QC_EN = setOf(DictationLanguage.FRENCH_QUEBEC, DictationLanguage.ENGLISH)
+
+/** Dictates [segments] one after the other into a field holding [before]; returns the field. */
+private fun dictate(vararg segments: String, languages: Set<DictationLanguage> = QC_EN, before: String = ""): String {
+    val sink = StringSink(before)
+    val p = TextPipeline(languages = languages)
+    for (s in segments) p.applyFinal(s, ModelFamily.NEMO_TRANSDUCER, sink)
+    return sink.text
+}
+
+class PunctuationCommandsTest {
+    @Test fun issueExampleEndToEnd() {
+        // The scripted dictation of the issue, as one segment without any punctuation from the model.
+        assertEquals(
+            "Il a dit$NB: «${NB}bonjour$NB»",
+            dictate("il a dit deux-points ouvrir les guillemets bonjour fermer les guillemets", languages = QC),
+        )
+        // Without the hyphen: "deux points" is followed by another command, so it is one.
+        assertEquals(
+            "Il a dit$NB: «${NB}bonjour$NB»",
+            dictate("il a dit deux points ouvrir les guillemets bonjour fermer les guillemets", languages = QC),
+        )
+        // With the model's commas and capital letters.
+        assertEquals(
+            "Il a dit$NB: «${NB}bonjour$NB».",
+            dictate("Il a dit deux-points, ouvrir les guillemets, bonjour, fermer les guillemets.", languages = QC),
+        )
+        // Spread over several segments (pauses): the model's period after "Bonjour" stays inside.
+        assertEquals(
+            "Il a dit$NB: «${NB}Bonjour.$NB»",
+            dictate("Il a dit", "Deux-points.", "Ouvrir les guillemets.", "Bonjour.", "Fermer les guillemets.", languages = QC),
+        )
+    }
+
+    @Test fun eachFrenchCommand() {
+        val cases = listOf(
+            "il a dit deux-points oui" to "Il a dit$NB: oui",
+            "du pain point-virgule du lait" to "Du pain; du lait",
+            "du pain point virgule du lait" to "Du pain; du lait",
+            "on se voit lundi ouvrir la parenthèse ou mardi fermer la parenthèse" to "On se voit lundi (ou mardi)",
+            "lundi parenthèse ouvrante ou mardi parenthèse fermante" to "Lundi (ou mardi)",
+            "tu viens demain point d'interrogation" to "Tu viens demain?",
+            "quelle belle journée point d'exclamation" to "Quelle belle journée!",
+            "il a dit guillemet ouvrant oui guillemet fermant" to "Il a dit «${NB}oui$NB»",
+            "il a dit ouvrez les guillemets oui fermez les guillemets" to "Il a dit «${NB}oui$NB»",
+            "il a dit guillemets ouverts oui guillemets fermés" to "Il a dit «${NB}oui$NB»",
+        )
+        for ((said, expected) in cases) assertEquals(said, expected, dictate(said, languages = QC))
+    }
+
+    @Test fun eachEnglishCommand() {
+        val cases = listOf(
+            "she said colon open quote hello close quote" to "She said: “hello”",
+            "she said open quote hello end quote" to "She said “hello”",
+            "bread semicolon milk" to "Bread; milk",
+            "see you Monday open parenthesis or Tuesday close parenthesis" to "See you Monday (or Tuesday)",
+            "are you coming question mark" to "Are you coming?",
+            "what a day exclamation mark" to "What a day!",
+            "what a day exclamation point" to "What a day!",
+        )
+        for ((said, expected) in cases) assertEquals(said, expected, dictate(said, languages = EN))
+    }
+
+    @Test fun layoutAndDeletionStillWork() {
+        assertEquals("Bonjour.\nMerci.", dictate("Bonjour.", "Nouvelle ligne.", "merci.", languages = QC))
+        assertEquals("Dear John.\n\nThanks.", dictate("Dear John.", "New paragraph.", "Thanks.", languages = EN))
+        assertEquals("Un deux", dictate("Un deux trois", "Efface le dernier mot.", languages = QC))
+    }
+
+    @Test fun signsAreTheirOwnPiecesInTheParser() {
+        assertEquals(
+            listOf(
+                Piece.Text("il a dit"), Piece.Cmd(Command.COLON), Piece.Cmd(Command.OPEN_QUOTE),
+                Piece.Text("bonjour"), Piece.Cmd(Command.CLOSE_QUOTE),
+            ),
+            VoiceCommands.parse("il a dit deux-points ouvrir les guillemets bonjour fermer les guillemets"),
+        )
+        assertEquals(listOf(Piece.Cmd(Command.QUESTION_MARK)), VoiceCommands.parse("Point d'interrogation."))
+    }
+
+    @Test fun commandsFollowTheChosenLanguages() {
+        // English wordings are text for a French-only user, and the reverse.
+        assertEquals("Are you coming question mark", dictate("are you coming question mark", languages = QC))
+        assertEquals("Tu viens point d'interrogation", dictate("tu viens point d'interrogation", languages = EN))
+        assertEquals("New paragraph.", dictate("New paragraph.", languages = QC))
+        // Both: each wording is typeset in its own language.
+        assertEquals("Tu viens?", dictate("tu viens point d'interrogation", languages = QC_EN))
+        assertEquals("She said “hi”", dictate("she said open quote hi close quote", languages = QC_EN))
+    }
+
+    @Test fun otherLanguagesKeepLineBreaksButNoPunctuation() {
+        val es = setOf(DictationLanguage.SPANISH)
+        assertEquals("Hola.\nGracias.", dictate("Hola.", "New line.", "Gracias.", languages = es))
+        assertEquals("Hola.\nGracias.", dictate("Hola.", "Nouvelle ligne.", "Gracias.", languages = es))
+        assertEquals("Hola question mark", dictate("hola question mark", languages = es))
+        assertTrue(CommandTable.active(es).none { it.command.isSign })
+    }
+
+    @Test fun disabledCommandsLeaveEverythingAsText() {
+        val sink = StringSink()
+        TextPipeline(commandsEnabled = false, languages = QC).applyFinal("tu viens point d'interrogation", ModelFamily.NEMO_TRANSDUCER, sink)
+        assertEquals("Tu viens point d'interrogation", sink.text)
+    }
+
+    @Test fun closingWithNothingOpenStaysText() {
+        assertEquals("Bonjour fermer les guillemets", dictate("bonjour fermer les guillemets", languages = QC))
+        assertEquals("Bonjour fermer la parenthèse", dictate("bonjour fermer la parenthèse", languages = QC))
+        // A closing sign cannot start the field.
+        assertEquals("Deux-points", dictate("deux-points", languages = QC))
+    }
+
+    @Test fun timeDictatedWithAColonHasNoSpaces() {
+        assertEquals("Rendez-vous à 13:52", dictate("rendez-vous à 13 deux-points 52", languages = QC))
+    }
+}
+
+/** Phrases that must not trigger any command: the words stay as the model wrote them. */
+class FalsePositiveTest {
+    private val french = listOf(
+        "J'ai marqué deux points.",
+        "J'ai marqué deux points hier soir.",
+        "Elle a mis deux points sur la carte.",
+        "Il y a deux points de vue.",
+        "En deux points, d'abord le budget.",
+        "C'est un point d'interrogation pour moi.",
+        "Ça reste un gros point d'interrogation.",
+        "Son avenir est un point d'interrogation.",
+        "Le point d'exclamation est de trop.",
+        "Il manque un point-virgule.",
+        "Le point-virgule est rare.",
+        "Il a ouvert les guillemets.",
+        "Il faut ouvrir les guillemets ici.",
+        "Pour ouvrir la parenthèse, il faut du courage.",
+        "Je vais ouvrir la parenthèse sur ce sujet.",
+        "Les guillemets ouverts, il cite.",
+        "On a ouvert une nouvelle ligne de métro.",
+        "Il est allé à la ligne d'arrivée.",
+        "Il faut effacer la dernière phrase du contrat.",
+        "Tu dois fermer les guillemets toi-même.",
+        "Il a dit point, virgule, et rien d'autre.",
+    )
+    private val english = listOf(
+        "That's a question mark for me.",
+        "His future is a big question mark.",
+        "Put a colon here.",
+        "My colon hurts.",
+        "Colon cancer screening saves lives.",
+        "I have colon problems.",
+        "The semicolon is rare.",
+        "I love that quote.",
+        "Open quotes on the website are free.",
+        "In the end quotes are fine.",
+        "Add an exclamation mark to the title.",
+        "We opened a new line of products.",
+        "Delete the last sentence of the contract.",
+    )
+
+    @Test fun frenchTrapsStayText() {
+        for (s in french) {
+            assertEquals(s, listOf(Piece.Text(s)), VoiceCommands.parse(s, CommandTable.active(QC)))
+            assertEquals(s, s, dictate(s, languages = QC))
+        }
+    }
+
+    @Test fun englishTrapsStayText() {
+        for (s in english) {
+            assertEquals(s, listOf(Piece.Text(s)), VoiceCommands.parse(s, CommandTable.active(EN)))
+            assertEquals(s, s, dictate(s, languages = EN))
+        }
+    }
+}
+
+/** The model already wrote the sign: only one remains. */
+class DuplicateSignTest {
+    @Test fun modelSignBeforeTheCommand() {
+        assertEquals("Il a dit$NB: oui", dictate("Il a dit : deux-points oui", languages = QC))
+        assertEquals("Il a dit$NB: oui", dictate("Il a dit: deux-points oui", languages = QC))
+        assertEquals("Vraiment?", dictate("Vraiment ? Point d'interrogation.", languages = QC))
+        assertEquals("Vraiment?", dictate("Vraiment? point d'interrogation", languages = QC))
+        assertEquals("Super!", dictate("Super ! Point d'exclamation !", languages = QC))
+        assertEquals("Really?", dictate("Really? Question mark.", languages = EN))
+    }
+
+    @Test fun modelSignAfterTheCommand() {
+        assertEquals("Vraiment?", dictate("Vraiment point d'interrogation ?", languages = QC))
+        assertEquals("Il a dit$NB: oui", dictate("Il a dit deux-points : oui", languages = QC))
+        assertEquals("Really?", dictate("Really question mark?", languages = EN))
+    }
+
+    @Test fun finalPeriodAfterTheCommandGoes() {
+        assertEquals("Tu viens?", dictate("Tu viens, point d'interrogation.", languages = QC))
+        assertEquals("Du pain; du lait.", dictate("Du pain, point-virgule, du lait.", languages = QC))
+    }
+
+    @Test fun signFromThePreviousSegmentIsReplaced() {
+        assertEquals("C'est vrai?", dictate("C'est vrai.", "Point d'interrogation.", languages = QC))
+        assertEquals("Il a dit$NB:", dictate("Il a dit :", "Deux-points.", languages = QC))
+        assertEquals("C'est vrai${NB}?", dictate("C'est vrai.", "Point d'interrogation.", languages = FR))
+    }
+
+    @Test fun quotesTheModelAlreadyClosedAreNotDoubled() {
+        assertEquals(
+            "Il a dit «${NB}oui$NB»",
+            dictate("il a dit ouvrir les guillemets oui", "» fermer les guillemets", languages = QC),
+        )
+    }
+}
+
+class TypographyTest {
+    private val said = "il a dit deux-points ouvrir les guillemets oui fermer les guillemets point-virgule " +
+        "tu viens point d'interrogation super point d'exclamation"
+
+    @Test fun quebec() {
+        assertEquals("Il a dit$NB: «${NB}oui$NB»; tu viens? Super!", dictate(said, languages = QC))
+    }
+
+    @Test fun france() {
+        assertEquals("Il a dit$NB: «${NB}oui$NB»$NB; tu viens$NB? Super$NB!", dictate(said, languages = FR))
+    }
+
+    @Test fun bothFrenchVariantsChosenUseQuebec() {
+        assertEquals(
+            "Il a dit$NB: «${NB}oui$NB»; tu viens? Super!",
+            dictate(said, languages = setOf(DictationLanguage.FRENCH_QUEBEC, DictationLanguage.FRENCH_FRANCE)),
+        )
+    }
+
+    @Test fun english() {
+        assertEquals(
+            "She said: “yes”; are you coming? Great!",
+            dictate(
+                "she said colon open quote yes close quote semicolon are you coming question mark great exclamation mark",
+                languages = EN,
+            ),
+        )
+    }
+
+    @Test fun noSpaceBetweenApostropheAndOpeningQuote() {
+        assertEquals(
+            "C'est l'«${NB}outil$NB»",
+            dictate("ouvrir les guillemets outil fermer les guillemets", languages = QC, before = "C'est l'"),
+        )
+    }
+
+    @Test fun capitalAfterSentenceEndAndInsideQuotesAtStart() {
+        assertEquals("Tu viens? On part.", dictate("tu viens point d'interrogation on part.", languages = QC))
+        assertEquals("«${NB}Bonjour$NB»", dictate("ouvrir les guillemets bonjour fermer les guillemets", languages = QC))
+        assertEquals("Il a dit$NB: et voilà", dictate("il a dit deux-points Et voilà", languages = QC))
+    }
+
+    @Test fun noDoubleSpaces() {
+        val out = dictate("Il a dit  :  deux-points ,  ouvrir les guillemets ,  oui ,  fermer les guillemets", languages = QC)
+        assertEquals("Il a dit$NB: «${NB}oui$NB»", out)
+        assertFalse(out.contains("  "))
+    }
+
+    @Test fun modelTimeIsUntouched() {
+        assertEquals("Rendez-vous à 13:52.", dictate("Rendez-vous à 13:52.", languages = QC))
+        assertEquals("Rendez-vous à 13:52.", dictate("Rendez-vous à 13:52.", languages = FR))
+    }
+
+    @Test fun modelPunctuationIsNotTypeset() {
+        // Only dictated signs get the no-break spaces; the model's text is inserted as it was.
+        assertEquals("Il a dit: oui? Non!", dictate("Il a dit: oui? Non!", languages = FR))
+    }
+
+    @Test fun signEditUnit() {
+        assertEquals(TextAssembler.SignEdit(0, "$NB:"), TextAssembler.sign("Voici", Command.COLON, Typography.QUEBEC))
+        assertEquals(TextAssembler.SignEdit(0, ":"), TextAssembler.sign("Here", Command.COLON, Typography.ENGLISH))
+        assertEquals(TextAssembler.SignEdit(0, "?"), TextAssembler.sign("Oui", Command.QUESTION_MARK, Typography.QUEBEC))
+        assertEquals(TextAssembler.SignEdit(0, "$NB?"), TextAssembler.sign("Oui", Command.QUESTION_MARK, Typography.FRANCE))
+        assertEquals(TextAssembler.SignEdit(2, "?"), TextAssembler.sign("Oui ?", Command.QUESTION_MARK, Typography.QUEBEC))
+        assertEquals(TextAssembler.SignEdit(0, " «$NB"), TextAssembler.sign("Il a dit", Command.OPEN_QUOTE, Typography.QUEBEC))
+        assertEquals(TextAssembler.SignEdit(0, "«$NB"), TextAssembler.sign("", Command.OPEN_QUOTE, Typography.QUEBEC))
+        assertEquals(TextAssembler.SignEdit(0, " “"), TextAssembler.sign("She said", Command.OPEN_QUOTE, Typography.ENGLISH))
+        assertEquals(TextAssembler.SignEdit(0, ":", glueNext = true), TextAssembler.sign("à 13", Command.COLON, Typography.FRANCE, "52"))
+        assertEquals(null, TextAssembler.sign("", Command.QUESTION_MARK, Typography.QUEBEC))
+        assertEquals(null, TextAssembler.sign("Ligne\n", Command.COLON, Typography.QUEBEC))
+        assertEquals(null, TextAssembler.sign("Rien d'ouvert", Command.CLOSE_QUOTE, Typography.QUEBEC))
+        // "etc..." keeps its periods.
+        assertEquals(TextAssembler.SignEdit(0, "?"), TextAssembler.sign("Et puis...", Command.QUESTION_MARK, Typography.QUEBEC))
+    }
+}
+
+class CommandTableTest {
+    @Test fun coversExactlyTheInitialListInBothLanguages() {
+        for (lang in CommandLanguage.entries) {
+            assertEquals(lang.name, Command.entries.toSet(), CommandTable.entries.filter { it.language == lang }.map { it.command }.toSet())
+        }
+        assertEquals(Command.entries.size * CommandLanguage.entries.size, CommandTable.entries.size)
+    }
+
+    @Test fun activeCommandsFollowLanguages() {
+        assertEquals(setOf(CommandLanguage.FRENCH), CommandTable.active(QC).map { it.language }.toSet())
+        assertEquals(setOf(CommandLanguage.FRENCH), CommandTable.active(FR).map { it.language }.toSet())
+        assertEquals(setOf(CommandLanguage.ENGLISH), CommandTable.active(EN).map { it.language }.toSet())
+        assertEquals(CommandTable.entries, CommandTable.active(QC_EN))
+    }
+
+    @Test fun noWordingIsSharedByTwoCommands() {
+        val seen = HashMap<List<String>, Command>()
+        for (e in CommandTable.entries) for (f in e.forms) {
+            val previous = seen.put(f.words, e.command)
+            assertTrue("${f.text} used by $previous and ${e.command}", previous == null || previous == e.command)
+        }
+    }
+
+    @Test fun everyFormIsRecognisedAlone() {
+        // Each wording, said alone in a field after some text, gives its command (deletions included).
+        for (e in CommandTable.entries) for (f in e.forms) {
+            val pieces = VoiceCommands.parse("${f.text}.", CommandTable.active(QC_EN))
+            assertEquals(f.text, listOf(Piece.Cmd(e.command)), pieces)
+        }
+    }
+
+    @Test fun helpExamplesAreWhatTheAppProduces() {
+        // Step 2.3 shows these examples: they must match the behaviour (French in Québec typography).
+        for (e in CommandTable.entries) {
+            val langs = if (e.language == CommandLanguage.FRENCH) QC else EN
+            assertEquals(e.example.said, e.example.result, dictate(e.example.said, languages = langs, before = e.example.before))
+        }
+    }
+
+    @Test fun everyFormHasASource() {
+        for (e in CommandTable.entries) for (f in e.forms) assertTrue(f.text, f.sources.isNotEmpty())
     }
 }

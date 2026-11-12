@@ -81,7 +81,7 @@
     <string name="settings_partials">Texte provisoire pendant qu\'on parle</string>
     <string name="settings_partials_help">Affiché souligné, remplacé par le texte final à chaque pause. Consomme plus de calcul.</string>
     <string name="settings_commands">Commandes vocales</string>
-    <string name="settings_commands_help">« nouvelle ligne », « nouveau paragraphe », « efface la dernière phrase », « efface le dernier mot » (et en anglais : « new line », « new paragraph », « delete last sentence », « delete last word »). Les commandes d\'effacement doivent être dites seules.</string>
+    <string name="settings_commands_help">Ponctuation : « deux-points », « point-virgule », « point d\'interrogation », « point d\'exclamation », « ouvrir / fermer les guillemets », « ouvrir / fermer la parenthèse ». Mise en forme : « nouvelle ligne », « nouveau paragraphe ». Effacement, dit seul : « efface la dernière phrase », « efface le dernier mot ». Les commandes suivent vos langues de dictée (français, anglais) ; dans une phrase ordinaire (« j\'ai marqué deux points »), les mots restent du texte.</string>
     <string name="settings_pause">Pause qui termine un segment</string>
     <string name="settings_vocabulary">Vocabulaire personnalisé</string>
     <string name="settings_vocabulary_help">Un mot par ligne pour le favoriser (noms propres, jargon). « mal entendu -> correct » pour corriger après transcription. Qwen3-ASR reçoit aussi les mots favoris pendant la reconnaissance.</string>

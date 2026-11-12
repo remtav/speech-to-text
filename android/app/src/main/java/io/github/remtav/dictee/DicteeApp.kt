@@ -133,6 +133,7 @@ class DicteeApp : Application() {
             commandsEnabled = settings.voiceCommands,
             vocabulary = settings.vocabulary,
             cleaner = if (settings.cleanupMode == CleanupMode.OFF) TextCleaner.NONE else LazyCleaner { cleaner() },
+            languages = settings.languages,
         )
         return DictationSession(
             spec = spec,
