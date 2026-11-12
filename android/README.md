@@ -71,9 +71,57 @@ saisir l'adresse (par exemple `http://192.168.1.10:8081` pour le serveur
 speech-to-text de ce dépôt, ou l'adresse d'un serveur compatible avec l'API
 OpenAI `/v1/audio/transcriptions`), tester la connexion, puis choisir
 « Serveur distant » comme modèle (écran principal ou bouton du clavier).
-Avec ce choix, l'audio de chaque segment est envoyé au serveur. Si le serveur
-ne répond pas, un modèle local prend le relais (réglable). En dehors du réseau
-local, utilisez HTTPS ou un VPN (WireGuard, Tailscale).
+En dehors du réseau local, utilisez HTTPS ou un VPN (WireGuard, Tailscale).
+
+**Dictée entière, polie par le serveur** (issue #13). Avec « Serveur distant »,
+rien ne s'affiche pendant la dictée : à la fin (appui sur stop), toute la
+dictée part au serveur en une seule requête. Le serveur de ce dépôt la
+transcrit (chemin rapide) puis la polit avec son LLM, et le texte poli est
+inséré d'un bloc. Pendant l'attente, le clavier affiche « Transcription et
+polissage… » avec un bouton **Annuler**.
+
+- Si le polissage échoue, le texte brut du serveur est inséré (message
+  discret, pas d'erreur).
+- Si le serveur est injoignable, en erreur, refuse l'accès ou ne répond pas à
+  temps (60 s + la durée de la dictée, 6 min au plus), ou si vous appuyez sur
+  Annuler, l'audio gardé sur le téléphone est transcrit par le modèle local de
+  repli (Parakeet par défaut) : aucune dictée n'est perdue. Après une panne,
+  le serveur est réessayé au bout de 60 s.
+- Une dictée dure au plus 5 minutes : au-delà, l'enregistrement s'arrête et
+  ce qui a été dit est envoyé.
+- Les commandes vocales et le vocabulaire s'appliquent au texte final. Les
+  mots favoris ne sont pas envoyés au serveur de ce dépôt.
+- Avec une API compatible OpenAI, la dictée part aussi en une fois, sans
+  polissage (ces serveurs n'en ont pas).
+
+**Derrière Cloudflare Access (tunnel Cloudflare).** L'application s'authentifie
+avec un *service token* :
+
+1. Dans le tableau de bord Cloudflare Zero Trust : *Access → Service
+   credentials → Service Tokens → Create Service Token*. Notez le **Client ID**
+   et le **Client Secret** (le secret ne s'affiche qu'une fois).
+2. Dans l'application Access qui protège le serveur, ajoutez une politique
+   dont l'action est **Service Auth** et qui inclut ce service token. Avec une
+   politique « Allow » ordinaire, Access renvoie le client vers sa page de
+   connexion (redirection 302) au lieu de le laisser passer.
+3. Dans Dictée locale → Réglages → Serveur distant : adresse `https://…`,
+   puis « Cloudflare Access Client ID » et « Cloudflare Access Client Secret ».
+   Les en-têtes `CF-Access-Client-Id` et `CF-Access-Client-Secret` sont
+   envoyés sur toutes les requêtes dès que les deux champs sont remplis. Le
+   jeton Bearer reste disponible en plus.
+4. « Tester la connexion » distingue : accès refusé (401/403), redirection
+   vers la page de connexion Access (302 : politique qui n'est pas « Service
+   Auth »), serveur injoignable, et succès (avec le modèle du serveur et la
+   disponibilité du polissage).
+
+Le secret reste dans les préférences privées de l'application, s'affiche
+masqué, et n'apparaît ni dans les journaux ni dans les rapports.
+
+**Diagnostic serveur** (Réglages → Serveur distant) : envoie les enregistrements
+de référence de l'application, puis leur enchaînement (environ 30 s), comme de
+vraies dictées. Pour chaque essai, l'écran affiche le temps d'envoi, le temps
+total jusqu'au résultat, le statut du polissage, et le texte brut et le texte
+poli côte à côte. « Exporter le rapport » le partage en texte, sans aucun secret.
 
 Réglages : texte provisoire, commandes vocales, pause de fin de segment,
 vocabulaire personnalisé, thème, vibrations, durée de maintien du modèle en

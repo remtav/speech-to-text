@@ -30,6 +30,7 @@
         <activity android:name=".ui.SettingsActivity" android:exported="false"
             android:windowSoftInputMode="adjustResize" />
         <activity android:name=".ui.CompareActivity" android:exported="false" />
+        <activity android:name=".ui.DiagnosticActivity" android:exported="false" />
 
         <service
             android:name=".ime.DicteeImeService"

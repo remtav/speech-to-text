@@ -3,8 +3,11 @@ package io.github.remtav.dictee
 import java.net.InetAddress
 import java.net.ServerSocket
 
-/** Debug builds only, for tests: records each HTTP request (headers + body) and answers with [respond]. */
-class RecordingServer(private val respond: (path: String) -> Pair<Int, String>) : AutoCloseable {
+/**
+ * Debug builds only, for tests: records each HTTP request (headers + body) and answers with [respond].
+ * A 3xx answer carries a `Location` to a Cloudflare Access login page, like Access does.
+ */
+class RecordingServer(private val respond: (Request) -> Pair<Int, String>) : AutoCloseable {
     class Request(val method: String, val path: String, val headers: Map<String, String>, val body: ByteArray)
 
     private val socket = ServerSocket(0, 50, InetAddress.getByName("127.0.0.1"))
@@ -38,11 +41,13 @@ class RecordingServer(private val respond: (path: String) -> Pair<Int, String>) 
                         val body = ByteArray(len)
                         var read = 0
                         while (read < len) { val n = input.read(body, read, len - read); if (n < 0) break; read += n }
-                        requests += Request(method, path, headers, body)
-                        val (code, text) = respond(path)
+                        val request = Request(method, path, headers, body)
+                        requests += request
+                        val (code, text) = try { respond(request) } catch (_: Exception) { 500 to "{}" }
                         val bytes = text.toByteArray()
+                        val location = if (code in 300..399) "Location: https://team.cloudflareaccess.com/cdn-cgi/access/login\r\n" else ""
                         c.getOutputStream().apply {
-                            write("HTTP/1.1 $code X\r\nContent-Type: application/json\r\nContent-Length: ${bytes.size}\r\n\r\n".toByteArray())
+                            write("HTTP/1.1 $code X\r\nContent-Type: application/json\r\n${location}Content-Length: ${bytes.size}\r\n\r\n".toByteArray())
                             write(bytes)
                             flush()
                         }

@@ -19,6 +19,12 @@
     <string name="status_listening_loading">À l\'écoute (chargement de %1$s)…</string>
     <string name="status_speaking">Parole détectée…</string>
     <string name="status_finishing">Transcription…</string>
+    <string name="status_server_polish">Transcription et polissage…</string>
+    <string name="status_server">Transcription sur le serveur…</string>
+    <string name="cd_cancel_wait">Annuler l\'attente du serveur et transcrire sur le téléphone</string>
+    <string name="msg_server_fallback">Serveur non utilisé (%1$s) : transcrit sur le téléphone</string>
+    <string name="msg_server_cancelled">Attente annulée : transcrit sur le téléphone</string>
+    <string name="msg_polish_failed">Texte non poli (%1$s) : texte brut du serveur inséré</string>
 
     <string name="msg_password">Dictée désactivée dans les champs de mot de passe</string>
     <string name="msg_no_permission">Autorisez le micro dans l\'application Dictée locale</string>
@@ -83,7 +89,7 @@
     <string name="settings_llm_note">Le LLM tourne sur l\'appareil (MediaPipe, arm64 uniquement). S\'il est indisponible, le nettoyage par règles est utilisé.</string>
 
     <string name="settings_remote">Serveur distant (optionnel)</string>
-    <string name="settings_remote_help">Pour transcrire sur un serveur que vous contrôlez (par exemple le serveur speech-to-text de ce dépôt, chez vous) quand les modèles du téléphone ne suffisent pas. Choisissez ensuite « Serveur distant » comme modèle. Attention : avec ce choix, l\'audio de chaque segment est envoyé au serveur. Les autres modèles restent entièrement sur le téléphone.</string>
+    <string name="settings_remote_help">Pour transcrire sur un serveur que vous contrôlez (par exemple le serveur speech-to-text de ce dépôt, chez vous) quand les modèles du téléphone ne suffisent pas. Choisissez ensuite « Serveur distant » comme modèle. Attention : avec ce choix, toute la dictée est envoyée au serveur en une fois à la fin, puis le texte transcrit et poli par le serveur est inséré. Les autres modèles restent entièrement sur le téléphone.</string>
     <string name="settings_remote_api">Type d\'API</string>
     <string name="settings_remote_model_hint">Nom du modèle (API OpenAI uniquement, ex. whisper-1)</string>
     <string name="settings_remote_key_hint">Clé d\'API / jeton (optionnel)</string>
@@ -92,6 +98,19 @@
     <string name="settings_remote_fallback">Si le serveur ne répond pas</string>
     <string name="settings_remote_no_fallback">Afficher une erreur</string>
     <string name="settings_remote_test">Tester la connexion</string>
+    <string name="settings_diagnostic">Diagnostic serveur</string>
+    <string name="settings_remote_no_fallback_warning">⚠ Aucun modèle local de repli installé : si le serveur ne répond pas, la dictée sera perdue. Téléchargez un modèle (Parakeet conseillé) et choisissez-le ci-dessus.</string>
+    <string name="settings_cf_access">Cloudflare Access (optionnel)</string>
+    <string name="settings_cf_access_help">Si le serveur est derrière Cloudflare Access, saisissez un service token (Zero Trust → Access → Service credentials) et donnez à l\'application Access une politique « Service Auth » qui l\'inclut. Les en-têtes CF-Access-Client-Id et CF-Access-Client-Secret sont envoyés seulement quand les deux champs sont remplis.</string>
+    <string name="settings_cf_id_hint">Cloudflare Access Client ID</string>
+    <string name="settings_cf_secret_hint">Cloudflare Access Client Secret</string>
+    <string name="diag_title">Diagnostic serveur</string>
+    <string name="diag_help">Envoie les enregistrements de référence de l\'application (et leur enchaînement, environ 30 s) comme de vraies dictées : une requête par essai, avec polissage. Aucune donnée personnelle, aucun secret dans le rapport.</string>
+    <string name="diag_run">Lancer</string>
+    <string name="diag_export">Exporter le rapport</string>
+    <string name="diag_running">Essai %1$d sur %2$d…</string>
+    <string name="diag_done">Terminé.</string>
+    <string name="diag_not_configured">Serveur non configuré : saisissez une adresse dans les réglages.</string>
     <string name="settings_remote_testing">Test en cours…</string>
     <string name="settings_remote_ok">✓ Connexion réussie : %1$s</string>
     <string name="settings_remote_failed">Échec : %1$s</string>

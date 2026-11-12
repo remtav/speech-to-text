@@ -24,6 +24,10 @@ import io.github.remtav.dictee.stt.EngineOptions
 import io.github.remtav.dictee.stt.ModelFamily
 import io.github.remtav.dictee.stt.ModelSpec
 import io.github.remtav.dictee.stt.SttEngineFactory
+import io.github.remtav.dictee.stt.RemoteEngine
+import io.github.remtav.dictee.stt.RemoteLog
+import io.github.remtav.dictee.stt.DictationResult
+import io.github.remtav.dictee.stt.WholeDictationEngine
 import io.github.remtav.dictee.text.RuleCleaner
 import java.io.File
 
@@ -55,6 +59,8 @@ class DicteeApp : Application() {
         settings = AppSettings(this)
         store = ModelStore(File(filesDir, "models"))
         engines = EngineManager(store, isInstalled = { isInstalled(it) })
+        // Messages are redacted by RemoteEngine: no token or Cloudflare secret reaches logcat.
+        RemoteEngine.defaultLog = RemoteLog { android.util.Log.i("DicteeRemote", it) }
         applyTheme()
     }
 
@@ -136,6 +142,14 @@ class DicteeApp : Application() {
             transcribe = { samples -> engines.use(spec, options) { it.transcribe(samples) } },
             // A provisional decode per 0.7 s would be one HTTP request each: off for the server.
             partials = settings.partials && spec.family != ModelFamily.REMOTE,
+            // The server gets the whole dictation in one request, polished (issue #13).
+            whole = if (spec.family != ModelFamily.REMOTE) null else { audio, segments, control ->
+                engines.use(spec, options) { engine ->
+                    (engine as? WholeDictationEngine)?.transcribeDictation(audio, segments, control)
+                        ?: DictationResult(segments.map { engine.transcribe(it).text }, DictationResult.Source.SERVER_RAW, transport = "segments")
+                }
+            },
+            canFallBack = options.remoteFallback != null,
         ) to null
     }
 

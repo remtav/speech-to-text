@@ -109,6 +109,19 @@ class AppSettings(context: Context) {
         get() = prefs.getString("remote_language", "") ?: ""
         set(v) = prefs.edit().putString("remote_language", v).apply()
 
+    /** Cloudflare Access service token (Client ID). Sent only when the secret is set too. */
+    var cfAccessClientId: String
+        get() = prefs.getString("cf_access_id", "") ?: ""
+        set(v) = prefs.edit().putString("cf_access_id", RemoteConfig.cleanHeaderValue(v)).apply()
+
+    /**
+     * Cloudflare Access service token (Client Secret). Kept in the app's private
+     * preferences like the Bearer token; never logged, never shown in clear.
+     */
+    var cfAccessClientSecret: String
+        get() = prefs.getString("cf_access_secret", "") ?: ""
+        set(v) = prefs.edit().putString("cf_access_secret", RemoteConfig.cleanHeaderValue(v)).apply()
+
     /** Local model id used when the server cannot be reached; "" for none. */
     var remoteFallbackId: String
         get() = prefs.getString("remote_fallback", ModelCatalog.default.id) ?: ""
@@ -120,6 +133,8 @@ class AppSettings(context: Context) {
         apiKey = remoteApiKey,
         model = remoteModel,
         language = remoteLanguage,
+        cfAccessClientId = cfAccessClientId,
+        cfAccessClientSecret = cfAccessClientSecret,
     )
 
     /**

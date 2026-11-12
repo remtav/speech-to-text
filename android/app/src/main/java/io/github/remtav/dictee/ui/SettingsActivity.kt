@@ -29,6 +29,8 @@ class SettingsActivity : AppCompatActivity() {
     private lateinit var remoteUrl: EditText
     private lateinit var remoteKey: EditText
     private lateinit var remoteModel: EditText
+    private lateinit var cfClientId: EditText
+    private lateinit var cfClientSecret: EditText
     private lateinit var remoteStatus: android.widget.TextView
     private lateinit var llmBox: LinearLayout
     private val refresh: () -> Unit = { renderLlm() }
@@ -124,6 +126,13 @@ class SettingsActivity : AppCompatActivity() {
         remoteModel = field(getString(R.string.settings_remote_model_hint), s.remoteModel, InputType.TYPE_CLASS_TEXT)
         remoteKey = field(getString(R.string.settings_remote_key_hint), s.remoteApiKey,
             InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD)
+        col.body(getString(R.string.settings_cf_access), small = false)
+        col.body(getString(R.string.settings_cf_access_help), small = true)
+        cfClientId = field(getString(R.string.settings_cf_id_hint), s.cfAccessClientId,
+            InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS)
+        // A password field: the secret is never shown in clear (nor in screenshots).
+        cfClientSecret = field(getString(R.string.settings_cf_secret_hint), s.cfAccessClientSecret,
+            InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD)
         col.body(getString(R.string.settings_remote_language), small = true)
         val langs = listOf("" to getString(R.string.settings_remote_lang_auto), "fr" to "Français", "en" to "English")
         col.radio(langs.map { it.second }, langs.indexOfFirst { it.first == s.remoteLanguage }.coerceAtLeast(0)) {
@@ -134,8 +143,15 @@ class SettingsActivity : AppCompatActivity() {
             ModelCatalog.all.map { it.id to it.displayName }
         col.radio(fallbacks.map { it.second }, fallbacks.indexOfFirst { it.first == s.remoteFallbackId }.coerceAtLeast(0)) {
             s.remoteFallbackId = fallbacks[it].first
+            if (::remoteStatus.isInitialized) updateRemoteWarning()
         }
-        col.button(getString(R.string.settings_remote_test), outlined = true) { testRemote() }
+        col.row().apply {
+            button(getString(R.string.settings_remote_test), outlined = true) { testRemote() }.spaced()
+            button(getString(R.string.settings_diagnostic), outlined = true) {
+                saveRemote()
+                startActivity(android.content.Intent(this@SettingsActivity, DiagnosticActivity::class.java))
+            }
+        }
         remoteStatus = col.body("", small = true)
         updateRemoteWarning()
     }
@@ -145,6 +161,8 @@ class SettingsActivity : AppCompatActivity() {
         s.remoteUrl = remoteUrl.text.toString()
         s.remoteApiKey = remoteKey.text.toString()
         s.remoteModel = remoteModel.text.toString()
+        s.cfAccessClientId = cfClientId.text.toString()
+        s.cfAccessClientSecret = cfClientSecret.text.toString()
         // Using the server needs a valid address; never leave it selected without one.
         if (s.activeModel.family == io.github.remtav.dictee.stt.ModelFamily.REMOTE && !s.remoteConfig().isConfigured) {
             s.activeModelId = ModelCatalog.default.id
@@ -153,11 +171,18 @@ class SettingsActivity : AppCompatActivity() {
 
     private fun updateRemoteWarning() {
         val c = app.settings.remoteConfig()
-        remoteStatus.text = when {
-            !c.isConfigured && app.settings.remoteUrl.isNotBlank() -> getString(R.string.settings_remote_invalid)
-            c.isInsecurePublic -> getString(R.string.settings_remote_insecure)
-            else -> ""
-        }
+        val lines = listOfNotNull(
+            when {
+                !c.isConfigured && app.settings.remoteUrl.isNotBlank() -> getString(R.string.settings_remote_invalid)
+                c.isInsecurePublic -> getString(R.string.settings_remote_insecure)
+                else -> null
+            },
+            // Without an installed local model, a server failure loses the dictation.
+            if (c.isConfigured && ModelCatalog.byId(app.settings.remoteFallbackId)?.let { app.isInstalled(it) } != true) {
+                getString(R.string.settings_remote_no_fallback_warning)
+            } else null,
+        )
+        remoteStatus.text = lines.joinToString("\n")
     }
 
     private fun testRemote() {

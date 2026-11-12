@@ -37,6 +37,9 @@ import io.github.remtav.dictee.dictation.TextSink
 import io.github.remtav.dictee.settings.ThemeMode
 import io.github.remtav.dictee.stt.EngineManager
 import io.github.remtav.dictee.stt.ModelCatalog
+import io.github.remtav.dictee.stt.DictationResult
+import io.github.remtav.dictee.stt.ModelFamily
+import io.github.remtav.dictee.stt.RemoteApi
 import io.github.remtav.dictee.stt.Transcription
 import io.github.remtav.dictee.ui.SetupActivity
 import java.lang.ref.WeakReference
@@ -57,6 +60,7 @@ class DicteeImeService : InputMethodService(), DictationListener, EngineManager.
     private var statusText: TextView? = null
     private var modelButton: MaterialButton? = null
     private var meter: LevelMeterView? = null
+    private var cancelWaitButton: MaterialButton? = null
 
     private var sink: ImeTextSink? = null
     /** Field the current dictation types into: package + field id. */
@@ -136,6 +140,9 @@ class DicteeImeService : InputMethodService(), DictationListener, EngineManager.
         statusText = v.findViewById(R.id.status)
         meter = v.findViewById(R.id.level)
         modelButton = v.findViewById<MaterialButton>(R.id.model).apply { setOnClickListener { showModelMenu(it) } }
+        cancelWaitButton = v.findViewById<MaterialButton>(R.id.cancel_wait).apply {
+            setOnClickListener { haptic(it); onCancelWaitTapped() }
+        }
         v.findViewById<ImageButton>(R.id.settings).setOnClickListener { openSettings() }
         v.findViewById<View>(R.id.key_switch).setOnClickListener {
             haptic(it)
@@ -317,6 +324,45 @@ class DicteeImeService : InputMethodService(), DictationListener, EngineManager.
         lastSegment = transcription
     }
 
+    /** "Annuler" while the server works: its job is cancelled and the phone transcribes the kept audio. */
+    fun onCancelWaitTapped() {
+        if (!controller.waitingServer) return
+        cancelledWait = true
+        controller.cancelServerWait()
+    }
+
+    private var cancelledWait = false
+
+    override fun onServerWait(waiting: Boolean) {
+        if (waiting) cancelledWait = false
+        render()
+    }
+
+    override fun onInfo(message: String) {
+        showMessage(message, error = false)
+    }
+
+    override fun onDictationResult(result: DictationResult, inserted: String) {
+        lastDictation = result
+        Log.i(TAG, "dictation result: ${result.source} via ${result.transport}, polish ${result.polishStatus}, ${result.totalMillis} ms")
+        when (result.source) {
+            DictationResult.Source.LOCAL_FALLBACK -> showMessage(
+                if (cancelledWait) getString(R.string.msg_server_cancelled)
+                else getString(R.string.msg_server_fallback, (result.fallbackReason ?: "?").take(120)),
+                error = false, rerender = false,
+            )
+            DictationResult.Source.SERVER_RAW -> if (result.polishStatus != "not requested" && result.transport != "segments") {
+                showMessage(getString(R.string.msg_polish_failed, result.polishStatus), error = false, rerender = false)
+            }
+            DictationResult.Source.SERVER_POLISHED -> {}
+        }
+        cancelledWait = false
+    }
+
+    /** Last whole-dictation result, for the instrumented tests. */
+    @Volatile var lastDictation: DictationResult? = null
+        private set
+
     /** Last transcription, for the instrumented tests and the status line. */
     @Volatile var lastSegment: Transcription? = null
         private set
@@ -474,8 +520,15 @@ class DicteeImeService : InputMethodService(), DictationListener, EngineManager.
         mic.isActivated = listening
 
         val es = engineState
+        // Read from the controller, per session: never a stale flag from a dropped dictation.
+        val waiting = controller.waitingServer && state == DictationState.FINISHING
+        cancelWaitButton?.visibility = if (waiting && controller.canCancelServerWait) View.VISIBLE else View.GONE
         val (text, isError) = when {
             passwordField -> getString(R.string.msg_password) to false
+            waiting -> getString(
+                if (spec.family == ModelFamily.REMOTE && app.settings.remoteApi == RemoteApi.OPENAI) R.string.status_server
+                else R.string.status_server_polish,
+            ) to false
             lastMessage != null && !listening -> lastMessage!! to lastMessageIsError
             state == DictationState.FINISHING -> getString(R.string.status_finishing) to false
             listening && es is EngineManager.State.Loading -> getString(R.string.status_listening_loading, es.spec.shortName) to false
