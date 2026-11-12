@@ -14,6 +14,7 @@ import io.github.remtav.dictee.stt.EngineOptions
 import io.github.remtav.dictee.stt.ModelCatalog
 import io.github.remtav.dictee.stt.ModelSpec
 import io.github.remtav.dictee.stt.ModelStore
+import io.github.remtav.dictee.stt.SampleResult
 import io.github.remtav.dictee.stt.SherpaEngine
 import io.github.remtav.dictee.stt.asDownloadable
 import io.github.remtav.dictee.text.Wer
@@ -65,15 +66,17 @@ object Host {
      * given headroom so a library update that degrades quality fails loudly.
      */
     val werCeiling = mapOf(
-        ModelCatalog.parakeet.id to mapOf("en" to 0.12, "fr" to 0.15),
-        ModelCatalog.qwen3.id to mapOf("en" to 0.12, "fr" to 0.15),
-        ModelCatalog.whisperTurbo.id to mapOf("en" to 0.12, "fr" to 0.15),
+        ModelCatalog.parakeet.id to mapOf("en" to 0.12, "fr" to 0.15, "frqc" to 0.60),
+        ModelCatalog.qwen3.id to mapOf("en" to 0.12, "fr" to 0.15, "frqc" to 0.60),
+        ModelCatalog.whisperTurbo.id to mapOf("en" to 0.12, "fr" to 0.15, "frqc" to 0.60),
     )
 }
 
 class SileroVadHostTest {
     @Test fun nativeLibraryLoadsAndVadSplitsAtPauses() {
-        val clips = Host.references.map { it.audio }
+        // Studio-trimmed clips only: Common Voice (frqc) clips carry leading and trailing silence,
+        // so the VAD rightly keeps well under 80 % of their length.
+        val clips = Host.references.filterNot { it.name.startsWith("frqc") }.map { it.audio }
         val source = PcmAudioSource(clips, realTime = false, gapSeconds = 1.5f)
         val vad = Host.vad()
         val buf = FloatArray(512)
@@ -98,6 +101,16 @@ class SileroVadHostTest {
 }
 
 class ModelAccuracyHostTest {
+    /**
+     * Reference groups. Engines only know the language code (`fr`); the Québec
+     * clips (Common Voice, accent « Français du Canada ») are told apart by the
+     * `frqc` file-name prefix in assets/reference/references.tsv.
+     */
+    private fun group(s: SampleResult): String = when {
+        s.sample.startsWith("frqc") -> "frqc"
+        else -> s.language
+    }
+
     private fun check(spec: ModelSpec) {
         val store = Host.ensureModel(spec)
         val bench = Benchmark(SherpaEngine.factory, { store.dirFor(it.id) }, EngineOptions(numThreads = 4))
@@ -105,17 +118,27 @@ class ModelAccuracyHostTest {
         println(Benchmark.report(listOf(result), "Host (Linux x86-64), sherpa-onnx 2.0.1"))
         assertNull(result.error, result.error)
         val ceilings = Host.werCeiling.getValue(spec.id)
-        for (lang in listOf("en", "fr")) {
-            val scored = result.samples.filter { it.language == lang }
-            assertTrue("no $lang reference", scored.isNotEmpty())
-            val errors = scored.sumOf { s ->
+        for (g in listOf("en", "fr", "frqc")) {
+            val scored = result.samples.filter { group(it) == g }
+            assertTrue("no $g reference", scored.isNotEmpty())
+            var errors = 0
+            var words = 0
+            for (s in scored) {
                 val ref = Host.references.first { it.name == s.sample }.reference!!
-                Wer.compute(ref, s.text).errors
+                val w = Wer.compute(ref, s.text)
+                errors += w.errors
+                words += w.referenceWords
             }
-            val words = scored.sumOf { s -> Wer.compute(Host.references.first { it.name == s.sample }.reference!!, "").referenceWords }
             val wer = errors.toDouble() / words
-            println("${spec.shortName} $lang WER = ${"%.1f".format(Locale.ROOT, wer * 100)} % (ceiling ${ceilings[lang]!! * 100} %)")
-            assertTrue("${spec.shortName} $lang WER $wer above ${ceilings[lang]}", wer <= ceilings.getValue(lang))
+            // Machine-readable line, collected in DECISIONS.md (issue #15, step 1.2).
+            println(
+                "WER ${spec.shortName} $g = ${"%.1f".format(Locale.ROOT, wer * 100)} % " +
+                    "($errors errors / $words words, ${scored.size} clips)",
+            )
+            // Québec clips: report, with a deliberately wide sanity ceiling (a handful of
+            // short clips from different speakers is too noisy for a tight bound).
+            val ceiling = ceilings.getValue(g)
+            assertTrue("${spec.shortName} $g WER $wer above $ceiling", wer <= ceiling)
         }
     }
 

@@ -518,3 +518,94 @@ dictée), le statut du polissage, et le texte brut et le texte poli côte à
 côte. « Exporter le rapport » permet de joindre le résultat à l'issue. Pour
 la fiabilité, couper le serveur (ou le tunnel) pendant l'attente : la dictée
 doit être insérée par le modèle local, avec le message « Serveur non utilisé ».
+
+## Issue #15, lot 1 — étape 1.2 : extraits québécois et mesure
+
+### Extraits retenus
+
+Six extraits de Common Voice 22.0 (français, partition `test`, CC0), tous
+portant le champ d'accent exact « Français du Canada », de six locuteurs
+différents (six `client_id` distincts ; genre et âge déclarés quand ils le
+sont). Source : miroir Hugging Face `fsicoli/common_voice_22_0`
+(`transcript/fr/test.tsv` pour les métadonnées, `audio/fr/test/fr_test_0.tar`
+pour l'audio), lu sans compte ni jeton ; les jeux `mozilla-foundation/*` sont
+protégés (401) et l'API `datasets-server` est désactivée pour ces miroirs.
+Le tar a été lu en flux jusqu'aux six fichiers.
+
+| Fichier | Clip Common Voice | Durée | Transcription (celle du jeu) |
+| --- | --- | --- | --- |
+| `frqc1.wav` | `common_voice_fr_19133342` | 5,0 s | Parfois, seuls le riz et le pain sont proposés à discrétion. |
+| `frqc2.wav` | `common_voice_fr_20306204` | 6,5 s | Du reste sa mère aimait ses sœurs. |
+| `frqc3.wav` | `common_voice_fr_35734313` | 5,2 s | À dix-huit ans, elle change légalement de nom. |
+| `frqc4.wav` | `common_voice_fr_29487871` | 4,9 s | Mais, n'étant plus maître de sa propre maison, il préfère arrêter. |
+| `frqc5.wav` | `common_voice_fr_40487212` | 4,9 s | La sorcière décide de rentrer au palais pour protéger les rebelles. |
+| `frqc6.wav` | `common_voice_fr_39757516` | 4,5 s | Je crains que ce ne soit pas franchement satisfaisant. |
+
+Sélection : 152 clips « Français du Canada » de la partition `test` ont 2
+votes positifs ou plus et aucun négatif ; parmi eux, un par locuteur, phrases
+de 7 à 12 mots sans noms propres ni caractères inhabituels, et sans phrase
+visiblement tronquée dans le jeu (plusieurs phrases de Common Voice ont un mot
+manquant, écartées). Choix fait uniquement sur le champ d'accent : **personne
+n'a écouté les clips**. Le code « canada » est déclaré par le contributeur et
+ne distingue pas le Québec des autres provinces ; l'écoute reste à faire
+(`A_VERIFIER.md`). Les phrases sont des phrases de Wikipédia et de romans, pas
+du vocabulaire québécois : la mesure porte sur l'accent, pas sur le lexique.
+
+Conversion : `ffmpeg -ac 1 -ar 16000 -c:a pcm_s16le`, soit environ 1 Mo au
+total pour les six fichiers.
+
+### Format dans `references.tsv`
+
+Les colonnes ne changent pas (`file`, `language`, `transcript`, `source`).
+Le code de langue reste `fr` (c'est ce que comprennent les moteurs, `Benchmark`,
+`CompareActivity` et `StoreTest`, qui exige exactement `{en, fr}`). Le marqueur
+de variante est le **préfixe `frqc` du nom de fichier** : aucune colonne
+ajoutée, aucun analyseur modifié. La colonne `source` donne la version du jeu,
+l'identifiant du clip, l'accent exact et l'adresse. `ModelAccuracyHostTest`
+sépare donc trois groupes : `en`, `fr` (`fr1`, France) et `frqc` (Québec).
+Effet de bord voulu : l'écran « Comparer les modèles » affiche aussi les six
+clips (« FR »), et le WER moyen d'un modèle les inclut.
+
+### Méthode
+
+`ModelAccuracyHostTest` (sherpa-onnx 2.0.1, CPU Linux x86-64, 4 fils,
+`Benchmark` de l'application) transcrit chaque clip entier ; le WER d'un
+groupe est (somme des erreurs) / (somme des mots de référence), calculé par
+`Wer` (minuscules, ponctuation retirée ; les nombres ne sont pas normalisés).
+Il imprime une ligne `WER <modèle> <groupe> = …` par modèle et par groupe.
+Seuil : pour `frqc`, **plafond très large de 60 %**, simple détecteur de
+décodage cassé (six clips courts sont trop peu pour un seuil serré) ; les
+plafonds `en` et `fr` existants (12 % et 15 %) sont inchangés. Le test ne
+dépend donc pas du résultat réel dans le détail, ce qui évite une CI fragile.
+
+### Résultats (mesure du 2026-11-12)
+
+| Modèle | Français québécois (6 clips, 59 mots) | Français de France (1 clip, 16 mots) | Anglais (2 clips, 66 mots) |
+| --- | --- | --- | --- |
+| Parakeet TDT 0.6b v3 | **6,8 %** (4 erreurs) | 0,0 % | 3,0 % |
+| Whisper large-v3-turbo | 10,2 % (6 erreurs) | 6,3 % | 4,5 % |
+| Qwen3-ASR 0.6B | 13,6 % (8 erreurs) | 0,0 % | 4,5 % |
+
+Par clip (québécois), erreurs : Parakeet `frqc1` 1 (« seul »), `frqc2` 3
+(« Du reste sa mère a M. »), les quatre autres 0 ; Qwen3 `frqc1` 1, `frqc2` 3
+(« sa mère est mécène »), `frqc3` 4 (« change les gélins de l'ombre »), le
+reste 0 ; Whisper `frqc1` 1, `frqc2` 1 (« ses âmes »), `frqc3` 4 (« 18 ans »
+écrit en chiffres, compté faux par `Wer`, et « nombre » pour « nom »), le reste
+0. Vitesse indicative (RTF CPU) : Parakeet 0,07, Whisper 0,3, Qwen3 0,6 à 0,9.
+
+### Conclusion
+
+**La mesure va dans le sens de l'observation, sans la prouver.** Parakeet a le
+WER le plus bas sur les clips québécois (6,8 % contre 10,2 % pour Whisper et
+13,6 % pour Qwen3-ASR), et c'est le seul qui transcrit correctement
+« dix-huit ans… de nom » (`frqc3`). Mais l'échantillon est de 59 mots : l'écart
+avec Whisper tient à deux erreurs, dont une est un artefact de notation
+(« 18 » contre « dix-huit »), et un seul clip (`frqc2`) fait échouer les trois
+modèles. Whisper et Parakeet sont donc au coude à coude une fois l'artefact
+retiré (5 erreurs contre 4) ; l'avantage net de Parakeet sur Qwen3 est plus
+solide. **Aucun écart à signaler avec la recommandation** : Parakeet reste
+recommandé pour le français québécois (aussi le plus petit et le plus rapide).
+À formuler dans l'application comme « mesuré sur six courts extraits », pas
+comme une supériorité établie. Pour un chiffre solide, il faudrait des dizaines
+de clips, ce que les 152 clips « Français du Canada » de la seule partition
+`test` permettraient, après écoute.
