@@ -20,6 +20,10 @@ object PolishApproaches {
 
     val live: List<PolishApproach> = listOf(
         IdentityApproach,
+        RulesApproach,
+        VocabularyApproach,
+        GeneralVocabularyApproach,
+        RulesAndVocabularyApproach,
     )
 
     fun recorded(cases: List<EvalCase>): List<RecordedApproach> {

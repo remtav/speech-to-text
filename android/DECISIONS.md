@@ -2012,3 +2012,214 @@ le dispositif ne compte rien par erreur (`identityCorrectsNothingAndDamagesNothi
   modifié depuis l'enregistrement) ou absente compte comme erreur, jamais
   comme réussite. Les approches à LLM ne sont pas bloquées par la garde : le
   rapport de l'étape 3.4 tranche avec les chiffres.
+
+## Issue #15, lot 3 — étape 3.2 : règles déterministes et vocabulaire enrichi
+
+Approches 1 et 2 de l'évaluation du polissage local, sans modèle. **Rien n'est
+activé** : le code est dans l'application mais aucun appel ne le branche (pas
+d'appel depuis `TextPipeline` ni `DicteeApp`, aucun réglage). Le comportement
+par défaut est inchangé ; `DefaultPathUnchangedTest` le garantit (le pipeline
+par défaut laisse intactes des phrases que les règles transformeraient, et
+aucun fichier hors de `text/polish/` ne mentionne le paquet).
+
+### Où est le code
+
+- `app/src/main/java/io/github/remtav/dictee/text/polish/PolishRules.kt` :
+  les règles (Kotlin pur, JVM, aucune dépendance Android).
+- `app/src/main/java/io/github/remtav/dictee/text/polish/ShippedVocabulary.kt` :
+  la liste livrée, appliquée par le mécanisme existant de `text/Vocabulary.kt`
+  (corrections `mal entendu -> correct`, insensibles à la casse, sur frontières
+  de mots).
+- Dans les sources de test : `polish/RuleBasedApproaches.kt` (les approches
+  `PolishApproach` qui enveloppent ce code), enregistrées dans
+  `PolishApproaches.live` : `regles`, `vocabulaire`, `vocabulaire-general`
+  (mesure du surapprentissage, voir plus bas) et `regles+vocabulaire`.
+- Tests : `PolishRulesTest` (chaque règle, chaque piège, signal),
+  `ShippedVocabularyTest` (noms hors du jeu, phrases ordinaires, adresses
+  masquées), `DefaultPathUnchangedTest`, et le noteur
+  (`PolishEvaluationTest`, garde « aucun contrôle abîmé » inchangée et verte).
+
+### API, dont le signal « cas probable » pour l'étape 3.3
+
+```kotlin
+object PolishRules {
+    fun polish(text: String, language: String): String       // le texte corrigé
+    fun assess(text: String, language: String): RuleResult   // texte + signal, jamais d'exception
+}
+enum class RuleSignal { UNCHANGED, CORRECTED, PROBABLE_CASE }
+data class RuleResult(val text: String, val signal: RuleSignal, val hasAddress: Boolean)
+
+object ShippedVocabulary {
+    val entries: List<Entry>                                  // (heard, correct, language, origin)
+    fun apply(text: String, language: String, origins: Set<Origin> = all): String
+    fun forLanguage(language: String, ...): Vocabulary
+}
+```
+
+`language` : `"fr"` ou `"en"` (toute autre valeur donne le français).
+
+- `UNCHANGED` : aucun contexte d'adresse ni d'épellation, texte intact.
+- `CORRECTED` : les règles ont réécrit quelque chose et rien de suspect ne
+  reste.
+- `PROBABLE_CASE` : une adresse ou une épellation est probablement là mais les
+  règles ne l'ont **pas résolue** (le texte peut avoir été modifié ailleurs).
+  Déclencheurs : « point com » / « dot ca » précédé d'un nom sans mot
+  d'introduction (« l'entreprise point com »), « arobase » (ou « at » après un
+  nom) suivi d'un domaine qu'on n'a pas su lire, suite d'au moins quatre lettres
+  isolées sans indice d'épellation et qui n'est pas dans l'ordre alphabétique
+  (`C O I F F E R I M O U S K Icom`). Les pièges (« un point commun », « des
+  point com », « arobase » employé comme mot) ne sont **pas** signalés : un
+  signal sur un contrôle enverrait inutilement le segment au LLM.
+- `hasAddress` : la sortie contient une adresse web ou un courriel (construite
+  ou déjà écrite par le modèle). Les règles ne peuvent pas vérifier
+  l'orthographe du nom (`kalmea.ca`, `coifferymusky.com`) : la combinaison de
+  3.3 peut choisir d'envoyer aussi ces segments au LLM.
+  Proposition pour 3.3 : LLM sur `signal == PROBABLE_CASE || hasAddress`, avec
+  `text` (déjà recollé) comme entrée.
+
+### Règles (approche 1)
+
+Principe : **dans le doute, ne rien changer**. Une adresse dite n'est réécrite
+que si toute sa forme est là : un nom (1 à 3 mots collés par unité, ex. « coiffe
+rimouski » → `coifferimouski`) précédé d'un mot d'introduction (sur, à, voir,
+va, c'est, est, to, at, on, visit, check out, is… ou début de segment ou
+ponctuation), les mots de point, et une fin connue (com, ca, org, net, edu, io,
+info, gov). Sinon rien.
+
+- « point » / « dot » → `.` ; « arobase » / « at » → `@` (en anglais « at »
+  exige un nom avant et un domaine lisible après) ; « barre oblique » /
+  « slash » → `/` suivi d'un mot (`quebec.ca/emploi`) ; « tiret », « trait
+  d'union », « dash », « hyphen » → `-` ; « underscore », « tiret du bas » →
+  `_` ; tout cela seulement **à l'intérieur** d'une adresse ou d'un courriel
+  reconnu, en français ou en anglais selon `language`.
+- Adresse construite : minuscules et accents retirés (`québec` → `quebec`,
+  `vidéotron` → `videotron`). Une adresse déjà écrite n'est jamais mise en
+  minuscules ni désaccentuée ; seuls les espaces parasites sont retirés
+  (`remi @ kalmia . ca` → `remi@kalmia.ca`, `www . kalmia . ca`) et le chemin
+  dit après (`kalmea.ca slash contact` → `kalmea.ca/contact`).
+- Jamais de mots ordinaires collés à une adresse écrite (`super kalmia.ca`
+  reste tel quel).
+- Épellation : `T-R-E-M-B-L-A-Y` (quatre lettres et plus), `B O U C H A R D` et
+  `G, A G N O N` quand un mot d'indice précède (« s'écrit », « s'appelle »,
+  « s'épelle », « spelled »… dans les 4 mots avant), lettres devant « point /
+  dot / arobase » (`c, o, i, f, f… point com`), `w w w`. Majuscules : un nom
+  épelé en majuscules devient `Gagnon` ; dans une adresse, minuscules. Une suite
+  dans l'ordre alphabétique (`A, B, C, D`) est une liste, pas une épellation.
+- Code postal canadien : `G 5 L, 3 A 1`, `G5L, 3A1`, `G5L3A1` → `G5L 3A1`
+  (majuscules seulement).
+
+Ce que les règles ne font pas : deviner un nom mal transcrit (`coiffrimouski`,
+`kelmia`, `kababoblique`), lire les chiffres dits (`G cinq L trois A un`),
+reconnaître une adresse sans mot d'introduction (signalée seulement), lire un
+domaine épelé sans mot de point (`… K Icom`).
+
+### Vocabulaire livré (approche 2)
+
+178 formes (158 « générales », 20 relevées dans le jeu) pour environ 125 noms
+réels et connus : marques et outils (GitHub, WhatsApp, iPhone, YouTube,
+Facebook, Instagram, Dropbox, PowerPoint, FaceTime, ChatGPT…), lieux du Québec
+(Rimouski, Chicoutimi, Saguenay, Trois-Rivières, Abitibi, Gaspésie,
+Sherbrooke, Hochelaga, Rivière-du-Loup, Lac-Mégantic, Sept-Îles, régions…),
+institutions et entreprises d'ici (Hydro-Québec, Desjardins, SAAQ, RAMQ,
+Vidéotron, Cirque du Soleil, universités, Centre Bell…). Chaque entrée porte sa
+langue (`fr`, `en` ou `*`) et son **origine** : `GENERAL` (forme qu'on listerait
+de toute façon : nom collé ou coupé, accent ou trait d'union manquant, casse,
+graphies phonétiques usuelles) ou `OBSERVED` (forme ajoutée parce qu'elle figure
+mot pour mot dans une transcription brute du jeu).
+
+Règles de la liste : une forme entendue qui n'est pas un mot ordinaire ; quand
+le mot nu est ordinaire, le contexte fait partie de la forme (`caisse des
+jardins` → `caisse Desjardins`, `sur team` → `sur Teams`, pas `team` seul ni
+`des jardins`). Les adresses écrites (tout ce qui contient `@` ou un point suivi
+de com, ca, org…) sont masquées avant application : aucune correction à
+l'intérieur de `github.com`. Variante à apostrophe typographique générée
+automatiquement. Entrée discutable, laissée telle quelle et signalée dans le
+code : « lac Saint-Jean » → `Lac-Saint-Jean` (le jeu l'attend, mais le lac
+lui-même s'écrit « lac Saint-Jean » ; la région, `Lac-Saint-Jean`).
+
+### Scores (jeu de 132 paires : 79 à corriger, 53 contrôles)
+
+Latence : **hôte Linux**, pas téléphone, un appel par phrase.
+
+| Approche | Corrigés | Modifiés à tort | Contrôles abîmés | dont mots rares | p50 / p95 ms (hôte) |
+| --- | --- | --- | --- | --- | --- |
+| identite | 0/79 (0,0 %) | 0 | 0/53 | 0/19 | 0,009 / 0,032 |
+| regles | 17/79 (21,5 %) | 2 (2,5 %) | 0/53 | 0/19 | 0,119 / 0,259 |
+| vocabulaire | 38/79 (48,1 %) | 1 (1,3 %) | 0/53 | 0/19 | 0,319 / 0,769 |
+| vocabulaire-general (sans les 20 formes relevées) | 19/79 (24,1 %) | 5 (6,3 %) | 0/53 | 0/19 | 0,264 / 0,579 |
+| regles+vocabulaire | 55/79 (69,6 %) | 2 (2,5 %) | 0/53 | 0/19 | 0,260 / 0,412 |
+
+Par catégorie (corrigés / à corriger) et par langue :
+
+| Approche | noms-propres (14) | toponymes (27) | web (16) | courriel (11) | épellation (11) | fr (58) | en (21) |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| regles | 0 | 0 | 4 | 4 | 9 | 11 | 6 |
+| vocabulaire | 14 | 24 | 0 | 0 | 0 | 31 | 7 |
+| vocabulaire-general | 11 | 8 | 0 | 0 | 0 | 14 | 5 |
+| regles+vocabulaire | 14 | 24 | 4 | 4 | 9 | 42 | 13 |
+
+Contrôles : 0 phrase abîmée sur 53 pour toutes les approches, dont les 19
+contrôles de mots rares (friperie, poudrerie, pourvoirie, tuque…), les 11
+contrôles déjà corrects et les pièges des règles (« un point commun », « mets un
+point final », « à la barre oblique du terrain », « arobase » employé comme
+mot, « plan B », « vitamine C », « dot com bubble »). La garde de la CI est
+inchangée.
+
+### Cas non corrigés les plus instructifs (regles+vocabulaire, 24 sur 79)
+
+- **Nom mal transcrit dans une adresse** (la majorité des 24) : `coiffrimouski.com`,
+  `Kalmia.ka`, `kelmia.ca`, `hydrokebec.com`, `kalmayer.co`, `Rémi@robazcalmier.ca`.
+  Les règles ne savent que recoller et mettre la ponctuation, pas retrouver
+  « kalmia » : c'est le travail d'un modèle (étape 3.3), ou d'un vocabulaire de
+  l'utilisateur.
+- **Adresse déjà fusionnée par le modèle** : `québec.kabaroblique emploi`,
+  `infoirobase coiffremouski.com`, `atkelmya.com` : le mot de jonction est
+  fondu dans un autre mot ; aucune règle sûre.
+- **Chiffres dits en lettres** : `G cinq L trois A un`. Faisable (nombres 0-9
+  dans un code postal) mais pas fait : hors de la portée de cette étape.
+- **Épellation + suffixe fondu** : `C O I F F E R I M O U S K Icom`. Signalé
+  `PROBABLE_CASE` (suite de lettres sans indice) mais non réécrit.
+- **Noms anglais mal transcrits** (`Chickaltomy`, `Chakotay`, `Chikautami`) :
+  aucune forme plausible générale ; ne pas les ajouter.
+- **Deux « modifiés à tort »** : `coifferymusky.com` (le modèle a mal entendu le
+  nom, les règles ont bien formé l'adresse : la forme est juste, le nom non) et
+  `kalmea.ca/contact` (« slash » bien recollé, nom faux). Ce sont des
+  améliorations partielles que la notation stricte compte comme erreurs.
+
+### Surapprentissage possible (à lire avant de se fier aux chiffres)
+
+- Le jeu était connu quand la liste a été écrite : les noms visés (GitHub,
+  WhatsApp, Rimouski, Hydro-Québec…) sont dans le jeu parce que ce sont les
+  noms d'ici et d'outils les plus courants, et dans la liste pour la même
+  raison. Cette coïncidence est voulue mais gonfle le score.
+- Sur les 38 cas corrigés par le vocabulaire, **19 le sont grâce à des formes
+  tirées mot pour mot du jeu** (20 formes tagguées `OBSERVED`) ; sans elles, le
+  vocabulaire corrige 19/79 (24,1 %) et se trompe 5 fois (corrections
+  partielles : un nom corrigé, l'autre non). Pour les noms propres, la part
+  générale est élevée (11/14), pour les toponymes elle est faible (8/27) : les
+  mauvaises transcriptions de toponymes d'ici sont irrégulières (`Sacney`,
+  `Chebouk`, `Auchas`), ce qui est le vrai constat : une liste ne couvre que ce
+  qu'on y a vu.
+- Les règles n'ont pas de liste à ajuster, mais leurs mots d'introduction et
+  leurs pièges ont été réglés sur les 53 contrôles : un contrôle jamais vu
+  (« c'était une bulle point com » sans « des ») pourrait être réécrit si un mot
+  d'introduction précède le nom. Aucune mesure hors jeu n'est possible tant que
+  de vraies dictées n'ont pas été ajoutées.
+- Les tests unitaires (`PolishRulesTest`, `ShippedVocabularyTest`) utilisent des
+  phrases hors du jeu (`you tube`, `sept iles`, `jean trait d'union luc arobase`),
+  ce qui vérifie le mécanisme, pas la couverture.
+
+### Limites
+
+- Le jeu est en partie synthétique : voix de synthèse Piper (pas une voix
+  québécoise), lignes rédigées à la main pour les cas non obtenus. Les erreurs
+  réelles d'un accent québécois seront différentes.
+- Des listes d'introduction, de mots vides et de fins d'adresse (`TLDS`) en
+  français et en anglais : une adresse en `.quebec`, `.gouv.qc.ca` dit
+  « point gouv point qc point ca » est couverte, un `.coop` ou un `.ai` non.
+- Des noms de domaine à plusieurs mots coupés par un mot vide (« ville de
+  québec point ca ») ne sont pas recollés.
+- Latences d'hôte seulement ; sur téléphone, ces approches sont négligeables
+  (microsecondes à millisecondes) mais ne sont pas mesurées.
+- Rien n'est branché : pour les activer, il faudrait un réglage, un ADR et une
+  décision de l'étape 3.4.
