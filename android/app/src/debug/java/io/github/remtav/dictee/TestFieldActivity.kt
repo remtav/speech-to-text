@@ -1,13 +1,13 @@
 package io.github.remtav.dictee
 
-import android.app.Activity
+import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
 import android.text.InputType
 import android.widget.EditText
 import android.widget.LinearLayout
 
 /** Two text fields and a password field, for the instrumented IME tests (debug builds only). */
-class TestFieldActivity : Activity() {
+class TestFieldActivity : AppCompatActivity() {
     lateinit var field1: EditText
     lateinit var field2: EditText
     lateinit var password: EditText

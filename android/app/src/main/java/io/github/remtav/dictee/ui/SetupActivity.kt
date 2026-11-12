@@ -149,7 +149,7 @@ class SetupActivity : AppCompatActivity() {
         card.addView(RadioButton(this).apply {
             text = buildString {
                 append(spec.displayName)
-                if (spec == ModelCatalog.default) append(getString(R.string.setup_default_suffix))
+                if (spec == ModelCatalog.default) append(' ').append(getString(R.string.setup_default_suffix).trim())
             }
             isChecked = active
             isEnabled = installed

@@ -90,17 +90,27 @@ abstract class ImeTestBase {
             val svc = DicteeImeService.instance?.get()
             svc != null && onMain { svc.isInputViewShown }
         }
-        val end = SystemClock.uptimeMillis() + 30_000
+        val end = SystemClock.uptimeMillis() + 45_000
         var tapped = SystemClock.uptimeMillis()
         while (!shown() && SystemClock.uptimeMillis() < end) {
             // A cold emulator sometimes ignores stateAlwaysVisible: tap the field like a user.
             if (SystemClock.uptimeMillis() - tapped > 4_000) {
+                // A cold emulator may not have bound the IME yet: select it again and ask for it.
+                shell("ime set $imeId")
                 device.findObject(By.res(BuildConfig.APPLICATION_ID, "test_field1"))?.click()
+                scenario.onActivity {
+                    it.field1.requestFocus()
+                    it.getSystemService(android.view.inputmethod.InputMethodManager::class.java)
+                        .showSoftInput(it.field1, 0)
+                }
                 tapped = SystemClock.uptimeMillis()
             }
             SystemClock.sleep(100)
         }
-        assertTrue("keyboard not shown", shown())
+        if (!shown()) {
+            val log = shell("logcat -d -t 80 -s DicteeIme:I InputMethodManagerService:* ImeTracker:*")
+            fail("keyboard not shown; current IME: ${shell("settings get secure default_input_method").trim()}\n$log")
+        }
     }
 
     protected val service: DicteeImeService get() = DicteeImeService.instance!!.get()!!
