@@ -112,12 +112,18 @@ jobs:
           disable-animations: true
           emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -no-boot-anim -camera-back none
           working-directory: android
-          script: ./gradlew --no-daemon connectedDebugAndroidTest
+          # Keep the app installed after the run so the screenshots can be pulled.
+          script: ./gradlew --no-daemon connectedDebugAndroidTest -Pandroid.injected.androidTest.leaveApksInstalledAfterRun=true; s=$?; mkdir -p screenshots; adb pull /sdcard/Android/data/io.github.remtav.dictee/files/screenshots/. screenshots/ || true; exit $s
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: instrumented-test-reports
           path: android/app/build/reports/androidTests/
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: screenshots
+          path: android/screenshots/
 
   release:
     name: Publish APK

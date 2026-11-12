@@ -153,6 +153,11 @@ class DicteeImeService : InputMethodService(), DictationListener, EngineManager.
 
     override fun onEvaluateFullscreenMode(): Boolean = false
 
+    /** Rebuilds the keyboard view, e.g. after the theme setting changed. */
+    fun rebuildInputView() {
+        setInputView(onCreateInputView())
+    }
+
     override fun onConfigurationChanged(newConfig: Configuration) {
         // Rotation: the dictation keeps running (it lives in the service, not the view).
         super.onConfigurationChanged(newConfig)
