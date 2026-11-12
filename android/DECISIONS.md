@@ -2494,3 +2494,203 @@ CI (émulateur) ne charge jamais MediaPipe.
 - **MediaPipe LLM Inference ne bouge plus sur Android** : un éventuel
   passage en production devra peut-être passer par LiteRT-LM (nouvelle
   décision).
+
+## Issue #15 — demande de l'utilisateur : pouvoir couper le polissage (« friperie »)
+
+Demande : « Le mot "friperie" sortait bien avant que le petit LLM repasse dessus
+pour du polissage. J'ai l'impression que le petit LLM détériore parfois la
+qualité de l'entrée. Ce serait mieux de donner au moins l'option de le
+désactiver. »
+
+### Constaté
+
+- Deux LLM peuvent repasser sur le texte :
+  - **Nettoyage local** (`cleanup/LlmCleaner.kt`, `AppSettings.cleanupMode`) :
+    déjà désactivable (`OFF` par défaut ; `DicteeApp.cleaner()` renvoie
+    `TextCleaner.NONE` en `OFF`, et `DicteeApp` ne crée même pas de
+    `LazyCleaner`). Son garde-fou (`text/Filters.kt`) est local ; il ne s'active
+    que si l'utilisateur a choisi « LLM ».
+  - **Polissage du serveur** (modèle « Serveur », dictée entière, #13) :
+    `RemoteEngine` envoyait toujours `polish=true` et insérait `polished_text`.
+    **Aucun réglage ne permettait de le couper.** C'est le suspect principal.
+- Le serveur (`app/main.py`, champ `polish: Optional[bool]`) retombe sur
+  `WHISPER_POLISH` quand le champ est absent : un serveur démarré avec
+  `WHISPER_POLISH=on` polirait même si le client n'envoie rien. Le client
+  envoie donc **`polish=false` explicitement** quand le réglage est coupé.
+- Sans polissage, le serveur ne renvoie ni `polish` ni `polished_text` utile :
+  l'ancien code aurait lu « not returned » et affiché « Texte non poli ».
+
+### Ajouté
+
+- Réglage **« Polissage par le serveur »** (Réglages, section Serveur distant ;
+  `AppSettings.remotePolish` → `RemoteConfig.polish`). Coupé : `polish=false`
+  (API à tâches et repli synchrone), texte brut inséré, `polishStatus =
+  "not requested"` (aucun message d'erreur), `polished_text` ignoré même si le
+  serveur en renvoie un. Le texte d'aide dit que le polissage corrige ponctuation
+  et hésitations mais qu'un LLM peut remplacer un mot bien transcrit.
+- Texte d'aide du nettoyage local complété par la même mise en garde.
+- Tests (`WholeDictationTest`) : `polish=false` envoyé et texte brut inséré ;
+  cas « friperie » (le serveur renvoie « fripperie » poli : coupé → « friperie »,
+  actif → mot altéré) ; repli synchrone ; réglage actif inchangé.
+
+### Défaut retenu : activé
+
+Le comportement par défaut de l'application ne change pas dans cette itération,
+et l'utilisateur coupe lui-même le réglage. **À trancher par l'utilisateur** :
+passer le défaut à désactivé (le plus sûr pour la fidélité des mots, au prix de
+la ponctuation et des hésitations non retirées). Un changement d'une ligne
+(`getBoolean("remote_polish", true)`).
+
+### Non fait
+
+- **Retour au texte brut après coup** : le clavier garde `rawText` et
+  `polishedText` dans `DictationResult` (`lastDictation`), mais rien ne permet de
+  remplacer le texte déjà inséré (il faudrait suivre la plage insérée dans le
+  champ, qui peut avoir été modifiée entre-temps) : plus qu'un petit changement.
+  Piste : bouton « Texte brut » à côté de « Annuler » juste après l'insertion,
+  qui remplace la plage insérée tant que le curseur n'a pas bougé.
+- **Cause côté serveur** : le garde-fou de `app/polish.py` laisse passer certaines
+  substitutions de mots (« friperie » → un mot voisin). Hors portée (#6, #13) :
+  à traiter dans une issue séparée sur le serveur.
+- Test instrumenté du réglage : aucun test existant des Réglages ne s'y prête
+  sans fragilité.
+
+### Ce que l'utilisateur doit dire
+
+Avec quel modèle le mot a été changé : **« Serveur »** (donc le polissage du
+serveur, désormais coupable) ou un **modèle du téléphone** (Parakeet, Qwen3-ASR,
+Whisper) avec le nettoyage réglé sur « LLM » (le nettoyage est `OFF` par défaut :
+à vérifier dans Réglages > Nettoyage du texte). Test simple : couper le
+polissage, redicter « friperie » ; si le mot sort bien, le LLM du serveur était
+en cause.
+
+### Suite du diagnostic (2026-11-12) et arrêt de l'enquête
+
+Chronologie :
+
+1. **Polissage du serveur** : suspect de départ ; l'interrupteur ci-dessus a
+   été ajouté. Écarté : l'utilisateur dictait avec un modèle du téléphone.
+2. **LLM local** (« Petit LLM local + garde-fou ») : écarté par l'utilisateur,
+   le nettoyage était sur « Désactivé ». Le trou trouvé dans le garde-fou est
+   réel et corrigé (ci-dessous), mais ce n'était pas la cause.
+3. **Texte provisoire puis décodage final** : l'utilisateur voyait
+   « friperie » s'afficher, puis changer quelques millisecondes plus tard.
+   Non conclu (voir constats).
+4. **Langue non transmise** : mot dicté seul, avec Parakeet et avec
+   Qwen3-ASR ; les deux rendent des mots qui ressemblent à de l'anglais deviné.
+   Pas de correction de vocabulaire. Non conclu.
+
+**Enquête arrêtée à la demande de l'utilisateur le 2026-11-12** : plusieurs
+mots québécois échouent. Il préfère prioriser un modèle déjà affiné sur le
+français québécois. Aucune mesure n'a été faite sur un enregistrement de
+« friperie » : il n'en existe pas dans le dépôt.
+
+#### Constats vérifiés
+
+- **Audio du provisoire et du final** (`DictationController.captureLoop`,
+  sources de sherpa-onnx 2.0.1 `voice-activity-detector.cc` et
+  `silero-vad-model.cc`, lues sur GitHub au tag `v2.0.1`) :
+  - le provisoire décode `ring.last(len)`, soit depuis la détection de parole
+    moins `LOOKBACK` (0,6 s) jusqu'à l'instant présent ; le dernier provisoire
+    avant le final contient donc jusqu'à ~0,5 s de silence après le mot ;
+  - le final décode le segment du VAD. Il commence à
+    `Tail - 2 × fenêtre - min_speech` au moment du déclenchement (~0,1 s avant
+    la première fenêtre jugée parole). Il finit à `Tail - min_silence`, soit
+    juste après la première fenêtre sous le seuil bas (0,35) : aucune marge
+    après le mot ;
+  - au-delà de 20 s sans pause, le VAD passe à `min_silence` 0,1 s et à un
+    seuil de 0,9, et peut couper au milieu d'une phrase.
+  - Sur l'hôte, en rejouant les 9 extraits de référence avec le vrai Silero, les
+    segments finals commencent 0,29 s après la fenêtre du provisoire et
+    finissent 0,5 s avant elle. Mots faux sur 141 : Parakeet, extrait entier 6,
+    final 9, provisoire le plus large 7, final avec 0,3 s de marge 9. Qwen3-ASR :
+    entier 11, final 6, provisoire 7, final avec marge 6. Les écarts vont dans
+    les deux sens et une marge de 0,3 s n'améliore rien : **aucune correction
+    sûre trouvée**, rien n'a été changé dans le découpage. Phrases entières
+    seulement, pas de mots isolés.
+- **Langue** (classes de l'AAR 2.0.1 lues par `javap`, plus sources C++
+  `offline-recognizer-qwen3-asr-impl.cc` et l'exemple officiel
+  `python-api-examples/offline-qwen3-asr-decode-files.py`) :
+  - **Qwen3-ASR** : `OfflineQwen3AsrModelConfig` n'a pas de champ de langue
+    (seulement `hotwords`), mais le flux en accepte une :
+    `OfflineStream.setOption("language", "French")`. `BuildSourceIds` écrit
+    alors « language French » dans le prompt au lieu de laisser le modèle
+    deviner. **Désormais transmise** (`SherpaEngine`, `AppSettings.engineOptions`,
+    `DictationLanguages.qwen3Language`), avec la même règle que Whisper : un
+    seul code de langue choisi. Le nom vient d'une table (fr → French,
+    en → English, zh, hi, es, ar, pt, ru). Bengali et ourdou ne sont pas des
+    langues de Qwen3-ASR : détection automatique. **Effet non mesuré** : la
+    mesure sur l'hôte a été interrompue (mémoire, puis arrêt de l'enquête).
+    C'est l'usage documenté par sherpa-onnx, rien de plus n'est affirmé.
+  - **Parakeet TDT v3** : aucune entrée de langue. `OfflineTransducerModelConfig`
+    n'a qu'encodeur, décodeur, joiner et `qnnConfig`, et
+    `offline-recognizer-transducer-nemo-impl.h` ne lit aucune option de flux.
+    La langue est implicite dans le modèle. Sur un mot seul, il a très peu de
+    contexte pour la deviner. L'application ne lui passe pas de hotwords (décodage
+    `greedy_search`) ; aucun palliatif n'a été essayé.
+  - Pour l'orchestrateur (table de recommandation inchangée) : avec une seule
+    langue choisie, Whisper et désormais Qwen3-ASR reçoivent la langue, pas
+    Parakeet.
+
+#### Whisper « en dernier recours » (observation de l'utilisateur, 2026-11-12)
+
+Sur son téléphone, Whisper transcrit bien les mots d'ici, dont ceux que
+Parakeet et Qwen3-ASR prennent pour de l'anglais, mais trop lentement pour un
+usage courant. Aucune latence n'a été mesurée sur appareil. Sur l'hôte, les
+facteurs temps réel indicatifs (étape 1.2) sont de 0,07 pour Parakeet, 0,3 pour
+Whisper et 0,6 à 0,9 pour Qwen3-ASR. Ils ne prédisent pas l'ordre sur le
+téléphone. Changements :
+
+- nouveau champ `ModelSpec.note`, affiché sous la description de chaque carte
+  de modèle (`SetupActivity`, style `BodySmall` du thème, pas d'avertissement).
+  Seul Whisper en a une : `ModelCatalog.WHISPER_NOTE`, formulée comme une
+  observation (« Observé sur un téléphone : … À garder en dernier recours … ») ;
+- la raison affichée quand la table désigne Whisper (bengali, ourdou) ajoute
+  « Il est plus lent que les deux autres (observé sur un téléphone) ». La
+  logique de la table n'a pas changé ;
+- `README.md`, section Modèles, donne la même précision.
+
+#### Garde-fou du LLM local (durcissement, hors cause)
+
+- **Trou trouvé** (`text/Filters.kt`, ancien `SafetyCheck.check`) :
+  - les segments de 8 mots ou plus toléraient jusqu'à 3 mots « nouveaux »
+    (8 % des mots de contenu). À partir d'environ 13 mots de contenu, un mot
+    changé passait : « friperie » → « fripperie », « friperies »,
+    « boutique »… ;
+  - `Normalize.fold` retirait les accents et la casse : « cégep » → « cegep »
+    passait, même dans une phrase courte ;
+  - la comparaison se faisait par ensemble, donc l'ordre était ignoré ;
+  - les mots grammaticaux étaient exclus du contrôle : un mot remplacé ou
+    supprimé passait (« la friperie » → « la ») ;
+  - jusqu'à 25 % (50 % en phrase courte) des mots de contenu pouvaient
+    disparaître ;
+  - les mots du vocabulaire comptaient comme permis partout.
+
+  Le test `SafetyCheckTest` reproduit ces cas : il échouait sur l'ancien code
+  (10 tests sur 19).
+- **Correction** : `SafetyCheck` (implémente la nouvelle interface
+  `CleanupGuard`) exige que chaque mot de la sortie soit un mot de l'entrée,
+  identique, dans le même ordre. Normalisation minimale : NFC, apostrophe et
+  trait d'union typographiques unifiés, ponctuation et espaces ignorés, casse de
+  la première lettre seulement. Le trait d'union fait partie du mot
+  (« peut-être » ≠ « peut être »). Les mots retirés doivent former des suites
+  qui sont chacune :
+  - des hésitations pures (euh, um… ; « ben », « bon », « like », « quoi » n'en font plus partie, car ils ont un sens) ;
+  - une répétition des mots voisins ;
+  - un faux départ repris juste après (« on va au, on va à ») ;
+  - une autocorrection terminée par un marqueur détaché par une virgule
+    (« lundi, non, » / « je veux dire, »).
+
+  Les contrôles négation, nombres et formule d'assistant sont gardés. Le
+  vocabulaire n'est plus passé au garde-fou : le LLM n'est plus rechargé quand
+  il change. Le prompt demande en plus de ne jamais corriger ni réépeler un
+  mot.
+- Le texte d'aide du réglage décrit la règle exacte (il remplace la mise en
+  garde ajoutée plus haut) : le nettoyage ne corrige jamais un mot mal entendu.
+- Une variante assouplie pour l'évaluation (lot 3, étape 3.3) implémentera
+  `CleanupGuard` à côté, sans toucher `SafetyCheck`. `LlmCleaner.createFromPath`
+  accepte un `guard`. Défaut inchangé : `CleanupMode.OFF`.
+- Limites : la sortie réelle de Qwen2.5 (MediaPipe, arm64) n'a pas été rejouée.
+  Le garde-fou strict rejettera plus de nettoyages : une autocorrection sans
+  virgule, ou une reformulation de ponctuation qui fusionne des mots. Le texte
+  nettoyé par règles est alors gardé.

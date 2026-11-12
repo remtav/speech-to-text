@@ -30,11 +30,17 @@ data class ModelSpec(
     val description: String,
     val license: String,
     val files: List<ModelFile>,
+    /** Short practical note shown on the model's card (empty: none). Not a warning. */
+    val note: String = "",
 ) {
     val totalBytes: Long get() = files.sumOf { it.size }
 }
 
 object ModelCatalog {
+    /** Shown on Whisper's card and in its recommendation (DECISIONS.md, issue #15, « friperie »). */
+    const val WHISPER_NOTE =
+        "Observé sur un téléphone : comprend bien des mots que les autres modèles ratent, mais plus lent. " +
+            "À garder en dernier recours, quand les autres modèles comprennent mal un mot."
     private const val PARAKEET =
         "https://huggingface.co/csukuangfj/sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8/resolve/main"
     private const val WHISPER =
@@ -94,6 +100,8 @@ object ModelCatalog {
         family = ModelFamily.WHISPER,
         description = "Encodeur-décodeur, ~100 langues.",
         license = "MIT",
+        // Observation of the user on his phone (issue #15, 2026-11-12), not a measurement on a device.
+        note = WHISPER_NOTE,
         files = listOf(
             ModelFile("turbo-encoder.int8.onnx", "$WHISPER/turbo-encoder.int8.onnx",
                 "b02dcdf54f348741e93fe732b67d933c8dcb6735655f710640143081db38878b", 674716297),

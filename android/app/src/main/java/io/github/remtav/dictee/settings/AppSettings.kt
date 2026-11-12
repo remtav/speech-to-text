@@ -145,6 +145,11 @@ class AppSettings(context: Context) {
         get() = prefs.getString("remote_fallback", ModelCatalog.default.id) ?: ""
         set(v) = prefs.edit().putString("remote_fallback", v).apply()
 
+    /** Server-side LLM polish of a whole dictation (issue #15). On by default; off = raw transcript. */
+    var remotePolish: Boolean
+        get() = prefs.getBoolean("remote_polish", true)
+        set(v) = prefs.edit().putBoolean("remote_polish", v).apply()
+
     fun remoteConfig() = RemoteConfig(
         baseUrl = remoteUrl,
         api = remoteApi,
@@ -153,6 +158,7 @@ class AppSettings(context: Context) {
         language = remoteLanguage,
         cfAccessClientId = cfAccessClientId,
         cfAccessClientSecret = cfAccessClientSecret,
+        polish = remotePolish,
     )
 
     /**
@@ -163,8 +169,13 @@ class AppSettings(context: Context) {
         val remote = spec.family == ModelFamily.REMOTE
         return EngineOptions(
             numThreads = threads,
-            // Forced only on Whisper, and only when a single language is chosen.
-            language = if (spec.family == ModelFamily.WHISPER) DictationLanguages.whisperLanguage(languages) else "",
+            // Forced only when a single language is chosen, on the models that take one:
+            // Whisper (code) and Qwen3-ASR (name). Parakeet takes none (sherpa-onnx 2.0.1).
+            language = when (spec.family) {
+                ModelFamily.WHISPER -> DictationLanguages.whisperLanguage(languages)
+                ModelFamily.QWEN3_ASR -> DictationLanguages.qwen3Language(languages)
+                else -> ""
+            },
             acceleration = acceleration,
             // Only these use hotwords: keeping them out of the other models' options means a
             // vocabulary edit does not reload an on-device model that ignores them.

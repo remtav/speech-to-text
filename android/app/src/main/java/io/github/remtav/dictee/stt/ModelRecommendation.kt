@@ -136,7 +136,8 @@ object ModelRecommendations {
         return ModelRecommendation(
             ModelCatalog.whisperTurbo,
             "$parakeetNote Qwen3-ASR ne couvre pas : $qwenMissing. " +
-                "Whisper est le seul des trois qui couvre toutes vos langues (1,04 Go).",
+                "Whisper est le seul des trois qui couvre toutes vos langues (1,04 Go). " +
+                "Il est plus lent que les deux autres (observé sur un téléphone).",
         )
     }
 }

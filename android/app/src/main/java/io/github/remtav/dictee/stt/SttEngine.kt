@@ -37,7 +37,11 @@ interface SttEngine {
 /** Options that shape how an engine is built. */
 data class EngineOptions(
     val numThreads: Int = defaultThreads(),
-    /** Language forced on the model ("" for automatic detection); used by Whisper only. */
+    /**
+     * Language forced on the model ("" for automatic detection), in the model's
+     * own form: a code for Whisper ("fr"), a name for Qwen3-ASR ("French").
+     * Parakeet has no such input.
+     */
     val language: String = "",
     /** Requested execution provider, see [Acceleration]. */
     val acceleration: Acceleration = Acceleration.CPU,

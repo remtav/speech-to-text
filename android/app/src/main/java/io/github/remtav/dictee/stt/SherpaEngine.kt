@@ -21,6 +21,9 @@ class SherpaEngine(
 
     override val provider: String = options.acceleration.provider
 
+    /** Qwen3-ASR reads the forced language per stream, not from its model config. */
+    private val streamLanguage: String = if (spec.family == ModelFamily.QWEN3_ASR) options.language else ""
+
     @Synchronized
     override fun transcribe(samples: FloatArray, sampleRate: Int): Transcription {
         val rec = checkNotNull(recognizer) { "engine released" }
@@ -29,6 +32,9 @@ class SherpaEngine(
         val start = System.nanoTime()
         val stream = rec.createStream()
         try {
+            // "language French" is then written into the prompt instead of being guessed
+            // (offline-recognizer-qwen3-asr-impl.cc, BuildSourceIds).
+            if (streamLanguage.isNotEmpty()) stream.setOption("language", streamLanguage)
             stream.acceptWaveform(samples, sampleRate)
             rec.decode(stream)
             val result = rec.getResult(stream)

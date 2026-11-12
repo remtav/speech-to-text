@@ -31,6 +31,21 @@ class DictationLanguagesTest {
     }
 
     @Test
+    fun qwen3GetsALanguageNameOnlyForOneCoveredCode() {
+        assertEquals("French", DictationLanguages.qwen3Language(setOf(FRENCH_QUEBEC)))
+        assertEquals("French", DictationLanguages.qwen3Language(setOf(FRENCH_QUEBEC, FRENCH_FRANCE)))
+        assertEquals("English", DictationLanguages.qwen3Language(setOf(ENGLISH)))
+        assertEquals("", DictationLanguages.qwen3Language(setOf(FRENCH_QUEBEC, ENGLISH)))
+        // Not Qwen3-ASR languages: automatic detection rather than a wrong name.
+        assertEquals("", DictationLanguages.qwen3Language(setOf(URDU)))
+        assertEquals("", DictationLanguages.qwen3Language(setOf(DictationLanguage.BENGALI)))
+        for (l in DictationLanguage.entries) {
+            val name = DictationLanguages.qwen3Language(setOf(l))
+            assertTrue("$l -> $name", name.isEmpty() || name.first().isUpperCase())
+        }
+    }
+
+    @Test
     fun serverOnlyAcceptsEmptyFrenchOrEnglish() {
         for (l in DictationLanguage.entries) {
             val code = DictationLanguages.remoteLanguage(setOf(l))
