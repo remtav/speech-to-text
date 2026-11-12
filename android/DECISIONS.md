@@ -588,3 +588,79 @@ et Whisper en français québécois, la table ne les départage pas sur ce crit�
 - Les raisons sont des phrases en français construites par la table (pas de
   chaînes en ressources) : l'étape 1.3 peut les afficher telles quelles ou les
   déplacer dans `strings.xml`.
+
+## Issue #15, lot 1 — étape 1.3 : renommage, accueil, langues
+
+### Renommage
+
+`app_name` = « Kalmia Blabla », libellé du clavier = « Kalmia Blabla (voix) ».
+Mises à jour : `strings.xml` (messages, étapes, zone d'essai), en-tête du
+rapport de `CompareActivity` et du diagnostic serveur. Inchangés, comme décidé :
+l'identifiant `io.github.remtav.dictee`, les noms de classes, les noms de
+fichiers de release. `AndroidManifest.xml` et `res/xml/method.xml` passent par
+`@string/app_name`, `@string/ime_name` et `@string/subtype_label` : rien à
+changer en dur. **Hors portée de cette étape, à reprendre en 1.4** : le README
+et `.github/workflows/android.yml` (titre et description de la release citent
+encore « Dictée locale » ; le fichier est un workflow, donc sous approbation).
+
+### Texte d'accueil (`setup_intro`)
+
+Quatre lignes : conçu au Québec pour le français d'ici ; la voix est
+transcrite sur le téléphone et n'est envoyée à personne, **sauf si l'utilisateur
+choisit lui-même un serveur distant** (la phrase reste vraie par défaut) et le
+réseau sert à télécharger les modèles ; pas de compte, pas de publicité, pas de
+télémétrie ; code ouvert, mais modèles d'éditeurs étrangers « nommés plus bas »
+(l'origine des modèles n'est pas cachée, pas de « 100 % québécois », rien sur
+Google). Chaque carte de modèle affiche éditeur, description, licence et
+« s'exécute sur votre téléphone ».
+
+### Étape « Vos langues »
+
+- Section 3 de l'écran de configuration, avant « 4. Modèles » : cases à cocher
+  pour les onze langues, Québec en tête et présélectionné. Même liste dans les
+  Réglages. Pas de « premier lancement » à mémoriser : sans choix enregistré,
+  la valeur par défaut est le français (Québec).
+- Stockage : `AppSettings.languages` (ensemble de noms d'enum, ordre de la
+  liste conservé). **Tout décocher est impossible** : la dernière case reste
+  cochée et un message l'explique ; en plus, un choix vide, absent ou inconnu se
+  relit comme le français (Québec) (`DictationLanguages.parse`).
+- Les cases de l'écran de configuration sont redessinées à chaque `onResume`
+  (une modification faite dans les Réglages y apparaît).
+
+### Recommandation et avertissement
+
+La carte du modèle de `ModelRecommendations.recommend` porte « Recommandé pour
+vos langues » et la phrase de raison. Un modèle qui ne couvre pas une langue
+cochée affiche « Attention : ce modèle ne couvre pas … » (texte, couleur
+`colorError` du thème en plus). Rien n'est bloqué : tous les boutons de
+téléchargement restent actifs. Le serveur distant n'est jamais badgé ni signalé.
+
+### Langue transmise aux moteurs
+
+- `EngineOptions.language` : Whisper local seulement, = le code unique quand
+  tous les choix partagent un `engineCode` (Québec + France = `fr`), vide
+  (détection automatique) sinon. Les autres modèles reçoivent toujours vide,
+  donc changer de langue ne recharge ni Parakeet ni Qwen3.
+- `remoteLanguage` : tant que l'utilisateur ne l'a pas réglé, il suit le choix
+  (`fr` ou `en` si c'est l'unique code, sinon vide), car le serveur n'accepte
+  que vide, `fr` ou `en`. Une valeur écrite explicitement, y compris vide
+  (« Détection automatique »), n'est jamais écrasée.
+
+### Tests
+
+- JVM : `DictationLanguagesTest` (code moteur, contrainte du serveur, repli du
+  choix vide, aller-retour du stockage). La persistance dans `SharedPreferences`
+  n'est pas testable sur la JVM (pas de `Context`) : couverte par l'instrumenté.
+- Instrumenté : `SetupLanguageTest` (lit l'arbre de vues par étiquettes et
+  identifiants, sans réseau ni modèle) : accueil au premier lancement, Parakeet
+  marqué pour le français québécois, badge et avertissement après ajout du
+  mandarin puis du bengali, dernière langue non décochable, changement dans les
+  Réglages -> recommandation changée, `remoteLanguage` et langue de Whisper.
+  Compilé ici (`assembleDebugAndroidTest`), exécuté par la CI seulement.
+- `ScreenshotTest` : aucun changement nécessaire (ne cite pas l'ancien nom) ;
+  captures à refaire en 1.4.
+
+### Thème
+
+Aucune couleur ni police en dur : `badge` et `warning` (dans `ui/Ui.kt`)
+utilisent `colorPrimary` et `colorError` du thème, l'étape 1.5 les habillera.

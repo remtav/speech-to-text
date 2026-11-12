@@ -42,6 +42,13 @@ class SettingsActivity : AppCompatActivity() {
         val col = scrollingColumn()
         col.title(getString(R.string.settings_title))
 
+        col.heading(getString(R.string.settings_languages))
+        col.body(getString(R.string.setup_languages_help), small = true)
+        LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }.also {
+            col.addView(it)
+            it.renderLanguageChoices(s) { }
+        }
+
         col.heading(getString(R.string.settings_dictation))
         col.switch(getString(R.string.settings_partials), s.partials) { s.partials = it }
         col.body(getString(R.string.settings_partials_help), small = true)

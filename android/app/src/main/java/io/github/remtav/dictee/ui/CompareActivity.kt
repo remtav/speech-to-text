@@ -150,7 +150,7 @@ class CompareActivity : AppCompatActivity() {
                 results += r
                 main.post { renderResult(r) }
             }
-            val header = "Dictée locale ${BuildConfig.VERSION_NAME} · ${Build.MANUFACTURER} ${Build.MODEL} · Android ${Build.VERSION.RELEASE}" +
+            val header = "Kalmia Blabla ${BuildConfig.VERSION_NAME} · ${Build.MANUFACTURER} ${Build.MODEL} · Android ${Build.VERSION.RELEASE}" +
                 " · ${app.settings.threads} threads"
             report = Benchmark.report(results, header)
             main.post {

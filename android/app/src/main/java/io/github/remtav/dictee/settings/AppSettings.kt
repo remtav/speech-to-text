@@ -3,6 +3,8 @@ package io.github.remtav.dictee.settings
 import android.content.Context
 import android.content.SharedPreferences
 import io.github.remtav.dictee.stt.Acceleration
+import io.github.remtav.dictee.stt.DictationLanguage
+import io.github.remtav.dictee.stt.DictationLanguages
 import io.github.remtav.dictee.stt.EngineOptions
 import io.github.remtav.dictee.stt.ModelCatalog
 import io.github.remtav.dictee.stt.ModelFamily
@@ -36,6 +38,14 @@ class AppSettings(context: Context) {
     var activeModelId: String
         get() = prefs.getString("active_model", ModelCatalog.default.id) ?: ModelCatalog.default.id
         set(v) = prefs.edit().putString("active_model", v).apply()
+
+    /**
+     * Languages the user dictates (never empty: an empty or missing choice reads
+     * as [DictationLanguage.default], and the screens refuse to uncheck the last one).
+     */
+    var languages: Set<DictationLanguage>
+        get() = DictationLanguages.parse(prefs.getStringSet("languages", null))
+        set(v) = prefs.edit().putStringSet("languages", DictationLanguages.serialize(v)).apply()
 
     val activeModel: ModelSpec get() = ModelCatalog.byId(activeModelId) ?: ModelCatalog.default
 
@@ -104,9 +114,12 @@ class AppSettings(context: Context) {
         get() = prefs.getString("remote_model", "") ?: ""
         set(v) = prefs.edit().putString("remote_model", v.trim()).apply()
 
-    /** "", "fr" or "en". */
+    /**
+     * "", "fr" or "en". Until the user sets it explicitly (even to "" for automatic
+     * detection) it follows the chosen languages; an explicit value is never overwritten.
+     */
     var remoteLanguage: String
-        get() = prefs.getString("remote_language", "") ?: ""
+        get() = prefs.getString("remote_language", null) ?: DictationLanguages.remoteLanguage(languages)
         set(v) = prefs.edit().putString("remote_language", v).apply()
 
     /** Cloudflare Access service token (Client ID). Sent only when the secret is set too. */
@@ -145,6 +158,8 @@ class AppSettings(context: Context) {
         val remote = spec.family == ModelFamily.REMOTE
         return EngineOptions(
             numThreads = threads,
+            // Forced only on Whisper, and only when a single language is chosen.
+            language = if (spec.family == ModelFamily.WHISPER) DictationLanguages.whisperLanguage(languages) else "",
             acceleration = acceleration,
             // Only these use hotwords: keeping them out of the other models' options means a
             // vocabulary edit does not reload an on-device model that ignores them.

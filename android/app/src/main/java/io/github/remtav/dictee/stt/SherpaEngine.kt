@@ -86,7 +86,7 @@ class SherpaEngine(
                         encoder = path("turbo-encoder.int8.onnx"),
                         decoder = path("turbo-decoder.int8.onnx"),
                         // Empty language: Whisper detects it for each segment.
-                        language = "",
+                        language = options.language,
                         task = "transcribe",
                     ),
                     tokens = path("turbo-tokens.txt"),
