@@ -1874,3 +1874,141 @@ montre les mots dits) : comportement attendu, documenté.
   modifié (hors portée).
 - Vie privée : aucune permission ni requête réseau ajoutée par le lot (manifeste :
   une activité non exportée).
+
+## Issue #15, lot 3 — étape 3.1 : jeu d'évaluation et notation
+
+L'instrument de mesure du polissage sur le téléphone, sans aucune approche de
+polissage (étapes 3.2 et 3.3). Rien ne change sous `app/src/main` : tout est
+dans les sources de test, donc absent de l'APK.
+
+### Jeu d'évaluation
+
+`app/src/test/resources/polissage/jeu-evaluation.tsv` : TSV UTF-8 commenté
+(en-tête `#` qui documente les colonnes), une paire par ligne :
+`id`, `langue` (`fr` / `en`), `categorie`, `dit` (ce que la personne dit),
+`brut` (sortie du modèle, entrée du polissage), `attendu`, `provenance`.
+
+**132 paires** : 79 à corriger, 53 contrôles qui ne doivent pas changer.
+
+| Catégorie | fr | en | Rôle |
+| --- | --- | --- | --- |
+| `noms-propres` (GitHub, WhatsApp, iPhone, Dropbox, Teams…) | 11 | 3 | à corriger |
+| `toponymes` (Rimouski, Chicoutimi, Lac-Saint-Jean, Hochelaga, Hydro-Québec, SAAQ, UQAR…) | 20 | 7 | à corriger |
+| `web` (dont `coifferimouski.com`, cas de l'issue) | 12 | 4 | à corriger |
+| `courriel` | 7 | 4 | à corriger |
+| `epellation` (lettres, codes postaux) | 8 | 3 | à corriger |
+| `controle` : phrases ordinaires et pièges (« un point commun », « mets un point final », « la barre oblique du terrain », « arobase » comme mot, « bulle des point com », « plan B », « vitamine C », « on the dot »…) | 15 | 8 | inchangé |
+| `controle-mots-rares` : mots rares ou d'ici bien transcrits (friperie, dépanneur, poudrerie, tuque, magasiner, clavardage, pourvoirie, cégep, courriel, achalandage, tabagie, pantoute, achaler…) | 18 | 1 | inchangé |
+| `controle-deja-correct` : mot visé que le modèle a déjà bien transcrit | 7 | 4 | inchangé |
+
+`controle-mots-rares` a été ajoutée à la demande de l'utilisateur : un
+polissage par LLM a abîmé « friperie », qui était bien transcrit. Ces lignes
+comptent dans le taux de contrôles abîmés et sont rapportées à part (colonne
+« dont mots rares » et ligne de catégorie) : c'est la mesure clé des approches
+à LLM de l'étape 3.3.
+
+**Règle de l'attendu.** Le brut corrigé sur le passage visé (le nom,
+l'adresse, l'épellation, y compris les mots que la transcription y a fondus :
+`kabaroblique emploi` → `.ca/emploi`), et identique au brut partout ailleurs,
+fautes non visées comprises (`Mais un point final…`, `Vas voir…`). Un
+polissage qui corrige aussi une faute non visée est donc compté « modifié à
+tort » : c'est voulu, on mesure ce qu'on a demandé. Les sorties où
+l'information est perdue (« remtav » rendu `rentave`, une lettre épelée en
+moins, une fin de phrase coupée par Whisper) n'ont pas été retenues comme cas
+à corriger. Conventions : une épellation de nom donne le nom en casse de nom
+propre (`Gagnon`), une adresse ou un courriel épelé donne des minuscules
+collées ; un code postal s'écrit `G5L 3A1`.
+
+### Provenance des transcriptions brutes
+
+Personne ne peut dicter dans le conteneur. Ce qui a été fait :
+
+- **80 lignes `tts+<modèle>`** : vraies sorties des trois modèles du
+  catalogue (Parakeet 41 lignes, Qwen3-ASR 33, Whisper 30 ; plusieurs modèles
+  sur une ligne quand leurs sorties sont identiques), 54 cas à corriger et
+  26 contrôles. 52 énoncés ont été synthétisés hors du dépôt avec
+  [Piper](https://github.com/rhasspy/piper) (`pip install piper-tts`, voix
+  `fr_FR-siwis-medium` et `en_US-lessac-medium` de `rhasspy/piper-voices`),
+  rééchantillonnés en 16 kHz mono (ffmpeg), puis transcrits sur l'hôte Linux
+  par `PolishSetTranscriptionHostTest`, qui passe par `SherpaEngine` (code de
+  l'application, sherpa-onnx 2.0.1, modèles int8 vérifiés par `ModelStore`),
+  Whisper avec la langue forcée comme le fait l'application pour une seule
+  langue. Le texte donné à la synthèse est dans la colonne `dit`.
+- **52 lignes `rédigé`** : écrites à la main, vraisemblables, d'après les
+  erreurs observées sur ces sorties réelles (mots coupés `git hub`, casse
+  perdue `iphone`, signes dictés laissés en toutes lettres `point ca`,
+  `arobase`, lettres séparées) ; et les contrôles rédigés.
+
+Ni l'audio ni l'outil de synthèse ne sont dans le dépôt. Pour régénérer les
+lignes `tts+…` : produire `liste.tsv` (`id<TAB>langue<TAB>dit`) et un
+`<id>.wav` par ligne dans un dossier, puis
+`./gradlew testDebugUnitTest --tests '*PolishSetTranscriptionHostTest*' -PmodelsDir=… -PpolishAudioDir=…`,
+qui écrit `transcriptions.tsv` dans ce dossier ; sans ces deux propriétés, le
+test est ignoré (il l'est en CI).
+
+**Limites.** Une voix de synthèse n'est pas une voix québécoise : elle est
+propre, régulière, à l'accent de France pour le français, et elle prononce
+les noms anglais à la française (`GitHub` → `J-Hub`). Les erreurs réelles
+d'une personne du Québec seront différentes (souvent plus nombreuses).
+L'épellation par synthèse est artificielle (lettres séparées par des
+virgules pour forcer une pause). Le jeu mesure donc la capacité d'un
+polissage à réparer des erreurs typiques, pas la qualité de bout en bout sur
+une vraie voix ; des lignes issues de vraies dictées pourront s'ajouter
+(nouvelle provenance à définir, par exemple `dictee+<modèle>`).
+
+### Notation
+
+Sources de test, paquet `io.github.remtav.dictee.polish` :
+
+- `PolishEval.kt` : `EvalCase`, `PolishEvalSet` (lecture et catégories),
+  l'interface `PolishApproach` (`name`, `needsLlm`, `description`,
+  `polish(raw: String, language: String): String`), `IdentityApproach`,
+  `RecordedApproach` (sorties enregistrées rejouées), `PolishNormalization`,
+  `Percentiles`, `PolishScorer`.
+- `PolishApproaches.kt` : le registre (`live`, plus les fichiers de
+  `src/test/resources/polissage/sorties/*.tsv`).
+- `PolishReport.kt` : tableau lisible et rapport machine.
+- `PolishEvaluationTest` : note toutes les approches du registre, imprime le
+  tableau, écrit `app/build/reports/polissage/resultats.json`,
+  `resultats.md` et `sorties-<approche>.tsv` (sortie et verdict de chaque
+  cas). Tourne dans `./gradlew testDebugUnitTest` (CI), sans modèle ni réseau,
+  en moins d'une seconde.
+- `PolishScorerTest` (le noteur lui-même) et `PolishEvalSetTest` (taille,
+  couverture, contrôles identiques, cas à corriger réellement différents,
+  unicité, provenance bien formée).
+
+**Mesures.** Taux de cas corrigés (sortie = attendu, sur les cas à corriger),
+taux de « modifiés à tort » (changé mais faux), taux de contrôles abîmés (doit
+rester à 0), erreurs (exception ou sortie enregistrée absente), le tout au
+total, par catégorie et par langue ; latence p50 / p95 par appel (rang le plus
+proche), mesurée **sur l'hôte** : un passage d'échauffement puis 5 passages
+chronométrés. Ce n'est pas la latence sur le téléphone.
+
+**Normalisation (stricte).** Avant comparaison : NFC, apostrophe typographique
+= apostrophe droite, suites d'espaces ou tabulations = un espace, espaces de
+bord retirés. Tout le reste compte : casse (`Github` ≠ `GitHub`), accents,
+traits d'union, ponctuation, espace dans un mot ou une adresse
+(`coifferimouski. com` ≠ `coifferimouski.com`) et espaces insécables (la
+typographie est le travail de `TextAssembler`, après le polissage).
+
+**Référence.** `identite` (ne change rien) donne 0/79 corrigés et 0/53 abîmés :
+le dispositif ne compte rien par erreur (`identityCorrectsNothingAndDamagesNothing`).
+
+### Brancher une approche
+
+- **Sans LLM (étape 3.2)** : l'ajouter à `PolishApproaches.live`, par exemple
+  `PolishApproach.of("regles", needsLlm = false) { raw, lang -> … }`. La garde
+  `approachesWithoutLlmDamageNoControlSentence` fait alors échouer la CI si
+  elle abîme une seule phrase de contrôle ou lève une exception. Le code de
+  l'approche reste hors du chemin par défaut de l'application.
+- **Avec LLM (étape 3.3)** : MediaPipe n'existe que pour arm64, l'approche ne
+  s'exécute pas sur l'hôte. On enregistre ses sorties sur un téléphone dans
+  `src/test/resources/polissage/sorties/<approche>.tsv` (en-têtes facultatifs
+  `# approche:`, `# llm: oui`, `# description:` ; colonnes
+  `id<TAB>brut<TAB>sortie[<TAB>latence_ms]`). Le noteur les rejoue : la
+  qualité est notée comme pour les autres, aucune latence d'hôte n'est
+  inventée ; une `latence_ms` mesurée sur le téléphone est rapportée comme
+  « appareil ». Une ligne dont le `brut` ne correspond plus au jeu (jeu
+  modifié depuis l'enregistrement) ou absente compte comme erreur, jamais
+  comme réussite. Les approches à LLM ne sont pas bloquées par la garde : le
+  rapport de l'étape 3.4 tranche avec les chiffres.

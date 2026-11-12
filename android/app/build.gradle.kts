@@ -170,6 +170,10 @@ android {
             // without it those tests are skipped.
             (project.findProperty("modelsDir") as String? ?: System.getenv("DICTEE_MODELS_DIR"))
                 ?.let { test.systemProperty("dictee.modelsDir", it) }
+            // Polishing evaluation (issue #15, step 3.1): where the scorer writes its report, and
+            // the synthetic-audio directory used only to regenerate the `tts+…` rows of the set.
+            test.systemProperty("dictee.polishReportDir", layout.buildDirectory.dir("reports/polissage").get().asFile.absolutePath)
+            (project.findProperty("polishAudioDir") as String?)?.let { test.systemProperty("dictee.polishAudioDir", it) }
             test.maxHeapSize = "2g"
             test.testLogging {
                 events("passed", "skipped", "failed")
