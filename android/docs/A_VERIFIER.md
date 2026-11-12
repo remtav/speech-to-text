@@ -35,7 +35,9 @@ corriger si ça ne convient pas. Les chemins partent de la racine du dépôt.
   coude. L'échantillon est trop petit pour conclure ; les phrases viennent de
   Wikipédia et de romans, donc la mesure porte sur l'accent, pas sur le
   vocabulaire d'ici.
-- **Choix fait** : Parakeet reste recommandé pour le français québécois.
+- **Choix fait** : Parakeet reste recommandé pour le français québécois. La
+  raison affichée dit : « il a fait le moins d'erreurs des trois, mesuré sur
+  six courts extraits (59 mots) : un indice, pas une preuve ».
 - **Où corriger** : la table et le libellé de la raison sont dans
   `android/app/src/main/java/io/github/remtav/dictee/stt/ModelRecommendation.kt`.
 
@@ -51,17 +53,25 @@ Reconnaît-on Kalmia au premier coup d'œil ? À regarder en particulier :
 | Filet des cartes et piste du curseur, volontairement discrets (contraste 1,48 : 1) | `colorOutlineVariant` dans `res/values/themes.xml` |
 | Icône de lancement (claire, sombre, monochrome d'Android 13) et logo de l'accueil | `res/drawable/ic_launcher_foreground.xml`, `ic_launcher_monochrome.xml`, `kalmia_logo.xml` |
 | Champs de saisie : soulignement Material conservé | `android/app/src/main/java/io/github/remtav/dictee/ui/Ui.kt` |
+| Largeur des touches : environ 36 à 40 dp chacune (huit touches sur une rangée), sous les 48 dp visés ; hauteur de 48 dp respectée. Confortable au pouce ? Sinon, passer à deux rangées | `android/app/src/main/res/layout/keyboard_view.xml` |
+| Changer Clair / Sombre dans les Réglages, puis rouvrir le clavier dans une autre application : il doit suivre | `android/app/src/main/java/io/github/remtav/dictee/ime/DicteeImeService.kt` |
+| Erreurs en rouge avec icône (échec de téléchargement, comparaison, test du serveur) : rendu correct ? | `markError()` dans `android/app/src/main/java/io/github/remtav/dictee/ui/Ui.kt` |
 | Couleurs elles-mêmes (reprises telles quelles de la source Kalmia) | `res/values/colors.xml`, `res/values-night/colors.xml` |
 
 ### 4. Le texte d'accueil dit-il ce que tu veux dire ?
 
-- **Texte actuel** (chaîne `setup_intro`) : « Un clavier vocal conçu au Québec,
-  pour le français d'ici. Votre voix est transcrite sur votre téléphone : elle
-  n'est envoyée à personne, sauf si vous choisissez vous-même un serveur
-  distant. Le réseau sert à télécharger les modèles. Pas de compte, pas de
-  publicité, pas de télémétrie. Le code source est ouvert : chacun peut le
-  vérifier. Les modèles de transcription, eux, viennent d'éditeurs étrangers,
-  nommés plus bas. »
+- **Texte actuel** : chaîne `setup_intro` de
+  `android/app/src/main/res/values/strings.xml` (quatre lignes : conçu au
+  Québec, la voix reste sur le téléphone sauf serveur distant choisi par toi,
+  ni compte ni publicité ni télémétrie, code source public et modèles
+  d'éditeurs étrangers).
+- **Écart avec ta formulation, à trancher** : l'issue dit « code source
+  ouvert ». La revue a écrit « code source public : chacun peut le lire et le
+  vérifier », parce que le dépôt n'a aucun fichier de licence : sans licence,
+  le code est lisible mais pas « ouvert » au sens habituel. Ajouter un fichier
+  `LICENSE` à la racine rendrait « ouvert » exact ; le mot se rétablit alors
+  dans `strings.xml`, `android/README.md` et le texte de release de
+  `.github/workflows/android.yml`.
 - **Où corriger** : `android/app/src/main/res/values/strings.xml`.
 
 ### 5. La table de recommandation te convient-elle ?
