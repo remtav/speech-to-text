@@ -112,7 +112,7 @@ class AppSettings(context: Context) {
     /** Cloudflare Access service token (Client ID). Sent only when the secret is set too. */
     var cfAccessClientId: String
         get() = prefs.getString("cf_access_id", "") ?: ""
-        set(v) = prefs.edit().putString("cf_access_id", v.trim()).apply()
+        set(v) = prefs.edit().putString("cf_access_id", RemoteConfig.cleanHeaderValue(v)).apply()
 
     /**
      * Cloudflare Access service token (Client Secret). Kept in the app's private
@@ -120,7 +120,7 @@ class AppSettings(context: Context) {
      */
     var cfAccessClientSecret: String
         get() = prefs.getString("cf_access_secret", "") ?: ""
-        set(v) = prefs.edit().putString("cf_access_secret", v.trim()).apply()
+        set(v) = prefs.edit().putString("cf_access_secret", RemoteConfig.cleanHeaderValue(v)).apply()
 
     /** Local model id used when the server cannot be reached; "" for none. */
     var remoteFallbackId: String

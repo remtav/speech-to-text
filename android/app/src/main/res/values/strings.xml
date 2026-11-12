@@ -99,6 +99,7 @@
     <string name="settings_remote_no_fallback">Afficher une erreur</string>
     <string name="settings_remote_test">Tester la connexion</string>
     <string name="settings_diagnostic">Diagnostic serveur</string>
+    <string name="settings_remote_no_fallback_warning">⚠ Aucun modèle local de repli installé : si le serveur ne répond pas, la dictée sera perdue. Téléchargez un modèle (Parakeet conseillé) et choisissez-le ci-dessus.</string>
     <string name="settings_cf_access">Cloudflare Access (optionnel)</string>
     <string name="settings_cf_access_help">Si le serveur est derrière Cloudflare Access, saisissez un service token (Zero Trust → Access → Service credentials) et donnez à l\'application Access une politique « Service Auth » qui l\'inclut. Les en-têtes CF-Access-Client-Id et CF-Access-Client-Secret sont envoyés seulement quand les deux champs sont remplis.</string>
     <string name="settings_cf_id_hint">Cloudflare Access Client ID</string>

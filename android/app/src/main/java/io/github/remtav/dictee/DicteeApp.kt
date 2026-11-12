@@ -149,6 +149,7 @@ class DicteeApp : Application() {
                         ?: DictationResult(segments.map { engine.transcribe(it).text }, DictationResult.Source.SERVER_RAW, transport = "segments")
                 }
             },
+            canFallBack = options.remoteFallback != null,
         ) to null
     }
 

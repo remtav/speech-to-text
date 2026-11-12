@@ -21,6 +21,7 @@ class DiagnosticActivity : AppCompatActivity() {
     private lateinit var results: LinearLayout
     private val trials = ArrayList<ServerDiagnostic.Trial>()
     @Volatile private var control: WaitControl? = null
+    @Volatile private var destroyed = false
     private var running = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -38,6 +39,7 @@ class DiagnosticActivity : AppCompatActivity() {
     }
 
     override fun onDestroy() {
+        destroyed = true
         control?.abandon()
         super.onDestroy()
     }
@@ -56,13 +58,14 @@ class DiagnosticActivity : AppCompatActivity() {
         val plan = diag.plan(CompareActivity.loadReferences(this))
         kotlin.concurrent.thread(name = "server-diagnostic") {
             for ((i, sample) in plan.withIndex()) {
+                if (destroyed) break
                 runOnUiThread { status.text = getString(R.string.diag_running, i + 1, plan.size) }
                 val c = WaitControl().also { control = it }
                 val trial = diag.run(sample, c)
-                if (c.cancelled) break
+                if (c.cancelled || destroyed) break
                 runOnUiThread { trials += trial; render(trial, trials.size) }
             }
-            runOnUiThread { running = false; status.text = getString(R.string.diag_done) }
+            if (!destroyed) runOnUiThread { running = false; status.text = getString(R.string.diag_done) }
         }
     }
 

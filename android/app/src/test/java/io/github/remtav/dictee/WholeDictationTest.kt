@@ -51,6 +51,8 @@ class WholeDictationTest {
     @Volatile private var pollsBeforeDone = 2
     @Volatile private var polishJson = """"polished_text": "$polished", "polish": {"applied": true, "model": "m", "fallback_reason": null}"""
     @Volatile private var errorBody = ""
+    @Volatile private var postDelayMillis = 0L
+    @Volatile private var pollCode = 200
     private val polls = AtomicInteger()
     private lateinit var server: RecordingServer
     private val logs: MutableList<String> = Collections.synchronizedList(ArrayList())
@@ -67,10 +69,12 @@ class WholeDictationTest {
 
     private fun respond(req: RecordingServer.Request): Pair<Int, String> = when {
         req.method == "POST" && req.path == "/jobs" ->
-            if (jobsCode == 202) 202 to """{"id": "job1", "status": "queued"}""" else jobsCode to errorBody
+            if (postDelayMillis > 0) Thread.sleep(postDelayMillis).let { 202 to """{"id": "job1", "status": "queued"}""" }
+            else if (jobsCode == 202) 202 to """{"id": "job1", "status": "queued"}""" else jobsCode to errorBody
         req.method == "GET" && req.path == "/jobs/job1" -> {
             val n = polls.incrementAndGet()
             when {
+                pollCode != 200 -> pollCode to "{}"
                 jobStatus == "running" || n <= pollsBeforeDone -> 200 to """{"id": "job1", "status": "running", "stage": "polish"}"""
                 jobStatus == "error" -> 200 to """{"id": "job1", "status": "error", "error": {"code": "x", "message": "GPU out of memory"}}"""
                 else -> 200 to """{"id": "job1", "status": "done", "result": {"text": " $raw ", "language": "fr", $polishJson}}"""
@@ -106,7 +110,10 @@ class WholeDictationTest {
         return s.substring(i + marker.length).substringBefore("\r\n--")
     }
 
-    private fun jobPosts() = server.requests.filter { it.method == "POST" && it.path == "/jobs" }
+    /** A snapshot: the server thread may still be appending to the list. */
+    private fun reqs(): List<RecordingServer.Request> = synchronized(server.requests) { server.requests.toList() }
+
+    private fun jobPosts() = reqs().filter { it.method == "POST" && it.path == "/jobs" }
 
     // ----------------------------------------------------- controller, end to end
 
@@ -114,6 +121,8 @@ class WholeDictationTest {
         val results: MutableList<DictationResult> = Collections.synchronizedList(ArrayList())
         val waits: MutableList<Boolean> = Collections.synchronizedList(ArrayList())
         val states: MutableList<Pair<DictationState, String?>> = Collections.synchronizedList(ArrayList())
+        val infos: MutableList<String> = Collections.synchronizedList(ArrayList())
+        override fun onInfo(message: String) { infos += message }
         val done = java.util.concurrent.CountDownLatch(1)
         override fun onState(state: DictationState, message: String?) {
             states += state to message
@@ -158,7 +167,7 @@ class WholeDictationTest {
         val s = String(post.body, Charsets.ISO_8859_1)
         val wav = WavReader.read(post.body.copyOfRange(s.indexOf("RIFF"), post.body.size).inputStream())
         assertTrue("whole audio expected, got ${wav.samples.size}", wav.samples.size >= (1f + 1.2f + 0.8f + 2f) * 16000)
-        assertTrue(server.requests.none { it.path == "/transcribe/streaming" })
+        assertTrue(reqs().none { it.path == "/transcribe/streaming" })
         assertEquals(DictationResult.Source.SERVER_POLISHED, rec.results.single().source)
         assertEquals(listOf(true, false), rec.waits.toList())
         assertEquals(DictationState.IDLE, c.state)
@@ -191,7 +200,7 @@ class WholeDictationTest {
     @Test fun nothingSaidSendsNothing() {
         val (sink, rec, _) = dictate(remote(), clips = listOf(PcmAudio(FloatArray(16000), 16000)))
         assertEquals("", sink.text)
-        assertTrue(server.requests.isEmpty())
+        assertTrue(reqs().isEmpty())
         assertTrue(rec.results.isEmpty())
     }
 
@@ -206,8 +215,9 @@ class WholeDictationTest {
         val (sink, rec, _) = dictate(engine, clips = listOf(burst(6f)), maxSeconds = 2)
         assertTrue("got ${seen.get()} samples", seen.get() in 1..2 * 16000)
         assertEquals("Dit pendant deux secondes", sink.text)
-        assertTrue(rec.states.any { it.second?.contains("Durée maximale") == true })
-        assertEquals(DictationState.IDLE, rec.states.last().first) // information, not an error
+        assertTrue(rec.infos.any { it.contains("Durée maximale") }) // information, not an error
+        assertTrue(rec.states.none { it.second?.contains("Durée maximale") == true })
+        assertEquals(DictationState.IDLE, rec.states.last().first)
     }
 
     // ------------------------------------------------------------ local fallback
@@ -240,7 +250,7 @@ class WholeDictationTest {
         jobsCode = 302
         assertLocalFallback("Cloudflare Access")
         // The redirect was not followed.
-        assertTrue(server.requests.none { it.path.contains("cdn-cgi") })
+        assertTrue(reqs().none { it.path.contains("cdn-cgi") })
     }
 
     @Test fun fallsBackWhenUnreachable() {
@@ -253,7 +263,7 @@ class WholeDictationTest {
         // Budget: 0.5 s + 1 × the audio (~5 s of dictation) — short for the test.
         val c = config(waitBase = 500).copy(waitCapMillis = 1_500)
         assertLocalFallback("Délai dépassé", c)
-        waitUntil { server.requests.any { it.path == "/jobs/job1/cancel" } }
+        waitUntil { reqs().any { it.path == "/jobs/job1/cancel" } }
     }
 
     @Test fun fallsBackOnHtmlInsteadOfJson() {
@@ -290,7 +300,7 @@ class WholeDictationTest {
         assertEquals("Premier segment. Deuxième segment. Troisième.", sink.text)
         assertEquals(3, local.calls.get())
         assertEquals(DictationResult.Source.LOCAL_FALLBACK, rec.results.single().source)
-        waitUntil { server.requests.any { it.method == "POST" && it.path == "/jobs/job1/cancel" } }
+        waitUntil { reqs().any { it.method == "POST" && it.path == "/jobs/job1/cancel" } }
         // A user cancel says nothing about the server: the next dictation tries it again.
         jobStatus = "done"
         val seg = burst(0.5f).samples
@@ -307,7 +317,7 @@ class WholeDictationTest {
         t.join()
         assertTrue(r.texts.isEmpty())
         assertEquals(0, local.calls.get())
-        waitUntil { server.requests.any { it.path == "/jobs/job1/cancel" } }
+        waitUntil { reqs().any { it.path == "/jobs/job1/cancel" } }
     }
 
     @Test fun cancelBeforeAnyRequestGoesStraightToLocal() {
@@ -317,7 +327,7 @@ class WholeDictationTest {
         val r = engine.transcribeDictation(seg, listOf(seg), control)
         assertEquals(DictationResult.Source.LOCAL_FALLBACK, r.source)
         assertEquals(1, local.calls.get())
-        assertTrue(server.requests.isEmpty())
+        assertTrue(reqs().isEmpty())
     }
 
     // ---------------------------------------------------- transports and headers
@@ -327,15 +337,15 @@ class WholeDictationTest {
         val (sink, rec, _) = dictate(remote())
         assertEquals(polished, sink.text)
         assertEquals("sync", rec.results.single().transport)
-        val sync = server.requests.single { it.path == "/transcribe/streaming" }
+        val sync = reqs().single { it.path == "/transcribe/streaming" }
         assertEquals("true", field(sync.body, "polish"))
     }
 
     @Test fun cloudflareHeadersOnEveryRequestWhenConfigured() {
         dictate(remote(config(cf = true)))
         RemoteEngine.check(config(cf = true)).getOrThrow()
-        assertTrue(server.requests.size >= 4) // POST /jobs, polls, /health
-        for (r in server.requests) {
+        assertTrue(reqs().size >= 4) // POST /jobs, polls, /health
+        for (r in reqs()) {
             assertEquals(r.path, clientId, r.headers["cf-access-client-id"])
             assertEquals(r.path, secret, r.headers["cf-access-client-secret"])
         }
@@ -346,7 +356,7 @@ class WholeDictationTest {
         RemoteEngine.check(config(cf = false)).getOrThrow()
         // One of the two alone sends neither.
         RemoteEngine.check(config(cf = false).copy(cfAccessClientId = clientId)).getOrThrow()
-        for (r in server.requests) {
+        for (r in reqs()) {
             assertFalse(r.headers.containsKey("cf-access-client-id"))
             assertFalse(r.headers.containsKey("cf-access-client-secret"))
         }
@@ -354,13 +364,13 @@ class WholeDictationTest {
 
     @Test fun bearerTokenKeptAlongsideCloudflare() {
         dictate(remote(config().copy(apiKey = "bearer-token")))
-        assertTrue(server.requests.all { it.headers["authorization"] == "Bearer bearer-token" })
+        assertTrue(reqs().all { it.headers["authorization"] == "Bearer bearer-token" })
     }
 
     @Test fun openAiApiSendsTheWholeDictationOnceWithoutPolish() {
         val (sink, rec, _) = dictate(remote(config(api = RemoteApi.OPENAI)))
         assertEquals("Hello from OpenAI.", sink.text)
-        val req = server.requests.single()
+        val req = reqs().single()
         assertEquals("/v1/audio/transcriptions", req.path)
         assertNull(field(req.body, "polish"))
         assertEquals("not requested", rec.results.single().polishStatus)
@@ -440,6 +450,139 @@ class WholeDictationTest {
         assertFalse(report.contains(secret))
         assertFalse(report.contains(clientId))
         assertFalse(report.contains("bearer-token-xyz"))
+    }
+
+
+    // ------------------------------------------------- findings of the review
+
+    @Test fun cancelDuringUploadCancelsTheJobOnceCreated() {
+        postDelayMillis = 1_000 // the server answers POST /jobs late (slow upload)
+        val (engine, local) = fallback()
+        val (sink, _, _) = dictate(engine) { c ->
+            waitUntil { jobPosts().isNotEmpty() }
+            c.cancelServerWait()
+        }
+        assertEquals("Premier segment. Deuxième segment. Troisième.", sink.text)
+        assertEquals(3, local.calls.get())
+        // The job created after we gave up is cancelled as soon as its id arrives.
+        waitUntil { reqs().any { it.method == "POST" && it.path == "/jobs/job1/cancel" } }
+    }
+
+    @Test fun transientPollFailureFallsBackAndCancelsTheJob() {
+        pollCode = 524 // Cloudflare timeout on one GET
+        assertLocalFallback("524")
+        waitUntil { reqs().any { it.method == "POST" && it.path == "/jobs/job1/cancel" } }
+    }
+
+    @Test fun anyRemoteFailureStillFallsBack() {
+        val broken = object : io.github.remtav.dictee.stt.SttEngine, WholeDictationEngine {
+            override val spec = ModelCatalog.remote
+            override val provider = "remote"
+            override fun transcribe(samples: FloatArray, sampleRate: Int) = throw IllegalStateException("bug")
+            override fun transcribeDictation(audio: FloatArray, segments: List<FloatArray>, control: WaitControl): DictationResult =
+                throw IllegalArgumentException("Unexpected char 0x200b in header value")
+            override fun release() {}
+        }
+        val local = ScriptedEngine(ModelCatalog.parakeet, listOf("sauvé."), 0)
+        val seg = burst(0.5f).samples
+        val r = FallbackEngine(broken, { local }).transcribeDictation(seg, listOf(seg), WaitControl())
+        assertEquals(listOf("sauvé."), r.texts)
+        assertFalse(r.fallbackReason!!.contains("0x200b")) // only the exception class
+        // Whole audio lost (out of memory) but segments kept: straight to local.
+        val r2 = FallbackEngine(remote(), { local }).transcribeDictation(FloatArray(0), listOf(seg), WaitControl())
+        assertEquals(DictationResult.Source.LOCAL_FALLBACK, r2.source)
+        assertTrue(reqs().isEmpty())
+    }
+
+    @Test fun serverWaitEndsWhenTheLocalFallbackStarts() {
+        jobStatus = "running"
+        lateinit var controller: DictationController
+        val waitingDuringLocal = Collections.synchronizedList(ArrayList<Boolean>())
+        val local = object : io.github.remtav.dictee.stt.SttEngine {
+            override val spec = ModelCatalog.parakeet
+            override val provider = "local"
+            override fun transcribe(samples: FloatArray, sampleRate: Int): io.github.remtav.dictee.stt.Transcription {
+                waitingDuringLocal += controller.waitingServer
+                return io.github.remtav.dictee.stt.Transcription("local.")
+            }
+            override fun release() {}
+        }
+        val (_, rec, _) = dictate(FallbackEngine(remote(), { local })) { c ->
+            controller = c
+            waitUntil { c.waitingServer }
+            c.cancelServerWait()
+        }
+        assertEquals(listOf(false, false, false), waitingDuringLocal.toList())
+        assertEquals(listOf(true, false), rec.waits.toList())
+    }
+
+    @Test fun waitingStateIsPerDictation() {
+        val sink = StringSink()
+        val rec = Recorder()
+        val c = DictationController({ sink }, { it.run() }, rec)
+        val releaseA = java.util.concurrent.CountDownLatch(1)
+        val releaseB = java.util.concurrent.CountDownLatch(1)
+        fun session(release: java.util.concurrent.CountDownLatch, text: String) = DictationSession(
+            ModelCatalog.remote, PcmAudioSource(listOf(burst(0.5f)), realTime = false), EnergyVad(), TextPipeline(),
+            transcribe = { throw AssertionError() },
+            whole = { _, _, _ ->
+                // A request that does not react to interrupts, like socket I/O on Android.
+                while (!release.await(50, java.util.concurrent.TimeUnit.MILLISECONDS)) Unit
+                DictationResult(listOf(text), DictationResult.Source.SERVER_RAW)
+            },
+        )
+        c.start(session(releaseA, "a."))
+        waitUntil { c.waitingServer }
+        c.cancel() // field changed: A is dropped but its request is still running
+        assertFalse(c.waitingServer)
+        c.start(session(releaseB, "b."))
+        waitUntil { c.waitingServer }
+        releaseA.countDown() // A's request ends late: it must not end B's wait
+        Thread.sleep(300)
+        assertTrue(c.waitingServer)
+        assertTrue(c.canCancelServerWait)
+        releaseB.countDown()
+        waitUntil { c.state == DictationState.IDLE }
+        assertEquals("B.", sink.text)
+    }
+
+    @Test fun resultHeldWhileTheFieldIsAwayKeepsItsDetails() {
+        var available = false
+        val sink = StringSink()
+        val rec = Recorder()
+        val c = DictationController({ if (available) sink else null }, { it.run() }, rec)
+        c.start(DictationSession(
+            ModelCatalog.remote, PcmAudioSource(listOf(burst(0.5f)), realTime = false), EnergyVad(), TextPipeline(),
+            transcribe = { throw AssertionError() },
+            whole = { a, segs, ctl -> remote().transcribeDictation(a, segs, ctl) },
+        ))
+        rec.await()
+        assertEquals("", sink.text)
+        available = true
+        c.deliverPending()
+        assertEquals(polished, sink.text)
+        assertEquals(DictationResult.Source.SERVER_POLISHED, rec.results.single().source)
+    }
+
+    @Test fun invisibleCharactersPastedWithTheSecretAreDropped() {
+        assertEquals(secret, RemoteConfig.cleanHeaderValue(" ​$secret\n"))
+        val c = config().copy(cfAccessClientSecret = "​$secret ")
+        dictate(remote(c))
+        assertTrue(reqs().all { it.headers["cf-access-client-secret"] == secret })
+    }
+
+    @Test fun redirectElsewhereIsNotCalledAnAccessLogin() {
+        val s = java.net.ServerSocket(0)
+        Thread {
+            s.accept().use { sock ->
+                sock.getInputStream().read(ByteArray(4096))
+                sock.getOutputStream().write("HTTP/1.1 301 X\r\nLocation: https://stt.example.com/health\r\nContent-Length: 0\r\n\r\n".toByteArray())
+            }
+        }.start()
+        val e = RemoteEngine.check(config(url = "http://127.0.0.1:${s.localPort}")).exceptionOrNull() as RemoteException
+        s.close()
+        assertEquals(RemoteFailure.ACCESS_REDIRECT, e.failure)
+        assertTrue(e.message!!, e.message!!.contains("stt.example.com"))
     }
 
     private fun waitUntil(timeout: Long = 5_000, condition: () -> Boolean) {

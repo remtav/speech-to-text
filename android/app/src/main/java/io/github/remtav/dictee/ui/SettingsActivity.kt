@@ -143,6 +143,7 @@ class SettingsActivity : AppCompatActivity() {
             ModelCatalog.all.map { it.id to it.displayName }
         col.radio(fallbacks.map { it.second }, fallbacks.indexOfFirst { it.first == s.remoteFallbackId }.coerceAtLeast(0)) {
             s.remoteFallbackId = fallbacks[it].first
+            if (::remoteStatus.isInitialized) updateRemoteWarning()
         }
         col.row().apply {
             button(getString(R.string.settings_remote_test), outlined = true) { testRemote() }.spaced()
@@ -170,11 +171,18 @@ class SettingsActivity : AppCompatActivity() {
 
     private fun updateRemoteWarning() {
         val c = app.settings.remoteConfig()
-        remoteStatus.text = when {
-            !c.isConfigured && app.settings.remoteUrl.isNotBlank() -> getString(R.string.settings_remote_invalid)
-            c.isInsecurePublic -> getString(R.string.settings_remote_insecure)
-            else -> ""
-        }
+        val lines = listOfNotNull(
+            when {
+                !c.isConfigured && app.settings.remoteUrl.isNotBlank() -> getString(R.string.settings_remote_invalid)
+                c.isInsecurePublic -> getString(R.string.settings_remote_insecure)
+                else -> null
+            },
+            // Without an installed local model, a server failure loses the dictation.
+            if (c.isConfigured && ModelCatalog.byId(app.settings.remoteFallbackId)?.let { app.isInstalled(it) } != true) {
+                getString(R.string.settings_remote_no_fallback_warning)
+            } else null,
+        )
+        remoteStatus.text = lines.joinToString("\n")
     }
 
     private fun testRemote() {

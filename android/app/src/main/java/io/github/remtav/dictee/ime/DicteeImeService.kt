@@ -61,7 +61,6 @@ class DicteeImeService : InputMethodService(), DictationListener, EngineManager.
     private var modelButton: MaterialButton? = null
     private var meter: LevelMeterView? = null
     private var cancelWaitButton: MaterialButton? = null
-    private var waitingServer = false
 
     private var sink: ImeTextSink? = null
     /** Field the current dictation types into: package + field id. */
@@ -335,9 +334,12 @@ class DicteeImeService : InputMethodService(), DictationListener, EngineManager.
     private var cancelledWait = false
 
     override fun onServerWait(waiting: Boolean) {
-        waitingServer = waiting
         if (waiting) cancelledWait = false
         render()
+    }
+
+    override fun onInfo(message: String) {
+        showMessage(message, error = false)
     }
 
     override fun onDictationResult(result: DictationResult, inserted: String) {
@@ -518,8 +520,9 @@ class DicteeImeService : InputMethodService(), DictationListener, EngineManager.
         mic.isActivated = listening
 
         val es = engineState
-        val waiting = waitingServer && state == DictationState.FINISHING
-        cancelWaitButton?.visibility = if (waiting) View.VISIBLE else View.GONE
+        // Read from the controller, per session: never a stale flag from a dropped dictation.
+        val waiting = controller.waitingServer && state == DictationState.FINISHING
+        cancelWaitButton?.visibility = if (waiting && controller.canCancelServerWait) View.VISIBLE else View.GONE
         val (text, isError) = when {
             passwordField -> getString(R.string.msg_password) to false
             waiting -> getString(

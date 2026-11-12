@@ -103,6 +103,15 @@ data class RemoteConfig(
     fun waitBudgetMillis(audioSeconds: Float): Long =
         (waitBaseMillis + (audioSeconds * 1000).toLong()).coerceAtMost(waitCapMillis)
 
+    companion object {
+        /**
+         * Keeps only the characters an HTTP header value may hold (printable ASCII,
+         * no spaces). A zero-width space pasted with the secret would otherwise make
+         * the HTTP stack throw an error whose message quotes the whole value.
+         */
+        fun cleanHeaderValue(v: String): String = v.filter { it.code in 0x21..0x7E }
+    }
+
     /** Replaces every secret of this config found in [text] (error bodies, messages) by "***". */
     fun redact(text: String): String {
         var out = text
@@ -169,6 +178,14 @@ class WaitControl {
         }
         hooks.forEach { runCatching { it() } }
     }
+
+    private val localHooks = java.util.concurrent.CopyOnWriteArrayList<() -> Unit>()
+
+    /** Runs [hook] when the fallback starts transcribing on the phone (the server wait is over). */
+    fun onLocalStart(hook: () -> Unit) { localHooks += hook }
+
+    /** Called by [FallbackEngine] before it transcribes the kept audio locally. */
+    fun localStarted() = localHooks.forEach { runCatching { it() } }
 
     /** Runs [hook] at cancellation (at once if already cancelled). */
     fun onCancel(hook: () -> Unit) {
@@ -308,8 +325,13 @@ class RemoteEngine(
                     put("polish", "true")
                     if (config.language.isNotBlank()) put("language", config.language)
                 }
+                // If we give up while the upload is still going (Annuler, deadline), the job may be
+                // created anyway: cancel it as soon as its id arrives.
+                val orphan: (String) -> Unit = { body ->
+                    runCatching { JSONObject(body).optString("id", "") }.getOrNull()?.takeIf { it.isNotEmpty() }?.let { cancelJobAsync(it) }
+                }
                 val created = try {
-                    postCancellable(config.jobsUrl(), fields, wav, deadline, control)
+                    postCancellable(config.jobsUrl(), fields, wav, deadline, control, orphan)
                 } catch (e: RemoteException) {
                     if (e.httpCode != 404 && e.httpCode != 405) throw e
                     // A server without the job API: the synchronous route, same options.
@@ -324,7 +346,14 @@ class RemoteEngine(
                 log("job $id created in $upload ms")
                 val cancelHook = { cancelJobAsync(id) }
                 control.onCancel(cancelHook)
-                val result = pollJob(id, deadline, control)
+                val result = try {
+                    pollJob(id, deadline, control)
+                } catch (e: RemoteException) {
+                    // A poll failure or a timeout leaves the job running for nothing: cancel it.
+                    // (A cancel already did through the hook; a failed job has nothing to cancel.)
+                    if (e.failure != RemoteFailure.CANCELLED && e.failure != RemoteFailure.JOB_FAILED) cancelJobAsync(id)
+                    throw e
+                }
                 serverResult(result, upload, elapsed(start), seconds, "jobs")
             }
         }
@@ -335,7 +364,7 @@ class RemoteEngine(
         val polishedRaw = if (json.isNull("polished_text")) "" else json.optString("polished_text", "").trim()
         val polish = json.optJSONObject("polish")
         val applied = polish?.optBoolean("applied", false) == true
-        val polished = polishedRaw.takeIf { applied && it.isNotEmpty() }
+        val polished = polishedRaw.takeIf { (applied || polish == null) && it.isNotEmpty() }
         val status = when {
             polished != null -> "applied"
             polish == null -> "not returned"
@@ -357,11 +386,9 @@ class RemoteEngine(
         while (true) {
             checkCancelled(control)
             val remaining = deadline - now()
-            if (remaining <= 0) {
-                cancelJobAsync(id)
-                throw RemoteException("Délai dépassé en attendant le serveur", failure = RemoteFailure.TIMEOUT)
-            }
-            val body = request("GET", url, null, null, readTimeout = remaining.coerceIn(1, 15_000).toInt())
+            if (remaining <= 0) throw RemoteException("Délai dépassé en attendant le serveur", failure = RemoteFailure.TIMEOUT)
+            // On a helper thread too: Annuler and the deadline do not wait for a stalled GET.
+            val body = cancellable(deadline, control, null) { request("GET", url, null, null, readTimeout = it.coerceAtMost(15_000)) }
             val job = parse(body)
             when (val status = job.optString("status")) {
                 "done" -> return job.optJSONObject("result")
@@ -391,7 +418,7 @@ class RemoteEngine(
     private fun cancelJobAsync(id: String) {
         Thread({
             try {
-                request("POST", config.jobsUrl() + "/" + id + "/cancel", null, null, readTimeout = 5_000)
+                request("POST", config.jobsUrl() + "/" + id + "/cancel", null, listOf(ByteArray(0)), readTimeout = 5_000)
                 log("job $id cancelled")
             } catch (e: Exception) {
                 log("job $id: cancel failed (${e.message})")
@@ -399,32 +426,50 @@ class RemoteEngine(
         }, "remote-cancel").apply { isDaemon = true }.start()
     }
 
+    private fun postCancellable(
+        url: String, fields: Map<String, String>, wav: ByteArray, deadline: Long, control: WaitControl,
+        orphan: ((String) -> Unit)? = null,
+    ): String = cancellable(deadline, control, orphan) { post(url, fields, wav, it) }
+
     /**
-     * A POST that a cancellation interrupts: it runs on a helper thread and the
-     * caller gives up as soon as [control] is cancelled or the deadline passes.
+     * Runs a blocking request on a helper thread; the caller gives up as soon as
+     * [control] is cancelled or the deadline passes (socket I/O is not
+     * interruptible on Android). If the caller gave up and the request still
+     * succeeds, [orphan] gets its body (to cancel a job created meanwhile).
      */
-    private fun postCancellable(url: String, fields: Map<String, String>, wav: ByteArray, deadline: Long, control: WaitControl): String {
+    private fun cancellable(deadline: Long, control: WaitControl, orphan: ((String) -> Unit)?, call: (readTimeout: Int) -> String): String {
         checkCancelled(control)
         val remaining = deadline - now()
         if (remaining <= 0) throw RemoteException("Délai dépassé en attendant le serveur", failure = RemoteFailure.TIMEOUT)
-        val task = java.util.concurrent.FutureTask { post(url, fields, wav, remaining.coerceIn(1, Int.MAX_VALUE.toLong()).toInt()) }
-        val worker = Thread(task, "remote-post").apply { isDaemon = true }
-        val cancelHook = { task.cancel(true); Unit }
-        control.onCancel(cancelHook)
+        val gaveUp = java.util.concurrent.atomic.AtomicBoolean(false)
+        val result = java.util.concurrent.CompletableFuture<String>()
+        val worker = Thread({
+            try {
+                val body = call(remaining.coerceIn(1, Int.MAX_VALUE.toLong()).toInt())
+                if (!result.complete(body) || gaveUp.get()) orphan?.invoke(body)
+            } catch (e: Throwable) {
+                result.completeExceptionally(e)
+            }
+        }, "remote-request").apply { isDaemon = true }
+        control.onCancel { result.cancel(false) }
         worker.start()
         try {
-            return task.get(remaining + 1_000, java.util.concurrent.TimeUnit.MILLISECONDS)
+            return result.get(remaining + 1_000, java.util.concurrent.TimeUnit.MILLISECONDS)
         } catch (_: java.util.concurrent.CancellationException) {
+            gaveUp.set(true)
             throw RemoteException("Attente du serveur annulée", failure = RemoteFailure.CANCELLED)
         } catch (e: java.util.concurrent.ExecutionException) {
             val c = e.cause
             if (control.cancelled) throw RemoteException("Attente du serveur annulée", failure = RemoteFailure.CANCELLED)
-            throw c as? RemoteException ?: RemoteException(c?.message ?: "Erreur", c)
+            throw c as? RemoteException
+                ?: RemoteException(config.redact(c?.message ?: c?.javaClass?.simpleName ?: "Erreur"), c, RemoteFailure.BAD_RESPONSE)
         } catch (_: java.util.concurrent.TimeoutException) {
-            task.cancel(true)
+            gaveUp.set(true)
+            result.cancel(false)
             throw RemoteException("Délai dépassé en attendant le serveur", failure = RemoteFailure.TIMEOUT)
         } catch (e: InterruptedException) {
-            task.cancel(true)
+            gaveUp.set(true)
+            result.cancel(false)
             throw e
         }
     }
@@ -433,7 +478,7 @@ class RemoteEngine(
 
     private fun post(url: String, fields: Map<String, String>, wav: ByteArray, readTimeout: Int): String {
         val boundary = "dictee-" + UUID.randomUUID()
-        val payload = ByteArrayOutputStream().apply {
+        val head = ByteArrayOutputStream().apply {
             for ((k, v) in fields) {
                 write("--$boundary\r\nContent-Disposition: form-data; name=\"$k\"\r\n\r\n$v\r\n".toByteArray())
             }
@@ -441,23 +486,30 @@ class RemoteEngine(
                 ("--$boundary\r\nContent-Disposition: form-data; name=\"file\"; filename=\"dictation.wav\"\r\n" +
                     "Content-Type: audio/wav\r\n\r\n").toByteArray(),
             )
-            write(wav)
-            write("\r\n--$boundary--\r\n".toByteArray())
         }.toByteArray()
-        return request("POST", url, "multipart/form-data; boundary=$boundary", payload, readTimeout)
+        val tail = "\r\n--$boundary--\r\n".toByteArray()
+        // Streamed in three parts: no second copy of a WAV of up to ~10 MB.
+        return request("POST", url, "multipart/form-data; boundary=$boundary", listOf(head, wav, tail), readTimeout)
     }
 
-    private fun request(method: String, url: String, contentType: String?, payload: ByteArray?, readTimeout: Int): String {
-        val conn = open(config, url, readTimeout).apply {
-            requestMethod = method
-            if (payload != null) {
-                doOutput = true
-                setFixedLengthStreamingMode(payload.size)
-                setRequestProperty("Content-Type", contentType)
+    private fun request(method: String, url: String, contentType: String?, payload: List<ByteArray>?, readTimeout: Int): String {
+        val conn = try {
+            open(config, url, readTimeout).apply {
+                requestMethod = method
+                if (payload != null) {
+                    doOutput = true
+                    setFixedLengthStreamingMode(payload.sumOf { it.size.toLong() })
+                    setRequestProperty("Content-Type", contentType)
+                }
             }
+        } catch (e: IOException) {
+            throw RemoteException(config.redact("Serveur injoignable : ${e.message ?: e.javaClass.simpleName}"), e, RemoteFailure.UNREACHABLE)
+        } catch (e: RuntimeException) {
+            // e.g. a header value the HTTP stack refuses; its message may quote the value.
+            throw RemoteException(config.redact("Requête impossible : ${e.message ?: e.javaClass.simpleName}"), e, RemoteFailure.BAD_RESPONSE)
         }
         try {
-            if (payload != null) conn.outputStream.use { it.write(payload) }
+            if (payload != null) conn.outputStream.use { out -> payload.forEach { out.write(it) } }
             val code = conn.responseCode
             if (code !in 200..299) throw httpError(config, conn, code)
             return conn.inputStream.bufferedReader().use { it.readText() }
@@ -494,19 +546,25 @@ class RemoteEngine(
                 this.readTimeout = readTimeout
                 instanceFollowRedirects = false
                 setRequestProperty("Accept", "application/json")
-                if (config.apiKey.isNotBlank()) setRequestProperty("Authorization", "Bearer ${config.apiKey.trim()}")
+                if (config.apiKey.isNotBlank()) setRequestProperty("Authorization", "Bearer ${RemoteConfig.cleanHeaderValue(config.apiKey)}")
                 if (config.hasCfAccess) {
-                    setRequestProperty("CF-Access-Client-Id", config.cfAccessClientId.trim())
-                    setRequestProperty("CF-Access-Client-Secret", config.cfAccessClientSecret.trim())
+                    setRequestProperty("CF-Access-Client-Id", RemoteConfig.cleanHeaderValue(config.cfAccessClientId))
+                    setRequestProperty("CF-Access-Client-Secret", RemoteConfig.cleanHeaderValue(config.cfAccessClientSecret))
                 }
             }
 
         internal fun httpError(config: RemoteConfig, conn: HttpURLConnection, code: Int): RemoteException = when (code) {
-            in 300..399 -> RemoteException(
-                "Redirection (HTTP $code) vers la page de connexion de Cloudflare Access : " +
-                    "vérifiez le service token et que la politique de l'application est « Service Auth »",
-                failure = RemoteFailure.ACCESS_REDIRECT, httpCode = code,
-            )
+            in 300..399 -> {
+                val target = runCatching { URI(conn.getHeaderField("Location")).host }.getOrNull().orEmpty()
+                val msg = if (target.isEmpty() || target.contains("cloudflareaccess")) {
+                    "Redirection (HTTP $code) vers la page de connexion de Cloudflare Access : " +
+                        "vérifiez le service token et que la politique de l'application est « Service Auth »"
+                } else {
+                    "Redirection (HTTP $code) vers $target : vérifiez l'adresse (https:// ?) ou la politique Cloudflare Access " +
+                        "(« Service Auth »)"
+                }
+                RemoteException(msg, failure = RemoteFailure.ACCESS_REDIRECT, httpCode = code)
+            }
             401, 403 -> RemoteException(
                 "Accès refusé (HTTP $code) : vérifiez le jeton et le service token Cloudflare Access",
                 failure = RemoteFailure.ACCESS_DENIED, httpCode = code,
@@ -525,7 +583,11 @@ class RemoteEngine(
         /** Checks that the server answers; returns a short human-readable status. Blocking. */
         fun check(config: RemoteConfig): Result<String> = runCatching {
             if (!config.isConfigured) throw RemoteException("Adresse du serveur invalide", failure = RemoteFailure.BAD_RESPONSE)
-            val conn = open(config, config.healthUrl(), 10_000)
+            val conn = try {
+                open(config, config.healthUrl(), 10_000)
+            } catch (e: Exception) {
+                throw RemoteException(config.redact("requête impossible : ${e.message ?: e.javaClass.simpleName}"), e, RemoteFailure.BAD_RESPONSE)
+            }
             try {
                 val code = conn.responseCode
                 if (code !in 200..299) throw httpError(config, conn, code)
@@ -552,6 +614,8 @@ class RemoteEngine(
                 throw e
             } catch (e: IOException) {
                 throw RemoteException(config.redact("injoignable : ${e.message ?: e.javaClass.simpleName}"), e, RemoteFailure.UNREACHABLE)
+            } catch (e: RuntimeException) {
+                throw RemoteException(config.redact("requête impossible : ${e.message ?: e.javaClass.simpleName}"), e, RemoteFailure.BAD_RESPONSE)
             } finally {
                 conn.disconnect()
             }
@@ -608,6 +672,8 @@ class FallbackEngine(
         val whole = remote as? WholeDictationEngine
         if (whole == null) {
             reason = "pas de mode dictée entière"
+        } else if (audio.isEmpty() && segments.isNotEmpty()) {
+            reason = "audio complet indisponible (mémoire)"
         } else if (clock() < skipUntil) {
             reason = "serveur en échec il y a moins de ${retryAfterMillis / 1000} s"
         } else {
@@ -617,11 +683,20 @@ class FallbackEngine(
                 // A user cancel says nothing about the server: no retry delay for it.
                 if (e.failure != RemoteFailure.CANCELLED) skipUntil = clock() + retryAfterMillis
                 reason = e.message
+            } catch (e: InterruptedException) {
+                throw e
+            } catch (e: Exception) {
+                // Anything else (a bug, a refused header): the kept audio still goes local.
+                skipUntil = clock() + retryAfterMillis
+                reason = "erreur : ${e.javaClass.simpleName}"
+            } catch (e: OutOfMemoryError) {
+                reason = "mémoire insuffisante pour l'envoi"
             }
         }
         if (control.mode == WaitControl.Mode.ABANDON) {
             return DictationResult(emptyList(), DictationResult.Source.LOCAL_FALLBACK, transport = "none", fallbackReason = reason)
         }
+        control.localStarted()
         val start = System.nanoTime()
         val engine = localEngine()
         val texts = ArrayList<String>()

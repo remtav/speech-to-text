@@ -373,8 +373,8 @@ Décisions prises pendant le lot, en plus de celles arrêtées dans l'issue.
 - **Limite connue** : si l'utilisateur a choisi « Afficher une erreur » comme
   repli (ou si le modèle de repli n'est pas installé), il n'y a pas de modèle
   local. Une panne du serveur affiche alors une erreur et la dictée est
-  perdue. C'est un choix explicite de l'utilisateur. Le réglage par défaut
-  reste Parakeet, qui ne perd rien.
+  perdue. Les Réglages l'en avertissent, et le bouton Annuler est alors
+  masqué. Le réglage par défaut reste Parakeet, qui ne perd rien.
 
 ### Texte inséré
 
@@ -454,6 +454,61 @@ Décisions prises pendant le lot, en plus de celles arrêtées dans l'issue.
 - `RecordingServer` (builds debug) reçoit désormais la requête entière
   (méthode et chemin), et ajoute un `Location` vers une page Access à ses
   réponses 3xx.
+
+### Revue indépendante (Claude) et corrections
+
+Une revue indépendante du lot (un agent qui n'avait que le code et l'issue) a
+relevé les points suivants. Tous ont été vérifiés dans le code et corrigés :
+
+- **Attente suivie par dictée** : l'indicateur « en attente du serveur » était
+  global. Une dictée abandonnée (le champ change) dont la requête se termine
+  en retard pouvait effacer l'état d'attente de la dictée suivante, qui
+  restait alors sans bouton Annuler. L'indicateur porte désormais le numéro de
+  session, et l'IME le lit dans le contrôleur.
+- **Tâche serveur toujours annulée** : si Annuler ou le délai arrivait pendant
+  l'envoi de `POST /jobs`, la tâche était créée quand même et personne ne
+  l'annulait. Désormais, la tâche est annulée dès que son id arrive. Un échec
+  d'interrogation (502/524 passager de Cloudflare) l'annule aussi. Chaque
+  requête, `GET` compris, tourne sur un fil auxiliaire : Annuler et le délai
+  n'attendent plus une requête bloquée (les E/S réseau d'Android ne
+  s'interrompent pas).
+- **Fin de l'attente dès le repli local** : l'état « Transcription et
+  polissage… » et le bouton Annuler disparaissent dès que le téléphone prend
+  le relais (`WaitControl.onLocalStart`), et non à la fin de la transcription
+  locale.
+- **Pas de modèle de repli** : le bouton Annuler est masqué, puisqu'il ne
+  ferait que perdre la dictée, et les Réglages avertissent qu'une panne du
+  serveur perdrait alors la dictée.
+- **Repli pour toute erreur** : `FallbackEngine` passe au local pour toute
+  exception du chemin distant, pas seulement `RemoteException`, et pour un
+  manque de mémoire pendant l'envoi. La capture rattrape aussi un manque de
+  mémoire en agrandissant son tampon. Si l'audio complet ne peut pas être
+  copié, les segments partent directement au modèle local.
+- **Mémoire** : le corps multipart est écrit en trois morceaux (en-tête, WAV,
+  fin) au lieu d'être copié en entier, ce qui économise environ 20 Mo pour
+  une dictée de 5 min.
+- **Secret** : le Client ID, le secret et le jeton sont nettoyés des
+  caractères invisibles quand on les enregistre et quand on les envoie. Un
+  espace de largeur nulle collé avec le secret ferait sinon lever par la pile
+  HTTP une erreur qui cite la valeur. Tout message d'exception du chemin
+  distant et du test de connexion est expurgé.
+- **États d'interface** :
+  - « Durée maximale atteinte » est une information (`onInfo`), plus une
+    erreur rouge ;
+  - si la capture s'arrête seule (erreur du micro), la dictée passe en
+    « fin », avec Annuler ;
+  - un résultat mis de côté parce que le champ était absent garde ses
+    détails (message de repli ou de polissage) ;
+  - le diagnostic s'arrête quand on quitte l'écran.
+- **Divers** :
+  - une redirection vers un autre hôte que Cloudflare Access est signalée
+    comme telle, avec l'hôte cible ;
+  - un `polished_text` sans objet `polish` est accepté.
+- Nouveaux tests dans `WholeDictationTest` : annulation pendant l'envoi,
+  échec passager d'interrogation, erreur quelconque du chemin distant, fin de
+  l'attente au début du repli local, attente par dictée (dictée abandonnée
+  qui finit en retard), résultat mis de côté, caractères invisibles dans le
+  secret, redirection vers un autre hôte.
 
 ### Pour le point de contrôle
 

@@ -35,6 +35,8 @@ class DictationSession(
     val whole: ((audio: FloatArray, segments: List<FloatArray>, control: WaitControl) -> DictationResult)? = null,
     /** Longest whole dictation; recording stops there and what was said is sent. */
     val maxWholeSeconds: Int = 300,
+    /** False when no local model can take over: "Annuler" would only drop the dictation, so it is hidden. */
+    val canFallBack: Boolean = true,
 )
 
 interface DictationListener {
@@ -46,6 +48,8 @@ interface DictationListener {
     fun onSegment(transcription: Transcription, inserted: String) {}
     /** Whole-dictation mode: waiting for the server (true), or the wait is over (false). */
     fun onServerWait(waiting: Boolean) {}
+    /** Information that is not an error (maximum duration reached). */
+    fun onInfo(message: String) {}
     /** Whole-dictation mode: the result was inserted ([inserted] is what was typed). */
     fun onDictationResult(result: DictationResult, inserted: String) {}
 }
@@ -73,7 +77,10 @@ class DictationController(
 
     private val sessionId = AtomicInteger(0)
 
-    private class PendingText(val session: Int, val pipeline: TextPipeline, val pieces: List<Piece>, val t: Transcription)
+    private class PendingText(
+        val session: Int, val pipeline: TextPipeline, val pieces: List<Piece>, val t: Transcription,
+        val result: DictationResult? = null,
+    )
 
     /** Finals decoded while no field was available. Main thread only. */
     private val pending = ArrayList<PendingText>()
@@ -83,7 +90,11 @@ class DictationController(
         val sink = sinkProvider() ?: return
         val items = pending.filter { it.session == sessionId.get() }
         pending.clear()
-        for (p in items) listener.onSegment(p.t, p.pipeline.apply(p.pieces, sink))
+        for (p in items) {
+            val inserted = p.pipeline.apply(p.pieces, sink)
+            p.result?.let { listener.onDictationResult(it, inserted) }
+            listener.onSegment(p.t, inserted)
+        }
     }
     @Volatile private var run: Run? = null
 
@@ -114,9 +125,14 @@ class DictationController(
         run = Run(id, session).also { it.launch() }
     }
 
-    /** True while a whole dictation waits for the server (the keyboard shows "Annuler"). */
-    @Volatile var waitingServer: Boolean = false
-        private set
+    /** Session whose whole dictation waits for the server, 0 for none. */
+    @Volatile private var waitingFor = 0
+
+    /** True while the current whole dictation waits for the server (the keyboard shows "Annuler"). */
+    val waitingServer: Boolean get() = waitingFor != 0 && waitingFor == sessionId.get()
+
+    /** Whether "Annuler" can hand the dictation to a local model. */
+    val canCancelServerWait: Boolean get() = run?.s?.canFallBack == true
 
     /**
      * "Annuler" while waiting for the server: the server job is cancelled and the
@@ -234,7 +250,8 @@ class DictationController(
                         popped = true
                     }
                     if (wholeMode && totalSamples + CHUNK > maxWhole) {
-                        error = MAX_DURATION_MESSAGE.format(s.maxWholeSeconds / 60)
+                        val info = MAX_DURATION_MESSAGE.format(s.maxWholeSeconds / 60)
+                        post { listener.onInfo(info) }
                         break
                     }
                     if (popped) {
@@ -256,8 +273,9 @@ class DictationController(
                 }
             } catch (_: InterruptedException) {
                 // cancel()
-            } catch (e: Exception) {
-                error = "Erreur audio : ${e.message}"
+            } catch (e: Throwable) {
+                // Also an OutOfMemoryError while growing the whole-dictation buffer: keep what we have.
+                error = "Erreur audio : ${e.message ?: e.javaClass.simpleName}"
             } finally {
                 try { s.audio.stop() } catch (_: Exception) {}
             }
@@ -271,10 +289,16 @@ class DictationController(
                     }
                 } catch (_: Exception) {}
                 if (error != null) setState(DictationState.FINISHING, error)
+                else if (wholeMode && state == DictationState.LISTENING) setState(DictationState.FINISHING) // source ended by itself
                 if (wholeMode) {
                     // Nothing was said: nothing to send. Otherwise drop the leading silence only.
-                    val from = if (segments.isEmpty() && firstSpeech < 0) wholeLen else firstSpeech.coerceIn(0, wholeLen.toLong()).toInt()
-                    val audio = if (segments.isEmpty() && firstSpeech < 0) FloatArray(0) else whole.copyOfRange(from, wholeLen)
+                    val said = segments.isNotEmpty() || firstSpeech >= 0
+                    val from = firstSpeech.coerceIn(0, wholeLen.toLong()).toInt()
+                    val audio = if (!said) FloatArray(0) else try {
+                        if (from == 0 && wholeLen == whole.size) whole else whole.copyOfRange(from, wholeLen)
+                    } catch (_: OutOfMemoryError) {
+                        FloatArray(0) // the local fallback still has the segments
+                    }
                     whole = FloatArray(0)
                     jobs.offer(Job.Whole(id, audio, segments, error))
                 } else {
@@ -338,9 +362,8 @@ class DictationController(
                             break
                         }
                         is Job.Whole -> {
-                            // A max-duration stop is information, not an error.
-                            error = job.error?.takeIf { it != MAX_DURATION_MESSAGE.format(s.maxWholeSeconds / 60) }
-                            if (job.audio.isNotEmpty()) transcribeWhole(job)
+                            error = job.error
+                            if (job.audio.isNotEmpty() || job.segments.isNotEmpty()) transcribeWhole(job)
                             break
                         }
                     }
@@ -369,6 +392,8 @@ class DictationController(
         /** One request for the whole dictation; the result is inserted in one go. */
         private fun transcribeWhole(job: Job.Whole) {
             setWaiting(id, true)
+            // The local fallback ends the server wait: the keyboard drops "Annuler" at once.
+            control.onLocalStart { setWaiting(id, false) }
             val wholeFn = s.whole!!
             val result = try {
                 wholeFn(job.audio, job.segments, control)
@@ -385,7 +410,7 @@ class DictationController(
                     listener.onDictationResult(result, inserted)
                     listener.onSegment(t, inserted)
                 } else {
-                    pending += PendingText(id, s.pipeline, pieces, t)
+                    pending += PendingText(id, s.pipeline, pieces, t, result)
                     if (sink != null) deliverPending()
                 }
             }
@@ -394,11 +419,20 @@ class DictationController(
 
     // ------------------------------------------------------------------ helpers
 
-    @Suppress("UNUSED_PARAMETER")
+    /**
+     * Per session: a dropped dictation still finishing its request in the background
+     * must not end the wait of the next one (or start it).
+     */
+    @Synchronized
     private fun setWaiting(id: Int, waiting: Boolean) {
-        if (waitingServer == waiting) return
-        waitingServer = waiting
-        post { listener.onServerWait(waiting) }
+        if (waiting) {
+            if (waitingFor == id || sessionId.get() != id) return
+            waitingFor = id
+        } else {
+            if (waitingFor != id) return
+            waitingFor = 0
+        }
+        post(id) { listener.onServerWait(waiting) }
     }
 
     private fun post(block: () -> Unit) = mainExecutor.execute(block)
