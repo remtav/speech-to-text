@@ -95,6 +95,7 @@ class SherpaEngine(
                         // language chosen by the user is forced (AppSettings.engineOptions).
                         language = options.language,
                         task = "transcribe",
+                        tailPaddings = WhisperTuning.sanitizeTailPaddings(options.whisperTailPaddings),
                     ),
                     tokens = path("turbo-tokens.txt"),
                     modelType = "whisper",

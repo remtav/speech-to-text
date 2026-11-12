@@ -28,6 +28,7 @@ import io.github.remtav.dictee.stt.RemoteEngine
 import io.github.remtav.dictee.stt.RemoteLog
 import io.github.remtav.dictee.stt.DictationResult
 import io.github.remtav.dictee.stt.WholeDictationEngine
+import io.github.remtav.dictee.stt.WhisperTuning
 import io.github.remtav.dictee.text.RuleCleaner
 import java.io.File
 
@@ -141,8 +142,8 @@ class DicteeApp : Application() {
             vad = vad,
             pipeline = pipeline,
             transcribe = { samples -> engines.use(spec, options) { it.transcribe(samples) } },
-            // A provisional decode per 0.7 s would be one HTTP request each: off for the server.
-            partials = settings.partials && spec.family != ModelFamily.REMOTE,
+            // A provisional decode per 0.7 s would be one HTTP request each: off for the server. Off for Whisper too (too slow, see WhisperTuning).
+            partials = WhisperTuning.provisionalAllowed(spec, settings.partials),
             // The server gets the whole dictation in one request, polished (issue #13).
             whole = if (spec.family != ModelFamily.REMOTE) null else { audio, segments, control ->
                 engines.use(spec, options) { engine ->

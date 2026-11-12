@@ -11,6 +11,7 @@ import io.github.remtav.dictee.stt.ModelFamily
 import io.github.remtav.dictee.stt.RemoteApi
 import io.github.remtav.dictee.stt.RemoteConfig
 import io.github.remtav.dictee.stt.ModelSpec
+import io.github.remtav.dictee.stt.WhisperTuning
 import io.github.remtav.dictee.text.Vocabulary
 
 enum class CleanupMode(val label: String) {
@@ -60,6 +61,11 @@ class AppSettings(context: Context) {
     var partials: Boolean
         get() = prefs.getBoolean("partials", true)
         set(v) = prefs.edit().putBoolean("partials", v).apply()
+
+    /** Silence added to each Whisper segment, see [WhisperTuning]; only the allowed values, default 1000. */
+    var whisperTailPaddings: Int
+        get() = WhisperTuning.sanitizeTailPaddings(prefs.getInt("whisper_tail_paddings", WhisperTuning.DEFAULT_TAIL_PADDINGS))
+        set(v) = prefs.edit().putInt("whisper_tail_paddings", WhisperTuning.sanitizeTailPaddings(v)).apply()
 
     /** The "Comment dicter" screen has been opened (by itself at the end of the first setup, or by the user): it opens by itself only once. */
     var howToShown: Boolean
@@ -177,6 +183,7 @@ class AppSettings(context: Context) {
                 else -> ""
             },
             acceleration = acceleration,
+            whisperTailPaddings = WhisperTuning.tailPaddingsFor(spec, whisperTailPaddings),
             // Only these use hotwords: keeping them out of the other models' options means a
             // vocabulary edit does not reload an on-device model that ignores them.
             hotwords = if (spec.family == ModelFamily.QWEN3_ASR || remote) vocabulary.favoured else emptyList(),

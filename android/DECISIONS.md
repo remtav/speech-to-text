@@ -2904,3 +2904,33 @@ Décisions proposées (à confirmer par l'utilisateur ; rien n'est appliqué) :
    rapides sur segments courts ; distil-large-v3 est anglais seulement), whisper.cpp, QNN (étude séparée si Whisper devient
    courant). Le modèle québécois en évaluation par ailleurs a la même architecture donc la même vitesse : ces leviers
    lui sont applicables tels quels.
+
+### Mise en œuvre du 2026-11-12 (les deux gains les plus sûrs, plus l'écran de comparaison)
+
+Décisions 1 et 2 ci-dessus appliquées à la demande de l'utilisateur ; la 3 reste à faire sur le téléphone, la 4 inchangée.
+
+- **Plus de texte provisoire avec Whisper** (turbo et québécois) : `WhisperTuning.provisionalAllowed(spec, réglage)`
+  (`stt/WhisperTuning.kt`) est faux pour Whisper et pour le serveur, quel que soit le réglage « Texte provisoire » ; il le
+  suit pour Parakeet et Qwen3-ASR. Pas de réglage de remplacement : l'aide du réglage dit qu'il est sans effet avec Whisper.
+  Raison : mesuré sur l'hôte, les provisoires consomment 2,8 fois le calcul du final et le retardent de 1,5 s en moyenne.
+  Aucun test existant ne supposait du texte provisoire avec Whisper (`ControllerTest` et `ImeInstrumentedTest` utilisent un
+  moteur simulé de spec Parakeet ou le réglage seul ; vérifié).
+- **Réglage avancé « Silence ajouté pour Whisper »** (Réglages > Performance) : champ sherpa-onnx 2.0.1
+  `OfflineWhisperModelConfig.tailPaddings`, `Int` (vérifié par `javap`). `EngineOptions.whisperTailPaddings`, stocké par
+  `AppSettings.whisperTailPaddings`. Choix : **1 000 (défaut, valeur d'origine)**, 600 (plus rapide), 300 (encore plus
+  rapide, peut répéter des phrases) ; une valeur stockée hors de ces trois se relit 1 000. Passé à Whisper seulement ; pour les
+  autres modèles `engineOptions` met toujours 1 000, donc la clé de `EngineManager` ne change pas et rien ne se recharge ;
+  pour Whisper, changer la valeur recharge le modèle.
+- **Défaut gardé à 1 000** : le comportement ne change pas tant que l'utilisateur n'a pas validé 600 sur son téléphone (la
+  mesure hôte, −36 % de calcul à 600, ne dit rien de la qualité sur ses voix et ses mots isolés ; WER hôte 14,7 % contre
+  9,3 % à 300).
+- **« Comparer les modèles »** : `Benchmark` accepte des options par modèle ; l'écran passe `engineOptions(modèle)` (langue
+  forcée si une seule langue, threads, accélération, silence ajouté) au lieu d'options calquées sur le serveur. Effet de bord
+  voulu : Qwen3-ASR y reçoit aussi sa langue forcée et ses mots favorisés, comme au clavier. L'en-tête du rapport indique la
+  valeur du silence ajouté et la langue de Whisper.
+- **Tests** : `WhisperTuningTest` (provisoire, défaut, valeurs acceptées, valeur transmise à Whisper seulement, clé du moteur) ;
+  `ModelAccuracyHostTest.whisperTurbo*` (avec `-PmodelsDir`) vérifie que Whisper se charge avec le nouveau champ.
+- **Pas fait, volontairement** : filtre de phrase répétée, threads par défaut, décodage à blanc, XNNPACK/NNAPI/QNN.
+- **À mesurer sur le téléphone** : temps et texte de « friperie », d'une phrase de 5 s et de 15 s à 1 000, 600 et 300 (écran
+  « Comparer les modèles », une exécution par valeur) ; ne passer le défaut à 600 que sans répétition ni mot manquant sur
+  5 essais par valeur (ce serait un changement de défaut, donc une nouvelle décision) ; puis les threads (3 à 5).

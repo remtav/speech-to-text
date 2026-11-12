@@ -47,6 +47,8 @@ class Benchmark(
     private val factory: SttEngineFactory,
     private val dirFor: (ModelSpec) -> File,
     private val options: EngineOptions = EngineOptions(),
+    /** Options per model; the comparison screen passes the dictation's own (forced language, Whisper padding). */
+    private val optionsFor: (ModelSpec) -> EngineOptions = { options },
 ) {
     fun interface Progress {
         fun onProgress(message: String)
@@ -63,7 +65,7 @@ class Benchmark(
         try {
             progress.onProgress("Chargement de ${spec.shortName}…")
             val t0 = System.nanoTime()
-            engine = factory.create(spec, dirFor(spec), options)
+            engine = factory.create(spec, dirFor(spec), optionsFor(spec))
             val loadMillis = (System.nanoTime() - t0) / 1_000_000
             val results = samples.map { s ->
                 progress.onProgress("${spec.shortName} : ${s.name}")
@@ -80,7 +82,7 @@ class Benchmark(
             }
             return ModelResult(spec, engine.provider, loadMillis, sampler.stop(), baseline, results)
         } catch (e: Throwable) {
-            return ModelResult(spec, options.acceleration.provider, 0, sampler.stop(), baseline, emptyList(),
+            return ModelResult(spec, optionsFor(spec).acceleration.provider, 0, sampler.stop(), baseline, emptyList(),
                 error = e.message ?: e.javaClass.simpleName)
         } finally {
             engine?.release()

@@ -51,6 +51,12 @@ data class EngineOptions(
     val remote: RemoteConfig? = null,
     /** Local model used when the server cannot be reached (null: no fallback). */
     val remoteFallback: ModelSpec? = null,
+    /**
+     * Frames of silence sherpa-onnx appends to each Whisper segment (`tailPaddings` of
+     * OfflineWhisperModelConfig, Int; 100 frames = 1 s). Whisper only: other models always
+     * carry the default, so changing the setting never reloads them. See [WhisperTuning].
+     */
+    val whisperTailPaddings: Int = WhisperTuning.DEFAULT_TAIL_PADDINGS,
 ) {
     companion object {
         fun defaultThreads(): Int = Runtime.getRuntime().availableProcessors().coerceIn(1, 4)
