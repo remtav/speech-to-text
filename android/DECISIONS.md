@@ -1401,3 +1401,180 @@ Règle proposée à implémenter (point de départ pour 2.2, à valider par test
   commandes ; leur page « Dicter du texte » (iph2c0651d2) n'a été lue que sur
   la version fr-afri.
 - Les formes marquées U ne sont pas tirées d'une source officielle.
+
+## Issue #15, lot 2 — étape 2.2 : commandes de ponctuation et typographie
+
+Code : `text/CommandTable.kt` (nouveau), `text/VoiceCommands.kt`, `text/TextAssembler.kt`,
+`dictation/TextPipeline.kt`, `DicteeApp.kt` (langues transmises au pipeline), texte d'aide
+du réglage « Commandes vocales ». Liste initiale de l'issue seulement, sans ajout de signe
+(commentaire « Mode d'exécution »).
+
+### Table unique
+
+`CommandTable.entries` décrit chaque commande une fois par langue : `Command` (signe ou
+action, avec son `CommandKind` : signe ouvrant, signe fermant, mise en forme, effacement),
+`CommandLanguage` (FRENCH, ENGLISH), les formulations (`CommandForm` : texte affichable,
+sources A/G/U, `Strictness`), ce qui est produit (`produces`) et un exemple
+`CommandExample(said, result, before)`. La première formulation est la forme principale à
+afficher. L'analyse (`VoiceCommands.parse`) ne lit que cette table ; un test vérifie que
+chaque exemple donne exactement son résultat dans le pipeline, pour que l'écran « Comment
+dicter » de l'étape 2.3 (à générer depuis `CommandTable.active(langues)`) ne puisse pas
+diverger. Les commandes existantes (nouvelle ligne, nouveau paragraphe, effacements) y
+sont migrées avec toutes leurs formes, y compris « retour à la ligne », « next line »,
+« next paragraph » et « scratch that », qui existaient avant 2.1 (marquées U).
+
+Formulations retenues (source entre parenthèses, voir l'étape 2.1) :
+
+| Commande | Français | Anglais |
+| --- | --- | --- |
+| `«` / `“` | ouvrir / ouvrez / ouvre les guillemets, ouvrir guillemet(s) (U) ; guillemet ouvrant, guillemets ouvrants (A) ; guillemet(s) ouvert(s) (U) | open quote(s), begin quote(s) (U) |
+| `»` / `”` | fermer / fermez / ferme les guillemets, fermer guillemet(s) (U) ; guillemet fermant, guillemets fermants (A) ; guillemet(s) fermé(s) (U) | end quote (A) ; close quote(s), end quotes (U) |
+| `:` | deux-points ; deux points, sans trait d'union (A, iPhone), traité comme homographe | colon (A), homographe |
+| `;` | point-virgule (A) ; « point virgule » est reconnu aussi (le trait d'union est ignoré à la comparaison) | semicolon (A), semi colon (U) |
+| `(` | ouvrir / ouvrez / ouvre la parenthèse, ouvrir parenthèse (U) ; parenthèse ouvrante (A) | open parenthesis (A) ; open parentheses, open paren (U) |
+| `)` | fermer / fermez / ferme la parenthèse, fermer parenthèse (U) ; parenthèse fermante (A) | close parenthesis (A) ; close parentheses, close paren (U) |
+| `?` | point d'interrogation (A, G) | question mark (A, G) |
+| `!` | point d'exclamation (A, G) | exclamation mark (A), exclamation point (A, G) |
+| nouvelle ligne | nouvelle ligne (A, G), à la ligne (A), retour à la ligne (U) | new line (A, G), newline, next line (U) |
+| nouveau paragraphe | nouveau paragraphe (A, G) | new paragraph (A, G), next paragraph (U) |
+| effacements | efface / effacer / effacez / supprime / supprimer / supprimez la dernière phrase, … le dernier mot (U) | delete (the) last sentence, scratch that, delete (the) last word (U) |
+
+Écartées, comme le proposait 2.1 : « guillemet(s) » seul (Apple fr-ca, iPhone) et « quote »
+seul (Apple EN), trop exposés aux faux positifs ; « unquote » (non sourcé, et « quote
+unquote » est une expression).
+
+### Langues actives
+
+- Français (Québec ou France) → formulations françaises ; anglais → anglaises ; les deux si
+  les deux sont choisis. Une formulation anglaise dans une dictée « français seulement »
+  reste du texte.
+- **Autres langues seulement** (espagnol, etc.) : aucune commande de ponctuation (ce
+  seraient des mots français ou anglais au milieu d'une autre langue) ; les commandes de
+  mise en forme et d'effacement FR et EN restent actives, comme avant 2.2. Choix prudent :
+  aucun comportement existant ne disparaît, rien de nouveau ne s'ajoute.
+- Le réglage « Commandes vocales » désactivé coupe tout, comme avant.
+
+### Règle de déclenchement
+
+En deux phrases : **une formulation n'est une commande que si le mot qui la précède n'en
+fait pas un nom ou un verbe ordinaire (déterminant, nombre, possessif, préposition, verbe
+modal ; un adjectif courant comme « gros » est sauté) et si le mot qui la suit ne prolonge
+pas un groupe nominal (« pour », « de », « qui »…). Les homographes (« deux points » sans
+trait d'union, « colon ») doivent en plus être détachés des deux côtés (ponctuation ou bord
+de segment) ou suivis d'une autre commande.**
+
+Détails :
+
+- Les mots d'une formulation doivent se suivre, séparés seulement par des espaces ou des
+  traits d'union (« point, virgule » n'est pas « point-virgule »). Accents, majuscules et
+  traits d'union sont ignorés à la comparaison ; « deux-points » écrit avec trait d'union
+  par le modèle est la forme normale, « deux points » sans trait d'union la forme homographe.
+- Une commande voisine acceptée compte comme une ponctuation (calcul itératif jusqu'à
+  stabilité). C'est ce qui fait marcher l'exemple de l'issue en plein milieu de phrase, sans
+  aucune ponctuation du modèle : « ouvrir les guillemets » est accepté (précédé de
+  « points », suivi de « bonjour »), donc « deux points » est suivi d'une commande et
+  l'est aussi.
+- Mise en forme (nouvelle ligne, nouveau paragraphe) : règle d'avant 2.2 inchangée,
+  ponctuation, bord de segment ou commande des deux côtés. Effacements : segment entier.
+- Un guillemet ou une parenthèse fermante sans ouvrant correspondant dans le texte avant le
+  curseur, ou un signe fermant en tout début de champ ou de ligne, n'est pas inséré : les
+  mots dits sont tapés à la place.
+- Pourquoi pas la règle d'avant (ponctuation des deux côtés) pour tout : l'exemple de
+  l'issue n'a aucune ponctuation, et les modèles ne mettent pas de virgules fiables autour
+  des noms de signes. Pourquoi les mots voisins plutôt qu'un mot-clé d'activation : l'issue
+  l'exclut (« la commande est le nom du signe »). Les faux positifs observés dans les
+  phrases pièges viennent presque tous d'un déterminant ou d'un nombre juste avant.
+- Dans le doute, pas de commande : « il a dit deux points, bonjour » (sans trait d'union,
+  précédé d'un verbe, suivi de texte) reste du texte, parce qu'il a la même forme que
+  « j'ai marqué deux points, puis… ».
+
+Phrases pièges couvertes par `FalsePositiveTest` (aucune commande) : 21 en français
+(« J'ai marqué deux points. », « C'est un point d'interrogation pour moi. », « Il a ouvert
+les guillemets. », « Il faut ouvrir les guillemets ici. », « Ça reste un gros point
+d'interrogation. », « Il y a deux points de vue. », « Il a dit point, virgule, et rien
+d'autre. »…) et 13 en anglais (« That's a question mark for me. », « My colon hurts. »,
+« Colon cancer screening saves lives. », « I love that quote. », « Open quotes on the
+website are free. »…).
+
+### Doublons avec la ponctuation du modèle
+
+- **Avant le signe dicté** : le signe remplace la marque du modèle juste avant lui, dans le
+  même segment ou à la fin du texte déjà inséré : le même signe, ou une virgule, un point,
+  un deux-points, un point-virgule qui ne marquait qu'une pause (« C'est vrai. » puis
+  « Point d'interrogation. » → `C'est vrai?`). Pour `»` et `)`, le point, `?` et `!`
+  avant le signe sont gardés (`« Je viens. »` est correct). Des points de suspension ne
+  sont jamais retirés.
+- **Après le signe dicté** : la ponctuation que le modèle met juste après la commande est
+  retirée (même signe, virgule, point, deux-points, point-virgule) ; après `»` et `)`,
+  seul le même signe est retiré (`« bonjour », dit-il` garde sa virgule).
+- Un segment qui ne contient que des commandes perd la ponctuation du modèle autour
+  d'elles (« Fermer les guillemets. » dit seul ne laisse pas de point).
+
+### Typographie (`TextAssembler.sign`)
+
+| Variante | `:` | `;` `?` `!` | guillemets | `(` `)` |
+| --- | --- | --- | --- | --- |
+| Québec (OQLF) | espace insécable avant | rien avant | `«` + insécable … insécable + `»` | espace avant `(`, rien à l'intérieur |
+| France | espace insécable avant | espace insécable avant | `«` + insécable … insécable + `»` | idem |
+| Anglais | rien avant | rien avant | `“…”` sans espace intérieure | idem |
+
+- **Quelle variante** : la langue de la formulation dite décide français ou anglais (dans
+  une dictée bilingue, « question mark » est typographié à l'anglaise et « point
+  d'interrogation » à la française). Pour le français : France seulement si « Français
+  (France) » est choisi sans « Français (Québec) » ; sinon Québec, y compris quand les deux
+  sont choisis (la règle de l'OQLF ajoute moins d'espaces, et son absence d'espace devant
+  `;` `?` `!` est répandue en France aussi).
+- **Espace insécable U+00A0, pas l'espace fine U+202F**, y compris pour la France : le texte
+  s'affiche dans la police de l'application hôte, que nous ne contrôlons pas, et U+00A0
+  existe dans toutes les polices ; U+202F est absente de certaines (carré vide). L'espace
+  fine reste permise par l'OQLF et le Lexique, pas exigée.
+- **Seuls les signes dictés sont typographiés.** La ponctuation produite par le modèle est
+  insérée telle quelle : la modifier toucherait tout le texte dicté, y compris les heures
+  (13:52), les adresses, les rapports et les phrases anglaises d'une dictée bilingue.
+- Heure dictée : un `:` dicté entre deux chiffres (« 13 deux-points 52 ») est collé
+  (« 13:52 ») ; une heure écrite par le modèle n'est jamais touchée.
+- Pas d'espace entre une apostrophe et un guillemet ouvrant (`l'« outil »`), règle de
+  l'OQLF relevée en 2.1.
+- Majuscule après `?` et `!` (fin de phrase), pas après `:` ni `;`. Après un guillemet ou
+  une parenthèse ouvrante en début de phrase, la phrase commence encore : majuscule
+  (`« Bonjour »`). Pas de double espace : les espaces avant un signe fermant sont
+  retirés, une seule espace (sécable) suit.
+
+### Limites connues
+
+- « deux points » sans trait d'union suivi d'un mot ordinaire (« il a dit deux points
+  bonjour ») n'est pas reconnu : c'est le prix du « dans le doute, pas de commande ». La
+  forme avec trait d'union, une pause après la commande ou une commande juste après
+  (« ouvrir les guillemets ») la font reconnaître. Ce que chaque modèle écrit réellement
+  (« deux-points » ou « deux points ») est à vérifier en dictant.
+- Les listes de mots bloquants sont courtes et écrites à la main ; une phrase ordinaire
+  sans déterminant (« Ouvrir les guillemets, c'est facile. ») peut déclencher une commande.
+- Une commande coupée par une pause au milieu (« point » / « d'interrogation » dans deux
+  segments) n'est pas reconnue.
+- Le modèle peut lui-même transformer « deux-points » en `:` ou « point d'interrogation »
+  en `?` : alors aucune commande n'est vue et sa ponctuation reste telle quelle (sans
+  insécable).
+- Le texte provisoire (soulignement pendant la parole) montre les mots dits ; la
+  commande ne s'applique qu'au texte final.
+- Mode serveur : non vérifié ici (étape 2.4).
+
+### Tests
+
+`TextTest.kt` : `PunctuationCommandsTest` (exemple de l'issue de bout en bout dans le
+pipeline, en un segment avec et sans trait d'union, avec la ponctuation du modèle et en
+plusieurs segments ; chaque commande FR et EN ; langues actives ; autres langues ; réglage
+désactivé ; fermant sans ouvrant ; heure), `FalsePositiveTest` (34 phrases pièges),
+`DuplicateSignTest`, `TypographyTest` (Québec, France, les deux, anglais, apostrophe,
+majuscules, doubles espaces, heure du modèle intacte, ponctuation du modèle non
+typographiée, `SignEdit` unitaire), `CommandTableTest` (couverture exacte de la liste,
+langues actives, aucune formulation partagée, chaque forme reconnue seule, chaque exemple
+d'aide reproduit par le pipeline, chaque forme sourcée). Tests instrumentés
+(`VoiceCommandInstrumentedTest`) : langues FR + EN posées avant chaque test, plus la dictée
+scriptée de l'issue (`Il a dit : « bonjour »` avec insécables), le `?` qui remplace le
+point du segment précédent et « J'ai marqué deux points. » qui reste du texte.
+
+À essayer en dictant (vérification humaine) : l'exemple de l'issue d'un trait et avec
+pauses ; « deux-points » suivi d'une liste ; des phrases ordinaires contenant « deux
+points », « point d'interrogation », « guillemets » ; une dictée en France (réglage
+« Français (France) » seul) pour voir les insécables devant `;` `?` `!` ; l'affichage des
+insécables dans les applications courantes (messagerie, courriel).
