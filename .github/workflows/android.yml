@@ -6,7 +6,9 @@ name: Android
 # publishes the APK as a GitHub release.
 
 on:
+  # Branches are covered by their pull request; a push only matters on main (release).
   push:
+    branches: [main]
     paths:
       - "android/**"
       - ".github/workflows/android.yml"
