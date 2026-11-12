@@ -153,6 +153,10 @@ android {
 
     buildFeatures { buildConfig = true }
 
+    // Issue #15, step 3.3: the polishing evaluation set and the simulation lexicon are packaged in
+    // the TEST APK only (androidTest assets), for LlmPolishRecordingTest on a phone. Not in the app.
+    sourceSets.getByName("androidTest").assets.srcDir("src/test/resources/polissage")
+
     packaging {
         jniLibs { useLegacyPackaging = true }
     }

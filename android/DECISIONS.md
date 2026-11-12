@@ -2012,3 +2012,274 @@ le dispositif ne compte rien par erreur (`identityCorrectsNothingAndDamagesNothi
   modifié depuis l'enregistrement) ou absente compte comme erreur, jamais
   comme réussite. Les approches à LLM ne sont pas bloquées par la garde : le
   rapport de l'étape 3.4 tranche avec les chiffres.
+
+## Issue #15, lot 3 — étape 3.3 : petit LLM local, garde-fou assoupli, combinaison
+
+Approches 3 (petit LLM local, prompt élargi) et 4 (règles d'abord, LLM sur
+les cas probables). **Code d'évaluation seulement, hors du chemin par
+défaut** : nouveaux fichiers sous `app/src/main/java/io/github/remtav/dictee/cleanup/eval/`,
+appelés par aucun écran, aucun réglage, ni `DicteeApp` ni `TextPipeline` ;
+`CleanupMode`, `LlmCleaner`, son prompt et `SafetyCheck` sont inchangés.
+L'application se comporte exactement comme avant.
+
+**Aucun LLM n'a tourné pendant cette étape** (MediaPipe n'existe que pour
+arm64, le conteneur est x86-64). Tous les chiffres ci-dessous sont soit des
+propriétés du garde-fou (testables ici), soit des **simulations** nommées
+comme telles. Les vraies sorties, la latence et la mémoire restent **à faire
+sur le téléphone** (procédure plus bas).
+
+### Fichiers
+
+| Fichier | Rôle |
+| --- | --- |
+| `cleanup/eval/RelaxedSafetyCheck.kt` | garde-fou assoupli (spécification ci-dessous) |
+| `cleanup/eval/WidePrompt.kt` | prompt élargi (gabarits ChatML pour Qwen, Gemma) et `LexiconHints` |
+| `cleanup/eval/EvalPolishers.kt` | `LlmCall`, `GuardedLlmPolisher` (approche 3), `ProbableCaseDetector`, `SegmentClass`, `ProvisionalProbableCaseDetector`, `RulesThenLlmPolisher` (approche 4) |
+| `src/test/.../cleanup/eval/RelaxedSafetyCheckTest.kt` | 24 tests du garde-fou, sorties de LLM simulées bonnes et mauvaises |
+| `src/test/.../polish/LlmSimulationTest.kt` | plafond, protection, simulations, génération des fichiers `simulation-*` |
+| `src/test/resources/polissage/lexique-simulation.txt` | lexique de simulation (voir limites) |
+| `src/test/resources/polissage/sorties/simulation-*.tsv` | 6 sorties simulées, rejouées par le noteur de l'étape 3.1 |
+| `src/androidTest/.../LlmPolishRecordingTest.kt` | enregistrement sur téléphone (ignoré sans argument) |
+| `app/build.gradle.kts` | le jeu et le lexique sont copiés dans les assets de l'**APK de test** seulement |
+
+### Approche 3 : prompt élargi
+
+`WidePrompt.system` (consignes en anglais, que les petits modèles suivent
+mieux, exemples français et anglais) : corriger **seulement** les noms de
+produits et techniques (`git hub` → `GitHub`), les noms de lieux et
+d'institutions du Québec (`lac Saint Jean` → `Lac-Saint-Jean`), les lettres
+épelées et codes postaux, les adresses web et courriels dits à voix haute
+(`info arobase uqar point ca` → `info@uqar.ca`) ; recopier tout le reste
+lettre pour lettre, **même un mot rare, familier ou qui semble mal écrit**,
+avec une liste de mots d'ici à ne pas toucher (friperie, poudrerie,
+dépanneur, cégep, pourvoirie, achalandage, tabagie, clavardage, achaler,
+pantoute, magasiner, tuque, frette, char, chum) ; ne jamais ajouter,
+retirer, traduire, réordonner, reformuler ; ne pas toucher la ponctuation ni
+les majuscules hors des noms corrigés ; ne jamais inventer d'adresse.
+`LexiconHints` ajoute au prompt au plus 12 noms du lexique proches d'un
+groupe de 1 à 3 mots du segment (prompt court, donc latence contenue).
+
+Différences avec `LlmCleaner` : pas de `RuleCleaner` avant (les hésitations
+restent le travail du prompt de production), pas de seuil de 4 mots (« Va
+voir coiffe rimouski point com » est court), pas de délai de 4 s dans la
+variante (le test sur téléphone mesure la latence réelle ; l'étape 3.4
+compte les appels au-delà de 4 s).
+
+### Spécification du garde-fou assoupli
+
+`RelaxedSafetyCheck.check(entrée, sortie, options)` accepte la sortie
+seulement si elle se **dérive** de l'entrée, de gauche à droite, par une
+suite de réécritures autorisées, chacune consommant une suite contiguë de
+jetons de l'entrée et produisant une suite contiguë de jetons de la sortie
+(programmation dynamique, la dérivation acceptée est rendue dans `steps`).
+Jetons : mots (lettres et chiffres, traits d'union et apostrophes internes,
+élisions françaises séparées : `l'`, `assurance`), signes isolés, et
+adresses entières. Les espaces ne comptent que comme espacement avant un
+jeton, qui doit être conservé.
+
+| Règle | Permis | Exemple |
+| --- | --- | --- |
+| `KEEP` | même jeton, même texte (NFC, ’ = '), même espacement | |
+| `MIXED_CASE` | 1 à 3 mots de lettres → 1 mot, mêmes lettres, casse « mixte » (majuscule après la 1re lettre et à chaque jonction, au moins une minuscule) | `git hub` → `GitHub`, `iphone` → `iPhone` |
+| `HYPHEN_JOIN` | 2 à 4 mots joints par des traits d'union, lettres et casse inchangées, 1re lettre majuscule | `Rivière du Loup` → `Rivière-du-Loup` |
+| `SPELLING` | 3 lettres épelées ou plus (virgules ou tirets entre elles permis) → un mot de exactement ces lettres, casse libre | `G, A G N O N` → `Gagnon` |
+| `POSTAL_CODE` | lettres, chiffres et chiffres dits qui forment exactement un code postal → `A1A 1A1` | `G cinq L trois A un` → `G5L 3A1` |
+| `ADDRESS` | lecture fixe : `point`/`dot` = `.`, `arobase`/`at`/`a commercial` = `@`, `barre oblique`/`slash` = `/`, `tiret`/`dash`/`trait d'union` = `-`, espaces retirés, accents et casse repliés, lettres épelées jointes ; l'adresse doit être en minuscules, **égale exactement** à cette lecture, finir par un domaine connu (com, ca, org, net…) ; aucun mot-outil (de, des, la, the…) dans le passage | `québec point ca` → `quebec.ca` |
+| `LEXICON_FORM` | avec un lexique : le passage épelle une entrée, casse, accents, espaces, traits d'union et apostrophes mis à part | `Trois Rivieres` → `Trois-Rivières` |
+| `LEXICON_NEAR` | **désactivé par défaut** (`allowLexiconNear`) : 1 à 3 mots à faible distance d'édition d'un nom du lexique (0 sous 5 lettres, puis (n + 2) / 4), sans avaler un mot voisin (refusé si le passage sans son premier ou dernier mot est aussi proche) ; ou une adresse à distance ≤ max(1, n / 6) d'une adresse du lexique | `Drawbox` → `Dropbox` |
+
+**Tout le reste est refusé** : mot ajouté, retiré, remplacé (hors lexique),
+réordonné ; ponctuation ou espacement changé ; majuscule simple d'un mot
+ordinaire (`Fin de semaine`) ; préambule (« Voici le texte corrigé : ») ;
+saut de ligne ajouté ; chiffre changé ; adresse modifiée d'une lettre,
+complétée (`www.`, `https://`) ou au domaine changé ; sortie vide ou plus de
+deux fois plus longue. Un mot ne peut devenir qu'une entrée du lexique,
+jamais autre chose : `friperie` → `fripperie` est refusé dans toutes les
+configurations.
+
+Le lexique serait le vocabulaire de l'utilisateur plus la liste livrée par
+l'étape 3.2. Sans lexique, seules les réécritures qui ne changent aucune
+lettre (casse mixte, traits d'union, épellation, code postal, adresse)
+passent.
+
+**Tests** (`RelaxedSafetyCheckTest`, 24 tests) : chaque transformation
+permise ; et, avec les options les plus permissives (lexique + proximité),
+le refus d'hypercorrections de mots rares (`fripperie`, `CEGEP`, `Cégep`,
+`froid` pour `frette`, `voiture` pour `char`…), d'hallucinations, de
+traductions, de reformulations, de changements de ponctuation et
+d'espacement, d'adresses inventées ou altérées, des pièges des contrôles
+(`la bulle des point com` → `des.com`, `arobase` → `@`, `point final` →
+`.`), de changements de nombres, de remplacements hors lexique et
+d'épellations incomplètes.
+
+### Modèles vérifiés (le 2026-11-12)
+
+- **Qwen2.5 0,5B et 1,5B Instruct** (`.task` q8, Apache-2.0,
+  `litert-community` sur Hugging Face) : déjà dans `LlmCatalog`, inchangés.
+- **MediaPipe LLM Inference** : la dernière version de
+  `com.google.mediapipe:tasks-genai` sur le dépôt Maven de Google est
+  **0.10.35** (celle du projet ; métadonnées du 2026-04-27). Les pages de
+  documentation MediaPipe LLM Inference renvoient maintenant vers LiteRT-LM
+  (mise à jour du 2026-10-06) ; les résultats de recherche citent la
+  documentation officielle disant que l'API Android est en maintenance
+  seulement (dépréciée) et recommandant LiteRT-LM.
+- **Modèle plus récent et petit au format `.task`** : un seul vérifiable,
+  `litert-community/Gemma3-1B-IT` (fichier `gemma3-1b-it-int4.task`, 555 Mo,
+  aussi en q8 ~1,05 Go), **licence Gemma** (conditions d'utilisation de
+  Google, pas Apache) et **dépôt à accès restreint** (il faut un compte
+  Hugging Face et accepter la licence pour télécharger) : incompatible avec
+  le téléchargement anonyme de l'application, donc **pas ajouté** au
+  catalogue. Il peut être mesuré par le test sur téléphone (fichier poussé,
+  `-e llmTemplate gemma`).
+- **Non retenus** : Qwen3-0.6B (Apache-2.0, 328 Mio en int4), Qwen3.5-0.8B,
+  SmolLM2-360M, LFM2.5-1.2B : publiés seulement en `.litertlm`, qui demande
+  le moteur LiteRT-LM (`com.google.ai.edge.litertlm:litertlm-android`,
+  0.19.1), une nouvelle dépendance ; que `tasks-genai` 0.10.35 charge un
+  `.litertlm` n'a pas été vérifié. Passer à LiteRT-LM est une décision à
+  part (hors de cette étape), à reconsidérer puisque MediaPipe LLM Inference
+  n'évolue plus sur Android.
+
+Sources : `https://huggingface.co/api/models?author=litert-community`,
+`https://huggingface.co/litert-community/Qwen3-0.6B`,
+`https://dl.google.com/android/maven2/com/google/mediapipe/tasks-genai/maven-metadata.xml`,
+`https://developers.google.com/edge/mediapipe/solutions/genai/llm_inference/android`.
+
+### Chiffres calculés ici
+
+**(a) Plafond du garde-fou** : part des 79 cas à corriger acceptée si le LLM
+rendait exactement le texte attendu (`ceilingOfTheRelaxedGuard`, chiffres
+épinglés dans le test).
+
+| Configuration | Acceptés | noms-propres | toponymes | web | courriel | épellation |
+| --- | --- | --- | --- | --- | --- | --- |
+| sans lexique | 28/79 (35 %) | 7/14 | 2/27 | 5/16 | 4/11 | 10/11 |
+| lexique (forme) | 36/79 (46 %) | 9/14 | 8/27 | 5/16 | 4/11 | 10/11 |
+| lexique + proximité | 44/79 (56 %) | 12/14 | 13/27 | 5/16 | 4/11 | 10/11 |
+
+Les 35 refus restants sont voulus : nom trop déformé pour être rapproché
+(`J-Hub`, `Chebouk`, `Iroqebac`, `Auchas` → `Hochelaga`), mot voisin avalé
+(`et Mouski` → `Rimouski`), adresse dont la transcription a perdu ou changé
+des lettres (`coiffrimouski.com`, `kelmia.ca`, `kalmea.ca slash contact`,
+`remy@kelmia.com`) : rétablir ces adresses, c'est inventer des lettres, ce
+que le garde-fou interdit sauf si l'adresse est dans le lexique.
+
+**(a bis) Protection des 53 contrôles** : 9 modes de sortie fautive
+fabriqués (hypercorrection type `fripperie`, mot retiré, mot ajouté,
+ponctuation, majuscule, préambule, adresse inventée, accent retiré,
+synonyme) appliqués à chaque contrôle quand ils s'appliquent : **399
+sorties fautives, 399 refusées** dans chacune des trois configurations. Les
+mêmes modes appliqués au texte attendu des 79 cas (le nom est corrigé mais
+autre chose est abîmé) : **539 sorties, 0 acceptée** (un cas écarté et
+justifié dans le test : `Trois-Rivieres` sans accent est une réécriture
+permise du brut `Trois Rivieres`, aucune lettre du brut n'est changée).
+
+**(b) Simulations rejouées par le noteur** (`PolishEvaluationTest`, fichiers
+`sorties/simulation-*.tsv`, en-tête « SIMULATION, aucun LLM n'a tourné ») :
+
+| Fichier | Corrigés | Modifiés à tort | Contrôles abîmés |
+| --- | --- | --- | --- |
+| `simulation-llm-oracle-gardefou` (approche 3, LLM parfait, lexique) | 36/79 | 0 | 0/53 |
+| `simulation-llm-oracle-gardefou-proximite` (idem + proximité) | 44/79 | 0 | 0/53 |
+| `simulation-llm-bruyant-gardefou` (approche 3, LLM bruyant) | 13/79 | 0 | 0/53 |
+| `simulation-llm-bruyant-sans-gardefou` (même LLM, sans garde-fou) | 39/79 | 28/79 | 13/53 (dont 4/19 mots rares) |
+| `simulation-combinaison-oracle` (approche 4, LLM parfait) | 34/79 | 0 | 0/53 |
+| `simulation-combinaison-bruyant` (approche 4, LLM bruyant) | 12/79 | 0 | 0/53 |
+
+Le LLM « bruyant » est une invention déterministe (`NoisyLlm`, CRC32 de
+l'identifiant) : sur les cas à corriger, 55 % texte attendu, 15 % attendu
+abîmé, 15 % brut inchangé, 15 % brut abîmé ; sur les contrôles, 70 % intacts,
+30 % abîmés. Ce n'est **pas** un modèle de Qwen : il montre seulement que le
+garde-fou transforme les erreurs du LLM en « rien fait » plutôt qu'en mots
+abîmés, au prix de corrections perdues (39 → 13). Combinaison : avec les
+règles en identité (celles de 3.2 ne sont pas raccordées) et le détecteur
+provisoire, le LLM est appelé sur 75 des 132 segments (56/79 cas à corriger,
+19/53 contrôles) ; il manque 2 cas par rapport à l'approche 3 (adresse
+`coiffe Rimouski.com`, code postal en toutes lettres) que le détecteur
+provisoire ne signale pas.
+
+**Limites des simulations.** Le lexique de simulation contient les noms du
+jeu : les plafonds avec lexique sont optimistes. L'oracle mesure ce que le
+garde-fou laisse passer, pas ce qu'un modèle de 0,5 ou 1,5 milliard de
+paramètres sait faire. Aucune latence n'est simulée.
+
+### Interface à raccorder aux règles de 3.2 (approche 4)
+
+```kotlin
+enum class SegmentClass { UNCHANGED, CORRECTED, PROBABLE_CASE }
+fun interface ProbableCaseDetector { fun classify(raw: String, afterRules: String, language: String): SegmentClass }
+class RulesThenLlmPolisher(rules: (String, String) -> String, detector: ProbableCaseDetector, llm: GuardedLlmPolisher)
+```
+
+`ProvisionalProbableCaseDetector` (provisoire) signale : adresse dite
+(`point|dot` + com, ca, org, net, qc, gouv ; `arobase` ; `at … dot` ;
+`barre oblique` ; `slash`), 3 lettres majuscules épelées ou plus, code
+postal mal formé, groupe de 1 à 3 mots proche d'un nom du lexique ou qui
+l'épelle autrement. À raccorder (orchestrateur ou étape 3.4) : passer la
+fonction des règles de 3.2 en `rules` et sa classification en `detector` ;
+le garde-fou compare la sortie du LLM au texte **après** les règles (les
+règles ont leur propre garde en CI). Puis régénérer
+`simulation-combinaison-*` (le test `simulatedOutputFilesAreUpToDate` dit
+quoi copier) et relancer l'enregistrement sur téléphone.
+
+### Procédure de mesure sur téléphone (étape 3.4, point de contrôle)
+
+Téléphone arm64, débogage USB activé.
+
+1. Installer le modèle : dans l'application, Réglages → nettoyage « Petit LLM local + garde-fou » →
+   télécharger Qwen2.5 0,5B (et 1,5B), puis remettre le nettoyage sur
+   « Désactivé ». Pour Gemma 3 1B (accès restreint) : le télécharger sur un
+   ordinateur après avoir accepté la licence, puis
+   `adb push gemma3-1b-it-int4.task /sdcard/Android/data/io.github.remtav.dictee/files/llm/`.
+2. Construire et installer l'application et l'APK de test, depuis `android/` :
+   `./gradlew installDebug installDebugAndroidTest`.
+3. Lancer l'enregistrement (un modèle à la fois ; 1 ou 2 appels au LLM par
+   segment, compter plusieurs minutes) :
+
+   ```
+   adb shell am instrument -w \
+     -e class io.github.remtav.dictee.LlmPolishRecordingTest \
+     -e llmModel llm-qwen2.5-0.5b-instruct-q8 \
+     io.github.remtav.dictee.test/androidx.test.runner.AndroidJUnitRunner
+   ```
+
+   Variantes : `-e llmModel llm-qwen2.5-1.5b-instruct-q8` ;
+   `-e llmModel /sdcard/Android/data/io.github.remtav.dictee/files/llm/gemma3-1b-it-int4.task -e llmTemplate gemma -e llmName gemma3-1b` ;
+   `-e nearMatch true` pour le garde-fou avec proximité (changer aussi
+   `llmName`). Suivi : `adb logcat -s LlmPolishRecording`.
+4. Récupérer les fichiers :
+   `adb pull /sdcard/Android/data/io.github.remtav.dictee/files/polissage/ .`
+   puis copier les `llm-*.tsv` dans `app/src/test/resources/polissage/sorties/`
+   (le noteur les reprend tels quels, latence « appareil ») et reporter
+   `memoire-<nom>.txt` dans le rapport.
+5. `./gradlew testDebugUnitTest --tests '*PolishEvaluationTest*'` : tableau
+   avec qualité réelle et latence p50 / p95 mesurée sur le téléphone.
+
+Fichiers écrits : `llm-<nom>-prompt-large.tsv` (approche 3, après
+garde-fou), `llm-<nom>-prompt-large-sans-gardefou.tsv` (mêmes sorties avant
+garde-fou : ce que le garde-fou a empêché), `llm-<nom>-combinaison.tsv`
+(approche 4 ; latence du segment entier, presque nulle quand le LLM n'est
+pas appelé), `memoire-<nom>.txt` (PSS et VmRSS / VmHWM avant chargement,
+après chargement, après les passages ; durée de chargement). Un passage
+d'échauffement précède les mesures. Le test est ignoré sans `llmModel` : la
+CI (émulateur) ne charge jamais MediaPipe.
+
+### Risques
+
+- **C'est précisément ce genre de passe qui peut abîmer un mot correct.** Le
+  prompt demande de ne rien toucher d'autre, mais un modèle de 0,5 ou
+  1,5 milliard de paramètres ne suit pas toujours la consigne ; seule la
+  dérivation stricte du garde-fou l'empêche d'arriver dans le texte. Sans
+  garde-fou, le LLM simulé abîme 13 contrôles sur 53, dont 4 mots rares.
+- **Limites connues, acceptées par construction** (épinglées dans
+  `knownLimitsAreAcceptedByConstruction`) : une entrée du lexique qui est
+  aussi une expression ordinaire (`des jardins` → `Desjardins`) ; avec la
+  proximité, un mot ordinaire proche d'un nom (`la team` → `la Teams`) ;
+  deux prénoms joints (`Pierre Jean` → `Pierre-Jean`). Le garde-fou ne voit
+  pas le contexte : la proximité reste désactivée par défaut et le lexique
+  livré (3.2) devrait éviter les noms qui sont aussi des mots courants.
+- **Le garde-fou ne remplace pas la mesure** : un plafond de 36 à 44 cas sur
+  79 ne dit rien de la part que Qwen atteindra ; les « rien fait » coûtent de
+  la latence pour rien.
+- **MediaPipe LLM Inference ne bouge plus sur Android** : un éventuel
+  passage en production devra peut-être passer par LiteRT-LM (nouvelle
+  décision).
