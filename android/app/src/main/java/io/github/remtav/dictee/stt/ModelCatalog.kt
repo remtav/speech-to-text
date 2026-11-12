@@ -45,6 +45,14 @@ object ModelCatalog {
         "https://huggingface.co/csukuangfj/sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8/resolve/main"
     private const val WHISPER =
         "https://huggingface.co/csukuangfj/sherpa-onnx-whisper-turbo/resolve/main"
+    /**
+     * Base URL of the sherpa-onnx conversion of the Quebec French fine-tune of
+     * Whisper (issue #15, user request). No public conversion exists, so the
+     * files must be uploaded once (android/tools/whisper-hf-vers-sherpa/README.md)
+     * and this set to the `resolve/main` URL of the repository. While it is
+     * empty the model is not offered: the app never lists a download that fails.
+     */
+    private const val WHISPER_QC = ""
     private const val QWEN3 =
         "https://huggingface.co/csukuangfj2/sherpa-onnx-qwen3-asr-0.6B-int8-2026-03-25/resolve/main"
 
@@ -112,8 +120,36 @@ object ModelCatalog {
         ),
     )
 
+    /**
+     * `ele-sage/whisper-large-v3-turbo-fr-quebecois` (MIT, fine-tuned on Assemblée nationale du
+     * Québec and Common Voice), converted with the sherpa-onnx Whisper export and int8 quantization.
+     * Same architecture and files as [whisperTurbo], so the same engine branch loads it.
+     */
+    val whisperQuebec = ModelSpec(
+        id = "whisper-large-v3-turbo-fr-qc-int8",
+        displayName = "Whisper large-v3-turbo, français québécois",
+        shortName = "Whisper QC",
+        publisher = "ele-sage (communauté), d'après OpenAI",
+        family = ModelFamily.WHISPER,
+        description = "Whisper large-v3-turbo affiné sur du français québécois ; français seulement. " +
+            "WER annoncé par son auteur : 6,65 % sur son jeu de validation.",
+        license = "MIT",
+        files = listOf(
+            ModelFile("turbo-encoder.int8.onnx", "$WHISPER_QC/turbo-encoder.int8.onnx",
+                "3f774a722b473fb85fca92e24591afffec5159c53564089fed4dc191fe6fabfc", 674348342),
+            ModelFile("turbo-decoder.int8.onnx", "$WHISPER_QC/turbo-decoder.int8.onnx",
+                "9775633c180fa256f096fd97ad8825cfff2d159090d8a6f98542d82ae01e567e", 360961539),
+            ModelFile("turbo-tokens.txt", "$WHISPER_QC/turbo-tokens.txt",
+                "b34b360dbb493e781e479794586d661700670d65564001f23024971d1f2fa126", 816730),
+        ),
+    )
+
+    /** False until the converted files are published and [WHISPER_QC] is set. */
+    val whisperQuebecHosted: Boolean = WHISPER_QC.isNotEmpty()
+
     /** Downloadable on-device models. */
-    val all: List<ModelSpec> = listOf(parakeet, qwen3, whisperTurbo)
+    val all: List<ModelSpec> =
+        listOfNotNull(parakeet, qwen3, whisperTurbo, whisperQuebec.takeIf { whisperQuebecHosted })
 
     /**
      * A server the user runs (opt-in): nothing to download, "installed" once its

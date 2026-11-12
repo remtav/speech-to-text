@@ -75,6 +75,8 @@ object ModelRecommendations {
         ModelCatalog.parakeet.id to parakeetLanguages,
         ModelCatalog.qwen3.id to qwen3Languages,
         ModelCatalog.whisperTurbo.id to whisperLanguages,
+        // Fine-tuned on French only: the other languages are not covered.
+        ModelCatalog.whisperQuebec.id to setOf(DictationLanguage.FRENCH_QUEBEC, DictationLanguage.FRENCH_FRANCE),
     )
 
     /**

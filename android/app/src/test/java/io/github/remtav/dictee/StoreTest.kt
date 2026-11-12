@@ -9,6 +9,7 @@ import io.github.remtav.dictee.stt.Downloadable
 import io.github.remtav.dictee.stt.EngineManager
 import io.github.remtav.dictee.stt.EngineOptions
 import io.github.remtav.dictee.stt.ModelCatalog
+import io.github.remtav.dictee.stt.ModelFamily
 import io.github.remtav.dictee.stt.ModelFile
 import io.github.remtav.dictee.stt.ModelStore
 import io.github.remtav.dictee.stt.SttEngineFactory
@@ -33,7 +34,7 @@ private fun sha(b: ByteArray) = MessageDigest.getInstance("SHA-256").digest(b).j
 
 class CatalogTest {
     @Test fun catalogIsWellFormed() {
-        assertEquals(3, ModelCatalog.all.size)
+        assertEquals(if (ModelCatalog.whisperQuebecHosted) 4 else 3, ModelCatalog.all.size)
         assertEquals("parakeet-tdt-0.6b-v3-int8", ModelCatalog.default.id)
         assertEquals(ModelCatalog.all.size, ModelCatalog.all.map { it.id }.toSet().size)
         val items: List<Downloadable> = ModelCatalog.all.map { object : Downloadable {
@@ -50,6 +51,30 @@ class CatalogTest {
         assertTrue(ModelCatalog.parakeet.totalBytes in 600_000_000L..800_000_000L)
         assertTrue(ModelCatalog.qwen3.totalBytes in 900_000_000L..1_100_000_000L)
         assertTrue(ModelCatalog.whisperTurbo.totalBytes in 900_000_000L..1_200_000_000L)
+    }
+
+    /**
+     * The Quebec French Whisper (issue #15, user request) is offered only once its files are
+     * published: the app never lists a download that cannot succeed.
+     */
+    @Test fun quebecWhisperIsListedOnlyWhenItsFilesAreHosted() {
+        val m = ModelCatalog.whisperQuebec
+        assertEquals(ModelCatalog.whisperQuebecHosted, m in ModelCatalog.all)
+        assertEquals(ModelCatalog.whisperQuebecHosted, m in ModelCatalog.selectable)
+        assertEquals(ModelCatalog.whisperQuebecHosted, m.files.none { it.url.startsWith("/") })
+        // Same engine branch, same file names as Whisper large-v3-turbo; its own directory and id.
+        assertEquals(ModelFamily.WHISPER, m.family)
+        assertEquals(ModelCatalog.whisperTurbo.files.map { it.path }, m.files.map { it.path })
+        assertTrue(m.id != ModelCatalog.whisperTurbo.id)
+        assertEquals("MIT", m.license)
+        assertTrue(m.publisher.contains("ele-sage"))
+        for (f in m.files) assertTrue(f.sha256, Regex("[0-9a-f]{64}").matches(f.sha256))
+        // int8 conversion of the same architecture: same size as the original, within 5 %.
+        val ref = ModelCatalog.whisperTurbo.totalBytes.toDouble()
+        assertTrue(m.totalBytes in (ref * 0.95).toLong()..(ref * 1.05).toLong())
+        // Different weights than the original: no file may share its checksum, except the tokens.
+        val original = ModelCatalog.whisperTurbo.files.associate { it.path to it.sha256 }
+        for (f in m.files.filter { it.path.endsWith(".onnx") }) assertTrue(f.sha256 != original[f.path])
     }
 }
 

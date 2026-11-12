@@ -2791,3 +2791,78 @@ mesure sur le téléphone ne peut pas renverser ce plafond.
 - Aucun passage en défaut sans zéro contrôle abîmé sur de vraies dictées
   québécoises absentes du jeu.
 - Priorité au modèle de transcription affiné sur le français québécois.
+
+## Issue #15 — demande de l'utilisateur : modèle affiné sur le français québécois
+
+**Portée.** L'issue classait « l'ajout de nouveaux modèles au catalogue » hors portée. La demande explicite de
+l'utilisateur (« vérifie si tu es capable de trouver ce modèle et si oui, ajoute-le ») la remplace pour ce modèle
+précis seulement ; rien d'autre n'est ajouté.
+
+**Le modèle (trouvé, identifié sans ambiguïté).** `ele-sage/whisper-large-v3-turbo-fr-quebecois`
+(https://huggingface.co/ele-sage/whisper-large-v3-turbo-fr-quebecois), compte communautaire `ele-sage`, créé le
+2025-11-10, modifié le 2025-12-28. Fiche : « It achieves a Word Error Rate (WER) of 6.65% on the validation set »,
+dernière ligne du tableau d'entraînement (pas 2400 : 6,65 %). Base : `openai/whisper-large-v3-turbo` (809 M de
+paramètres, 4 couches de décodeur, la même architecture que le Whisper du catalogue). Données : ~69 h, soit
+Assemblée nationale du Québec (13 h), Common Voice « Français du Canada » (16,5 h) et Common Voice autres
+français (39 h), 1 époque. **Le jeu de validation n'est pas décrit** (ni sa composition, ni s'il est disjoint de
+l'entraînement) : le 6,65 % n'est comparable ni à nos six extraits ni au WER de l'article cité par l'issue.
+**Licence : MIT** (déclarée sur la fiche ; les données d'entraînement ont leurs propres licences, non vérifiées ici).
+Formats publiés : safetensors (3,2 Go, fp32) ; dépôt jumeau `…-ct2` (CTranslate2 fp16). Autres dépôts qui le
+reprennent (GGML : `MaderaTools/…`, CT2/OpenVINO/GGML : `ArchTianui/…`). Autres candidats « québécois » trouvés et
+écartés : `rishabbahal/whisper-small-quebecois-1` (adaptateur LoRA, pas de WER, pas de licence),
+`micross50/Whisper_FineTuned_Quebecois` (aucune fiche). Le seul avec 6,65 % est celui d'ele-sage.
+
+**Conversion sherpa-onnx.** Aucune n'existe (recherche sur Hugging Face : `csukuangfj`, `k2-fsa` et les comptes qui
+publient des Whisper turbo ajustés ; aucun pour ce modèle). Conversion faite ici, hors dépôt : poids transformers →
+format OpenAI (`hf_vers_openai.py`) → export `scripts/whisper/export-onnx.py` de sherpa-onnx (`exporter.py`) →
+int8 (`quantifier_int8.py`). Trois écarts à la procédure habituelle, documentés dans
+`android/tools/whisper-hf-vers-sherpa/README.md` : l'exporteur TorchScript (`dynamo=False`) parce que celui de
+torch 2.15 casse le décodeur ; une quantification int8 sobre en mémoire parce que celle d'onnxruntime dépasse 7 Go ;
+rien d'autre n'est modifié. Sortie : 674 348 342 + 360 961 539 octets (Whisper turbo d'origine : 674 716 297 +
+361 080 764), `tokens` identique. Contrôle : `openai-whisper` sur le point de contrôle converti, puis
+onnxruntime sur les ONNX int8, puis `SherpaEngine` : mêmes phrases que ci-dessous.
+
+**Mesures ici** (hôte Linux x86-64, 4 fils, sherpa-onnx 2.0.1, mêmes extraits `assets/reference`, même exécution de
+`ModelAccuracyHostTest`). WER, en erreurs / mots :
+
+| Modèle | en (2 extraits, 66 mots) | fr1 (16 mots) | frqc1..6 (59 mots) |
+|---|---|---|---|
+| Parakeet | 3,0 % (2) | 0,0 % (0) | 6,8 % (4) |
+| **Whisper QC** | 4,5 % (3) | 0,0 % (0) | **8,5 % (5)** |
+| Whisper turbo | 4,5 % (3) | 6,3 % (1) | 10,2 % (6) |
+| Qwen3-ASR | 4,5 % (3) | 0,0 % (0) | 13,6 % (8) |
+
+Par extrait québécois (WER) : Whisper QC 9,1 / 14,3 / 33,3 / 0 / 0 / 0 ; Whisper turbo 9,1 / 14,3 / 44,4 / 0 / 0 / 0.
+Le modèle affiné est donc à une erreur de moins que Whisper turbo et à une de plus que Parakeet sur 59 mots :
+**aucune différence significative** (un mot vaut 1,7 point). Il garde son anglais (même WER que Whisper turbo).
+Temps réel (RTF moyen, mêmes exécutions) : Parakeet 0,19 ; Qwen3-ASR 0,79 ; Whisper turbo 1,00 ; Whisper QC 1,16.
+**Ces RTF sont bruités** : la machine exécutait en parallèle les tests d'autres agents (le RTF d'un même extrait
+varie de 0,3 à 2,2 d'une exécution à l'autre pour le même modèle). La seule lecture fiable : Whisper QC a exactement
+l'architecture, la taille (1 036 Mo contre 1 037 Mo) et donc le coût de Whisper turbo, ~5 fois celui de Parakeet.
+Ce que l'utilisateur reproche à Whisper turbo sur son téléphone (trop lent) vaut donc pour ce modèle aussi.
+Non mesuré : le mot « friperie » dicté seul (pas d'enregistrement ; à essayer sur le téléphone une fois le modèle
+publié).
+
+**Hébergement : bloquant, à la charge de l'utilisateur.** Je n'ai aucun compte pour publier et rien n'a été
+publié. L'entrée `ModelCatalog.whisperQuebec` est complète (fichiers, SHA-256, tailles, éditeur, licence), mais
+sa constante d'URL `WHISPER_QC` est vide : tant qu'elle l'est, `ModelCatalog.all` ne contient pas le modèle,
+donc ni l'écran d'installation ni les Réglages ne le proposent (l'application ne propose jamais un
+téléchargement qui échoue). Choix retenu entre « URL à renseigner » et « entrée non listée » : une seule constante,
+un test qui vérifie la cohérence liste / URL. Les fichiers convertis sont dans
+`/home/user/modele-qc-work/sortie/` (hors dépôt, 1,0 Go).
+
+**Couverture de langues** (`ModelRecommendations.coverage`) : français (Québec et France) seulement ; la logique de
+recommandation n'est pas modifiée (un test vérifie que la table ne le recommande jamais). Les mesures ne justifient
+pas de le recommander à la place de Parakeet pour « Français (Québec) » : 8,5 % contre 6,8 %, et un coût cinq
+fois plus élevé.
+
+**CI.** `ModelAccuracyHostTest.whisperQuebec` est ignoré (`assumeTrue`) tant que le modèle n'est pas publié. Une
+fois publié, le job `models` télécharge ~1 Go de plus et décode six extraits de plus (environ +2 minutes ; le
+cache est indexé sur `ModelCatalog.kt`, donc il est de toute façon invalidé à chaque changement du catalogue).
+Le workflow n'est pas modifié (changement soumis à l'approbation de Rémi) : le titre « 3 models » du job reste exact
+tant que le modèle n'est pas publié.
+
+**À valider par l'utilisateur** : redistribuer une conversion int8 d'un modèle MIT est permis par la licence ;
+l'auteur est cité sur la carte (éditeur « ele-sage (communauté), d'après OpenAI », licence MIT). Le jeu
+d'entraînement inclut les débats de l'Assemblée nationale et Common Voice (CC0) : rien ne l'interdit, mais je n'ai
+pas vérifié leurs conditions d'utilisation pour un modèle dérivé ; à trancher avant de publier le dépôt de conversion.
