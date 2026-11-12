@@ -83,3 +83,74 @@ Reconnaît-on Kalmia au premier coup d'œil ? À regarder en particulier :
 - **Non mesuré** : la qualité réelle de Whisper en bengali et en ourdou, et
   l'effet de la langue forcée sur Whisper quand une seule langue est choisie.
 - **Où corriger** : `android/app/src/main/java/io/github/remtav/dictee/stt/ModelRecommendation.kt`.
+
+## Lot 2 — ponctuation dictée et tutoriel « Comment dicter »
+
+### 6. Les commandes en usage réel : manques et faux positifs
+
+- **Quoi faire** : dicter de vrais messages avec ponctuation pendant quelques
+  jours, avec le modèle que tu utilises. Commencer par l'exemple de l'issue,
+  d'un trait puis avec des pauses : « il a dit deux-points ouvrir les
+  guillemets bonjour fermer les guillemets » doit donner `Il a dit : « bonjour »`.
+- **Règle retenue** : dans le doute, pas de commande (un faux positif abîme le
+  texte, un manqué laisse seulement les mots). Liste initiale de l'issue, sans
+  ajout de signes.
+- **Cas à surveiller** :
+  - « deux points » sans trait d'union : reconnu seulement s'il est détaché
+    (ponctuation, bord de segment ou autre commande à côté). Regarder ce que
+    ton modèle écrit vraiment : « deux-points » ou « deux points ».
+  - Une commande en tête de phrase suivie d'une virgule reste une commande :
+    « Ouvrez les guillemets, s'il vous plaît » donne `« S'il vous plaît`.
+    Limite connue, non corrigée.
+  - Une commande coupée par une pause (« point » … « d'interrogation ») n'est
+    pas vue.
+  - Si le modèle écrit lui-même le signe (`:` au lieu de « deux-points »), ce
+    signe garde l'espacement du modèle : seuls les signes dictés sont
+    typographiés.
+  - Phrases ordinaires contenant « deux points », « point d'interrogation »,
+    « guillemets », « parenthèse » : elles doivent rester du texte (92 phrases
+    pièges sont testées).
+- **Où corriger** : listes de mots bloquants dans
+  `android/app/src/main/java/io/github/remtav/dictee/text/VoiceCommands.kt` ;
+  formulations acceptées dans `text/CommandTable.kt` ; ajouter chaque cas
+  trouvé à `FalsePositiveTest` dans
+  `android/app/src/test/java/io/github/remtav/dictee/TextTest.kt`.
+
+### 7. Typographie du Québec, de France et anglaise
+
+- **Quoi regarder** : au Québec, espace insécable devant `:` et dans les « »,
+  rien devant `;` `?` `!` (règle de l'OQLF, confirmée sur la Vitrine
+  linguistique). Avec « Français (France) » coché sans le Québec : espace
+  insécable aussi devant `;` `?` `!`. En anglais : aucune espace, guillemets “ ”.
+  Si Québec et France sont cochés ensemble, la règle du Québec s'applique.
+- **Choix à confirmer** : l'espace insécable ordinaire (U+00A0) partout, pas
+  l'espace fine (U+202F), parce que celle-ci manque dans certaines polices.
+  Vérifier l'affichage dans ta messagerie et ton courriel.
+- **Non vérifié** : la règle de France vient de sources de second rang ; le
+  *Lexique de l'Imprimerie nationale* n'a pas pu être consulté.
+- **Où corriger** : `sign()` dans
+  `android/app/src/main/java/io/github/remtav/dictee/text/TextAssembler.kt`.
+
+### 8. Écran « Comment dicter » sur le téléphone, clair et sombre
+
+| Point | Où corriger |
+| --- | --- |
+| Longueur de l'écran (jusqu'à 8 cartes, puis la liste complète) | `android/app/src/main/java/io/github/remtav/dictee/ui/HowTo.kt` (`HowToExamples`) |
+| Lisibilité des phrases dites en IBM Plex Mono quand elles passent sur plusieurs lignes | `ui/HowToActivity.kt` |
+| Moment de l'ouverture automatique : une seule fois, quand le clavier est activé, le micro autorisé et un modèle prêt | `SetupProgress` dans `ui/HowTo.kt`, appelé par `ui/SetupActivity.kt` |
+| Bouton d'aide du clavier sur la ligne d'état : reste-t-il assez de place au texte d'état sur un téléphone étroit ? | `android/app/src/main/res/layout/keyboard_view.xml` |
+| Le lien « vocabulaire » fait-il bien défiler les Réglages au bon endroit ? | `ui/SettingsActivity.kt` |
+| Texte des exemples et de la ligne de rappel | `android/app/src/main/res/values/strings.xml` (chaînes `howto_*`) ; les exemples eux-mêmes viennent de `text/CommandTable.kt` |
+
+### 9. Commandes avec ton serveur (polissage actif)
+
+- **Quoi faire** : avec le modèle « Serveur », dicter l'exemple de l'issue,
+  puis une phrase longue avec « point d'exclamation » au milieu, puis
+  « nouvelle ligne » au milieu d'une dictée longue.
+- **Ce qui est attendu** : les commandes sont interprétées sur le téléphone
+  après le polissage. Limite documentée : dans une dictée longue, le polissage
+  peut remplacer lui-même la commande par le signe, qui garde alors les
+  espaces du LLM et non celles du Québec. Jamais de doublon.
+- **Où corriger** : hors portée de cette itération (prompt et garde-fou du
+  serveur, `app/polish.py`). La limite est décrite dans `android/README.md`,
+  section « Dicter la ponctuation ».
