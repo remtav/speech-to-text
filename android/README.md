@@ -10,6 +10,19 @@ Spécification : issue #10. Choix de développement : [`DECISIONS.md`](DECISIONS
 Ce n'est pas un clavier de frappe : on garde son clavier habituel et on
 bascule vers celui-ci pour dicter.
 
+## Aperçu
+
+Captures prises automatiquement par la CI sur un émulateur Pixel 6
+(`ScreenshotTest`) ; le texte vient d'un moteur de test, pas d'un modèle.
+
+| Prêt | À l'écoute | Texte inséré | Thème sombre |
+|---|---|---|---|
+| ![Clavier prêt](docs/screenshots/keyboard-idle-light.png) | ![Clavier à l'écoute](docs/screenshots/keyboard-listening-light.png) | ![Texte inséré](docs/screenshots/keyboard-text-light.png) | ![Clavier sombre](docs/screenshots/keyboard-listening-dark.png) |
+
+| Configuration | Réglages | Comparaison des modèles |
+|---|---|---|
+| ![Écran de configuration](docs/screenshots/setup-dark.png) | ![Réglages](docs/screenshots/settings-dark.png) | ![Comparaison](docs/screenshots/compare-light.png) |
+
 ## Installation
 
 1. Télécharger l'APK de la dernière release `android-v…` du dépôt sur le

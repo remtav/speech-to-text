@@ -28,6 +28,8 @@ class ScreenshotTest : ImeTestBase() {
     @org.junit.Before
     fun portrait() {
         device.setOrientationNatural() // and stays frozen for the captures
+        instrumentation.waitForIdleSync()
+        Thread.sleep(1_500) // let a rotation left by a previous test finish
     }
 
     private fun shot(name: String) {
