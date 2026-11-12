@@ -35,7 +35,8 @@ class SetupActivity : AppCompatActivity() {
     private lateinit var micStatus: TextView
     private lateinit var modelsBox: LinearLayout
     private lateinit var languagesBox: LinearLayout
-    private val refresh: () -> Unit = { renderModels() }
+    // A download that ends can complete the setup: `maybeOpenHowTo` checks it.
+    private val refresh: () -> Unit = { renderModels(); maybeOpenHowTo() }
 
     private val askMic = registerForActivityResult(ActivityResultContracts.RequestPermission()) { renderSteps() }
     private val askNotifications = registerForActivityResult(ActivityResultContracts.RequestPermission()) { }
@@ -47,6 +48,9 @@ class SetupActivity : AppCompatActivity() {
         col.logo()
         col.title(getString(R.string.app_name))
         col.body(getString(R.string.setup_intro))
+        col.button(getString(R.string.setup_howto), outlined = true) {
+            startActivity(Intent(this@SetupActivity, HowToActivity::class.java))
+        }.tag = HOWTO_BUTTON_TAG
 
         col.heading(getString(R.string.setup_step_keyboard))
         keyboardStatus = col.body()
@@ -109,6 +113,7 @@ class SetupActivity : AppCompatActivity() {
     }
 
     private fun renderSteps() {
+        // Called again on resume, on focus and when a download ends: `maybeOpenHowTo` opens once.
         val imm = getSystemService(InputMethodManager::class.java)
         val enabled = imm.enabledInputMethodList.any { it.packageName == packageName }
         val current = Settings.Secure.getString(contentResolver, Settings.Secure.DEFAULT_INPUT_METHOD) ?: ""
@@ -119,7 +124,28 @@ class SetupActivity : AppCompatActivity() {
         }
         val mic = ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
         micStatus.text = getString(if (mic) R.string.setup_mic_ok else R.string.setup_mic_missing)
+        maybeOpenHowTo()
     }
+
+    /**
+     * Opens "Comment dicter" once, when the setup is complete (keyboard enabled, microphone
+     * allowed, a model ready: see [SetupProgress]). The screen marks itself as seen, but the flag
+     * is also set here before starting it, so a second call before it appears cannot open it twice.
+     */
+    private fun maybeOpenHowTo() {
+        val modelReady = (ModelCatalog.all + ModelCatalog.remote).any { app.isInstalled(it) }
+        val complete = SetupProgress.isComplete(isKeyboardEnabled(), isMicGranted(), modelReady)
+        if (SetupProgress.shouldOpenHowTo(complete, app.settings.howToShown)) {
+            app.settings.howToShown = true
+            startActivity(Intent(this, HowToActivity::class.java))
+        }
+    }
+
+    private fun isKeyboardEnabled() =
+        getSystemService(InputMethodManager::class.java).enabledInputMethodList.any { it.packageName == packageName }
+
+    private fun isMicGranted() =
+        ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
 
     private fun renderModels() {
         modelsBox.removeAllViews()
@@ -233,5 +259,6 @@ class SetupActivity : AppCompatActivity() {
         /** Tag of a model card, for tests. */
         fun modelCardTag(spec: ModelSpec) = "model_card_${spec.id}"
         const val WARNING_TAG = "model_warning"
+        const val HOWTO_BUTTON_TAG = "setup_howto_button"
     }
 }

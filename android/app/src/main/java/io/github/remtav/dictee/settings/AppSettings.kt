@@ -61,6 +61,11 @@ class AppSettings(context: Context) {
         get() = prefs.getBoolean("partials", true)
         set(v) = prefs.edit().putBoolean("partials", v).apply()
 
+    /** The "Comment dicter" screen has been opened (by itself at the end of the first setup, or by the user): it opens by itself only once. */
+    var howToShown: Boolean
+        get() = prefs.getBoolean("howto_shown", false)
+        set(v) = prefs.edit().putBoolean("howto_shown", v).apply()
+
     var voiceCommands: Boolean
         get() = prefs.getBoolean("voice_commands", true)
         set(v) = prefs.edit().putBoolean("voice_commands", v).apply()

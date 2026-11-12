@@ -12,6 +12,7 @@ import io.github.remtav.dictee.stt.DictationLanguage
 import io.github.remtav.dictee.stt.ModelCatalog
 import io.github.remtav.dictee.ui.CompareActivity
 import io.github.remtav.dictee.ui.DiagnosticActivity
+import io.github.remtav.dictee.ui.HowToActivity
 import io.github.remtav.dictee.ui.SettingsActivity
 import io.github.remtav.dictee.ui.SetupActivity
 import io.github.remtav.dictee.ui.languageTag
@@ -136,6 +137,9 @@ class ScreenshotTest : ImeTestBase() {
 
     @Test
     fun appScreens() {
+        // The setup screen opens "Comment dicter" by itself once the keyboard, the microphone and a model
+        // are in place (here a scripted model counts as installed): seen already, so the captures show the screens.
+        app.settings.howToShown = true
         for (mode in listOf(ThemeMode.LIGHT, ThemeMode.DARK)) {
             val suffix = mode.name.lowercase()
             setTheme(mode)
@@ -150,6 +154,8 @@ class ScreenshotTest : ImeTestBase() {
                 s.scrollToTag(SetupActivity.modelCardTag(ModelCatalog.parakeet), above = 24)
                 shot("setup-models-$suffix", s)
             }
+            // "Comment dicter": generated from the command table (Québec French is the default language).
+            ActivityScenario.launch(HowToActivity::class.java).use { shot("howto-$suffix", it) }
             ActivityScenario.launch(SettingsActivity::class.java).use { shot("settings-$suffix", it) }
             ActivityScenario.launch<CompareActivity>(Intent(context, CompareActivity::class.java)).use {
                 shot("compare-$suffix", it)
