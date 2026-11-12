@@ -30,15 +30,32 @@ data class ModelSpec(
     val description: String,
     val license: String,
     val files: List<ModelFile>,
+    /** Short practical note shown on the model's card (empty: none). Not a warning. */
+    val note: String = "",
 ) {
     val totalBytes: Long get() = files.sumOf { it.size }
 }
 
 object ModelCatalog {
+    /** Shown on Whisper's card and in its recommendation (DECISIONS.md, issue #15, « friperie »). */
+    const val WHISPER_NOTE =
+        "Observé sur un téléphone : comprend bien des mots que les autres modèles ratent, mais plus lent. " +
+            "À garder en dernier recours, quand les autres modèles comprennent mal un mot."
     private const val PARAKEET =
         "https://huggingface.co/csukuangfj/sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8/resolve/main"
     private const val WHISPER =
         "https://huggingface.co/csukuangfj/sherpa-onnx-whisper-turbo/resolve/main"
+    /**
+     * Base URL of the sherpa-onnx conversion of the Quebec French fine-tune of Whisper
+     * (issue #15, user request), published on 2026-11-12 under the user's Hugging Face account,
+     * at his request (android/tools/whisper-hf-vers-sherpa/README.md).
+     */
+    private const val WHISPER_QC =
+        "https://huggingface.co/remiavelo/sherpa-onnx-whisper-large-v3-turbo-fr-quebecois-int8/resolve/main"
+    /** Shown on the Quebec Whisper's card: same size and compute cost as Whisper, hence as slow. */
+    const val WHISPER_QC_NOTE =
+        "Même taille et même coût de calcul que Whisper large-v3-turbo, donc plus lent sur le téléphone " +
+            "(observation de l'utilisateur sur Whisper turbo, pas une mesure sur appareil)."
     private const val QWEN3 =
         "https://huggingface.co/csukuangfj2/sherpa-onnx-qwen3-asr-0.6B-int8-2026-03-25/resolve/main"
 
@@ -94,6 +111,8 @@ object ModelCatalog {
         family = ModelFamily.WHISPER,
         description = "Encodeur-décodeur, ~100 langues.",
         license = "MIT",
+        // Observation of the user on his phone (issue #15, 2026-11-12), not a measurement on a device.
+        note = WHISPER_NOTE,
         files = listOf(
             ModelFile("turbo-encoder.int8.onnx", "$WHISPER/turbo-encoder.int8.onnx",
                 "b02dcdf54f348741e93fe732b67d933c8dcb6735655f710640143081db38878b", 674716297),
@@ -104,8 +123,36 @@ object ModelCatalog {
         ),
     )
 
+    /**
+     * `ele-sage/whisper-large-v3-turbo-fr-quebecois` (MIT, fine-tuned on Assemblée nationale du
+     * Québec and Common Voice), converted with the sherpa-onnx Whisper export and int8 quantization.
+     * Same architecture and files as [whisperTurbo], so the same engine branch loads it.
+     */
+    val whisperQuebec = ModelSpec(
+        id = "whisper-large-v3-turbo-fr-qc-int8",
+        displayName = "Whisper large-v3-turbo, français québécois",
+        shortName = "Whisper QC",
+        publisher = "ele-sage (communauté), d'après OpenAI",
+        family = ModelFamily.WHISPER,
+        description = "Whisper large-v3-turbo affiné sur du français québécois par ele-sage (communauté). " +
+            "WER annoncé par son auteur : 6,65 % sur son jeu de validation. " +
+            "Mesuré ici : 5 erreurs sur 59 mots (8,5 %) sur six courts extraits, contre 4 pour Parakeet " +
+            "et 6 pour Whisper turbo : un indice, pas une preuve. Français seulement.",
+        license = "MIT",
+        note = WHISPER_QC_NOTE,
+        files = listOf(
+            ModelFile("turbo-encoder.int8.onnx", "$WHISPER_QC/turbo-encoder.int8.onnx",
+                "3f774a722b473fb85fca92e24591afffec5159c53564089fed4dc191fe6fabfc", 674348342),
+            ModelFile("turbo-decoder.int8.onnx", "$WHISPER_QC/turbo-decoder.int8.onnx",
+                "9775633c180fa256f096fd97ad8825cfff2d159090d8a6f98542d82ae01e567e", 360961539),
+            ModelFile("turbo-tokens.txt", "$WHISPER_QC/turbo-tokens.txt",
+                "b34b360dbb493e781e479794586d661700670d65564001f23024971d1f2fa126", 816730),
+        ),
+    )
+
     /** Downloadable on-device models. */
-    val all: List<ModelSpec> = listOf(parakeet, qwen3, whisperTurbo)
+    val all: List<ModelSpec> =
+        listOf(parakeet, qwen3, whisperTurbo, whisperQuebec)
 
     /**
      * A server the user runs (opt-in): nothing to download, "installed" once its

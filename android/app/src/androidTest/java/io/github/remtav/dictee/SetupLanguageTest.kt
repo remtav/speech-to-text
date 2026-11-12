@@ -129,6 +129,28 @@ class SetupLanguageTest {
     }
 
     @Test
+    fun quebecWhisperIsListedAndWarnsOnlyWhenEnglishIsAdded() {
+        ActivityScenario.launch(SetupActivity::class.java).use { s ->
+            fun warning(): String? {
+                var text: String? = null
+                s.onActivity { a ->
+                    val card = a.window.decorView.findViewWithTag<View>(SetupActivity.modelCardTag(ModelCatalog.whisperQuebec))
+                    assertNotNull("card of the Quebec Whisper", card)
+                    text = card.findViewWithTag<android.widget.TextView>(SetupActivity.WARNING_TAG)?.text?.toString()
+                }
+                return text
+            }
+            assertEquals(null, warning())
+            assertTrue(s.text().contains(ModelCatalog.WHISPER_QC_NOTE))
+            s.click(DictationLanguage.ENGLISH)
+            val w = warning()
+            assertTrue(w, w != null && w.contains("ne couvre pas") && w.contains("anglais"))
+            // Never the recommended one.
+            assertEquals(listOf(ModelCatalog.parakeet.id), s.recommendedModels())
+        }
+    }
+
+    @Test
     fun lastLanguageCannotBeUnchecked() {
         ActivityScenario.launch(SetupActivity::class.java).use { s ->
             s.click(DictationLanguage.FRENCH_QUEBEC)
@@ -191,11 +213,13 @@ class SetupLanguageTest {
         s.remoteLanguage = "" // explicit automatic detection is kept too
         s.languages = setOf(DictationLanguage.FRENCH_QUEBEC)
         assertEquals("", s.remoteLanguage)
-        // Whisper is forced only with a single code; other models never get one.
+        // Whisper and Qwen3-ASR are forced only with a single code; Parakeet takes no language.
         s.languages = setOf(DictationLanguage.FRENCH_QUEBEC, DictationLanguage.FRENCH_FRANCE)
         assertEquals("fr", s.engineOptions(ModelCatalog.whisperTurbo).language)
+        assertEquals("French", s.engineOptions(ModelCatalog.qwen3).language)
         assertEquals("", s.engineOptions(ModelCatalog.parakeet).language)
         s.languages = setOf(DictationLanguage.FRENCH_QUEBEC, DictationLanguage.ENGLISH)
         assertEquals("", s.engineOptions(ModelCatalog.whisperTurbo).language)
+        assertEquals("", s.engineOptions(ModelCatalog.qwen3).language)
     }
 }

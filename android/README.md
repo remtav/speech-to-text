@@ -30,7 +30,8 @@ bascule vers celui-ci pour dicter.
 | **Développée au Québec** | Affirmation de l'auteur. |
 
 **Origine des modèles.** Les modèles ne sont pas québécois : Parakeet vient de
-NVIDIA, Qwen3-ASR d'Alibaba, Whisper d'OpenAI, et le petit LLM facultatif de
+NVIDIA, Qwen3-ASR d'Alibaba, Whisper d'OpenAI (et sa variante affinée sur le français québécois, de
+ele-sage, une personne de la communauté), et le petit LLM facultatif de
 nettoyage du texte (désactivé par défaut) passe par MediaPipe, une
 bibliothèque de Google. La souveraineté offerte porte sur les **données** (la
 voix reste sur le téléphone par défaut) et sur le **logiciel** (code public,
@@ -85,8 +86,10 @@ langue cochée. Le choix se modifie aussi dans les Réglages. Il sert à :
   couvre pas une langue cochée affiche un avertissement écrit ; rien n'est
   bloqué, tous les modèles restent téléchargeables ;
 - **régler la langue des moteurs** : avec une seule langue (Québec et France
-  comptent pour `fr`), Whisper local et le serveur distant la reçoivent ;
-  avec plusieurs, la langue est détectée automatiquement.
+  comptent pour `fr`), Whisper local, Qwen3-ASR et le serveur distant la
+  reçoivent ; avec plusieurs, la langue est détectée automatiquement.
+  Parakeet ne prend aucune langue (sherpa-onnx 2.0.1 n'a pas d'entrée pour
+  elle) : il la devine, ce qui peut mal tourner sur un mot dicté seul.
 
 La table de recommandation (`stt/ModelRecommendation.kt`) se lit de haut en
 bas : Parakeet si toutes vos langues font partie de ses 25 langues
@@ -251,6 +254,27 @@ Limites connues :
 | Parakeet TDT 0.6b v3 (défaut) | NVIDIA | 671 Mo |
 | Qwen3-ASR 0.6B | Alibaba (Qwen) | 987 Mo |
 | Whisper large-v3-turbo | OpenAI | 1,04 Go |
+| Whisper large-v3-turbo, français québécois | ele-sage (communauté), d'après OpenAI | 1,04 Go |
+
+Whisper : observé par l'utilisateur sur son téléphone, il comprend bien des
+mots d'ici que Parakeet et Qwen3-ASR ratent (un mot isolé deviné en anglais,
+par exemple), mais il est trop lent pour un usage courant : à garder en
+dernier recours. Ce n'est pas une mesure sur appareil ; sur l'ordinateur de la
+CI, le facteur temps réel indicatif est de 0,07 pour Parakeet, 0,3 pour
+Whisper et 0,6 à 0,9 pour Qwen3-ASR (`DECISIONS.md`, étape 1.2), ce qui ne
+prédit pas l'ordre sur un téléphone. La carte de Whisper le dit. Pour le rendre plus rapide, Whisper n'affiche pas de texte provisoire pendant qu'on parle, et un réglage avancé (Réglages, « Silence ajouté pour Whisper », 1 000 par défaut, 600 ou 300) raccourcit le silence qu'il décode à la fin de chaque segment : mesuré sur ordinateur seulement, à valider sur le téléphone (`docs/ACCELERER_WHISPER.md`).
+
+**Whisper large-v3-turbo, français québécois** (1,04 Go) est le quatrième modèle proposé : c'est
+`ele-sage/whisper-large-v3-turbo-fr-quebecois` (communauté, MIT, d'après OpenAI), affiné sur du français québécois
+(débats de l'Assemblée nationale, Common Voice). Il ne couvre que le français : choisir l'anglais en plus
+affiche « ce modèle ne couvre pas anglais » sur sa carte. Il n'existait aucune conversion sherpa-onnx publique : la
+conversion int8 (`android/tools/whisper-hf-vers-sherpa/`) est hébergée par l'auteur de l'application, à sa demande, sur
+`huggingface.co/remiavelo/sherpa-onnx-whisper-large-v3-turbo-fr-quebecois-int8` ; l'application la télécharge de là,
+fichier par fichier, vérifiée par SHA-256. WER annoncé par son auteur : 6,65 % sur son jeu de validation. Mesuré ici :
+5 erreurs sur 59 mots (8,5 %) sur six courts extraits québécois, contre 4 pour Parakeet et 6 pour Whisper turbo :
+un indice, pas une preuve. Il a la même taille et le même coût de calcul que Whisper large-v3-turbo, donc il est plus
+lent sur le téléphone (observation de l'utilisateur sur Whisper turbo, pas une mesure sur appareil). Parakeet reste
+recommandé pour le français québécois ; ce modèle est seulement proposé.
 
 Chaque fichier est vérifié par SHA-256 ; les modèles se suppriment depuis
 l'écran principal. **Comparer les modèles** transcrit les extraits de
@@ -275,6 +299,9 @@ transcrit (chemin rapide) puis la polit avec son LLM, et le texte poli est
 inséré d'un bloc. Pendant l'attente, le clavier affiche « Transcription et
 polissage… » avec un bouton **Annuler**.
 
+- Le polissage se coupe dans les Réglages (« Polissage par le serveur », activé
+  par défaut) : un LLM peut parfois remplacer un mot bien transcrit. Coupé, le
+  clavier demande `polish=false` et insère le texte brut de la transcription.
 - Si le polissage échoue, le texte brut du serveur est inséré (message
   discret, pas d'erreur).
 - Si le serveur est injoignable, en erreur, refuse l'accès ou ne répond pas à
@@ -323,6 +350,12 @@ Réglages : texte provisoire, commandes vocales, pause de fin de segment,
 vocabulaire personnalisé, thème, vibrations, durée de maintien du modèle en
 mémoire, threads, accélération matérielle (CPU par défaut, XNNPACK, NNAPI),
 nettoyage du texte (désactivé, règles, ou petit LLM local avec garde-fou).
+
+**Polissage local des noms et des adresses** (« git hub » → `GitHub`,
+« coiffe rimouski point com » → `coifferimouski.com`) : évalué, **pas
+activé**. Le code d'évaluation n'est relié à aucun écran ni réglage. Le
+rapport chiffré, la recommandation et la procédure de mesure sur le
+téléphone sont dans [`docs/POLISSAGE_LOCAL.md`](docs/POLISSAGE_LOCAL.md).
 
 ## Développement
 

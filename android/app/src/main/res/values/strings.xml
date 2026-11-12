@@ -80,7 +80,7 @@
     <string name="settings_languages">Vos langues</string>
     <string name="settings_dictation">Dictée</string>
     <string name="settings_partials">Texte provisoire pendant qu\'on parle</string>
-    <string name="settings_partials_help">Affiché souligné, remplacé par le texte final à chaque pause. Consomme plus de calcul.</string>
+    <string name="settings_partials_help">Affiché souligné, remplacé par le texte final à chaque pause. Consomme plus de calcul. Sans effet avec Whisper, qui ne montre pas de texte provisoire (le texte final arrive plus vite ainsi).</string>
     <string name="settings_commands">Commandes vocales</string>
     <string name="settings_commands_help">Ponctuation : « deux-points », « point-virgule », « point d\'interrogation », « point d\'exclamation », « ouvrir / fermer les guillemets », « ouvrir / fermer la parenthèse ». Mise en forme : « nouvelle ligne », « nouveau paragraphe ». Effacement, dit seul : « efface la dernière phrase », « efface le dernier mot ». Les commandes suivent vos langues de dictée (français, anglais) ; dans une phrase ordinaire (« j\'ai marqué deux points »), les mots restent du texte.</string>
     <string name="settings_pause">Pause qui termine un segment</string>
@@ -93,12 +93,19 @@
     <string name="settings_threads">Threads de calcul</string>
     <string name="settings_acceleration">Accélération matérielle</string>
     <string name="settings_acceleration_help">Le CPU est le choix sûr. NNAPI peut utiliser le NPU/GPU du Snapdragon ; s\'il n\'est pas pris en charge, le moteur revient automatiquement au CPU. Comparez avec l\'écran de comparaison.</string>
+    <string name="settings_whisper_tail">Silence ajouté pour Whisper (avancé)</string>
+    <string name="settings_whisper_tail_1000">1 000 (par défaut, valeur d\'origine)</string>
+    <string name="settings_whisper_tail_600">600 (plus rapide)</string>
+    <string name="settings_whisper_tail_300">300 (encore plus rapide, peut répéter des phrases)</string>
+    <string name="settings_whisper_tail_help">Whisper turbo et le modèle québécois ajoutent un silence à la fin de chaque segment ; en raccourcir la durée accélère le décodage. Mesuré sur ordinateur seulement : l\'effet sur la qualité n\'est pas vérifié sur téléphone. À 300, des phrases répétées ont été observées. Changer ce réglage recharge le modèle ; il est sans effet sur les autres modèles. Essayez avec l\'écran de comparaison.</string>
     <string name="settings_cleanup">Nettoyage du texte</string>
-    <string name="settings_cleanup_help">Retire les hésitations et les autocorrections après chaque segment. Le LLM ne remplace le texte que si un garde-fou vérifie qu\'il n\'a rien ajouté ni retiré ; sinon le texte brut est gardé.</string>
+    <string name="settings_cleanup_help">Retire les hésitations et les autocorrections après chaque segment. Le texte du LLM n\'est gardé que si un garde-fou vérifie que chaque mot restant est identique à la lettre près, dans le même ordre, et que seuls des hésitations, des répétitions ou une autocorrection (« lundi, non, mardi ») ont été retirés ; sinon le texte nettoyé par les règles simples est gardé. Le nettoyage ne corrige donc jamais un mot mal entendu par le modèle de transcription. « Désactivé » : aucun traitement après la transcription.</string>
     <string name="settings_llm_note">Le LLM tourne sur l\'appareil (MediaPipe, arm64 uniquement). S\'il est indisponible, le nettoyage par règles est utilisé.</string>
 
     <string name="settings_remote">Serveur distant (optionnel)</string>
-    <string name="settings_remote_help">Pour transcrire sur un serveur que vous contrôlez (par exemple le serveur speech-to-text de ce dépôt, chez vous) quand les modèles du téléphone ne suffisent pas. Choisissez ensuite « Serveur distant » comme modèle. Attention : avec ce choix, toute la dictée est envoyée au serveur en une fois à la fin, puis le texte transcrit et poli par le serveur est inséré. Les autres modèles restent entièrement sur le téléphone.</string>
+    <string name="settings_remote_help">Pour transcrire sur un serveur que vous contrôlez (par exemple le serveur speech-to-text de ce dépôt, chez vous) quand les modèles du téléphone ne suffisent pas. Choisissez ensuite « Serveur distant » comme modèle. Attention : avec ce choix, toute la dictée est envoyée au serveur en une fois à la fin, puis le texte transcrit par le serveur est inséré (poli par son LLM si le réglage « Polissage par le serveur » est actif). Les autres modèles restent entièrement sur le téléphone.</string>
+    <string name="settings_remote_polish">Polissage par le serveur</string>
+    <string name="settings_remote_polish_help">Le serveur repasse sur la dictée entière avec un LLM : il corrige la ponctuation et retire les hésitations. Mais un LLM peut parfois remplacer un mot bien transcrit par un autre. Si vous voyez des mots changés, coupez ce réglage : le texte brut de la transcription est alors inséré tel quel.</string>
     <string name="settings_remote_api">Type d\'API</string>
     <string name="settings_remote_model_hint">Nom du modèle (API OpenAI uniquement, ex. whisper-1)</string>
     <string name="settings_remote_key_hint">Clé d\'API / jeton (optionnel)</string>
