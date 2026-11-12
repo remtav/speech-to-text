@@ -1874,3 +1874,38 @@ montre les mots dits) : comportement attendu, documenté.
   modifié (hors portée).
 - Vie privée : aucune permission ni requête réseau ajoutée par le lot (manifeste :
   une activité non exportée).
+
+## Issue #15 — demande de l'utilisateur : accélérer Whisper large-v3-turbo
+
+Enquête menée le 2026-11-12, sans modification du code de l'application. Rapport complet, avec sources, mesures hôte et
+procédure de mesure sur téléphone : [`docs/ACCELERER_WHISPER.md`](docs/ACCELERER_WHISPER.md). Test de mesure ajouté :
+`app/src/test/java/io/github/remtav/dictee/WhisperSpeedHostTest.kt` (sauté sans `-PmodelsDir`).
+
+Constats vérifiés dans le code de sherpa-onnx 2.0.1 et dans les fichiers du modèle :
+
+- L'encodeur de l'export sherpa-onnx accepte une longueur variable : ce n'est **pas** une fenêtre fixe de 30 s. Mais
+  sherpa-onnx ajoute **1 000 images (10 s) de silence** à chaque segment (`tail_paddings`, défaut -1 = 1 000) ; l'AAR
+  2.0.1 expose `OfflineWhisperModelConfig.tailPaddings`, que `SherpaEngine` ne renseigne pas.
+- Le décodeur a déjà un cache KV et un décodage glouton (le seul que sherpa offre pour Whisper) ; la langue forcée est
+  déjà transmise (elle n'économise qu'une étape de décodeur : 0 à 6 % mesuré).
+- Le modèle int8 est quantifié dynamiquement (`MatMulInteger`, `DynamicQuantizeLinear`), opérateurs absents des listes de
+  XNNPACK et de NNAPI d'onnxruntime : pas de gain attendu de ces fournisseurs, risque de ralentissement.
+
+Mesures hôte (x86-64, 4 cœurs, machine partagée : tendances, pas la latence du téléphone) : sur 1 thread, la fenêtre fixe
+de 30 s coûterait 8,4 s contre 2,1 s pour la marge par défaut, 1,3 s à 600 et 0,86 s à 300 (mot de 1 s) ; à 300 des
+répétitions apparaissent (WER 14,7 % contre 9,3 %), à 100 la sortie est inutilisable (42,7 %). Les provisoires consomment
+2,8 fois le calcul du final pour 5 s de parole et le final attend en moyenne 1,5 s (jusqu'à 5,9 s) derrière un provisoire
+non interruptible.
+
+Décisions proposées (à confirmer par l'utilisateur ; rien n'est appliqué) :
+
+1. **Couper le texte provisoire pour Whisper** (une ligne dans `DicteeApp.kt`) : gain le plus sûr, faisable tout de suite.
+2. **Ajouter un réglage `tailPaddings`** (`EngineOptions`, `SherpaEngine`, `AppSettings`), défaut inchangé (1 000) ; passer
+   à 600 seulement après mesure sur le téléphone avec des voix réelles et des mots isolés ; ajouter un filtre de phrase
+   répétée si 300 à 600 est retenu.
+3. **Mesurer sur le téléphone** (procédure du rapport) le nombre de threads (3 à 5), XNNPACK et NNAPI avant tout changement
+   de `defaultThreads()` ou du fournisseur par défaut.
+4. **Écarter** : Whisper small (WER 16 % contre 9,3 %), medium, tiny/base, distillations (même encodeur, donc pas plus
+   rapides sur segments courts ; distil-large-v3 est anglais seulement), whisper.cpp, QNN (étude séparée si Whisper devient
+   courant). Le modèle québécois en évaluation par ailleurs a la même architecture donc la même vitesse : ces leviers
+   lui sont applicables tels quels.
