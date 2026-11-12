@@ -253,7 +253,7 @@ Limites connues :
 | Whisper large-v3-turbo | OpenAI | 1,04 Go |
 
 Un quatrième modèle est préparé mais pas encore proposé : **Whisper large-v3-turbo, français québécois**
-(`ele-sage/whisper-large-v3-turbo-fr-quebecois`, MIT, 1,03 Go, français seulement ; WER annoncé par son auteur :
+(`ele-sage/whisper-large-v3-turbo-fr-quebecois`, MIT, 1,04 Go, français seulement ; WER annoncé par son auteur :
 6,65 % sur son jeu de validation). Il n'existe aucune conversion sherpa-onnx publique : elle se produit avec
 `android/tools/whisper-hf-vers-sherpa/` et doit être téléversée une fois pour que l'application puisse la
 télécharger (procédure dans le README de ce dossier). Tant que ce n'est pas fait, l'application ne le liste pas.

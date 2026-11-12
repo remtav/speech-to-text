@@ -1921,7 +1921,7 @@ Le modèle affiné est donc à une erreur de moins que Whisper turbo et à une d
 Temps réel (RTF moyen, mêmes exécutions) : Parakeet 0,19 ; Qwen3-ASR 0,79 ; Whisper turbo 1,00 ; Whisper QC 1,16.
 **Ces RTF sont bruités** : la machine exécutait en parallèle les tests d'autres agents (le RTF d'un même extrait
 varie de 0,3 à 2,2 d'une exécution à l'autre pour le même modèle). La seule lecture fiable : Whisper QC a exactement
-l'architecture, la taille (1 033 Mo contre 1 037 Mo) et donc le coût de Whisper turbo, ~5 fois celui de Parakeet.
+l'architecture, la taille (1 036 Mo contre 1 037 Mo) et donc le coût de Whisper turbo, ~5 fois celui de Parakeet.
 Ce que l'utilisateur reproche à Whisper turbo sur son téléphone (trop lent) vaut donc pour ce modèle aussi.
 Non mesuré : le mot « friperie » dicté seul (pas d'enregistrement ; à essayer sur le téléphone une fois le modèle
 publié).
