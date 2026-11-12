@@ -45,6 +45,22 @@
             android:textAppearance="?attr/textAppearanceBodyMedium"
             android:textColor="?attr/colorOnSurfaceVariant" />
 
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/cancel_wait"
+            style="@style/Widget.Material3.Button.TonalButton"
+            android:layout_width="wrap_content"
+            android:layout_height="40dp"
+            android:layout_marginEnd="4dp"
+            android:insetTop="0dp"
+            android:insetBottom="0dp"
+            android:minWidth="0dp"
+            android:paddingStart="12dp"
+            android:paddingEnd="12dp"
+            android:text="@string/cancel"
+            android:contentDescription="@string/cd_cancel_wait"
+            android:textSize="13sp"
+            android:visibility="gone" />
+
         <ImageButton
             android:id="@+id/settings"
             android:layout_width="40dp"

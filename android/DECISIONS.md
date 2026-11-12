@@ -177,6 +177,8 @@ du téléphone ne suffisent pas. Choix faits :
     la plupart des serveurs auto-hébergés (faster-whisper-server/speaches,
     serveur whisper.cpp, LocalAI, vLLM…). Les mots favoris du vocabulaire
     partent dans `prompt`.
+- *(Remplacé par l'issue #13, voir la dernière section : la dictée entière part
+  désormais en une requête, polie par le serveur.)*
 - Chaque segment du VAD est envoyé en WAV 16 kHz 16 bits mono, ce qui garde les
   commandes vocales, le vocabulaire et l'assemblage du texte identiques. Le
   texte provisoire est désactivé avec le serveur : une requête toutes les 0,7 s
@@ -304,3 +306,160 @@ références, plus le texte de son propre enregistrement ; « Partager » export
 le tout en texte. Points à trancher : modèle par défaut, nombre de threads,
 intérêt de NNAPI, valeur de la pause de fin de segment, intérêt du texte
 provisoire selon la consommation constatée.
+
+## Issue #13, lot 1 : dictée entière transcrite et polie par le serveur
+
+Décisions prises pendant le lot, en plus de celles arrêtées dans l'issue.
+
+### Côté serveur : aucune modification
+
+- `POST /jobs` accepte déjà `quick` et `polish`. Le résultat de
+  `GET /jobs/{id}` contient `text`, `polished_text` et `polish`, comme
+  `/transcribe`. C'est déjà couvert par `tests/test_api.py`
+  (`TestPolish.test_quick_job`, `test_polish_stage_reported`). Le point
+  « non vérifié » de l'issue est donc tranché : rien à ajouter côté serveur,
+  et `pytest` n'est pas concerné par ce lot.
+
+### Transport
+
+- **API de tâches** : `POST /jobs` (`quick=true`, `polish=true`, `language`
+  si réglé), puis `GET /jobs/{id}` toutes les 400 ms. Chaque `GET` a un délai
+  de lecture d'au plus 15 s : une requête courte ne risque pas le délai du
+  proxy Cloudflare.
+- **Repli synchrone** sur `POST /transcribe/streaming` avec `polish=true`
+  seulement si `POST /jobs` répond **404 ou 405** : c'est la marque d'un
+  serveur sans API de tâches. Les autres échecs (5xx, 401/403, 302, réseau)
+  ne sont pas des problèmes de route : ils passent directement au repli local.
+  Retenter la même requête sur une autre route doublerait l'attente pour rien.
+- **Redirections jamais suivies** (`instanceFollowRedirects = false`). Sinon,
+  `HttpURLConnection` suivrait le 302 d'Access vers la page de connexion et
+  recevrait un 200 en HTML. Tout 3xx est traité comme « redirection vers la
+  page de connexion Access ».
+- Une réponse 200 qui n'est pas du JSON (page HTML d'un proxy) est un échec
+  (`BAD_RESPONSE`) et mène au repli local.
+- **Délai total** : 60 s + 1 × la durée de l'audio, plafonné à 6 min, compté
+  depuis le début de l'envoi (envoi compris). Une fois le délai dépassé, la
+  tâche serveur est annulée (`POST /jobs/{id}/cancel`, au mieux) et l'app
+  passe au repli local. Connexion : 4 s, comme avant.
+- Le segment isolé (`RemoteEngine.transcribe`, utilisé par l'écran de
+  comparaison) garde `/transcribe/streaming` sans polissage, pour comparer
+  les modèles à armes égales. Il reçoit aussi les en-têtes Access.
+
+### Audio envoyé et repli
+
+- Pendant une dictée en mode serveur, le contrôleur garde **tout l'audio
+  capté** et, à part, **les segments du VAD**. La transcription segment par
+  segment et le texte provisoire sont coupés.
+- On envoie l'audio complet, du début de la première parole (moins 0,6 s de
+  marge, comme pour les segments) jusqu'à l'arrêt. Le silence initial est
+  retiré, mais on garde les pauses internes : elles portent la ponctuation et
+  le rythme que le serveur et le polissage exploitent. Si le VAD n'a entendu
+  aucune parole, rien n'est envoyé et rien n'est inséré.
+- **Repli local sur les segments du VAD**, pas sur l'audio complet : les
+  modèles du téléphone sont faits pour des segments d'au plus 20 s (une
+  dictée de 5 min en un bloc dépasserait leur mémoire). Le texte est assemblé
+  comme avant (`TextAssembler`). Mémoire : au pire environ 2 × 19 Mo pour une
+  dictée de 5 min, libérés à la fin.
+- **Annuler** (pendant l'attente) : la tâche serveur est annulée et le modèle
+  local transcrit l'audio gardé. Une annulation par l'utilisateur ne dit rien
+  de l'état du serveur : elle **ne déclenche pas** le délai de 60 s avant le
+  prochain essai. Les vraies pannes, elles, le déclenchent, comme avant.
+- **Dictée abandonnée** (le champ change, l'IME se ferme) : la tâche serveur
+  est annulée, et rien n'est transcrit ni inséré. C'est le comportement
+  existant pour un changement de champ.
+- **Durée maximale** : au bout de 5 min, la capture s'arrête et ce qui a été
+  dit est envoyé. Le message « Durée maximale atteinte » est une information,
+  pas une erreur.
+- **Limite connue** : si l'utilisateur a choisi « Afficher une erreur » comme
+  repli (ou si le modèle de repli n'est pas installé), il n'y a pas de modèle
+  local. Une panne du serveur affiche alors une erreur et la dictée est
+  perdue. C'est un choix explicite de l'utilisateur. Le réglage par défaut
+  reste Parakeet, qui ne perd rien.
+
+### Texte inséré
+
+- `polished_text` si `polish.applied` est vrai et que le texte n'est pas
+  vide. Sinon, `text` (le brut du serveur) est inséré, avec le message
+  discret « Texte non poli (raison) ». Ce n'est pas une erreur.
+- Les commandes vocales, le vocabulaire, les filtres et l'assemblage
+  s'appliquent au texte final, comme pour un segment. Le filtre
+  d'hallucinations Whisper ne s'applique pas : la famille « distant » n'y est
+  pas soumise, comme avant.
+- Après un repli local, le clavier affiche la raison (« Serveur non utilisé
+  (…) : transcrit sur le téléphone ») ou « Attente annulée ».
+
+### Cloudflare Access et secrets
+
+- Deux réglages, Client ID et Client Secret. Les en-têtes ne partent que si
+  **les deux** sont remplis : un seul en-tête serait refusé par Access de
+  toute façon, et le refus serait moins clair.
+- Le secret est stocké dans les préférences privées existantes (l'issue exclut
+  le stockage chiffré avancé). Il est saisi dans un champ mot de passe, donc
+  masqué, y compris dans les captures d'écran.
+- Pour qu'il n'apparaisse jamais dans un journal :
+  - `RemoteConfig.toString()` masque le jeton et le service token ;
+    `EngineOptions` est un data class qui pourrait être journalisé ;
+  - tout message d'erreur qui inclut une réponse du serveur passe par
+    `RemoteConfig.redact()`, qui remplace secret, jeton et Client ID par `***`.
+    C'est le cas d'un serveur qui renverrait les en-têtes reçus ;
+  - le journal du chemin distant (`RemoteLog`, balise logcat `DicteeRemote`)
+    ne reçoit que des messages déjà expurgés ;
+  - le rapport du diagnostic indique seulement « service token configuré :
+    oui/non ».
+- Test de connexion : `GET /health` avec tous les en-têtes. Il distingue :
+  accès refusé (401/403), redirection Access (3xx, avec le conseil
+  « politique Service Auth »), serveur injoignable, réponse illisible et
+  succès. En cas de succès, il affiche aussi la disponibilité du polissage
+  (`polish_available`).
+
+### Interface
+
+- Pas de nouvel état de dictée : l'attente du serveur est l'état FINISHING
+  existant, avec un indicateur `waitingServer`. Le clavier affiche
+  « Transcription et polissage… » (« Transcription sur le serveur… » pour une
+  API OpenAI) et un bouton **Annuler** à côté de la ligne d'état. Le micro
+  reste désactivé pendant l'attente, comme pendant toute transcription de fin.
+- **Diagnostic serveur** : écran à part (`DiagnosticActivity`), ouvert depuis
+  les Réglages. Chaque lancement fait 4 essais : les trois enregistrements de
+  référence, puis leur enchaînement avec 1 s de silence entre chacun
+  (environ 31 s, proche de la dictée de 30 s de la cible de latence). Le
+  diagnostic n'a pas de repli local, puisqu'il mesure le serveur : un échec
+  est affiché comme tel. La logique est dans `ServerDiagnostic`, testée en JVM.
+
+### Tests
+
+- `WholeDictationTest` (JVM, faux serveur HTTP local qui imite l'API de
+  tâches) couvre :
+  - une seule requête par dictée de trois énoncés, avec `polish=true` et
+    `quick=true`, et le WAV qui contient toute la dictée ;
+  - les en-têtes Access sur toutes les requêtes (`POST /jobs`, chaque
+    `GET /jobs/{id}`, `/health`), et leur absence s'ils ne sont pas configurés
+    ou incomplets ;
+  - l'insertion de `polished_text`, puis de `text` si le polissage a échoué
+    ou est absent ;
+  - le repli local sur l'audio gardé en cas de 502, d'erreur de tâche, de
+    401, de 403, de 302 (redirection non suivie), de serveur injoignable, de
+    délai dépassé (avec annulation de la tâche) et de réponse HTML ;
+  - le nouvel essai après 60 s, l'annulation (Annuler, abandon, annulation
+    avant l'envoi), la route synchrone si `/jobs` répond 404, l'API OpenAI, le
+    budget d'attente, la durée maximale et la dictée sans parole ;
+  - le test de connexion par cas ;
+  - l'absence du secret dans tous les journaux et messages, y compris quand le
+    serveur renvoie le secret dans son erreur ;
+  - le rapport du diagnostic.
+- Test instrumenté `dictationOnARemoteServer` : deux énoncés dictés dans
+  l'IME réelle vers un faux serveur de tâches sur l'émulateur. Il vérifie une
+  seule requête et une seule insertion du texte poli, l'état d'attente, les
+  en-têtes Access, et que le secret est absent de logcat.
+- `RecordingServer` (builds debug) reçoit désormais la requête entière
+  (méthode et chemin), et ajoute un `Location` vers une page Access à ses
+  réponses 3xx.
+
+### Pour le point de contrôle
+
+Réglages → Serveur distant → **Diagnostic serveur** donne, pour chaque essai,
+le temps d'envoi et le temps total (cible : moins de 5 s pour 30 s de
+dictée), le statut du polissage, et le texte brut et le texte poli côte à
+côte. « Exporter le rapport » permet de joindre le résultat à l'issue. Pour
+la fiabilité, couper le serveur (ou le tunnel) pendant l'attente : la dictée
+doit être insérée par le modèle local, avec le message « Serveur non utilisé ».

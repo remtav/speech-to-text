@@ -293,19 +293,40 @@ class OptionalFeaturesInstrumentedTest : ImeTestBase() {
 
     @Test
     fun dictationOnARemoteServer() {
-        // A server on the device's loopback stands in for the home server: the real
-        // RemoteEngine (HTTP, multipart WAV, cleartext to a LAN-style address) is used.
-        RecordingServer { 200 to """{"text": "Bonjour depuis le serveur.", "language": "fr"}""" }.use { server ->
+        // A server on the device's loopback stands in for the home server behind Cloudflare
+        // Access: the real RemoteEngine (job API, polling, multipart WAV, cleartext to a
+        // LAN-style address) is used. Two utterances: still one request, one insertion.
+        val polls = java.util.concurrent.atomic.AtomicInteger()
+        RecordingServer { req ->
+            when {
+                req.method == "POST" && req.path == "/jobs" -> 202 to """{"id": "j1", "status": "queued"}"""
+                req.path == "/jobs/j1" && polls.incrementAndGet() < 3 -> 200 to """{"id": "j1", "status": "running"}"""
+                req.path == "/jobs/j1" -> 200 to """{"id": "j1", "status": "done", "result": {"text": "alice et moi euh after early nightfall", "language": "fr", "polished_text": "Alice et moi, after early nightfall.", "polish": {"applied": true}}}"""
+                else -> 404 to "{}"
+            }
+        }.use { server ->
             app.settings.remoteUrl = "http://127.0.0.1:${server.port}"
+            app.settings.cfAccessClientId = "test-id.access"
+            app.settings.cfAccessClientSecret = "test-secret-value"
+            app.settings.remoteFallbackId = ""
             app.settings.activeModelId = ModelCatalog.remote.id
             TestHooks.engineFactory = null
-            useAudio("fr1")
+            useAudio("fr1", "en1")
             launchFields()
             tapMic()
-            waitFor("text from the server", 20_000) { field1() == "Bonjour depuis le serveur." }
-            val req = server.requests.first()
-            assertEquals("/transcribe/streaming", req.path)
-            assertTrue(req.body.size > 100_000) // ~6 s of 16 kHz 16-bit audio
+            // The keyboard shows the waiting state (with "Annuler") while the server works.
+            waitFor("waiting for the server", 30_000) { service.controller.waitingServer }
+            waitFor("text from the server", 30_000) { field1() == "Alice et moi, after early nightfall." }
+            val posts = server.requests.filter { it.method == "POST" }
+            assertEquals(1, posts.size)
+            assertEquals("/jobs", posts.single().path)
+            val body = String(posts.single().body, Charsets.ISO_8859_1)
+            assertTrue(body.contains("name=\"polish\"\r\n\r\ntrue"))
+            assertTrue(posts.single().body.size > 300_000) // both clips: ~13 s of 16 kHz 16-bit audio
+            assertTrue(server.requests.all { it.headers["cf-access-client-secret"] == "test-secret-value" })
+            assertEquals(io.github.remtav.dictee.stt.DictationResult.Source.SERVER_POLISHED, service.lastDictation?.source)
+            // The secret never reaches logcat.
+            assertFalse(shell("logcat -d").contains("test-secret-value"))
         }
     }
 
