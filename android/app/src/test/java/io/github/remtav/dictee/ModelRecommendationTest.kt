@@ -42,6 +42,18 @@ class ModelRecommendationTest {
         }
     }
 
+    @Test fun quebecWhisperCoversFrenchOnlyAndIsNeverRecommendedByTheTable() {
+        val qc = ModelCatalog.whisperQuebec
+        assertTrue(ModelRecommendations.covers(qc, DictationLanguage.FRENCH_QUEBEC))
+        assertTrue(ModelRecommendations.covers(qc, DictationLanguage.FRENCH_FRANCE))
+        for (l in DictationLanguage.entries.filter { it.engineCode != "fr" }) {
+            assertFalse(l.toString(), ModelRecommendations.covers(qc, l))
+        }
+        for (combo in allCombinations()) {
+            assertTrue(combo.toString(), ModelRecommendations.recommend(combo).model != qc)
+        }
+    }
+
     @Test fun quebecFrenchAloneRecommendsParakeet() {
         val rec = ModelRecommendations.recommend(setOf(DictationLanguage.FRENCH_QUEBEC))
         assertEquals(ModelCatalog.parakeet, rec.model)
