@@ -1,5 +1,7 @@
 package io.github.remtav.dictee.ui
 
+import io.github.remtav.dictee.dictation.StringSink
+import io.github.remtav.dictee.dictation.TextPipeline
 import io.github.remtav.dictee.stt.DictationLanguage
 import io.github.remtav.dictee.text.CommandEntry
 import io.github.remtav.dictee.text.CommandExample
@@ -30,14 +32,16 @@ object SetupProgress {
  * One "say this, you get that" card. Several commands can share one example
  * (opening and closing quotes and the colon share one sentence; so do the
  * parentheses): they are shown once, with [commands] listing what it teaches.
+ * [result] is what the keyboard itself produces for the user's languages (France
+ * typography for a France-only user), not the Québec text written in the table.
  */
 data class HowToExample(
     val language: CommandLanguage,
     val example: CommandExample,
     val commands: List<CommandEntry>,
+    val result: String,
 ) {
     val said: String get() = example.said
-    val result: String get() = example.result
     val before: String get() = example.before
 }
 
@@ -52,7 +56,17 @@ object HowToExamples {
     fun all(chosen: Set<DictationLanguage>): List<HowToExample> =
         CommandTable.active(chosen)
             .groupBy { it.language to it.example }
-            .map { (key, entries) -> HowToExample(key.first, key.second, entries) }
+            .map { (key, entries) -> HowToExample(key.first, key.second, entries, render(key.second, chosen)) }
+
+    /**
+     * Runs [example] through the keyboard's own text pipeline, with the typography of
+     * [chosen] (review 2.R): the card can only show what dictating it gives.
+     */
+    fun render(example: CommandExample, chosen: Set<DictationLanguage>): String {
+        val sink = StringSink(example.before)
+        TextPipeline(languages = chosen).applyFinal(example.said, null, sink)
+        return sink.text
+    }
 
     /**
      * The examples put forward: at most [max], the languages sharing the slots equally

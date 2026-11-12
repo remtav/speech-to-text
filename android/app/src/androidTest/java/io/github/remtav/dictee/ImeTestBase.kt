@@ -51,8 +51,12 @@ abstract class ImeTestBase {
         app.settings.haptics = false
         app.settings.cleanupMode = CleanupMode.OFF
         app.settings.activeModelId = ModelCatalog.parakeet.id
+        // Keyboard enabled, microphone granted (HowToInstrumentedTest) and a scripted model "installed":
+        // the setup screen would open "Comment dicter" over itself. Only HowToInstrumentedTest tests that.
+        app.settings.howToShown = true
         TestHooks.assumeInstalled = true
         app.engines.release()
+        waitUntilImeIsKnown()
         shell("ime enable $imeId")
         shell("ime set $imeId")
         device.setOrientationNatural()
@@ -69,6 +73,16 @@ abstract class ImeTestBase {
         app.engines.release()
         device.setOrientationNatural()
         device.unfreezeRotation()
+    }
+
+    /**
+     * Right after the APKs are installed, the system may not have registered the keyboard service
+     * yet: "ime enable" and "ime set" then fail with "unrecognized IME ID", and the first test of the
+     * run found the keyboard missing (CI of lot 2, review 2.R). Waits until the system lists it.
+     */
+    private fun waitUntilImeIsKnown() {
+        val end = SystemClock.uptimeMillis() + 60_000
+        while (imeId !in shell("ime list -a -s") && SystemClock.uptimeMillis() < end) SystemClock.sleep(250)
     }
 
     protected fun clip(name: String): PcmAudio = context.assets.open("reference/$name.wav").use { WavReader.read(it) }
@@ -96,6 +110,7 @@ abstract class ImeTestBase {
             // A cold emulator sometimes ignores stateAlwaysVisible: tap the field like a user.
             if (SystemClock.uptimeMillis() - tapped > 4_000) {
                 // A cold emulator may not have bound the IME yet: select it again and ask for it.
+                shell("ime enable $imeId")
                 shell("ime set $imeId")
                 device.findObject(By.res(BuildConfig.APPLICATION_ID, "test_field1"))?.click()
                 scenario.onActivity {

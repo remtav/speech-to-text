@@ -59,7 +59,9 @@ class HowToInstrumentedTest : ImeTestBase() {
 
     private fun View.allViews(): Sequence<View> = sequence {
         yield(this@allViews)
-        if (this is ViewGroup) for (i in 0 until childCount) yieldAll(getChildAt(i).allViews())
+        // `this` alone would be the SequenceScope here, never a ViewGroup: the tree was never walked (review 2.R).
+        val view = this@allViews
+        if (view is ViewGroup) for (i in 0 until view.childCount) yieldAll(view.getChildAt(i).allViews())
     }
 
     private fun ActivityScenario<*>.viewsTagged(tag: String): List<View> {
@@ -80,6 +82,7 @@ class HowToInstrumentedTest : ImeTestBase() {
     @Test
     fun opensAtTheEndOfTheFirstSetupAndNotTheSecondTime() {
         // 1. Keyboard enabled and microphone allowed, but no model: the setup is not complete.
+        app.settings.howToShown = false // ImeTestBase marks it seen for the other tests
         TestHooks.assumeInstalled = false
         val notYet = monitorHowTo()
         ActivityScenario.launch(SetupActivity::class.java).use {

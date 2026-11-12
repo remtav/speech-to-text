@@ -214,7 +214,7 @@ depuis l'écran principal et depuis le bouton d'aide du clavier.
 - **Typographie selon la langue** (seuls les signes dictés sont touchés).
   Québec (OQLF) : espace insécable avant `:` et dans les guillemets, rien avant
   `;` `?` `!`. France : espace insécable aussi avant `;` `?` `!`. Anglais :
-  aucune espace, guillemets “…”. « Français (France) » seul donne la typographie
+  aucune espace, guillemets “…”. « Français (France) » choisi sans « Français (Québec) » donne la typographie
   de France ; dans les autres cas, celle du Québec.
 - **Langues** : les commandes de ponctuation suivent les langues choisies
   (français, anglais, ou les deux). Avec d'autres langues seulement, seules la
@@ -223,8 +223,14 @@ depuis l'écran principal et depuis le bouton d'aide du clavier.
 
 Limites connues :
 
-- « deux points » sans trait d'union, suivi d'un mot ordinaire, n'est pas
-  reconnu ; une commande coupée par une pause en deux segments non plus.
+- « deux points » sans trait d'union, suivi d'un mot ordinaire (même après une
+  virgule), n'est pas reconnu ; une commande coupée par une pause en deux
+  segments non plus.
+- Une commande dite en tête de phrase et suivie d'une virgule reste une
+  commande : « Ouvrez les guillemets, s'il vous plaît » donne `« S'il vous
+  plaît`. On ne peut pas la distinguer de « Ouvrez les guillemets, bonjour… ».
+- Les heures (« 13 deux-points 52 » → `13:52`) ne sont collées que dites d'un
+  seul souffle.
 - Le texte provisoire (pendant la parole) montre les mots dits ; la commande
   s'applique au texte final.
 - **Mode serveur.** Les commandes s'appliquent au texte reçu du serveur, comme
@@ -244,7 +250,7 @@ Limites connues :
 |---|---|---|
 | Parakeet TDT 0.6b v3 (défaut) | NVIDIA | 671 Mo |
 | Qwen3-ASR 0.6B | Alibaba (Qwen) | 987 Mo |
-| Whisper large-v3-turbo | OpenAI | 1 037 Mo |
+| Whisper large-v3-turbo | OpenAI | 1,04 Go |
 
 Chaque fichier est vérifié par SHA-256 ; les modèles se suppriment depuis
 l'écran principal. **Comparer les modèles** transcrit les extraits de

@@ -1746,3 +1746,131 @@ quantité, deux écritures ; à uniformiser si le lot 2 est revu.
 complète) ; la place laissée au texte d'état du clavier par le nouveau bouton, sur un
 téléphone étroit ; la lisibilité des phrases dites en Plex Mono sur plusieurs lignes ; le
 moment de l'ouverture automatique après le dernier téléchargement.
+
+## Issue #15, lot 2 — revue indépendante (2.R)
+
+Revue faite sur le diff du lot (`origin/main...HEAD`, PR #17) et les critères
+d'acceptation de l'issue, sans les comptes rendus des agents qui ont codé.
+
+### Critères d'acceptation
+
+| Critère | État | Preuve |
+| --- | --- | --- |
+| Tests unitaires par commande, FR et EN | rempli | `TextTest.kt` : `PunctuationCommandsTest.eachFrenchCommand`, `eachEnglishCommand`, `CommandTableTest.everyFormIsRecognisedAlone` (chaque formulation de la table) |
+| Phrases pièges sans aucune commande | rempli, étendu | `FalsePositiveTest` : 34 phrases d'origine, plus 58 phrases de la revue (`reviewTrapsStayText`), `pronounBeforeAVerbWordingStaysText`, `homographFollowedByACommaAndWordsStaysText` |
+| Doublons avec la ponctuation du modèle | rempli | `DuplicateSignTest`, `PunctuationCommandsTest.realisticModelOutputs` |
+| Typographie Québec, France, anglais dans `TextTest` | rempli | `TypographyTest` |
+| Test instrumenté : ouverture en fin de première configuration, réouverture depuis l'écran principal et le clavier | rempli après correction du test (voir CI) | `HowToInstrumentedTest` ; à confirmer par la CI |
+| Test instrumenté : dictée scriptée « il a dit deux-points ouvrir les guillemets bonjour fermer les guillemets » | rempli (vert en CI) | `VoiceCommandInstrumentedTest.dictatedColonAndQuotesAreTypesetForQuebec` |
+| Formulations retenues et sources dans `DECISIONS.md` | rempli | sections « Issue #15, lot 2 », étape 2.1 |
+| Capture du tutoriel dans le README | en attente | liens présents ; images `docs/screenshots/howto-*.png` à déposer par l'orchestrateur après la CI (`ScreenshotTest` produit `howto-light` / `howto-dark`) |
+
+### Faux positifs trouvés et corrigés (`text/VoiceCommands.kt`)
+
+Une soixantaine de phrases ordinaires nouvelles (FR québécois et EN) passées
+dans `TextPipeline`. Sept changeaient le texte de l'utilisateur :
+
+1. « Ouvre les guillemets du rapport et corrige-les. » → `« Du rapport…`.
+   Correction : après une formulation de guillemets ou de parenthèses, « du »,
+   « des » (et en anglais « are », « were », « from », « about », « with »,
+   « mark(s) ») en font un groupe nominal. Limité aux guillemets et parenthèses :
+   après `;` `?` `!` la phrase suivante commence souvent ainsi (« du pain
+   point-virgule du lait »).
+2. « Guillemets ouverts ou fermés, peu importe. » → `« Ou fermés…`. Correction :
+   formulation suivie de « ou / et » puis d'un adjectif d'état opposé (ouverts,
+   fermés, ouvrants…) : deux adjectifs coordonnés, pas une commande.
+3. « Deux points, c'est pas assez. », « Colon, rectum and liver. » → la virgule
+   disparaissait, et au milieu d'un champ (« Il a marqué. Deux points, c'est pas
+   assez. ») le texte devenait ` : c'est pas assez`. Correction : un homographe
+   (« deux points » sans trait d'union, « colon ») suivi d'une virgule puis de
+   mots ordinaires reste du texte ; suivi d'une virgule puis d'une autre
+   commande, il reste une commande (« Il a dit, deux points, ouvrir les
+   guillemets… »).
+4. « Point d'exclamation, ça crie trop. », « Question mark, or period? »,
+   « End quote. », « Fermer la parenthèse. », « Deux points. » en début de champ :
+   le signe ne pouvait pas s'appliquer, les mots revenaient, mais sans la
+   ponctuation que la commande avait absorbée (virgule ou point perdus).
+   Correction : `Piece.Cmd.spoken` garde les mots et la ponctuation prise ; une
+   commande seule dans son segment garde le segment entier.
+5. « Je ferme la parenthèse et on continue. », « Je ferme les guillemets. »,
+   « I close quotes with a dash. » après un guillemet ou une parenthèse ouverts :
+   fermaient le signe. Correction : un pronom sujet ou complément avant une
+   formulation qui commence par un verbe (ouvrir, fermer, open, close, begin,
+   end) en fait une phrase sur le signe. Pas appliqué aux noms de signes :
+   « viens-tu point d'interrogation » donne toujours `Viens-tu?`.
+
+Restent ambiguës, laissées en commande et documentées dans le README : une
+formulation de signe dite en tête de segment puis une virgule (« Ouvrez les
+guillemets, s'il vous plaît » ; « Il pose la question, point
+d'interrogation. »). On ne peut pas les distinguer d'une vraie dictée
+(« Ouvrez les guillemets, bonjour… ») sans comprendre la phrase.
+
+Vrais positifs vérifiés (tests `realisticModelOutputs`) : une commande par
+segment avec majuscule et point du modèle, « Deux points. » seul entre deux
+commandes, commande en fin de segment, segment fait d'une seule commande,
+guillemet ouvert dans un segment et fermé dans un autre, deux signes identiques
+dictés de suite (un seul reste). Réglage « Commandes vocales » coupé : rien
+n'est interprété ni typographié sur plusieurs segments
+(`disabledCommandsAcrossSegments`). Le texte provisoire n'interprète rien (il
+montre les mots dits) : comportement attendu, documenté.
+
+### Autres corrections
+
+- **Aide juste pour « Français (France) »** (`ui/HowTo.kt`) : la carte affichait
+  le texte de la table, en typographie québécoise (`Tu viens demain?`), alors
+  que le clavier produit `Tu viens demain ?` pour un utilisateur de France.
+  `HowToExample.result` est maintenant calculé en passant l'exemple dans
+  `TextPipeline` avec les langues de l'utilisateur ; l'aide montre ce que le
+  clavier produit, par construction (`HowToExamplesTest.resultsAreWhatTheKeyboardProducesForTheUsersTypography`).
+- **Tailles** : la raison de recommandation de Whisper et le tableau des modèles
+  du README écrivent « 1,04 Go », comme la carte (`SizeFormat`).
+- **README** : limites précisées (homographe suivi d'une virgule, commande en
+  tête de segment suivie d'une virgule, heure collée seulement dans un même
+  segment) ; « France sans Québec » au lieu de « France seul » (France +
+  anglais donne aussi la typographie de France).
+
+### CI de la PR #17 (commit 7bff6e0) : causes et corrections
+
+- **`HowToInstrumentedTest`, 5 échecs « rien trouvé à l'écran »** : faute du
+  test, pas de l'écran. Dans `View.allViews()`, `if (this is ViewGroup)` était
+  écrit dans le bloc `sequence { }`, où `this` est le `SequenceScope` : l'arbre
+  des vues n'était jamais parcouru, seule la vue racine était rendue. Les parties
+  du test qui ne dépendent pas de cette recherche (l'ouverture automatique en fin
+  de configuration, le bouton du clavier) passaient déjà. Corrigé en
+  `this@allViews`, comme dans `SetupLanguageTest`.
+- **`DictationEndToEndTest.audioFileIsDictatedIntoTheField`, « unrecognized IME
+  ID »** : c'était le tout premier test de l'exécution, lancé une dizaine de
+  secondes après l'installation des APK ; aucun test précédent ne pouvait avoir
+  changé l'état. Le système n'avait pas encore enregistré le service du clavier :
+  `ime enable` échouait dans `setUp`, et la boucle de `launchFields` ne relançait
+  que `ime set`, qui échoue tant que le clavier n'est pas activé. Corrigé dans
+  `ImeTestBase` : attente (60 s au plus) que `ime list -a -s` liste le clavier
+  avant `ime enable` / `ime set`, et `ime enable` relancé avec `ime set` dans la
+  boucle. Course au démarrage, donc intermittente : elle explique qu'il passait au
+  lot 1.
+- **État laissé entre tests** : `HowToInstrumentedTest` accorde le micro
+  (permission qu'on ne peut pas retirer sans tuer le processus des tests). Avec
+  le clavier activé et le moteur scripté « installé », tout test qui ouvre
+  `SetupActivity` aurait vu « Comment dicter » s'ouvrir par-dessus.
+  `ImeTestBase` et `SetupLanguageTest` marquent maintenant l'écran comme déjà vu ;
+  seul `opensAtTheEndOfTheFirstSetupAndNotTheSecondTime` remet le drapeau à faux.
+
+### Vérifié sans changement
+
+- Table unique : `HowToActivity` ne contient aucun exemple recopié
+  (`neitherTheScreenNorTheStringsCopyAnExampleByHand`) ; tout vient de
+  `CommandTable.active` et `HowToExamples`.
+- Ouverture automatique : une seule fois (drapeau posé avant `startActivity`,
+  donc ni boucle ni double ouverture à la rotation) ; l'écouteur de
+  téléchargement n'est actif que pendant `onResume`, donc pas d'ouverture depuis
+  l'arrière-plan.
+- Bouton d'aide du clavier : 48 dp, description « Comment dicter »,
+  `FLAG_ACTIVITY_NEW_TASK`.
+- Thème : écran construit avec les aides de `ui/Ui.kt` (styles nommés, attributs
+  du thème) ; `NoHardcodedStyleTest` vert. La ligne « Tout se passe sur votre
+  téléphone… sauf si vous choisissez vous-même un serveur distant » est exacte.
+- Mode serveur : la limite du README correspond au code (`RemoteEngine` envoie le
+  texte poli tel quel à `TextPipeline`) ; `ServerCommandsTest` vert. Serveur non
+  modifié (hors portée).
+- Vie privée : aucune permission ni requête réseau ajoutée par le lot (manifeste :
+  une activité non exportée).

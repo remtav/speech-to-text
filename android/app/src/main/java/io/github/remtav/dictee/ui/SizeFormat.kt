@@ -3,7 +3,7 @@ package io.github.remtav.dictee.ui
 import java.util.Locale
 
 /**
- * Sizes in French units (o, ko, Mo, Go), decimal like the rest of the screens (671 Mo, 1 037 Mo),
+ * Sizes in French units (o, ko, Mo, Go), decimal like the rest of the screens (671 Mo, 1,04 Go),
  * whatever the language of the phone: Android's own formatter writes "MB" and "GB" under an
  * English system. Pure Kotlin, tested on the JVM.
  */

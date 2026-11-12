@@ -333,6 +333,29 @@ class PunctuationCommandsTest {
         assertEquals("Deux-points", dictate("deux-points", languages = QC))
     }
 
+    /** Typical model outputs checked by the review (2.R): capitals, periods, one command per segment. */
+    @Test fun realisticModelOutputs() {
+        assertEquals("Voici la liste$NB: du pain.", dictate("Voici la liste.", "Deux-points.", "Du pain.", languages = QC))
+        assertEquals("Voici la liste$NB:", dictate("Voici la liste", "Deux-points.", languages = QC))
+        assertEquals("Super!\n\nMerci.", dictate("Super.", "Point d'exclamation.", "Nouveau paragraphe.", "Merci.", languages = QC))
+        assertEquals("Tu viens?\n", dictate("Tu viens.", "Point d'interrogation, nouvelle ligne.", languages = QC))
+        assertEquals("Wow!", dictate("Wow point d'exclamation point d'exclamation", languages = QC))
+        assertEquals("Bon$NB: «${NB}Allô$NB»", dictate("Bon", "Deux points.", "Ouvrir les guillemets", "Allô", "Fermer les guillemets.", languages = QC))
+        assertEquals("Le chat (Félix)", dictate("Le chat", "Ouvrir la parenthèse", "Félix", "Fermer la parenthèse.", languages = QC))
+        assertEquals("“Hello”.", dictate("Open quote hello close quote.", languages = EN))
+        assertEquals("DEUX-POINTS", dictate("DEUX-POINTS", languages = QC))
+        // A sign that cannot apply gives back the words with the model's punctuation.
+        assertEquals("Point d'interrogation.", dictate("Point d'interrogation.", languages = QC))
+    }
+
+    @Test fun disabledCommandsAcrossSegments() {
+        val sink = StringSink()
+        val p = TextPipeline(commandsEnabled = false, languages = QC)
+        for (seg in listOf("Il a dit", "Deux-points.", "Ouvrir les guillemets.", "Bonjour.")) p.applyFinal(seg, ModelFamily.NEMO_TRANSDUCER, sink)
+        assertEquals("Il a dit Deux-points. Ouvrir les guillemets. Bonjour.", sink.text)
+        assertFalse(sink.text.contains(NB))
+    }
+
     @Test fun timeDictatedWithAColonHasNoSpaces() {
         assertEquals("Rendez-vous à 13:52", dictate("rendez-vous à 13 deux-points 52", languages = QC))
     }
@@ -378,6 +401,93 @@ class FalsePositiveTest {
         "We opened a new line of products.",
         "Delete the last sentence of the contract.",
     )
+
+    /** Found by the independent review (2.R): each one changed the text before its fix. */
+    private val reviewFrench = listOf(
+        "Ouvre les guillemets du rapport et corrige-les.",
+        "Deux points, c'est pas assez.",
+        "Deux points de suture, c'est rien.",
+        "Point d'exclamation, ça crie trop.",
+        "Guillemets ouverts ou fermés, peu importe.",
+        "Fermer la parenthèse.",
+        "Deux points.",
+        // and ordinary sentences that already stayed text
+        "On a gagné par deux points.",
+        "On a gagné par deux points hier.",
+        "Mets ça entre parenthèses.",
+        "C'est un nouveau paragraphe de ma vie.",
+        "Il a fait deux points, puis il est parti.",
+        "Ils ont perdu deux points au classement.",
+        "Le match s'est fini à deux points d'écart.",
+        "Ferme les guillemets quand tu as fini.",
+        "J'ouvre une parenthèse, ma mère est malade.",
+        "Bon, je ferme la parenthèse.",
+        "Une ligne, deux lignes, trois lignes.",
+        "Il faut écrire à la ligne suivante.",
+        "Va à la ligne, s'il te plaît.",
+        "Il est revenu à la ligne de départ.",
+        "J'ai écrit nouvelle ligne dans le courriel.",
+        "La nouvelle ligne de bus passe chez nous.",
+        "Le nouveau paragraphe est trop long.",
+        "Un point d'interrogation plane sur le projet.",
+        "Point d'interrogation sur le budget.",
+        "Le point-virgule, c'est compliqué.",
+        "Point-virgule ou virgule, je ne sais pas.",
+        "Elle a mis un point d'exclamation partout.",
+        "Les guillemets fermés, on passe à autre chose.",
+        "Elle met toujours ses idées entre guillemets.",
+        "Je mets toujours deux points avant une liste.",
+        "Avec deux points d'avance, on est premiers.",
+        "Montréal a deux points de plus que Québec.",
+        "Tu me dois deux points, mon chum.",
+        "C'était un point d'interrogation, pas un point.",
+        "Est-ce que c'est un deux-points ou un point-virgule?",
+        "Pas de point d'exclamation, merci.",
+        "Mettez deux-points après le titre.",
+        "Il a un problème au colon.",
+    )
+    private val reviewEnglish = listOf(
+        "Question mark, or period?",
+        "Colon, rectum and liver.",
+        "End quote.",
+        "The colon is an organ.",
+        "Quote me on that.",
+        "I need a new line of credit.",
+        "She opened a new paragraph in her life.",
+        "The question mark is at the end.",
+        "That's a quote from Shakespeare.",
+        "He scored two points.",
+        "The colon, which is long, absorbs water.",
+        "Semicolon usage is rare.",
+        "He closed the parenthesis.",
+        "Open parenthesis is the left one.",
+        "The next line is important.",
+        "Next paragraph talks about cats.",
+        "I had a colon exam.",
+        "Scratch that idea.",
+    )
+
+    @Test fun reviewTrapsStayText() {
+        for (s in reviewFrench) assertEquals(s, s, dictate(s, languages = QC))
+        for (s in reviewEnglish) assertEquals(s, s, dictate(s, languages = EN))
+        for (s in reviewFrench + reviewEnglish) assertEquals(s, s, dictate(s, languages = QC_EN))
+    }
+
+    /** A sentence about the sign, said after a quote or parenthesis was opened: stays text (review 2.R). */
+    @Test fun pronounBeforeAVerbWordingStaysText() {
+        assertEquals("Il a dit (voir annexe je ferme la parenthèse et on continue.", dictate("Il a dit (voir annexe", "Je ferme la parenthèse et on continue.", languages = QC))
+        assertEquals("Il a écrit « oui je ferme les guillemets.", dictate("Il a écrit « oui", "Je ferme les guillemets.", languages = QC))
+        assertEquals("He wrote “hi I close quotes with a dash.", dictate("He wrote “hi", "I close quotes with a dash.", languages = EN))
+        // Names of signs after a pronoun still work: "viens-tu?" is Québec French.
+        assertEquals("Viens-tu?", dictate("viens-tu point d'interrogation", languages = QC))
+    }
+
+    /** Homograph after another sentence, with a comma: stays text, even mid-field. */
+    @Test fun homographFollowedByACommaAndWordsStaysText() {
+        assertEquals("Il a marqué. Deux points, c'est pas assez.", dictate("Il a marqué.", "Deux points, c'est pas assez.", languages = QC))
+        // But between two commands, with the model's commas, it is one.
+        assertEquals("Il a dit$NB: «${NB}bonjour$NB».", dictate("Il a dit, deux points, ouvrir les guillemets, bonjour, fermer les guillemets.", languages = QC))
+    }
 
     @Test fun frenchTrapsStayText() {
         for (s in french) {

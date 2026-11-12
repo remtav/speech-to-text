@@ -82,6 +82,39 @@ object VoiceCommands {
         "for", "of", "in", "on", "is", "was", "that", "which", "at", "to", "means", "looks",
     )
 
+    /**
+     * After quotes and parentheses only (their wordings are plural nouns or verbs):
+     * "les guillemets du rapport", "open quotes are free", "close quote marks"
+     * (review 2.R). Not after ; ? !, where the next clause often starts so
+     * ("du pain point-virgule du lait", "semicolon are you coming").
+     */
+    private val RIGHT_BLOCKERS_ENCLOSING_FR = setOf("du", "des")
+    private val RIGHT_BLOCKERS_ENCLOSING_EN = setOf("are", "were", "from", "about", "with", "mark", "marks")
+    private val ENCLOSING = setOf(
+        Command.OPEN_QUOTE, Command.CLOSE_QUOTE, Command.OPEN_PARENTHESIS, Command.CLOSE_PARENTHESIS,
+    )
+
+    /**
+     * Subject or object pronouns before a wording that starts with a verb
+     * ("je ferme la parenthèse", "you close quotes"): a sentence about the
+     * sign, not a command (review 2.R). Not applied to the names of signs:
+     * "viens-tu point d'interrogation" must still work.
+     */
+    private val PRONOUNS_FR = setOf(
+        "je", "j", "tu", "il", "elle", "on", "nous", "vous", "ils", "elles",
+        "ne", "n", "me", "m", "te", "t", "se", "s", "y", "lui",
+    )
+    private val PRONOUNS_EN = setOf("i", "we", "you", "they", "he", "she", "it", "don't", "didn't", "never")
+    private val VERBS = setOf("ouvrir", "ouvrez", "ouvre", "fermer", "fermez", "ferme", "open", "close", "begin", "end")
+
+    /** "guillemets ouverts ou fermés": two adjectives joined, not a command (review 2.R). */
+    private val COORDINATORS = setOf("ou", "et", "or", "and")
+    private val OPPOSITE_STATES = setOf(
+        "ouvert", "ouverts", "ouverte", "ouvertes", "ferme", "fermes", "fermee", "fermees",
+        "ouvrant", "ouvrants", "ouvrante", "ouvrantes", "fermant", "fermants", "fermante", "fermantes",
+        "open", "opened", "closed", "close", "opening", "closing",
+    )
+
     private class Word(val folded: String, val range: IntRange)
 
     private class Candidate(val start: Int, val len: Int, val entry: CommandEntry, val form: CommandForm) {
@@ -90,7 +123,13 @@ object VoiceCommands {
 
     private sealed interface Side {
         object Edge : Side
-        object Punct : Side
+
+        /**
+         * Punctuation between the wording and its neighbour. [soft]: only
+         * commas (a pause, not the end of a clause). [next]: the candidate
+         * right after the punctuation, if any.
+         */
+        class Punct(val soft: Boolean = false, val next: Int? = null) : Side
         class Neighbour(val candidate: Int) : Side
         class WordAt(val index: Int) : Side
     }
@@ -137,17 +176,23 @@ object VoiceCommands {
             val first = words[c.start].range.first
             val last = words[c.end].range.last
             addText(pieces, segment.substring(textStart, first), previous, c.entry.command)
-            pieces += Piece.Cmd(c.entry.command, segment.substring(first, last + 1), c.entry.language)
             var end = last + 1
             val absorbed = absorbedAfter(c.entry.command)
             while (end < segment.length && (segment[end] in absorbed || segment[end] in SPACES)) end++
+            // The words and the punctuation the command took: typed back as they were
+            // when the sign cannot apply ("Deux points." at the start of the field).
+            val spoken = segment.substring(first, end).trimEnd { it in SPACES }
+            pieces += Piece.Cmd(c.entry.command, spoken, c.entry.language)
             textStart = end
             previous = c.entry.command
         }
         addText(pieces, segment.substring(textStart), previous, null)
         // A segment made only of commands: what is left is the model's punctuation around them.
         if (pieces.filterIsInstance<Piece.Text>().none { t -> t.text.any { it.isLetterOrDigit() } }) {
-            return pieces.filterIsInstance<Piece.Cmd>()
+            val commands = pieces.filterIsInstance<Piece.Cmd>()
+            // One command alone keeps the whole segment to type back if the sign cannot
+            // apply ("End quote." with nothing open keeps its period).
+            return commands.singleOrNull()?.let { listOf(Piece.Cmd(it.command, segment.trim(), it.language)) } ?: commands
         }
         return pieces
     }
@@ -201,7 +246,7 @@ object VoiceCommands {
     private fun leftSide(segment: String, words: List<Word>, cs: List<Candidate>, k: Int, c: Candidate): Side {
         val gapStart = if (c.start == 0) 0 else words[c.start - 1].range.last + 1
         val gap = segment.substring(gapStart, words[c.start].range.first)
-        if (gap.any { it in BOUNDARY_PUNCT || it == '\n' || it in "«»“”\"()" }) return Side.Punct
+        if (gap.any { it in BOUNDARY_PUNCT || it == '\n' || it in "«»“”\"()" }) return Side.Punct()
         if (c.start == 0) return Side.Edge
         if (k > 0 && cs[k - 1].end == c.start - 1) return Side.Neighbour(k - 1)
         return Side.WordAt(c.start - 1)
@@ -210,14 +255,18 @@ object VoiceCommands {
     private fun rightSide(segment: String, words: List<Word>, cs: List<Candidate>, k: Int, c: Candidate): Side {
         val gapEnd = if (c.end == words.size - 1) segment.length else words[c.end + 1].range.first
         val gap = segment.substring(words[c.end].range.last + 1, gapEnd)
-        if (gap.any { it in BOUNDARY_PUNCT || it == '\n' || it in "«»“”\"()" }) return Side.Punct
+        if (gap.any { it in BOUNDARY_PUNCT || it == '\n' || it in "«»“”\"()" }) {
+            val soft = c.end < words.size - 1 && gap.all { it == ',' || it in SPACES }
+            val next = if (k + 1 < cs.size && cs[k + 1].start == c.end + 1) k + 1 else null
+            return Side.Punct(soft, next)
+        }
         if (c.end == words.size - 1) return Side.Edge
         if (k + 1 < cs.size && cs[k + 1].start == c.end + 1) return Side.Neighbour(k + 1)
         return Side.WordAt(c.end + 1)
     }
 
     private fun detached(side: Side, accepted: BooleanArray) = when (side) {
-        Side.Edge, Side.Punct -> true
+        Side.Edge, is Side.Punct -> true
         is Side.Neighbour -> accepted[side.candidate]
         is Side.WordAt -> false
     }
@@ -228,22 +277,38 @@ object VoiceCommands {
         if (c.entry.command.kind == CommandKind.LAYOUT) return l && r
         if (leftBlocked(c, words, left)) return false
         if (c.form.strictness == Strictness.HOMOGRAPH) {
+            // "Deux points, c'est pas assez", "Colon, rectum and liver": a comma then
+            // ordinary words is a pause in a sentence, not a command (review 2.R).
+            if (right is Side.Punct && right.soft && (right.next == null || !accepted[right.next])) return false
             return (l && r) || (right is Side.Neighbour && accepted[right.candidate])
         }
-        val rightBlockers = if (c.entry.language == CommandLanguage.FRENCH) RIGHT_BLOCKERS_FR else RIGHT_BLOCKERS_EN
-        if (right is Side.WordAt && head(words[right.index].folded) in rightBlockers) return false
+        if (right is Side.WordAt) {
+            val rightBlockers = if (c.entry.language == CommandLanguage.FRENCH) RIGHT_BLOCKERS_FR else RIGHT_BLOCKERS_EN
+            val next = words[right.index].folded
+            if (head(next) in rightBlockers) return false
+            if (c.entry.command in ENCLOSING) {
+                val enclosing = if (c.entry.language == CommandLanguage.FRENCH) RIGHT_BLOCKERS_ENCLOSING_FR else RIGHT_BLOCKERS_ENCLOSING_EN
+                if (next in enclosing) return false
+            }
+            if (next in COORDINATORS && words.getOrNull(right.index + 1)?.folded in OPPOSITE_STATES) return false
+        }
         return true
     }
 
     /** The word before (no punctuation between) makes the wording an ordinary phrase. */
     private fun leftBlocked(c: Candidate, words: List<Word>, left: Side): Boolean {
-        if (left == Side.Edge || left == Side.Punct) return false
+        if (left == Side.Edge || left is Side.Punct) return false
         val french = c.entry.language == CommandLanguage.FRENCH
         val blockers = if (french) LEFT_BLOCKERS_FR else LEFT_BLOCKERS_EN
         val adjectives = if (french) PRENOMINAL_FR else PRENOMINAL_EN
         val i = c.start - 1
         val w = tail(words[i].folded)
         if (w in blockers) return true
+        if (c.form.words.first() in VERBS) {
+            val pronouns = if (french) PRONOUNS_FR else PRONOUNS_EN
+            // "je ferme", "j'ouvre"… and "il ne ferme" ("ne" is in the list too).
+            if (w in pronouns || head(words[i].folded) in pronouns && words[i].folded.contains('\'')) return true
+        }
         if (w in adjectives && i > 0) return tail(words[i - 1].folded) in blockers
         return false
     }

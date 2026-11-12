@@ -72,6 +72,20 @@ class HowToExamplesTest {
     }
 
     @Test
+    fun resultsAreWhatTheKeyboardProducesForTheUsersTypography() {
+        // Québec: the text of the table, as written.
+        for (ex in HowToExamples.all(quebec)) assertEquals(ex.said, ex.example.result, ex.result)
+        for (ex in HowToExamples.all(english)) assertEquals(ex.said, ex.example.result, ex.result)
+        for (ex in HowToExamples.all(quebecAndEnglish)) assertEquals(ex.said, ex.example.result, ex.result)
+        // France alone (review 2.R): no-break space before ; ? !, not the Québec text of the table.
+        val france = HowToExamples.all(setOf(DictationLanguage.FRENCH_FRANCE))
+        val question = france.single { Command.QUESTION_MARK in it.commands.map { c -> c.command } }
+        assertEquals("Tu viens demain\u00A0?", question.result)
+        val semicolon = france.single { Command.SEMICOLON in it.commands.map { c -> c.command } }
+        assertEquals("Du pain\u00A0; du lait", semicolon.result)
+    }
+
+    @Test
     fun aLanguageWithoutPunctuationCommandsStillGetsExamples() {
         // Spanish only: no sign command (CommandTable.active), line breaks and deletions remain
         val shown = HowToExamples.featured(setOf(DictationLanguage.SPANISH))
