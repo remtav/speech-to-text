@@ -182,7 +182,7 @@ jobs:
           fail_on_unmatched_files: true
           files: dictee-${{ env.VERSION_NAME }}.apk
           body: |
-            Kalmia Blabla: a voice keyboard designed in Quebec, for the French spoken here. Your voice is transcribed on your phone and sent to no one by default; no account, no ads, no telemetry, open source code.
+            Kalmia Blabla: a voice keyboard designed in Quebec, for the French spoken here. Your voice is transcribed on your phone and sent to no one by default; no account, no ads, no telemetry, and public source code anyone can read.
             Voice keyboard APK (issue #10), built from ${{ github.sha }}.
             Signed with the project's private release key: each release installs over the previous one, and an APK signed by anyone else is refused as an update.
             Install: download the APK on the phone, allow installs from this source, then open "Kalmia Blabla" to enable the keyboard and download a model.
