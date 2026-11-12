@@ -154,3 +154,104 @@ Reconnaît-on Kalmia au premier coup d'œil ? À regarder en particulier :
 - **Où corriger** : hors portée de cette itération (prompt et garde-fou du
   serveur, `app/polish.py`). La limite est décrite dans `android/README.md`,
   section « Dicter la ponctuation ».
+
+## Lot 3 — polissage local, et demandes ajoutées en cours de route
+
+### 10. Lire le rapport et décider de ce qui sera livré
+
+- **Quoi lire** : `android/docs/POLISSAGE_LOCAL.md`, section « La décision à
+  prendre ».
+- **Recommandation du rapport** : ne livrer aucun LLM de polissage. Sur le jeu
+  de 132 paires, « règles + vocabulaire » corrige 55 cas sur 79 sans abîmer
+  aucune des 53 phrases de contrôle ; un LLM parfait (simulé) derrière le
+  garde-fou n'en ajoute qu'un. Aucun LLM n'a réellement tourné : ces chiffres
+  sont des plafonds et des simulations.
+- **Réserves** : la liste de vocabulaire a été écrite en connaissant le jeu
+  (sans les formes tirées du jeu : 36 cas corrigés, 6 modifiés à tort) ; les
+  transcriptions viennent d'une voix de synthèse à accent de France ;
+  « coifferimouski.com » n'est rétabli que si la transcription a gardé toutes
+  les lettres du nom.
+- **Choix fait en attendant** : rien n'est branché ni activé.
+- **Où corriger** : pour proposer « règles + vocabulaire » en option, brancher
+  `android/app/src/main/java/io/github/remtav/dictee/text/polish/PolishRules.kt`
+  et `ShippedVocabulary.kt` derrière un nouveau réglage ; relire d'abord la
+  liste de `ShippedVocabulary.kt` (une forme qui serait un mot ordinaire
+  abîmerait du texte) et ajouter de vraies dictées québécoises au jeu
+  `android/app/src/test/resources/polissage/jeu-evaluation.tsv`.
+- **Facultatif** : mesurer le LLM sur le téléphone avec la procédure du
+  rapport. Elle n'a jamais été exécutée : signaler toute étape fausse.
+
+### 11. Le modèle Whisper affiné sur le français québécois
+
+- **Ce que c'est** : `ele-sage/whisper-large-v3-turbo-fr-quebecois` (MIT),
+  converti et publié sous ton compte :
+  https://huggingface.co/remiavelo/sherpa-onnx-whisper-large-v3-turbo-fr-quebecois-int8.
+  Relire la fiche de ce dépôt : elle est sous ton nom.
+- **Quoi faire** : le télécharger depuis l'écran de configuration, dicter
+  « friperie » seul et les autres mots d'ici qui échouaient, puis le comparer
+  aux autres dans « Comparer les modèles » avec ta voix.
+- **Mesuré ici** : 5 erreurs sur 59 mots sur les six extraits québécois
+  (Parakeet 4, Whisper turbo 6, Qwen3-ASR 8). Trop peu pour conclure ; les
+  mots isolés n'ont pas été mesurés. Le WER de 6,65 % est celui annoncé par
+  l'auteur sur son propre jeu.
+- **À savoir** : même taille et même coût que Whisper turbo, donc aussi lent ;
+  français seulement. Parakeet reste le modèle recommandé.
+- **Non vérifié** : le téléchargement sans compte depuis un téléphone (le
+  dépôt est public d'après Hugging Face, mais l'essai fait ici passait par ton
+  jeton) ; les conditions des données d'entraînement de l'auteur pour la
+  redistribution d'un dérivé.
+- **Où corriger** : `android/app/src/main/java/io/github/remtav/dictee/stt/ModelCatalog.kt`
+  (entrée `whisperQuebec`) ; la recommandation est dans `stt/ModelRecommendation.kt`.
+- **Jeton** : le jeton Hugging Face est enregistré sur ton environnement
+  « Default » de Claude Code ; le retirer s'il ne sert plus.
+
+### 12. Vitesse de Whisper (turbo et québécois)
+
+- **Changé pour tous** : avec un modèle Whisper, plus de texte provisoire
+  pendant qu'on parle (il retardait le résultat final). Vérifier dans le
+  clavier que le texte arrive plus tôt après la pause.
+- **À essayer** : Réglages > Performance > « Silence ajouté pour Whisper ».
+  Valeur par défaut 1 000 (inchangée). Dans « Comparer les modèles », faire
+  une exécution à jeter puis une par valeur (1 000, 600, 300), avec
+  « friperie » seul, une phrase de 5 s et une dictée de 15 s ; regarder le
+  texte autant que le temps. Ne garder 600 que sans répétition ni mot manquant
+  sur environ cinq essais ; à 300, des phrases répétées ont été observées.
+- **Mesuré sur ordinateur seulement** (x86-64, machine partagée) : ce sont des
+  tendances, pas la latence du téléphone. Procédure complète, threads compris :
+  `android/docs/ACCELERER_WHISPER.md`.
+- **Où corriger** : `stt/WhisperTuning.kt` (texte provisoire),
+  `settings/AppSettings.kt` (`whisperTailPaddings`, défaut).
+
+### 13. Langue transmise à Qwen3-ASR (changement de défaut non mesuré)
+
+- **Ce qui a changé** : quand une seule langue est cochée — c'est le cas du
+  choix initial, « Français (Québec) » —, Qwen3-ASR reçoit maintenant cette
+  langue, comme Whisper. Parakeet n'accepte aucune langue : il devine toujours,
+  ce qui explique qu'un mot dit seul parte vers l'anglais.
+- **Quoi faire** : avec Qwen3-ASR, dicter des mots d'ici dits seuls, puis une
+  phrase française contenant quelques mots anglais ; vérifier que rien n'est
+  francisé à tort.
+- **Où corriger** : `DictationLanguages.qwen3Language` dans
+  `android/app/src/main/java/io/github/remtav/dictee/stt/DictationLanguages.kt`
+  et `AppSettings.engineOptions`.
+
+### 14. Polissage : ce qui peut encore repasser sur le texte
+
+- **Polissage par le serveur** : nouvel interrupteur dans les Réglages,
+  activé par défaut (comportement inchangé). Le couper insère le texte brut.
+  À décider : le laisser activé ou le couper par défaut (une ligne,
+  `AppSettings.remotePolish`).
+- **Petit LLM local** : toujours désactivé par défaut. Son garde-fou refuse
+  maintenant tout mot changé, même d'une lettre. Pour le confirmer : l'activer,
+  dicter des phrases longues contenant des mots d'ici, vérifier qu'aucun mot
+  ne change, puis le remettre sur « Désactivé ».
+- **Enquête « friperie »** : arrêtée à ta demande, sans cause trouvée. Le cas
+  exact n'a jamais été reproduit, faute d'enregistrement. Chronologie dans
+  `android/DECISIONS.md`, section « pouvoir couper le polissage ».
+
+### 15. Un vrai banc d'essai avec ta voix (proposé, non fait)
+
+- **Idée** : mesurer les quatre modèles sur des mots québécois dits seuls et
+  en phrases, avec ta voix. « Comparer les modèles » (bouton « Enregistrer une
+  phrase ») et le test de lecture du lot 4 en couvrent une partie ; une liste
+  de mots isolés d'ici serait une petite issue à part.
