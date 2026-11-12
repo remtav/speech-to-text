@@ -99,7 +99,7 @@ object ModelRecommendations {
      * 2. Every language is among Parakeet's 25: Parakeet (smallest download,
      *    671 Mo). With Quebec French, the reason names the basis.
      * 3. Otherwise Qwen3-ASR (987 Mo) if it covers everything chosen.
-     * 4. Otherwise Whisper (1 037 Mo), the only model covering all eleven.
+     * 4. Otherwise Whisper (1,04 Go), the only model covering all eleven.
      *
      * Nothing is blocked: the other models stay downloadable.
      */
@@ -136,7 +136,7 @@ object ModelRecommendations {
         return ModelRecommendation(
             ModelCatalog.whisperTurbo,
             "$parakeetNote Qwen3-ASR ne couvre pas : $qwenMissing. " +
-                "Whisper est le seul des trois qui couvre toutes vos langues (1 037 Mo).",
+                "Whisper est le seul des trois qui couvre toutes vos langues (1,04 Go).",
         )
     }
 }

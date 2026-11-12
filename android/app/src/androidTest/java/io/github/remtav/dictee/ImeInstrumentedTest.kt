@@ -10,12 +10,14 @@ import io.github.remtav.dictee.dictation.DictationState
 import io.github.remtav.dictee.settings.AppSettings
 import io.github.remtav.dictee.settings.CleanupMode
 import io.github.remtav.dictee.stt.Acceleration
+import io.github.remtav.dictee.stt.DictationLanguage
 import io.github.remtav.dictee.stt.EngineManager
 import io.github.remtav.dictee.stt.ModelCatalog
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
+import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 import java.io.File
@@ -104,6 +106,12 @@ class DictationEndToEndTest : ImeTestBase() {
 @RunWith(AndroidJUnit4::class)
 class VoiceCommandInstrumentedTest : ImeTestBase() {
 
+    /** The commands of the chosen languages only (step 2.2): these tests dictate in French and English. */
+    @Before
+    fun chooseFrenchAndEnglish() {
+        app.settings.languages = setOf(DictationLanguage.FRENCH_QUEBEC, DictationLanguage.ENGLISH)
+    }
+
     private fun dictate(vararg segments: String): String {
         val clips = Array(segments.size) { if (it % 2 == 0) "en1" else "fr1" }
         useAudio(*clips, gap = 1.2f)
@@ -129,6 +137,21 @@ class VoiceCommandInstrumentedTest : ImeTestBase() {
         app.settings.voiceCommands = false
         assertEquals("Bonjour. Nouvelle ligne.", dictate("Bonjour.", "Nouvelle ligne."))
     }
+
+    /** Issue #15, lot 2: the scripted dictation of the issue, Québec typography (no-break spaces). */
+    @Test fun dictatedColonAndQuotesAreTypesetForQuebec() {
+        app.settings.languages = setOf(DictationLanguage.FRENCH_QUEBEC)
+        assertEquals(
+            "Il a dit\u00A0: «\u00A0bonjour\u00A0»",
+            dictate("il a dit deux-points ouvrir les guillemets bonjour fermer les guillemets"),
+        )
+    }
+
+    @Test fun dictatedQuestionMarkReplacesTheModelPeriodAcrossSegments() =
+        assertEquals("C'est vrai?", dictate("C'est vrai.", "Point d'interrogation."))
+
+    @Test fun ordinaryPhraseIsNotACommand() =
+        assertEquals("J'ai marqué deux points.", dictate("J'ai marqué deux points."))
 }
 
 /** Lot 2: robustness scenarios. */

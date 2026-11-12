@@ -170,9 +170,79 @@ Configuration (accueil et étapes ; « Vos langues » ; modèle recommandé avec
 - Bouton du modèle (en haut à gauche) : changer de modèle sans quitter le champ.
 - Touches : clavier précédent, `,` `.` espace `?` `!`, effacer (maintenir pour
   répéter), entrée.
-- Commandes vocales : « nouvelle ligne », « nouveau paragraphe », « efface la
-  dernière phrase », « efface le dernier mot » (et en anglais).
+- Commandes vocales : voir « Dicter la ponctuation » ci-dessous.
 - Désactivé dans les champs de mot de passe.
+
+## Dicter la ponctuation
+
+**La commande est le nom du signe**, tel qu'on le dirait à quelqu'un : pas de
+mot d'activation à apprendre. Les formulations sont celles des dictées d'Apple
+et de Google, pour qu'une habitude prise ailleurs fonctionne ici.
+
+| Vous dites | Vous obtenez |
+|---|---|
+| « deux-points » (colon) | `:` |
+| « point-virgule » (semicolon) | `;` |
+| « point d'interrogation » (question mark) | `?` |
+| « point d'exclamation » (exclamation mark) | `!` |
+| « ouvrir les guillemets » / « fermer les guillemets » (open quote / end quote) | « … » en français, “…” en anglais |
+| « ouvrir la parenthèse » / « fermer la parenthèse » (open parenthesis / close parenthesis) | `(` `)` |
+| « nouvelle ligne » (new line) | retour à la ligne |
+| « nouveau paragraphe » (new paragraph) | ligne vide |
+| « efface la dernière phrase », « efface le dernier mot » (delete last sentence / word) | efface ce qui précède |
+
+Exemple : « il a dit deux-points ouvrir les guillemets bonjour fermer les
+guillemets » donne `Il a dit : « bonjour »`. Les variantes courantes sont
+acceptées (« ouvrez les guillemets », « guillemet ouvrant », « à la ligne »…).
+La liste complète et à jour est celle de l'écran « Comment dicter », généré
+depuis la même table que l'analyse (`CommandTable`) : l'aide ne peut pas
+diverger du comportement.
+
+![Comment dicter, clair](docs/screenshots/howto-light.png)
+![Comment dicter, sombre](docs/screenshots/howto-dark.png)
+
+L'écran « Comment dicter » s'ouvre à la fin de la configuration ; on le rouvre
+depuis l'écran principal et depuis le bouton d'aide du clavier.
+
+- **Peu de faux positifs.** Une formulation n'est une commande que si les mots
+  autour n'en font pas du texte ordinaire : « j'ai marqué deux points » ou
+  « c'est un point d'interrogation pour moi » restent du texte. Dans le doute,
+  le texte reste tel quel.
+- **Jamais de doublon.** Si le modèle a déjà mis un signe là où vous en dictez
+  un, il n'en reste qu'un. La virgule et le point, que les modèles placent déjà
+  bien, ne sont pas dans la liste.
+- **Typographie selon la langue** (seuls les signes dictés sont touchés).
+  Québec (OQLF) : espace insécable avant `:` et dans les guillemets, rien avant
+  `;` `?` `!`. France : espace insécable aussi avant `;` `?` `!`. Anglais :
+  aucune espace, guillemets “…”. « Français (France) » choisi sans « Français (Québec) » donne la typographie
+  de France ; dans les autres cas, celle du Québec.
+- **Langues** : les commandes de ponctuation suivent les langues choisies
+  (français, anglais, ou les deux). Avec d'autres langues seulement, seules la
+  mise en forme et les effacements restent actifs. Le réglage « Commandes
+  vocales » les coupe toutes.
+
+Limites connues :
+
+- « deux points » sans trait d'union, suivi d'un mot ordinaire (même après une
+  virgule), n'est pas reconnu ; une commande coupée par une pause en deux
+  segments non plus.
+- Une commande dite en tête de phrase et suivie d'une virgule reste une
+  commande : « Ouvrez les guillemets, s'il vous plaît » donne `« S'il vous
+  plaît`. On ne peut pas la distinguer de « Ouvrez les guillemets, bonjour… ».
+- Les heures (« 13 deux-points 52 » → `13:52`) ne sont collées que dites d'un
+  seul souffle.
+- Le texte provisoire (pendant la parole) montre les mots dits ; la commande
+  s'applique au texte final.
+- **Mode serveur.** Les commandes s'appliquent au texte reçu du serveur, comme
+  à celui d'un modèle local. Avec le polissage du serveur (dictée entière), son
+  modèle de langage peut remplacer lui-même une commande par le signe, avec ses
+  propres espaces (une espace ordinaire avant `: ? ! ;`, sans la typographie du
+  Québec), ou la laisser telle quelle ; dans les deux cas il n'y a pas de
+  doublon. Le garde-fou du serveur rejette en général une réponse où des mots
+  ont disparu, et c'est alors le texte brut qui est utilisé, mais pas toujours
+  (une dictée longue avec « point d'exclamation » ou « nouvelle ligne » au
+  milieu peut passer). Pour des signes toujours typographiés comme ici, utilisez
+  un modèle du téléphone, ou une API compatible OpenAI (sans polissage).
 
 ## Modèles
 
@@ -180,7 +250,7 @@ Configuration (accueil et étapes ; « Vos langues » ; modèle recommandé avec
 |---|---|---|
 | Parakeet TDT 0.6b v3 (défaut) | NVIDIA | 671 Mo |
 | Qwen3-ASR 0.6B | Alibaba (Qwen) | 987 Mo |
-| Whisper large-v3-turbo | OpenAI | 1 037 Mo |
+| Whisper large-v3-turbo | OpenAI | 1,04 Go |
 
 Chaque fichier est vérifié par SHA-256 ; les modèles se suppriment depuis
 l'écran principal. **Comparer les modèles** transcrit les extraits de
@@ -214,7 +284,8 @@ polissage… » avec un bouton **Annuler**.
   le serveur est réessayé au bout de 60 s.
 - Une dictée dure au plus 5 minutes : au-delà, l'enregistrement s'arrête et
   ce qui a été dit est envoyé.
-- Les commandes vocales et le vocabulaire s'appliquent au texte final. Les
+- Les commandes vocales et le vocabulaire s'appliquent au texte final reçu
+  (limite du polissage : voir « Dicter la ponctuation »). Les
   mots favoris ne sont pas envoyés au serveur de ce dépôt.
 - Avec une API compatible OpenAI, la dictée part aussi en une fois, sans
   polissage (ces serveurs n'en ont pas).

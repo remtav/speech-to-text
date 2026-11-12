@@ -1177,3 +1177,715 @@ la JVM.
 - Largeur des touches (environ 40 dp) : assez confortable au pouce ? Sinon,
   passer à deux rangées.
 - Choisir une licence pour le dépôt si « code source ouvert » doit être écrit.
+
+## Issue #15, lot 2 — étape 2.1 : formulations des dictées d'Apple et de Google
+
+Date de consultation de toutes les sources : 2026-11-12. Aucun code touché.
+
+**Ce qui est « mot pour mot » et ce qui ne l'est pas.** Les pages d'Apple, de
+Google et de l'OQLF ont été téléchargées en HTML et leur texte extrait
+mécaniquement (aucun résumé d'outil) : les formulations des tableaux ci-dessous
+sont donc celles des pages. Les résumés produits par l'outil de lecture ont été
+écartés, sauf pour la lecture initiale. Pour l'usage de France, la seule source
+lue en entier est un guide du CNRS de 1995 (un document de référence
+typographique, pas l'Imprimerie nationale) ; le *Lexique des règles typographiques
+en usage à l'Imprimerie nationale* est un livre et n'a pas pu être consulté
+(voir « Non vérifié »). Les propositions de la partie 2 sont des choix de
+conception, pas des citations.
+
+### 1. Formulations relevées
+
+Convention : le texte entre guillemets est celui de la page ; « non documenté »
+signifie que la page ne liste pas cette commande.
+
+| Signe | Apple FR | Apple EN | Google FR | Google EN |
+| --- | --- | --- | --- | --- |
+| Guillemet ouvrant | Mac fr-afri et fr-fr : « guillemet ouvrant » ; Mac fr-ca : « guillemet » ; iPhone (fr-afri, fr-ca, fr-fr) : « Guillemets » | Mac et iPhone : « quote » | non documenté | non documenté |
+| Guillemet fermant | Mac (fr-afri, fr-ca, fr-fr) : « guillemet fermant » ; iPhone : « Guillemets fermants » | Mac et iPhone : « end quote » | non documenté | non documenté |
+| Deux-points | Mac : « deux-points » ; iPhone : « Deux points » (sans trait d'union) | « colon » | non documenté | non documenté |
+| Point-virgule | « point-virgule » (Mac et iPhone) | « semicolon » | non documenté | non documenté |
+| Parenthèse ouvrante | « parenthèse ouvrante » (Mac et iPhone) | « open parenthesis » | non documenté | non documenté |
+| Parenthèse fermante | « parenthèse fermante » (Mac et iPhone) | « close parenthesis » | non documenté | non documenté |
+| Point d'interrogation | « point d’interrogation » | « question mark » | « Point d'interrogation » (liste de la page Docs et de l'aide Gboard FR) | « Question mark » (Docs, Gboard) |
+| Point d'exclamation | « point d’exclamation » | Mac : « exclamation mark » ; iPhone : « Exclamation point » | « Point d'exclamation » (Docs, Gboard FR) | « Exclamation point » (Docs, Gboard) |
+| Nouvelle ligne | Mac : « nouvelle ligne » ; iPhone (fr-afri, fr-ca, fr-fr) : « À la ligne » | « new line » (Mac et iPhone) | « Nouvelle ligne » (Docs, Gboard FR) | « New line » (Docs, Gboard) |
+| Nouveau paragraphe | « nouveau paragraphe » (Mac et iPhone) | « new paragraph » (Mac et iPhone) | « Nouveau paragraphe » (Docs, Gboard FR) | « New paragraph » (Docs, Gboard) |
+| *(info)* Virgule | « virgule » | « comma » | « Virgule » (Docs, Gboard FR) | « Comma » |
+| *(info)* Point | « point » | Mac : « period/point/dot/full stop » ; iPhone : « Period » | Docs FR : « Période » ; Gboard FR : « Point » | « Period » |
+
+Notes qui changent le sens du tableau :
+
+- **Google FR : les commandes de Google Docs ne sont pas des commandes
+  françaises.** La page française dit : « Les commandes vocales sont disponibles
+  en anglais uniquement. Vous devez choisir l'anglais comme langue du document et
+  du compte. » La liste française (« Période », « Virgule »…) est la
+  traduction de la liste anglaise, pas ce qu'on dicte. La version anglaise dit
+  « Voice commands are available only in English. The account language and
+  document language must both be English. » Les deux pages ajoutent que la
+  ponctuation « might not be available in every language ». Pour Google, il n'y
+  a donc **aucune source française** à reprendre ; la colonne ne décrit que ce que la page affiche.
+- **Google ne documente ni guillemets, ni deux-points, ni point-virgule, ni
+  parenthèses** (Docs et Gboard, FR et EN). Seuls six éléments sont listés : period, comma,
+  exclamation point, question mark, new line, new paragraph. Gboard introduit sa
+  liste par « Some phrases you can use are » / « Voici quelques expressions que
+  vous pouvez utiliser », donc la liste n'est pas présentée comme exhaustive ;
+  on ne peut pas en déduire que le reste est refusé.
+- **Apple Mac, variantes régionales.** fr-afri, fr-fr et fr-ca donnent les
+  mêmes commandes, sauf : fr-ca appelle l'ouvrant simplement « guillemet »
+  (le fermant reste « guillemet fermant ») et écrit « arobas » (hors liste).
+  La page fr-afri (l'URL de l'issue) a « guillemet ouvrant ».
+- **Apple iPhone** (page « Commandes de dictée de texte » de l'iPhone,
+  `iph3bf19d7b9`) : « Guillemets » / « Guillemets fermants » (pluriel), « Deux points »,
+  « À la ligne ». Cette page iPhone et la page Mac ne s'accordent donc pas
+  sur le même mot (Mac : « nouvelle ligne », iPhone : « À la ligne »). La page
+  iPhone « Dicter du texte » écrit : « Dites "nouvelle ligne" ou "nouveau
+  paragraphe" » : les deux sont donc comprises.
+- Les pages d'Apple signalent que, pour certaines langues, la dictée ajoute
+  automatiquement une partie de la ponctuation (« Pour certaines langues, Dictée
+  ajoute automatiquement certains signes de ponctuation »).
+- Le tableau Mac contient aussi, hors liste initiale : « guillemet anglais simple
+  ouvrant / fermant », « apostrophe », « crochet ouvrant / fermant », « points de
+  suspension », « tiret », « trait d'union », « arobase », « barre oblique », etc.
+  Rien de cela n'est repris : l'issue interdit d'ajouter des signes.
+
+Sources (toutes consultées le 2026-11-12) :
+
+- Apple, Mac : https://support.apple.com/fr-afri/guide/mac-help/mh40695/mac ,
+  https://support.apple.com/fr-ca/guide/mac-help/mh40695/mac ,
+  https://support.apple.com/fr-fr/guide/mac-help/mh40695/mac ,
+  https://support.apple.com/en-us/guide/mac-help/mh40695/mac
+- Apple, iPhone : https://support.apple.com/fr-ca/guide/iphone/iph3bf19d7b9/ios ,
+  https://support.apple.com/fr-afri/guide/iphone/iph3bf19d7b9/ios ,
+  https://support.apple.com/fr-fr/guide/iphone/iph3bf19d7b9/ios ,
+  https://support.apple.com/en-us/guide/iphone/iph3bf19d7b9/ios ,
+  https://support.apple.com/fr-afri/guide/iphone/dictate-text-iph2c0651d2/ios
+- Google Docs : https://support.google.com/docs/answer/4492226?hl=fr et `?hl=en`
+  (section « Ajouter des signes de ponctuation » / « Add punctuation »)
+- Gboard : https://support.google.com/gboard/answer/2781851?hl=fr et `?hl=en`
+
+### 2. Formulations à accepter (proposition pour l'étape 2.2)
+
+Dans la liste initiale de l'issue seulement. « Source » dit d'où vient la forme :
+A = page d'Apple, G = page de Google, U = usage courant ajouté pour la tolérance
+(non sourcé, à confirmer par les tests de phrases pièges). Le français d'abord ;
+chaque forme s'accepte avec l'article et l'impératif courants (« ouvrir / ouvrez /
+ouvre »).
+
+| Signe | Forme principale | Variantes à accepter | Source / remarque |
+| --- | --- | --- | --- |
+| Guillemet ouvrant `«` / `“` | « ouvrir les guillemets » | « ouvrez / ouvre les guillemets », « ouvrir guillemet(s) », « guillemet ouvrant », « guillemets ouvrants », « guillemet(s) ouvert(s) » | « guillemet ouvrant » : A (Mac). Les formes avec « ouvrir » : U (issue). **Ne pas accepter « guillemet(s) » seul** pour ouvrir, bien qu'Apple (iPhone, Mac fr-ca) le fasse : c'est le mot le plus exposé aux faux positifs (« il a dit guillemets… »). |
+| Guillemet fermant `»` / `”` | « fermer les guillemets » | « fermez / ferme les guillemets », « fermer guillemet(s) », « guillemet fermant », « guillemets fermants », « guillemet(s) fermé(s) » | « guillemet(s) fermant(s) » : A. Autres : U. |
+| Deux-points `:` | « deux-points » | « deux points » | A (Mac, iPhone). Variante sans trait d'union nécessaire : la transcription l'écrit des deux façons. |
+| Point-virgule `;` | « point-virgule » | « point virgule » | A. |
+| Parenthèse ouvrante `(` | « ouvrir la parenthèse » | « ouvrez / ouvre la parenthèse », « ouvrir parenthèse », « parenthèse ouvrante » | « parenthèse ouvrante » : A. « ouvrir la parenthèse » : U (issue). |
+| Parenthèse fermante `)` | « fermer la parenthèse » | « fermez / ferme la parenthèse », « fermer parenthèse », « parenthèse fermante » | idem. |
+| Point d'interrogation `?` | « point d'interrogation » | (aucune) | A, G. |
+| Point d'exclamation `!` | « point d'exclamation » | (aucune) | A, G. |
+| Nouvelle ligne | « nouvelle ligne » | « à la ligne » | « nouvelle ligne » : A (Mac), G ; « à la ligne » : A (iPhone). **Ne pas ajouter « retour à la ligne »** sans test : pas dans les sources. |
+| Nouveau paragraphe | « nouveau paragraphe » | (aucune) | A, G. |
+
+| Signe | Forme principale (EN) | Variantes à accepter (EN) | Source / remarque |
+| --- | --- | --- | --- |
+| Open quote `“` | « open quote » | « open quotes », « begin quote », « begin quotes », « quote » **seul seulement en début ou fin de segment** | « quote » : A, mais très exposé aux faux positifs ; « open quote » / « begin quote » : U. |
+| Close quote `”` | « close quote » | « close quotes », « end quote », « end quotes », « unquote » | « end quote » : A ; « unquote » : U (non sourcé). |
+| Colon `:` | « colon » | (aucune) | A. |
+| Semicolon `;` | « semicolon » | « semi colon » | A. |
+| Open parenthesis `(` | « open parenthesis » | « open paren », « open parentheses » | A ; autres : U. |
+| Close parenthesis `)` | « close parenthesis » | « close paren », « close parentheses » | idem. |
+| Question mark `?` | « question mark » | (aucune) | A, G. |
+| Exclamation mark `!` | « exclamation mark » | « exclamation point » | « exclamation mark » : A (Mac) ; « exclamation point » : A (iPhone), G. |
+| New line | « new line » | « newline » | A, G ; « newline » : U. |
+| New paragraph | « new paragraph » | (aucune) | A, G. |
+
+Notes de conception pour 2.2 :
+
+- Virgule et point restent hors liste (règle de l'issue). Leurs formulations
+  sont consignées ci-dessus pour mémoire seulement.
+- Les formes les plus à risque (« guillemet(s) » seul, « quote » seul, « point
+  virgule ») sont à protéger par les règles de bord de segment et la liste de
+  phrases pièges de l'issue (« j'ai marqué deux points », « c'est un point
+  d'interrogation pour moi »).
+- Google FR n'offrant aucune commande française, l'alignement sur les
+  habitudes prises ailleurs en français se fait sur Apple seulement ; les
+  six commandes que Google comprend en anglais coïncident avec celles d'Apple.
+
+### 3. Règle d'espacement typographique (à vérifier pour 2.2)
+
+**OQLF — confirmée, avec une précision.** Source :
+Vitrine linguistique, « Espacement avant et après les signes de ponctuation et
+les symboles » (dernière mise à jour affichée : 2024),
+https://vitrinelinguistique.oqlf.gouv.qc.ca/22039/la-typographie/espacement/espacement-avant-et-apres-les-signes-de-ponctuation-et-les-symboles .
+Texte de la page : « L'Office québécois de la langue française opte pour
+l'absence d'espace devant le point-virgule, le point d'exclamation et le point
+d'interrogation. Cette pratique, qui est répandue dans l'usage, tend à devenir
+une convention, notamment parce que certains logiciels ne permettent pas
+d'insérer l'espace fine (espace insécable réduite) de façon conviviale […]. Cela
+dit, on peut opter pour l'espace fine lorsqu'elle est disponible. » Le tableau :
+
+| Signe | Avant | Après |
+| --- | --- | --- |
+| `:` | une espace insécable | une espace (sécable) |
+| `:` dans une heure (13:52:45) | pas d'espace | pas d'espace |
+| `;` | pas d'espace ou une espace fine | une espace |
+| `?` | pas d'espace ou une espace fine | une espace |
+| `!` | pas d'espace ou une espace fine | une espace |
+| `«` | une espace | une espace insécable |
+| `»` | une espace insécable | une espace |
+| `(` | une espace | pas d'espace |
+| `)` | pas d'espace | une espace |
+
+Exemples de la page : « Les étapes sont les suivantes␣: planification… »,
+« un "remède miracle␣"␣: un morceau de gingembre! » (␣ = espace insécable).
+La page précise aussi : « On ne met pas d'espace insécable entre une apostrophe
+et un guillemet ouvrant » et « Les mêmes règles typographiques s'appliquent pour
+les guillemets anglais simples […], les guillemets droits doubles ».
+
+Verdict sur la règle citée de mémoire dans l'issue : **exacte** (rien devant
+`;` `?` `!` ; espace insécable devant `:` ; espaces insécables à l'intérieur des
+« »). Deux précisions à reporter dans 2.2 : (a) l'espace fine est **permise**
+au Québec, pas exigée : « rien » est la valeur par défaut, et mettre une espace
+fine insécable (U+202F) avant `;` `?` `!` reste conforme ; (b) le tableau
+distingue l'espace **sécable** après le signe (`:` `;` `?` `!`) de l'espace
+**insécable** à l'intérieur des guillemets, et prévoit l'espace sécable avant `«`
+et après `»`. Le `:` ne prend rien dans une heure (« 13:52 ») : un risque de
+faux espacement si le `:` est produit par une commande vocale entre deux chiffres ;
+à tester. Il n'y a pas de règle pour les parenthèses dans la partie de
+l'issue : le tableau dit pas d'espace après `(` ni avant `)`.
+
+**Usage de France — confirmé par une source reconnue de second rang, pas par
+l'Imprimerie nationale elle-même.**
+
+- Guide « Règles typographiques de base » du CNRS (délégation aux systèmes
+  d'information, 25 novembre 1995, version 1.1),
+  https://www.pharmacie.universite-paris-saclay.fr/sites/default/files/media/2020-09/regles-typographie_cnrs.pdf :
+  `:` `;` `!` `?` : « espace insécable » avant, « espace sécable » après ;
+  `«` : espace sécable avant, espace insécable après ; `»` : espace insécable
+  avant, espace sécable après. Le guide ne parle pas d'espace fine.
+- Wikipédia, « Espace (typographie) »
+  (https://fr.wikipedia.org/wiki/Espace_(typographie)), qui cite le *Lexique de
+  l'Imprimerie nationale* (p. 51, 145-149) : l'espace fine insécable (U+202F) est
+  la forme « requise en français » devant le point-virgule, le point d'exclamation
+  et le point d'interrogation, et le deux-points dans certaines marches
+  typographiques ; « En France et dans la plupart des pays francophones d'Europe,
+  on a pris l'habitude de remplacer l'espace fine insécable par une espace mots
+  insécable » ; l'usage canadien est décrit comme « l'absence d'espace […] excepté
+  devant le deux-points et avec les guillemets, où c'est l'espace mots insécable
+  qui est la norme », ce qui concorde avec l'OQLF. La page note aussi que
+  « l'usage dans la plupart des entreprises de l'industrie graphique française
+  toutefois est d'utiliser l'espace fine insécable aussi avec le deux-points ».
+  Source de second rang : à lire comme un témoignage de l'usage, pas comme une
+  norme.
+
+Règle proposée à implémenter (point de départ pour 2.2, à valider par tests) :
+
+| Locale | `;` `?` `!` | `:` | `«` … `»` | Anglais |
+| --- | --- | --- | --- | --- |
+| Québec (OQLF) | rien devant (option : U+202F) ; espace sécable après | U+00A0 devant ; espace après | `«` + U+00A0 + texte + U+00A0 + `»` | s.o. |
+| France | U+202F (ou U+00A0 à défaut) devant ; espace après | U+00A0 (ou U+202F) devant ; espace après | `«` + U+00A0 + texte + U+00A0 + `»` | s.o. |
+| Anglais | rien devant, espace après | rien devant, espace après | `“`…`”` sans espace intérieure | s.o. |
+
+### Non vérifié
+
+- **Lexique des règles typographiques en usage à l'Imprimerie nationale** :
+  livre, pas de version en ligne trouvée ; l'usage de France n'est confirmé que par
+  un guide du CNRS (1995) et par Wikipédia qui cite le Lexique. Si une valeur
+  exacte du Lexique est exigée (espace fine insécable ou espace insécable avant
+  `;` `?` `!`), elle reste à lire dans l'ouvrage.
+- **Google, commandes françaises** : aucune page officielle consultée ne documente
+  de commande vocale en français pour Docs ; l'aide Gboard française liste six
+  éléments mais le comportement réel de la saisie vocale de Gboard en français
+  (si elle comprend « ouvrir les guillemets ») n'a pas été testé.
+- **Rendu réel** des commandes sur un iPhone ou un téléphone Android : non
+  essayé ; les formulations viennent des pages d'aide, pas d'un essai.
+- Les pages iPhone fr-afri et fr-fr ont été lues pour le tableau des
+  commandes ; leur page « Dicter du texte » (iph2c0651d2) n'a été lue que sur
+  la version fr-afri.
+- Les formes marquées U ne sont pas tirées d'une source officielle.
+
+## Issue #15, lot 2 — étape 2.2 : commandes de ponctuation et typographie
+
+Code : `text/CommandTable.kt` (nouveau), `text/VoiceCommands.kt`, `text/TextAssembler.kt`,
+`dictation/TextPipeline.kt`, `DicteeApp.kt` (langues transmises au pipeline), texte d'aide
+du réglage « Commandes vocales ». Liste initiale de l'issue seulement, sans ajout de signe
+(commentaire « Mode d'exécution »).
+
+### Table unique
+
+`CommandTable.entries` décrit chaque commande une fois par langue : `Command` (signe ou
+action, avec son `CommandKind` : signe ouvrant, signe fermant, mise en forme, effacement),
+`CommandLanguage` (FRENCH, ENGLISH), les formulations (`CommandForm` : texte affichable,
+sources A/G/U, `Strictness`), ce qui est produit (`produces`) et un exemple
+`CommandExample(said, result, before)`. La première formulation est la forme principale à
+afficher. L'analyse (`VoiceCommands.parse`) ne lit que cette table ; un test vérifie que
+chaque exemple donne exactement son résultat dans le pipeline, pour que l'écran « Comment
+dicter » de l'étape 2.3 (à générer depuis `CommandTable.active(langues)`) ne puisse pas
+diverger. Les commandes existantes (nouvelle ligne, nouveau paragraphe, effacements) y
+sont migrées avec toutes leurs formes, y compris « retour à la ligne », « next line »,
+« next paragraph » et « scratch that », qui existaient avant 2.1 (marquées U).
+
+Formulations retenues (source entre parenthèses, voir l'étape 2.1) :
+
+| Commande | Français | Anglais |
+| --- | --- | --- |
+| `«` / `“` | ouvrir / ouvrez / ouvre les guillemets, ouvrir guillemet(s) (U) ; guillemet ouvrant, guillemets ouvrants (A) ; guillemet(s) ouvert(s) (U) | open quote(s), begin quote(s) (U) |
+| `»` / `”` | fermer / fermez / ferme les guillemets, fermer guillemet(s) (U) ; guillemet fermant, guillemets fermants (A) ; guillemet(s) fermé(s) (U) | end quote (A) ; close quote(s), end quotes (U) |
+| `:` | deux-points ; deux points, sans trait d'union (A, iPhone), traité comme homographe | colon (A), homographe |
+| `;` | point-virgule (A) ; « point virgule » est reconnu aussi (le trait d'union est ignoré à la comparaison) | semicolon (A), semi colon (U) |
+| `(` | ouvrir / ouvrez / ouvre la parenthèse, ouvrir parenthèse (U) ; parenthèse ouvrante (A) | open parenthesis (A) ; open parentheses, open paren (U) |
+| `)` | fermer / fermez / ferme la parenthèse, fermer parenthèse (U) ; parenthèse fermante (A) | close parenthesis (A) ; close parentheses, close paren (U) |
+| `?` | point d'interrogation (A, G) | question mark (A, G) |
+| `!` | point d'exclamation (A, G) | exclamation mark (A), exclamation point (A, G) |
+| nouvelle ligne | nouvelle ligne (A, G), à la ligne (A), retour à la ligne (U) | new line (A, G), newline, next line (U) |
+| nouveau paragraphe | nouveau paragraphe (A, G) | new paragraph (A, G), next paragraph (U) |
+| effacements | efface / effacer / effacez / supprime / supprimer / supprimez la dernière phrase, … le dernier mot (U) | delete (the) last sentence, scratch that, delete (the) last word (U) |
+
+Écartées, comme le proposait 2.1 : « guillemet(s) » seul (Apple fr-ca, iPhone) et « quote »
+seul (Apple EN), trop exposés aux faux positifs ; « unquote » (non sourcé, et « quote
+unquote » est une expression).
+
+### Langues actives
+
+- Français (Québec ou France) → formulations françaises ; anglais → anglaises ; les deux si
+  les deux sont choisis. Une formulation anglaise dans une dictée « français seulement »
+  reste du texte.
+- **Autres langues seulement** (espagnol, etc.) : aucune commande de ponctuation (ce
+  seraient des mots français ou anglais au milieu d'une autre langue) ; les commandes de
+  mise en forme et d'effacement FR et EN restent actives, comme avant 2.2. Choix prudent :
+  aucun comportement existant ne disparaît, rien de nouveau ne s'ajoute.
+- Le réglage « Commandes vocales » désactivé coupe tout, comme avant.
+
+### Règle de déclenchement
+
+En deux phrases : **une formulation n'est une commande que si le mot qui la précède n'en
+fait pas un nom ou un verbe ordinaire (déterminant, nombre, possessif, préposition, verbe
+modal ; un adjectif courant comme « gros » est sauté) et si le mot qui la suit ne prolonge
+pas un groupe nominal (« pour », « de », « qui »…). Les homographes (« deux points » sans
+trait d'union, « colon ») doivent en plus être détachés des deux côtés (ponctuation ou bord
+de segment) ou suivis d'une autre commande.**
+
+Détails :
+
+- Les mots d'une formulation doivent se suivre, séparés seulement par des espaces ou des
+  traits d'union (« point, virgule » n'est pas « point-virgule »). Accents, majuscules et
+  traits d'union sont ignorés à la comparaison ; « deux-points » écrit avec trait d'union
+  par le modèle est la forme normale, « deux points » sans trait d'union la forme homographe.
+- Une commande voisine acceptée compte comme une ponctuation (calcul itératif jusqu'à
+  stabilité). C'est ce qui fait marcher l'exemple de l'issue en plein milieu de phrase, sans
+  aucune ponctuation du modèle : « ouvrir les guillemets » est accepté (précédé de
+  « points », suivi de « bonjour »), donc « deux points » est suivi d'une commande et
+  l'est aussi.
+- Mise en forme (nouvelle ligne, nouveau paragraphe) : règle d'avant 2.2 inchangée,
+  ponctuation, bord de segment ou commande des deux côtés. Effacements : segment entier.
+- Un guillemet ou une parenthèse fermante sans ouvrant correspondant dans le texte avant le
+  curseur, ou un signe fermant en tout début de champ ou de ligne, n'est pas inséré : les
+  mots dits sont tapés à la place.
+- Pourquoi pas la règle d'avant (ponctuation des deux côtés) pour tout : l'exemple de
+  l'issue n'a aucune ponctuation, et les modèles ne mettent pas de virgules fiables autour
+  des noms de signes. Pourquoi les mots voisins plutôt qu'un mot-clé d'activation : l'issue
+  l'exclut (« la commande est le nom du signe »). Les faux positifs observés dans les
+  phrases pièges viennent presque tous d'un déterminant ou d'un nombre juste avant.
+- Dans le doute, pas de commande : « il a dit deux points, bonjour » (sans trait d'union,
+  précédé d'un verbe, suivi de texte) reste du texte, parce qu'il a la même forme que
+  « j'ai marqué deux points, puis… ».
+
+Phrases pièges couvertes par `FalsePositiveTest` (aucune commande) : 21 en français
+(« J'ai marqué deux points. », « C'est un point d'interrogation pour moi. », « Il a ouvert
+les guillemets. », « Il faut ouvrir les guillemets ici. », « Ça reste un gros point
+d'interrogation. », « Il y a deux points de vue. », « Il a dit point, virgule, et rien
+d'autre. »…) et 13 en anglais (« That's a question mark for me. », « My colon hurts. »,
+« Colon cancer screening saves lives. », « I love that quote. », « Open quotes on the
+website are free. »…).
+
+### Doublons avec la ponctuation du modèle
+
+- **Avant le signe dicté** : le signe remplace la marque du modèle juste avant lui, dans le
+  même segment ou à la fin du texte déjà inséré : le même signe, ou une virgule, un point,
+  un deux-points, un point-virgule qui ne marquait qu'une pause (« C'est vrai. » puis
+  « Point d'interrogation. » → `C'est vrai?`). Pour `»` et `)`, le point, `?` et `!`
+  avant le signe sont gardés (`« Je viens. »` est correct). Des points de suspension ne
+  sont jamais retirés.
+- **Après le signe dicté** : la ponctuation que le modèle met juste après la commande est
+  retirée (même signe, virgule, point, deux-points, point-virgule) ; après `»` et `)`,
+  seul le même signe est retiré (`« bonjour », dit-il` garde sa virgule).
+- Un segment qui ne contient que des commandes perd la ponctuation du modèle autour
+  d'elles (« Fermer les guillemets. » dit seul ne laisse pas de point).
+
+### Typographie (`TextAssembler.sign`)
+
+| Variante | `:` | `;` `?` `!` | guillemets | `(` `)` |
+| --- | --- | --- | --- | --- |
+| Québec (OQLF) | espace insécable avant | rien avant | `«` + insécable … insécable + `»` | espace avant `(`, rien à l'intérieur |
+| France | espace insécable avant | espace insécable avant | `«` + insécable … insécable + `»` | idem |
+| Anglais | rien avant | rien avant | `“…”` sans espace intérieure | idem |
+
+- **Quelle variante** : la langue de la formulation dite décide français ou anglais (dans
+  une dictée bilingue, « question mark » est typographié à l'anglaise et « point
+  d'interrogation » à la française). Pour le français : France seulement si « Français
+  (France) » est choisi sans « Français (Québec) » ; sinon Québec, y compris quand les deux
+  sont choisis (la règle de l'OQLF ajoute moins d'espaces, et son absence d'espace devant
+  `;` `?` `!` est répandue en France aussi).
+- **Espace insécable U+00A0, pas l'espace fine U+202F**, y compris pour la France : le texte
+  s'affiche dans la police de l'application hôte, que nous ne contrôlons pas, et U+00A0
+  existe dans toutes les polices ; U+202F est absente de certaines (carré vide). L'espace
+  fine reste permise par l'OQLF et le Lexique, pas exigée.
+- **Seuls les signes dictés sont typographiés.** La ponctuation produite par le modèle est
+  insérée telle quelle : la modifier toucherait tout le texte dicté, y compris les heures
+  (13:52), les adresses, les rapports et les phrases anglaises d'une dictée bilingue.
+- Heure dictée : un `:` dicté entre deux chiffres (« 13 deux-points 52 ») est collé
+  (« 13:52 ») ; une heure écrite par le modèle n'est jamais touchée.
+- Pas d'espace entre une apostrophe et un guillemet ouvrant (`l'« outil »`), règle de
+  l'OQLF relevée en 2.1.
+- Majuscule après `?` et `!` (fin de phrase), pas après `:` ni `;`. Après un guillemet ou
+  une parenthèse ouvrante en début de phrase, la phrase commence encore : majuscule
+  (`« Bonjour »`). Pas de double espace : les espaces avant un signe fermant sont
+  retirés, une seule espace (sécable) suit.
+
+### Limites connues
+
+- « deux points » sans trait d'union suivi d'un mot ordinaire (« il a dit deux points
+  bonjour ») n'est pas reconnu : c'est le prix du « dans le doute, pas de commande ». La
+  forme avec trait d'union, une pause après la commande ou une commande juste après
+  (« ouvrir les guillemets ») la font reconnaître. Ce que chaque modèle écrit réellement
+  (« deux-points » ou « deux points ») est à vérifier en dictant.
+- Les listes de mots bloquants sont courtes et écrites à la main ; une phrase ordinaire
+  sans déterminant (« Ouvrir les guillemets, c'est facile. ») peut déclencher une commande.
+- Une commande coupée par une pause au milieu (« point » / « d'interrogation » dans deux
+  segments) n'est pas reconnue.
+- Le modèle peut lui-même transformer « deux-points » en `:` ou « point d'interrogation »
+  en `?` : alors aucune commande n'est vue et sa ponctuation reste telle quelle (sans
+  insécable).
+- Le texte provisoire (soulignement pendant la parole) montre les mots dits ; la
+  commande ne s'applique qu'au texte final.
+- Mode serveur : non vérifié ici (étape 2.4).
+
+### Tests
+
+`TextTest.kt` : `PunctuationCommandsTest` (exemple de l'issue de bout en bout dans le
+pipeline, en un segment avec et sans trait d'union, avec la ponctuation du modèle et en
+plusieurs segments ; chaque commande FR et EN ; langues actives ; autres langues ; réglage
+désactivé ; fermant sans ouvrant ; heure), `FalsePositiveTest` (34 phrases pièges),
+`DuplicateSignTest`, `TypographyTest` (Québec, France, les deux, anglais, apostrophe,
+majuscules, doubles espaces, heure du modèle intacte, ponctuation du modèle non
+typographiée, `SignEdit` unitaire), `CommandTableTest` (couverture exacte de la liste,
+langues actives, aucune formulation partagée, chaque forme reconnue seule, chaque exemple
+d'aide reproduit par le pipeline, chaque forme sourcée). Tests instrumentés
+(`VoiceCommandInstrumentedTest`) : langues FR + EN posées avant chaque test, plus la dictée
+scriptée de l'issue (`Il a dit : « bonjour »` avec insécables), le `?` qui remplace le
+point du segment précédent et « J'ai marqué deux points. » qui reste du texte.
+
+À essayer en dictant (vérification humaine) : l'exemple de l'issue d'un trait et avec
+pauses ; « deux-points » suivi d'une liste ; des phrases ordinaires contenant « deux
+points », « point d'interrogation », « guillemets » ; une dictée en France (réglage
+« Français (France) » seul) pour voir les insécables devant `;` `?` `!` ; l'affichage des
+insécables dans les applications courantes (messagerie, courriel).
+
+## Issue #15, lot 2 — étape 2.4 : commandes en mode serveur, README
+
+Code : `app/src/test/.../ServerCommandsTest.kt` (nouveau). Aucun changement de code
+applicatif ni de serveur (prompt, modèle, garde-fou : hors portée de l'issue).
+`android/README.md` : section « Dicter la ponctuation » (commandes du lot 2, règle,
+faux positifs, doublons, typographie, limites dont celle du mode serveur), lignes
+d'image `howto-light.png` / `howto-dark.png` (PNG déposés après la CI, étape 2.3).
+
+### Ce que fait chaque mode
+
+- **Dictée entière du clavier (modèle « Serveur », issue #13)** : c'est le seul chemin du
+  clavier avec le serveur (`DicteeApp.kt` : `whole` posé pour `ModelFamily.REMOTE`).
+  `RemoteEngine.transcribeDictation` demande `polish=true` (API de ce dépôt) et renvoie
+  `texts = [polished_text ou text]` (`serverResult`). `DictationController.transcribeWhole`
+  passe chaque texte par `TextPipeline.prepare` puis `apply` : **les commandes sont donc
+  interprétées sur le téléphone, après le polissage**, avec la typographie des langues
+  choisies. Si le polissage échoue ou est rejeté, le texte brut suit le même chemin.
+  API compatible OpenAI : une requête, sans polissage, même pipeline.
+- **Repli local** (serveur en panne) : segments transcrits localement, pipeline normal.
+- **Segment par segment transcrit par le serveur** (`RemoteEngine.transcribe`) : n'est plus
+  utilisé par la dictée du clavier ; seulement l'écran de comparaison (sans pipeline).
+  Il envoie `polish` non défini (le serveur applique alors `WHISPER_POLISH`) mais ne lit
+  que `text`, toujours brut (`app/main.py`, docstring de la route). Le chemin reste testé.
+
+### Ce que le polissage du serveur peut faire aux commandes
+
+Prompt (`app/polish.py:96-130`) : il ne parle pas des commandes ; règle 3, « corriger la
+ponctuation… en français, mettre une espace avant ? ! : et ; et laisser les guillemets
+tels que dictés ». Le LLM peut donc écrire lui-même `:` `?` `!` `;` ou « nouvelle ligne »
+en saut de ligne, ou laisser les mots. Le garde-fou `safety_check` (même fichier) juge des
+mots, pas de la ponctuation. Mesuré avec la fonction réelle sur des paires brut/poli
+(non conservées dans un test : elles dépendent du serveur) :
+
+| Remplacement par le LLM | Résultat du garde-fou |
+| --- | --- |
+| « deux-points » → `:` | rejeté dans tous les cas essayés : « deux » est un mot-nombre (`dropped_fact`) |
+| « ouvrir… fermer les guillemets » → « … » | rejeté (`dropped_content` / `short_dropped`) |
+| « point d'interrogation » en fin de dictée → `?` | rejeté (`ending`) |
+| « point d'interrogation », « point d'exclamation », « point-virgule », « nouvelle ligne » au milieu d'une dictée longue (plus de 8 mots) → signe | **accepté** (deux mots de contenu sur beaucoup) |
+| mots laissés tels quels | accepté : ce sont alors des commandes côté téléphone |
+
+Conséquences, fixées par `ServerCommandsTest` :
+
+1. Mots de commande dans le texte reçu (poli ou brut) : interprétés, typographie d'ici.
+2. Signe déjà placé par le LLM : conservé tel quel (`Il a dit : « bonjour »`, espaces
+   ordinaires), jamais de doublon ; **pas de typographie Québec** (ni insécable, ni retrait
+   de l'espace avant `?` `!` `;`), parce que seuls les signes dictés sont typographiés
+   (décision 2.2). Le LLM écrit en outre une espace avant `?` `!` `;` même au Québec.
+3. Signe du LLM suivi des mots de la commande : un seul signe (`DuplicateSign`).
+4. Segments : le polissage éventuel du serveur est ignoré, les commandes s'appliquent.
+
+Pas de correction côté Android : normaliser la ponctuation du texte poli, ou retirer le
+polissage quand des commandes sont dictées, changerait le texte de tous et dépasse la
+portée. **Limite documentée** dans le README (« Mode serveur »). Pistes pour plus tard,
+hors lot 2 : demander au serveur de laisser intactes les formulations de la table, ou lui
+passer l'option `commands=off`.
+
+### À essayer avec son serveur (humain)
+
+Dicter, modèle « Serveur » avec polissage actif : (a) « il a dit deux-points ouvrir les
+guillemets bonjour fermer les guillemets » ; (b) une phrase longue avec « point
+d'exclamation » au milieu ; (c) « nouvelle ligne » au milieu d'une dictée longue ;
+comparer l'état « polissage appliqué » du diagnostic avec le texte inséré, et voir si les
+espaces avant `? ! :` sont celles du Québec.
+
+## Issue #15, lot 2 — étape 2.3 : écran « Comment dicter »
+
+Écran `ui/HowToActivity.kt` (au thème Kalmia, déclaré au manifeste), logique pure dans
+`ui/HowTo.kt` (testée sur la JVM). Rien du contenu des commandes n'est écrit à la main :
+l'écran lit `CommandTable.active(settings.languages)`, et un test vérifie qu'aucun exemple
+de la table n'est recopié dans `HowToActivity.kt` ni dans les chaînes de l'écran.
+
+### Contenu et ordre de l'écran
+
+1. Titre, puis une ligne de rappel : « Tout se passe sur votre téléphone : votre voix y est
+   transcrite et n'est envoyée à personne, sauf si vous choisissez vous-même un serveur
+   distant. » Exacte dans les deux cas (par défaut, ou serveur facultatif choisi par
+   l'utilisateur) ; la phrase ne dit rien du serveur au-delà de l'exception, car le
+   comportement des commandes en mode serveur est l'objet de l'étape 2.4.
+2. Si les commandes vocales sont désactivées (Réglages), un paragraphe le dit et un bouton
+   ouvre les Réglages ; les exemples restent affichés, car ils décrivent ce qui marche une
+   fois l'option remise.
+3. Les exemples « Dites ceci / Vous obtenez » : la phrase dite en IBM Plex Mono
+   (`TextAppearance.Kalmia.Value`), le résultat en Newsreader (`Body`), une ligne de
+   commandes enseignées.
+4. « Toutes les commandes » : une ligne par entrée de `CommandTable.active` (formulation
+   principale en Plex Mono, ce qu'elle donne, les autres formulations acceptées).
+5. Zone d'essai : un `EditText` (touchez, le clavier apparaît ; pas de focus automatique, qui
+   cacherait le haut de l'écran), puis le modèle recommandé (`ModelRecommendations.recommend`)
+   avec sa raison, son état installé ou non et un bouton vers la configuration, puis le
+   lien vers le vocabulaire personnalisé des Réglages (qui s'ouvrent déjà défilés à cette
+   section, extra `EXTRA_SCROLL_TO_VOCABULARY`) pour « GitHub » et les noms propres.
+
+L'écran est redessiné à chaque reprise (`onResume`) : langues, commandes vocales ou
+modèle ont pu changer dans les Réglages ; le texte de la zone d'essai est conservé.
+
+### Choix des exemples (plus de 8 entrées dans la table)
+
+- Les entrées qui partagent un exemple sont fusionnées : les guillemets ouvrant et fermant et
+  le deux-points montrent la même phrase (« il a dit deux-points ouvrir les guillemets
+  bonjour fermer les guillemets »), les parenthèses de même. Une seule carte, qui liste les
+  commandes qu'elle enseigne.
+- Après fusion, le français seul compte 9 exemples (guillemets + deux-points, point-virgule,
+  parenthèses, ?, !, nouvelle ligne, nouveau paragraphe, effacer la phrase, effacer le mot) :
+  on en montre **8 au plus** (`HowToExamples.MAX_FEATURED`), les 8 premiers dans l'ordre de la
+  table, qui est celui de la liste de l'issue (signes d'abord). Le neuvième (« efface le
+  dernier mot ») reste dans « Toutes les commandes ».
+- Avec deux langues (français et anglais), les places sont partagées à parts égales, le
+  français d'abord : **4 exemples français puis 4 anglais**. Une langue qui en a moins que sa
+  part cède ses places aux autres. Avec l'anglais seul : 8 exemples anglais. Avec une langue
+  sans commande de ponctuation (espagnol seul), la table ne garde que les retours à la
+  ligne et les effacements des deux langues : 4 + 4 exemples, ce que `CommandTable.active`
+  décide déjà.
+- Les résultats des exemples sont ceux de la table, donc en typographie du Québec pour le
+  français (espace insécable avant `:` seulement) : une personne en « Français (France) »
+  seul verra, dans ses dictées, une espace insécable de plus devant `;` `?` `!` que dans
+  l'aide. Écart assumé, relevé pour la vérification finale.
+
+### Ouvertures
+
+- **Fin de la première configuration** (`SetupProgress.isComplete`) : clavier **activé**
+  (pas forcément sélectionné : on le choisit en tout temps depuis un autre clavier), micro
+  **autorisé**, et **un modèle prêt** (un modèle téléchargé, ou le serveur de l'utilisateur
+  une fois configuré). Les trois ensemble : c'est à ce moment seulement que le téléphone dicte
+  vraiment. La condition est revérifiée à chaque reprise, au retour du focus (retour du
+  sélecteur de clavier) et à la fin d'un téléchargement (écouteur de `Downloads`). **Une seule
+  fois** : le drapeau `AppSettings.howToShown` est posé avant le démarrage de l'écran, et par
+  toute ouverture de l'écran (l'ouvrir à la main avant la fin de la configuration compte
+  comme l'avoir vu).
+- **Écran principal** : un bouton « Comment dicter » juste sous le texte d'accueil, donc visible
+  sans défiler (`SetupActivity.HOWTO_BUTTON_TAG`).
+- **Clavier** : bouton d'aide (`R.id.help`, icône vectorielle `ic_help` teintée par
+  `colorControlNormal` comme celle des Réglages, zone tactile 48 × 48 dp, description
+  « Comment dicter »), placé **sur la ligne d'état, entre l'état et le bouton de réglages**.
+  La rangée des touches n'est pas touchée : les touches gardent leur largeur. C'est le texte
+  d'état (poids 1, deux lignes au plus, points de suspension) qui cède 48 dp. Depuis le
+  service : `FLAG_ACTIVITY_NEW_TASK`.
+
+### Tailles en français
+
+Les tailles de modèle venaient de `Formatter.formatShortFileSize`, qui écrit « MB » et « GB »
+sous un système en anglais. Remplacé par `ui/SizeFormat.kt` (octets décimaux, unités o, ko, Mo,
+Go, virgule décimale, indépendant de la langue du téléphone) ; `Context.size()` y renvoie, donc
+les cartes de modèles, les Réglages et les téléchargements en profitent. Exemples : 671 Mo,
+987 Mo, 1,04 Go. Le texte de recommandation écrit encore « 1 037 Mo » pour Whisper : même
+quantité, deux écritures ; à uniformiser si le lot 2 est revu.
+
+### Tests
+
+- JVM (`HowToTest.kt`) : fusion des exemples partagés, chaque commande enseignée par une
+  carte, chaque exemple issu de la table active, 5 à 8 exemples pour plusieurs jeux de langues,
+  partage 4 + 4 et français d'abord, langue sans ponctuation, aucun exemple recopié à la main
+  dans l'écran ni les chaînes ; table de vérité de « fin de configuration » et « une seule
+  fois » ; formatage des tailles.
+- Instrumentés (`HowToInstrumentedTest.kt`, moteur scripté, scénarios enchaînés et jamais
+  imbriqués, un moniteur d'activité dit quand l'écran démarre) : pas d'ouverture sans modèle ;
+  ouverture à la fin de la première configuration ; pas la deuxième fois ; réouverture depuis
+  l'écran principal ; depuis le bouton d'aide du clavier (zone ≥ 48 dp, description) ; chaque
+  exemple affiché vient de la table, mêmes cartes et même ordre que la logique pure ; rappel,
+  modèle recommandé, lien du vocabulaire, zone d'essai ; avertissement quand les commandes
+  sont désactivées. `ScreenshotTest` : `howto-light.png` et `howto-dark.png`.
+- Non exécutés ici (pas d'émulateur) : les tests instrumentés sont compilés et relus.
+
+À juger à l'écran (vérification humaine) : la longueur de l'écran (les 8 cartes plus la liste
+complète) ; la place laissée au texte d'état du clavier par le nouveau bouton, sur un
+téléphone étroit ; la lisibilité des phrases dites en Plex Mono sur plusieurs lignes ; le
+moment de l'ouverture automatique après le dernier téléchargement.
+
+## Issue #15, lot 2 — revue indépendante (2.R)
+
+Revue faite sur le diff du lot (`origin/main...HEAD`, PR #17) et les critères
+d'acceptation de l'issue, sans les comptes rendus des agents qui ont codé.
+
+### Critères d'acceptation
+
+| Critère | État | Preuve |
+| --- | --- | --- |
+| Tests unitaires par commande, FR et EN | rempli | `TextTest.kt` : `PunctuationCommandsTest.eachFrenchCommand`, `eachEnglishCommand`, `CommandTableTest.everyFormIsRecognisedAlone` (chaque formulation de la table) |
+| Phrases pièges sans aucune commande | rempli, étendu | `FalsePositiveTest` : 34 phrases d'origine, plus 58 phrases de la revue (`reviewTrapsStayText`), `pronounBeforeAVerbWordingStaysText`, `homographFollowedByACommaAndWordsStaysText` |
+| Doublons avec la ponctuation du modèle | rempli | `DuplicateSignTest`, `PunctuationCommandsTest.realisticModelOutputs` |
+| Typographie Québec, France, anglais dans `TextTest` | rempli | `TypographyTest` |
+| Test instrumenté : ouverture en fin de première configuration, réouverture depuis l'écran principal et le clavier | rempli après correction du test (voir CI) | `HowToInstrumentedTest` ; à confirmer par la CI |
+| Test instrumenté : dictée scriptée « il a dit deux-points ouvrir les guillemets bonjour fermer les guillemets » | rempli (vert en CI) | `VoiceCommandInstrumentedTest.dictatedColonAndQuotesAreTypesetForQuebec` |
+| Formulations retenues et sources dans `DECISIONS.md` | rempli | sections « Issue #15, lot 2 », étape 2.1 |
+| Capture du tutoriel dans le README | en attente | liens présents ; images `docs/screenshots/howto-*.png` à déposer par l'orchestrateur après la CI (`ScreenshotTest` produit `howto-light` / `howto-dark`) |
+
+### Faux positifs trouvés et corrigés (`text/VoiceCommands.kt`)
+
+Une soixantaine de phrases ordinaires nouvelles (FR québécois et EN) passées
+dans `TextPipeline`. Sept changeaient le texte de l'utilisateur :
+
+1. « Ouvre les guillemets du rapport et corrige-les. » → `« Du rapport…`.
+   Correction : après une formulation de guillemets ou de parenthèses, « du »,
+   « des » (et en anglais « are », « were », « from », « about », « with »,
+   « mark(s) ») en font un groupe nominal. Limité aux guillemets et parenthèses :
+   après `;` `?` `!` la phrase suivante commence souvent ainsi (« du pain
+   point-virgule du lait »).
+2. « Guillemets ouverts ou fermés, peu importe. » → `« Ou fermés…`. Correction :
+   formulation suivie de « ou / et » puis d'un adjectif d'état opposé (ouverts,
+   fermés, ouvrants…) : deux adjectifs coordonnés, pas une commande.
+3. « Deux points, c'est pas assez. », « Colon, rectum and liver. » → la virgule
+   disparaissait, et au milieu d'un champ (« Il a marqué. Deux points, c'est pas
+   assez. ») le texte devenait ` : c'est pas assez`. Correction : un homographe
+   (« deux points » sans trait d'union, « colon ») suivi d'une virgule puis de
+   mots ordinaires reste du texte ; suivi d'une virgule puis d'une autre
+   commande, il reste une commande (« Il a dit, deux points, ouvrir les
+   guillemets… »).
+4. « Point d'exclamation, ça crie trop. », « Question mark, or period? »,
+   « End quote. », « Fermer la parenthèse. », « Deux points. » en début de champ :
+   le signe ne pouvait pas s'appliquer, les mots revenaient, mais sans la
+   ponctuation que la commande avait absorbée (virgule ou point perdus).
+   Correction : `Piece.Cmd.spoken` garde les mots et la ponctuation prise ; une
+   commande seule dans son segment garde le segment entier.
+5. « Je ferme la parenthèse et on continue. », « Je ferme les guillemets. »,
+   « I close quotes with a dash. » après un guillemet ou une parenthèse ouverts :
+   fermaient le signe. Correction : un pronom sujet ou complément avant une
+   formulation qui commence par un verbe (ouvrir, fermer, open, close, begin,
+   end) en fait une phrase sur le signe. Pas appliqué aux noms de signes :
+   « viens-tu point d'interrogation » donne toujours `Viens-tu?`.
+
+Restent ambiguës, laissées en commande et documentées dans le README : une
+formulation de signe dite en tête de segment puis une virgule (« Ouvrez les
+guillemets, s'il vous plaît » ; « Il pose la question, point
+d'interrogation. »). On ne peut pas les distinguer d'une vraie dictée
+(« Ouvrez les guillemets, bonjour… ») sans comprendre la phrase.
+
+Vrais positifs vérifiés (tests `realisticModelOutputs`) : une commande par
+segment avec majuscule et point du modèle, « Deux points. » seul entre deux
+commandes, commande en fin de segment, segment fait d'une seule commande,
+guillemet ouvert dans un segment et fermé dans un autre, deux signes identiques
+dictés de suite (un seul reste). Réglage « Commandes vocales » coupé : rien
+n'est interprété ni typographié sur plusieurs segments
+(`disabledCommandsAcrossSegments`). Le texte provisoire n'interprète rien (il
+montre les mots dits) : comportement attendu, documenté.
+
+### Autres corrections
+
+- **Aide juste pour « Français (France) »** (`ui/HowTo.kt`) : la carte affichait
+  le texte de la table, en typographie québécoise (`Tu viens demain?`), alors
+  que le clavier produit `Tu viens demain ?` pour un utilisateur de France.
+  `HowToExample.result` est maintenant calculé en passant l'exemple dans
+  `TextPipeline` avec les langues de l'utilisateur ; l'aide montre ce que le
+  clavier produit, par construction (`HowToExamplesTest.resultsAreWhatTheKeyboardProducesForTheUsersTypography`).
+- **Tailles** : la raison de recommandation de Whisper et le tableau des modèles
+  du README écrivent « 1,04 Go », comme la carte (`SizeFormat`).
+- **README** : limites précisées (homographe suivi d'une virgule, commande en
+  tête de segment suivie d'une virgule, heure collée seulement dans un même
+  segment) ; « France sans Québec » au lieu de « France seul » (France +
+  anglais donne aussi la typographie de France).
+
+### CI de la PR #17 (commit 7bff6e0) : causes et corrections
+
+- **`HowToInstrumentedTest`, 5 échecs « rien trouvé à l'écran »** : faute du
+  test, pas de l'écran. Dans `View.allViews()`, `if (this is ViewGroup)` était
+  écrit dans le bloc `sequence { }`, où `this` est le `SequenceScope` : l'arbre
+  des vues n'était jamais parcouru, seule la vue racine était rendue. Les parties
+  du test qui ne dépendent pas de cette recherche (l'ouverture automatique en fin
+  de configuration, le bouton du clavier) passaient déjà. Corrigé en
+  `this@allViews`, comme dans `SetupLanguageTest`.
+- **`DictationEndToEndTest.audioFileIsDictatedIntoTheField`, « unrecognized IME
+  ID »** : c'était le tout premier test de l'exécution, lancé une dizaine de
+  secondes après l'installation des APK ; aucun test précédent ne pouvait avoir
+  changé l'état. Le système n'avait pas encore enregistré le service du clavier :
+  `ime enable` échouait dans `setUp`, et la boucle de `launchFields` ne relançait
+  que `ime set`, qui échoue tant que le clavier n'est pas activé. Corrigé dans
+  `ImeTestBase` : attente (60 s au plus) que `ime list -a -s` liste le clavier
+  avant `ime enable` / `ime set`, et `ime enable` relancé avec `ime set` dans la
+  boucle. Course au démarrage, donc intermittente : elle explique qu'il passait au
+  lot 1.
+- **CI suivante (commit 205d898) : 26 échecs « keyboard not shown », clavier
+  pourtant sélectionné**, `showSoftInput` en échec à `PHASE_CLIENT_VIEW_SERVED`
+  dès le premier test. Cause : une boîte « Pixel Launcher isn't responding »
+  (ANR du lanceur sur l'émulateur à froid) restée au premier plan toute
+  l'exécution ; le champ de test n'avait jamais le focus de fenêtre. Preuve :
+  les captures de `ScreenshotTest` de cette exécution montrent la boîte sur
+  l'écran de configuration ; celles de 7bff6e0 ne l'ont pas. Les tests qui ne
+  passent que par `onActivity` (SetupLanguageTest, la plupart de
+  HowToInstrumentedTest) passaient. Correction dans `ImeTestBase` :
+  `dismissNotRespondingDialogs()` répond « Attendre » (`android:id/aerr_wait`)
+  au démarrage de chaque test, après l'ouverture du champ et dans la boucle de
+  relance ; `ime enable` / `ime set` ne sont appelés que si le clavier n'est pas
+  déjà activé / sélectionné ; l'attente de l'enregistrement du service interroge
+  toutes les secondes (au lieu de 250 ms, pour ne pas charger le système au
+  démarrage) ; le message d'échec donne la fenêtre qui a le focus.
+- **État laissé entre tests** : `HowToInstrumentedTest` accorde le micro
+  (permission qu'on ne peut pas retirer sans tuer le processus des tests). Avec
+  le clavier activé et le moteur scripté « installé », tout test qui ouvre
+  `SetupActivity` aurait vu « Comment dicter » s'ouvrir par-dessus.
+  `ImeTestBase` et `SetupLanguageTest` marquent maintenant l'écran comme déjà vu ;
+  seul `opensAtTheEndOfTheFirstSetupAndNotTheSecondTime` remet le drapeau à faux.
+
+### Vérifié sans changement
+
+- Table unique : `HowToActivity` ne contient aucun exemple recopié
+  (`neitherTheScreenNorTheStringsCopyAnExampleByHand`) ; tout vient de
+  `CommandTable.active` et `HowToExamples`.
+- Ouverture automatique : une seule fois (drapeau posé avant `startActivity`,
+  donc ni boucle ni double ouverture à la rotation) ; l'écouteur de
+  téléchargement n'est actif que pendant `onResume`, donc pas d'ouverture depuis
+  l'arrière-plan.
+- Bouton d'aide du clavier : 48 dp, description « Comment dicter »,
+  `FLAG_ACTIVITY_NEW_TASK`.
+- Thème : écran construit avec les aides de `ui/Ui.kt` (styles nommés, attributs
+  du thème) ; `NoHardcodedStyleTest` vert. La ligne « Tout se passe sur votre
+  téléphone… sauf si vous choisissez vous-même un serveur distant » est exacte.
+- Mode serveur : la limite du README correspond au code (`RemoteEngine` envoie le
+  texte poli tel quel à `TextPipeline`) ; `ServerCommandsTest` vert. Serveur non
+  modifié (hors portée).
+- Vie privée : aucune permission ni requête réseau ajoutée par le lot (manifeste :
+  une activité non exportée).

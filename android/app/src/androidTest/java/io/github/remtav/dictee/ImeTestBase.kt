@@ -51,11 +51,15 @@ abstract class ImeTestBase {
         app.settings.haptics = false
         app.settings.cleanupMode = CleanupMode.OFF
         app.settings.activeModelId = ModelCatalog.parakeet.id
+        // Keyboard enabled, microphone granted (HowToInstrumentedTest) and a scripted model "installed":
+        // the setup screen would open "Comment dicter" over itself. Only HowToInstrumentedTest tests that.
+        app.settings.howToShown = true
         TestHooks.assumeInstalled = true
         app.engines.release()
-        shell("ime enable $imeId")
-        shell("ime set $imeId")
+        waitUntilImeIsKnown()
+        selectIme()
         device.setOrientationNatural()
+        dismissNotRespondingDialogs()
     }
 
     @After
@@ -69,6 +73,37 @@ abstract class ImeTestBase {
         app.engines.release()
         device.setOrientationNatural()
         device.unfreezeRotation()
+    }
+
+    /**
+     * Right after the APKs are installed, the system may not have registered the keyboard service
+     * yet: "ime enable" and "ime set" then fail with "unrecognized IME ID", and the first test of the
+     * run found the keyboard missing (CI of lot 2, review 2.R). Waits until the system lists it.
+     */
+    private fun waitUntilImeIsKnown() {
+        val end = SystemClock.uptimeMillis() + 60_000
+        while (imeId !in shell("ime list -a -s") && SystemClock.uptimeMillis() < end) SystemClock.sleep(1_000)
+    }
+
+    /** Enables and selects the keyboard only when it is not already: a no-op otherwise, nothing to reset. */
+    private fun selectIme() {
+        if (imeId !in shell("settings get secure enabled_input_methods")) shell("ime enable $imeId")
+        if (shell("settings get secure default_input_method").trim() != imeId) shell("ime set $imeId")
+    }
+
+    /**
+     * A cold CI emulator sometimes shows "Pixel Launcher isn't responding" (CI of lot 2, commit
+     * 205d898: the dialog stays on top for the whole run, so the test field never gets the window
+     * focus, `showSoftInput` fails at PHASE_CLIENT_VIEW_SERVED and every keyboard test fails; the
+     * ScreenshotTest captures show it over the setup screen). Answers "Wait", which leaves the
+     * other app as it was.
+     */
+    protected fun dismissNotRespondingDialogs() {
+        repeat(3) {
+            if (!device.hasObject(By.textContains("isn't responding")) && !device.hasObject(By.res("android", "aerr_wait"))) return
+            (device.findObject(By.res("android", "aerr_wait")) ?: device.findObject(By.text("Wait")))?.click()
+            device.waitForIdle(1_000)
+        }
     }
 
     protected fun clip(name: String): PcmAudio = context.assets.open("reference/$name.wav").use { WavReader.read(it) }
@@ -86,6 +121,7 @@ abstract class ImeTestBase {
 
     protected fun launchFields() {
         scenario = ActivityScenario.launch(TestFieldActivity::class.java)
+        dismissNotRespondingDialogs()
         val shown = {
             val svc = DicteeImeService.instance?.get()
             svc != null && onMain { svc.isInputViewShown }
@@ -95,8 +131,10 @@ abstract class ImeTestBase {
         while (!shown() && SystemClock.uptimeMillis() < end) {
             // A cold emulator sometimes ignores stateAlwaysVisible: tap the field like a user.
             if (SystemClock.uptimeMillis() - tapped > 4_000) {
-                // A cold emulator may not have bound the IME yet: select it again and ask for it.
-                shell("ime set $imeId")
+                // A system dialog may have taken the focus; a cold emulator may not have selected the IME yet
+                // (only re-selected when it is not: a no-op "ime set" would not help, a real one resets the input).
+                dismissNotRespondingDialogs()
+                selectIme()
                 device.findObject(By.res(BuildConfig.APPLICATION_ID, "test_field1"))?.click()
                 scenario.onActivity {
                     it.field1.requestFocus()
@@ -109,7 +147,8 @@ abstract class ImeTestBase {
         }
         if (!shown()) {
             val log = shell("logcat -d -t 80 -s DicteeIme:I InputMethodManagerService:* ImeTracker:*")
-            fail("keyboard not shown; current IME: ${shell("settings get secure default_input_method").trim()}\n$log")
+            val focus = shell("dumpsys window").lines().filter { "mCurrentFocus" in it || "mFocusedApp" in it }.joinToString("\n")
+            fail("keyboard not shown; current IME: ${shell("settings get secure default_input_method").trim()}\n$focus\n$log")
         }
     }
 

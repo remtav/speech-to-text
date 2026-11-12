@@ -3,11 +3,13 @@ package io.github.remtav.dictee.ui
 import android.os.Bundle
 import android.text.InputType
 import android.view.Gravity
+import android.view.View
 import android.view.ViewGroup
 import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.RadioButton
 import android.widget.RadioGroup
+import android.widget.ScrollView
 import androidx.appcompat.app.AppCompatActivity
 import com.google.android.material.materialswitch.MaterialSwitch
 import com.google.android.material.slider.Slider
@@ -61,7 +63,7 @@ class SettingsActivity : AppCompatActivity() {
             s.pauseSeconds = it
         }
 
-        col.heading(getString(R.string.settings_vocabulary))
+        col.heading(getString(R.string.settings_vocabulary)).tag = VOCABULARY_TAG
         col.body(getString(R.string.settings_vocabulary_help), small = true)
         vocabulary = EditText(this).apply {
             setText(s.vocabularyText)
@@ -101,6 +103,14 @@ class SettingsActivity : AppCompatActivity() {
         }
         llmBox = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         col.addView(llmBox)
+
+        // Opened from the "Comment dicter" screen: show the vocabulary straight away.
+        if (intent.getBooleanExtra(EXTRA_SCROLL_TO_VOCABULARY, false)) {
+            col.post {
+                val heading = col.findViewWithTag<View>(VOCABULARY_TAG)
+                (col.parent as? ScrollView)?.scrollTo(0, heading?.top ?: 0)
+            }
+        }
     }
 
     override fun onResume() {
@@ -295,5 +305,11 @@ class SettingsActivity : AppCompatActivity() {
                 if (fromUser) onChange(v)
             }
         })
+    }
+
+    companion object {
+        /** Intent extra: scroll to the personal vocabulary on opening. */
+        const val EXTRA_SCROLL_TO_VOCABULARY = "scroll_to_vocabulary"
+        const val VOCABULARY_TAG = "settings_vocabulary"
     }
 }
