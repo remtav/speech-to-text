@@ -4,6 +4,7 @@ import android.content.Intent
 import android.view.View
 import android.view.ViewGroup
 import android.widget.CheckBox
+import androidx.lifecycle.Lifecycle
 import androidx.test.core.app.ActivityScenario
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
@@ -46,12 +47,6 @@ class SetupLanguageTest {
     private fun View.allViews(): Sequence<View> = sequence {
         yield(this@allViews)
         if (this@allViews is ViewGroup) for (i in 0 until childCount) yieldAll(getChildAt(i).allViews())
-    }
-
-    private fun ActivityScenario<*>.root(): View {
-        var v: View? = null
-        onActivity { v = it.window.decorView }
-        return v!!
     }
 
     private fun ActivityScenario<*>.text(): String {
@@ -140,21 +135,43 @@ class SetupLanguageTest {
         }
     }
 
+    /**
+     * Never two scenarios at once: ActivityScenario starts each activity in a cleared task,
+     * so launching the settings while holding the setup scenario destroyed the setup
+     * activity (its scenario then failed with a NullPointerException in CI).
+     */
     @Test
     fun changingTheLanguagesInTheSettingsChangesTheRecommendation() {
         ActivityScenario.launch(SetupActivity::class.java).use { setup ->
             assertEquals(listOf(ModelCatalog.parakeet.id), setup.recommendedModels())
-            ActivityScenario.launch<SettingsActivity>(Intent(context, SettingsActivity::class.java)).use { settings ->
-                // Same list, same default as on the setup screen.
-                assertTrue(settings.box(DictationLanguage.FRENCH_QUEBEC).isChecked)
-                settings.click(DictationLanguage.ARABIC)
-                settings.click(DictationLanguage.HINDI)
-            }
-            // Back on the setup screen (recreated: onResume redraws the languages and the cards).
-            setup.recreate()
-            instrumentation.waitForIdleSync()
+        }
+        ActivityScenario.launch<SettingsActivity>(Intent(context, SettingsActivity::class.java)).use { settings ->
+            // Same list, same default as on the setup screen.
+            assertTrue(settings.box(DictationLanguage.FRENCH_QUEBEC).isChecked)
+            settings.click(DictationLanguage.ARABIC)
+            settings.click(DictationLanguage.HINDI)
+        }
+        assertEquals(
+            setOf(DictationLanguage.FRENCH_QUEBEC, DictationLanguage.HINDI, DictationLanguage.ARABIC),
+            app.settings.languages,
+        )
+        ActivityScenario.launch(SetupActivity::class.java).use { setup ->
             assertEquals(listOf(ModelCatalog.qwen3.id), setup.recommendedModels())
             assertTrue(setup.box(DictationLanguage.ARABIC).isChecked)
+        }
+    }
+
+    /** The setup screen stays below the settings: coming back (onResume) redraws languages and cards. */
+    @Test
+    fun setupRedrawsOnResumeAfterTheLanguagesChanged() {
+        ActivityScenario.launch(SetupActivity::class.java).use { setup ->
+            assertEquals(listOf(ModelCatalog.parakeet.id), setup.recommendedModels())
+            setup.moveToState(Lifecycle.State.CREATED) // covered, as by the settings screen
+            app.settings.languages = setOf(DictationLanguage.FRENCH_QUEBEC, DictationLanguage.BENGALI)
+            setup.moveToState(Lifecycle.State.RESUMED)
+            instrumentation.waitForIdleSync()
+            assertEquals(listOf(ModelCatalog.whisperTurbo.id), setup.recommendedModels())
+            assertTrue(setup.box(DictationLanguage.BENGALI).isChecked)
         }
     }
 

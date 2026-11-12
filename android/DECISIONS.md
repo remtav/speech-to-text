@@ -1033,7 +1033,7 @@ la JVM.
 | Compilation et CI vertes | rempli (local) ; CI : voir le rapport de la PR #16 | `./gradlew testDebugUnitTest assembleDebug assembleDebugAndroidTest lintDebug` |
 | Plus de « Dictée locale » dans les chaînes affichées ni le README | rempli | `grep` : restent seulement `DECISIONS.md` (historique), la vérification de `SetupLanguageTest` et le `-dname "CN=Dictee locale"` d'une commande `keytool` du README (nom interne d'un certificat, jamais affiché) |
 | Tests de la table : couverture de chaque combinaison, Québec seul → Parakeet, jamais Parakeet hors de ses langues | rempli | `ModelRecommendationTest` (2 047 combinaisons) |
-| Test instrumenté : accueil → langue → modèle marqué ; Réglages → recommandation changée | rempli (exécuté en CI seulement) | `SetupLanguageTest` |
+| Test instrumenté : accueil → langue → modèle marqué ; Réglages → recommandation changée | rempli après correction (échouait en CI, voir 12) ; exécuté en CI seulement | `SetupLanguageTest` |
 | WER par modèle sur les extraits québécois dans `DECISIONS.md` | rempli | section « étape 1.2 » |
 | Affirmations de l'accueil et du README vérifiables ; Google : lien officiel | rempli après correction (« code source ouvert », voir plus bas) | citations Google relues le 2026-11-12 |
 | Couleurs = source Kalmia | rempli | `ThemeContrastTest.paletteIsTheKalmiaOneFromTheSource`, comparé à `design/marque/tokens.css` |
@@ -1112,6 +1112,30 @@ la JVM.
 11. Citation de la politique de Google : majuscule rétablie (« Contenus
     multimédias… », mot pour mot). Commentaire de `SherpaEngine` mis à jour
     (la langue de Whisper n'est plus toujours vide).
+
+12. **CI rouge : `SetupLanguageTest.changingTheLanguagesInTheSettingsChangesTheRecommendation`**
+    (NPE dans `ActivityScenario.recreate`). Cause racine : `ActivityScenario`
+    (androidx.test core 1.6.1, `InstrumentationActivityInvoker`) démarre chaque
+    activité avec `FLAG_ACTIVITY_NEW_TASK | FLAG_ACTIVITY_CLEAR_TASK` (valeur
+    `0x10008000` relevée dans le bytecode) : lancer le scénario des Réglages
+    pendant que celui de la configuration était ouvert **détruisait**
+    l'activité de configuration, et `setup.recreate()` n'avait plus d'activité.
+    Corrigé sans sauter le test : les scénarios se suivent (configuration →
+    Réglages → configuration, la recommandation passe à Qwen3-ASR), et un
+    nouveau test, `setupRedrawsOnResumeAfterTheLanguagesChanged`, couvre le vrai
+    chemin « l'écran reste dessous puis revient » par
+    `moveToState(CREATED)` / `moveToState(RESUMED)`. Aide `root()` inutilisée
+    retirée.
+13. **Captures claires des écrans en paysage** (2400x1080 en CI, les sombres et
+    celles du clavier en portrait) : une rotation laissée par un test précédent
+    n'était pas finie, et `setOrientationNatural()` suivi d'une pause fixe ne
+    l'attendait pas. `ScreenshotTest` coupe la rotation automatique et fixe la
+    rotation utilisateur à 0 par `settings put system …` (valeur rétablie
+    après le test), gèle la rotation, puis **attend** que l'écran soit en
+    portrait (rotation 0, hauteur > largeur) et que l'activité capturée ait une
+    configuration portrait ; chaque capture vérifie ensuite que l'image est
+    plus haute que large, sinon le test échoue. Les captures sont écrites à
+    l'échelle 0,5 (540x1200 sur l'émulateur Pixel 6, comme celles du dépôt).
 
 ### Vérifié sans changement
 
