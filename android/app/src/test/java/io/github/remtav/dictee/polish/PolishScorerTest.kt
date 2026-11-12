@@ -89,7 +89,7 @@ class PolishScorerTest {
             # description: sorties enregistrées sur un téléphone
             id	brut	sortie	latence_ms
             t1	${target.raw}	${target.expected}	850
-            c1	${control.raw}	On a trouvé un point com mun.	900
+            c1	${control.raw}	On a trouvé un point com mun.	4100
             t2	une ancienne version du brut	Va voir coifferimouski.com.
         """.trimIndent()
         val rec = RecordedApproach.parse("fichier", file).bind(cases)
@@ -104,6 +104,7 @@ class PolishScorerTest {
         assertEquals("appareil", s.latency!!.where)
         assertEquals(2, s.latency!!.samples)
         assertEquals(850.0, s.latency!!.p50, 0.0)
+        assertEquals(1, s.latency!!.overBudget) // one segment above LlmCleaner's 4 s delay
     }
 
     @Test fun recordedFileWithoutLatencyHasNoLatency() {

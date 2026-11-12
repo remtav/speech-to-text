@@ -1,15 +1,15 @@
 # approche: simulation-combinaison-oracle
 # llm: oui
-# description: SIMULATION, aucun LLM n'a tourné (MediaPipe : arm64 seulement). Lexique : lexique-simulation.txt (plafond optimiste). Approche 4 : règles = identité (celles de l'étape 3.2 ne sont pas encore raccordées), détecteur provisoire, LLM « oracle » simulé : rend exactement le texte attendu. Garde-fou assoupli avec lexique.
+# description: SIMULATION, aucun LLM n'a tourné (MediaPipe : arm64 seulement). Lexique : liste livrée (ShippedVocabulary, étape 3.2). Approche 4 raccordée : règles + vocabulaire livré (étape 3.2), LLM seulement si PolishRules.assess signale un cas probable ou une adresse, LLM « oracle » simulé : rend exactement le texte attendu. Garde-fou assoupli avec le lexique livré.
 # Fichier généré par LlmSimulationTest : ne pas modifier à la main. Ce n'est PAS une mesure.
 id	brut	sortie
-fr-np-01-parakeet	Mon code est sur J-Hub, je t'envoie le lien sur WhatsApp.	Mon code est sur J-Hub, je t'envoie le lien sur WhatsApp.
+fr-np-01-parakeet	Mon code est sur J-Hub, je t'envoie le lien sur WhatsApp.	Mon code est sur GitHub, je t'envoie le lien sur WhatsApp.
 fr-np-01-qwen3	Mon code est sur github. Je t'envoie le lien sur whatsapp.	Mon code est sur GitHub. Je t'envoie le lien sur WhatsApp.
-fr-np-01-whisper	Mon code est sur jhub, je t'envoie le lien sur WhatsApp.	Mon code est sur jhub, je t'envoie le lien sur WhatsApp.
+fr-np-01-whisper	Mon code est sur jhub, je t'envoie le lien sur WhatsApp.	Mon code est sur GitHub, je t'envoie le lien sur WhatsApp.
 fr-np-02-whisper	J'ai acheté un nouvel iPhone chez BestBuy	J'ai acheté un nouvel iPhone chez Best Buy
-fr-np-03-parakeet	On fait la réunion sur Team ou sur Zoom?	On fait la réunion sur Team ou sur Zoom?
-fr-np-03-whisper	On fait la réunion sur Team ou sur Zoom ?	On fait la réunion sur Team ou sur Zoom ?
-fr-np-05-parakeet	Je l'ai mis sur Google Drive et dans Drawbox.	Je l'ai mis sur Google Drive et dans Drawbox.
+fr-np-03-parakeet	On fait la réunion sur Team ou sur Zoom?	On fait la réunion sur Teams ou sur Zoom?
+fr-np-03-whisper	On fait la réunion sur Team ou sur Zoom ?	On fait la réunion sur Teams ou sur Zoom ?
+fr-np-05-parakeet	Je l'ai mis sur Google Drive et dans Drawbox.	Je l'ai mis sur Google Drive et dans Dropbox.
 fr-np-r01	J'ai poussé le correctif sur git hub hier soir.	J'ai poussé le correctif sur GitHub hier soir.
 fr-np-r02	Installe l'application sur ton iphone.	Installe l'application sur ton iPhone.
 fr-np-r03	Partage le document dans google docs.	Partage le document dans Google Docs.
@@ -17,43 +17,43 @@ fr-np-r04	On se parle sur face time ce soir.	On se parle sur FaceTime ce soir.
 en-np-r01	I pushed the fix to git hub last night.	I pushed the fix to GitHub last night.
 en-np-r02	Send it to me on whats app.	Send it to me on WhatsApp.
 en-np-r03	Open the slides in power point.	Open the slides in PowerPoint.
-fr-to-01-parakeet	Je pars pour et Mouski demain matin.	Je pars pour et Mouski demain matin.
-fr-to-01-qwen3	Je pars pour Imouski demain matin.	Je pars pour Imouski demain matin.
-fr-to-01-whisper	Je pars pour Emuski demain matin.	Je pars pour Emuski demain matin.
-fr-to-02-parakeet	On a pris un café à Chikouti avant d'aller au lac Saint-Jean.	On a pris un café à Chikouti avant d'aller au lac Saint-Jean.
-fr-to-02-qwen3	On a pris un café à Chikutimi avant d'aller au lac Saint Jean.	On a pris un café à Chikutimi avant d'aller au lac Saint Jean.
-fr-to-03-qwen3	Ma sœur habite à trois rivieres, mon frère en habite tibit.	Ma sœur habite à trois rivieres, mon frère en habite tibit.
-fr-to-05-parakeet	Il travaille chez Hydro Québec à Sacney.	Il travaille chez Hydro Québec à Sacney.
-fr-to-05-qwen3	Il travaille chez Iroqebac à Saguenay.	Il travaille chez Iroqebac à Saguenay.
-fr-to-05-whisper	Il travaille chez Hydro-Québec à Sacné.	Il travaille chez Hydro-Québec à Sacné.
-fr-to-06-parakeet	On s'est rencontrés dans Auchas, près du métro Joliette	On s'est rencontrés dans Auchas, près du métro Joliette
-fr-to-06-qwen3	On s'est rencontré dans Chlagar, près du métro Joliette.	On s'est rencontré dans Chlagar, près du métro Joliette.
+fr-to-01-parakeet	Je pars pour et Mouski demain matin.	Je pars pour Rimouski demain matin.
+fr-to-01-qwen3	Je pars pour Imouski demain matin.	Je pars pour Rimouski demain matin.
+fr-to-01-whisper	Je pars pour Emuski demain matin.	Je pars pour Rimouski demain matin.
+fr-to-02-parakeet	On a pris un café à Chikouti avant d'aller au lac Saint-Jean.	On a pris un café à Chicoutimi avant d'aller au Lac-Saint-Jean.
+fr-to-02-qwen3	On a pris un café à Chikutimi avant d'aller au lac Saint Jean.	On a pris un café à Chicoutimi avant d'aller au Lac-Saint-Jean.
+fr-to-03-qwen3	Ma sœur habite à trois rivieres, mon frère en habite tibit.	Ma sœur habite à Trois-Rivières, mon frère en Abitibi.
+fr-to-05-parakeet	Il travaille chez Hydro Québec à Sacney.	Il travaille chez Hydro-Québec à Saguenay.
+fr-to-05-qwen3	Il travaille chez Iroqebac à Saguenay.	Il travaille chez Hydro-Québec à Saguenay.
+fr-to-05-whisper	Il travaille chez Hydro-Québec à Sacné.	Il travaille chez Hydro-Québec à Saguenay.
+fr-to-06-parakeet	On s'est rencontrés dans Auchas, près du métro Joliette	On s'est rencontrés dans Hochelaga, près du métro Joliette
+fr-to-06-qwen3	On s'est rencontré dans Chlagar, près du métro Joliette.	On s'est rencontré dans Hochelaga, près du métro Joliette.
 fr-to-07-parakeet	La société de l'assurance automobile du Québec a fermé le bureau de Matane.	La Société de l'assurance automobile du Québec a fermé le bureau de Matane.
 fr-to-07-qwen3	La société de l'assurance Automobile du Québec a fermé le bureau de Matane.	La Société de l'assurance automobile du Québec a fermé le bureau de Matane.
-fr-to-08-parakeet	On va faire du ski au Mont-Sainte-Anne puis souper à Chebouk.	On va faire du ski au Mont-Sainte-Anne puis souper à Chebouk.
-fr-to-08-qwen3	On va faire du ski au mont Sainte-Annie puis souper à Chebok.	On va faire du ski au mont Sainte-Annie puis souper à Chebok.
+fr-to-08-parakeet	On va faire du ski au Mont-Sainte-Anne puis souper à Chebouk.	On va faire du ski au Mont-Sainte-Anne puis souper à Sherbrooke.
+fr-to-08-qwen3	On va faire du ski au mont Sainte-Annie puis souper à Chebok.	On va faire du ski au Mont-Sainte-Anne puis souper à Sherbrooke.
 fr-ctl-10-parakeet	Le train passe à Rivière du Loup vers midi.	Le train passe à Rivière-du-Loup vers midi.
-en-to-01-parakeet	We drove from Montreal to Remelsky along the St. Lawrence.	We drove from Montreal to Remelsky along the St. Lawrence.
-en-to-01-whisper	We drove from Montreal to Rimelski along the St. Lawrence.	We drove from Montreal to Rimelski along the St. Lawrence.
+en-to-01-parakeet	We drove from Montreal to Remelsky along the St. Lawrence.	We drove from Montreal to Rimouski along the St. Lawrence.
+en-to-01-whisper	We drove from Montreal to Rimelski along the St. Lawrence.	We drove from Montreal to Rimouski along the St. Lawrence.
 en-to-02-parakeet	The conference is in Chickaltomy in the Segne region.	The conference is in Chickaltomy in the Segne region.
 en-to-02-qwen3	The conference is in Chakotay, in the Saguenay region.	The conference is in Chakotay, in the Saguenay region.
 en-to-02-whisper	The conference is in Chikautami in the Saguenay region.	The conference is in Chikautami in the Saguenay region.
 fr-to-r01	Le colloque a lieu à l'université du Québec à Rimouski.	Le colloque a lieu à l'Université du Québec à Rimouski.
 fr-to-r02	On passe par la gaspésie cet été.	On passe par la Gaspésie cet été.
-fr-to-r03	Il habite à Magogue depuis deux ans.	Il habite à Magogue depuis deux ans.
+fr-to-r03	Il habite à Magogue depuis deux ans.	Il habite à Magog depuis deux ans.
 fr-to-r04	Mon compte est à la caisse des jardins.	Mon compte est à la caisse Desjardins.
 en-to-r01	She moved to Trois Rivieres last year.	She moved to Trois-Rivières last year.
 en-to-r02	We visited Abitibi and Lac Saint Jean.	We visited Abitibi and Lac-Saint-Jean.
 fr-web-01-parakeet	Va voir coiffrimouski.com	Va voir coiffrimouski.com
-fr-web-01-qwen3	Vas voir coiffe rymusky point com.	Vas voir coiffe rymusky point com.
-fr-web-01-whisper	Va voir coiffe Rimouski.com	Va voir coiffe Rimouski.com
+fr-web-01-qwen3	Vas voir coiffe rymusky point com.	Vas voir coifferymusky.com.
+fr-web-01-whisper	Va voir coiffe Rimouski.com	Va voir coifferimouski.com
 fr-web-02-parakeet	Le site, c'est Kalmia.ka	Le site, c'est Kalmia.ka
 fr-web-02-whisper	Le site c'est kelmia.ca.	Le site c'est kelmia.ca.
 fr-web-03-parakeet	Inscris-toi sur québec.kabaroblique emploi	Inscris-toi sur québec.kabaroblique emploi
 fr-web-03-qwen3	Inscris-toi sur kebec point kababobliqueemploi	Inscris-toi sur kebec point kababobliqueemploi
 fr-web-04-parakeet	Tout est sur www.hydrokebec.com	Tout est sur www.hydrokebec.com
 fr-web-04-qwen3	Tout est sur www.iroquebec.com.	Tout est sur www.iroquebec.com.
-en-web-01-parakeet	Go to kalmea.ca slash contact.	Go to kalmea.ca slash contact.
+en-web-01-parakeet	Go to kalmea.ca slash contact.	Go to kalmea.ca/contact.
 en-web-01-qwen3	Go to klmia.com/contact.	Go to klmia.com/contact.
 en-web-01-whisper	Go to kalmayer.co/contact	Go to kalmayer.co/contact
 fr-web-r01	Va sur coiffe rimouski point com.	Va sur coifferimouski.com.

@@ -2694,3 +2694,100 @@ téléphone. Changements :
   Le garde-fou strict rejettera plus de nettoyages : une autocorrection sans
   virgule, ou une reformulation de ponctuation qui fusionne des mots. Le texte
   nettoyé par règles est alors gardé.
+
+## Issue #15, lot 3 — étape 3.4 : rapport et recommandation
+
+Rapport : `android/docs/POLISSAGE_LOCAL.md` (question, jeu et ses limites,
+tableau comparatif mesuré / simulé / à faire sur le téléphone, cas
+`coifferimouski.com`, risques, recommandation, procédure de mesure, décision à
+prendre). Lien depuis `android/README.md`.
+
+### Raccord de 3.2 et 3.3 (approche 4)
+
+- Nouveau fichier `app/src/main/java/io/github/remtav/dictee/cleanup/eval/WiredCombination.kt` :
+  - `WiredRules.apply` : `PolishRules.polish`, puis `ShippedVocabulary.apply`.
+    **Choix** : l'étage déterministe est « règles + vocabulaire », pas les
+    règles seules, parce que c'est la meilleure approche sans LLM (55/79,
+    0 contrôle abîmé). La combinaison mesure ainsi ce qu'un LLM ajoute à ce
+    qu'on livrerait sans lui.
+  - `RuleSignalDetector` : envoie au LLM les segments où
+    `PolishRules.assess(brut)` donne `PROBABLE_CASE` ou `hasAddress` (la
+    proposition de 3.2). Les noms mal transcrits ne sont pas envoyés : c'est la
+    définition de l'approche 4 dans l'issue (LLM seulement là où une règle
+    signale un cas probable). Le LLM est appelé sur 22 segments sur 132
+    (21 cas à corriger : web 9, courriel 10, épellation 2 ; 1 contrôle,
+    `fr-web-04-whisper`, une adresse déjà écrite).
+  - `ShippedLexicon.names` : formes correctes de `ShippedVocabulary`
+    (lexique du garde-fou assoupli, à la place du lexique de simulation).
+  - `wiredCombination(llm, allowLexiconNear, template)`.
+- `ProvisionalProbableCaseDetector` est gardé pour comparaison, il n'est plus
+  utilisé par la combinaison.
+- Le raccord est dans `cleanup/eval/` (et non dans `text/polish/`) : les règles
+  ne dépendent pas du code d'évaluation du LLM.
+
+### Simulations régénérées et ajoutées
+
+`src/test/resources/polissage/sorties/` :
+`simulation-combinaison-oracle` et `simulation-combinaison-bruyant` (approche 4
+raccordée : 56/79, 2 modifiés à tort, 0/53 abîmés, oracle comme bruyant) ;
+nouveaux `simulation-llm-oracle-gardefou-lexique-livre` (36/79) et
+`simulation-llm-bruyant-gardefou-lexique-livre` (13/79), l'approche 3 avec le
+lexique qu'on livrerait. Les autres simulations de 3.3 sont inchangées.
+
+Plafonds épinglés dans `LlmSimulationTest` (LLM oracle) :
+
+| Variante | Corrigés / 79 |
+| --- | --- |
+| Approche 3, lexique livré | 36 |
+| Approche 4 raccordée, avec ou sans proximité | 56 |
+| Règles + vocabulaire puis LLM sur **tous** les segments | 57 (58 avec proximité) |
+
+Conclusion tirée dans le rapport : derrière le garde-fou, un LLM, même
+parfait, n'ajoute qu'un à trois cas aux 55 de règles + vocabulaire ; la
+mesure sur le téléphone ne peut pas renverser ce plafond.
+
+### Autres changements
+
+- Nouvelle approche notée `regles+vocabulaire-general` (règles + vocabulaire
+  sans les 20 formes `OBSERVED`) : 36/79, 6 modifiés à tort, 0/53 abîmés.
+  C'est la borne basse de la meilleure approche, que le rapport cite à côté
+  de 55/79.
+- Noteur : pour une latence « appareil », compte des segments au-delà de 4 s
+  (délai de `LlmCleaner`). Il apparaît dans `resultats.md`
+  (`… (appareil, 3/132 > 4 s)`) et dans `resultats.json` (`au_dela_4s`).
+  Testé dans `PolishScorerTest`.
+- `LlmPolishRecordingTest` : garde-fou avec le lexique livré, combinaison
+  raccordée (`wiredCombination`, même gabarit et même option de proximité).
+  Procédure dans le rapport.
+- `DefaultPathUnchangedTest` : seul `cleanup/eval/` peut citer les règles. Un
+  nouveau test vérifie qu'aucun fichier hors de `cleanup/eval/` ne cite le
+  paquet d'évaluation du LLM (garde-fou assoupli, prompt élargi, détecteurs,
+  combinaison). Un autre vérifie que `text/polish/` ne dépend pas de
+  `cleanup.eval`.
+
+### Comportement par défaut, vérifié
+
+- Recherche dans `app/src/main` : seuls `cleanup/eval/` et `text/polish/`
+  citent ces classes. Aucun appel depuis `DicteeApp`, `TextPipeline` ou
+  `SettingsActivity`. `CleanupMode.fromName` retombe sur `OFF`.
+- Changements « friperie », relus dans les commits `fc65b55` et `8c1eb05` :
+  - **un seul changement de défaut**, la langue transmise à Qwen3-ASR quand une
+    seule langue est choisie (le choix initial, « Français (Québec) » seul,
+    est dans ce cas). Il n'a pas été mesuré ; le rapport le dit dans une
+    section à part ;
+  - `remote_polish` vaut `true` par défaut, et le client envoie `polish=true`
+    comme avant ;
+  - le garde-fou strict et le nouveau prompt ne jouent qu'en mode LLM, qui
+    n'est pas le défaut ;
+  - le reste ne change que des textes affichés.
+
+### Recommandation (résumé)
+
+- Rien n'est activé par défaut.
+- Ne pas livrer de LLM de polissage.
+- Dans une itération suivante, au choix de l'utilisateur, une option
+  désactivée par défaut : d'abord les règles, puis le vocabulaire livré après
+  relecture.
+- Aucun passage en défaut sans zéro contrôle abîmé sur de vraies dictées
+  québécoises absentes du jeu.
+- Priorité au modèle de transcription affiné sur le français québécois.

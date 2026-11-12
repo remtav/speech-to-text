@@ -337,6 +337,12 @@ vocabulaire personnalisé, thème, vibrations, durée de maintien du modèle en
 mémoire, threads, accélération matérielle (CPU par défaut, XNNPACK, NNAPI),
 nettoyage du texte (désactivé, règles, ou petit LLM local avec garde-fou).
 
+**Polissage local des noms et des adresses** (« git hub » → `GitHub`,
+« coiffe rimouski point com » → `coifferimouski.com`) : évalué, **pas
+activé**. Le code d'évaluation n'est relié à aucun écran ni réglage. Le
+rapport chiffré, la recommandation et la procédure de mesure sur le
+téléphone sont dans [`docs/POLISSAGE_LOCAL.md`](docs/POLISSAGE_LOCAL.md).
+
 ## Développement
 
 Prérequis : JDK 17+, SDK Android (plateforme 35). Les dépendances natives

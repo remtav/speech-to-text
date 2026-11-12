@@ -253,8 +253,16 @@ data class Tally(val targets: Int, val corrected: Int, val wrong: Int, val contr
     }
 }
 
-/** Latency in milliseconds; [where] says what was measured ("hôte" or "appareil"). */
-data class Latency(val where: String, val p50: Double, val p95: Double, val samples: Int)
+/**
+ * Latency in milliseconds; [where] says what was measured ("hôte" or "appareil").
+ * [overBudget]: device measurements above [BUDGET_MS], the delay after which
+ * LlmCleaner gives up on a segment (null for host timings).
+ */
+data class Latency(val where: String, val p50: Double, val p95: Double, val samples: Int, val overBudget: Int? = null) {
+    companion object {
+        const val BUDGET_MS = 4000.0
+    }
+}
 
 data class ApproachScore(
     val approach: PolishApproach,
@@ -294,7 +302,10 @@ object PolishScorer {
             }
             val device = approach.deviceMillis(cases)
             val latency = if (device.isEmpty()) null
-            else Latency("appareil", Percentiles.of(device, 50.0)!!, Percentiles.of(device, 95.0)!!, device.size)
+            else Latency(
+                "appareil", Percentiles.of(device, 50.0)!!, Percentiles.of(device, 95.0)!!, device.size,
+                overBudget = device.count { it > Latency.BUDGET_MS },
+            )
             return ApproachScore(approach, results, latency)
         }
         require(repeats >= 1)

@@ -4,8 +4,12 @@ import io.github.remtav.dictee.cleanup.eval.GuardedLlmPolisher
 import io.github.remtav.dictee.cleanup.eval.LlmCall
 import io.github.remtav.dictee.cleanup.eval.ProvisionalProbableCaseDetector
 import io.github.remtav.dictee.cleanup.eval.RelaxedSafetyCheck
+import io.github.remtav.dictee.cleanup.eval.RuleSignalDetector
 import io.github.remtav.dictee.cleanup.eval.RulesThenLlmPolisher
 import io.github.remtav.dictee.cleanup.eval.SegmentClass
+import io.github.remtav.dictee.cleanup.eval.ShippedLexicon
+import io.github.remtav.dictee.cleanup.eval.WiredRules
+import io.github.remtav.dictee.cleanup.eval.wiredCombination
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -24,7 +28,9 @@ import java.util.zip.CRC32
  *     to the 53 control sentences, and to the expected text of the 79 cases)
  *     that the guard rejects.
  *  3. Simulated runs of approach 3 (wide prompt + relaxed guard) and
- *     approach 4 (rules, provisional detector, LLM, guard) with an "oracle"
+ *     approach 4 (wired in step 3.4: PolishRules + ShippedVocabulary, then the
+ *     LLM where PolishRules.assess flags PROBABLE_CASE or an address, guard
+ *     with the shipped lexicon) with an "oracle"
  *     LLM (returns the expected text) and a "noisy" LLM (defined below).
  *     Their outputs are committed as `src/test/resources/polissage/sorties/simulation-*.tsv`
  *     so that the scorer (PolishEvaluationTest) reports them next to the
@@ -41,6 +47,7 @@ class LlmSimulationTest {
     private val none = RelaxedSafetyCheck.Options()
     private val withLexicon = RelaxedSafetyCheck.Options(lexicon = lexicon)
     private val withNear = RelaxedSafetyCheck.Options(lexicon = lexicon, allowLexiconNear = true)
+    private val withShipped = RelaxedSafetyCheck.Options(lexicon = ShippedLexicon.names)
     private val configs = listOf("sans lexique" to none, "lexique" to withLexicon, "lexique + proximité" to withNear)
 
     // ----------------------------------------------------------- 1. ceiling
@@ -64,6 +71,9 @@ class LlmSimulationTest {
         assertEquals(CEILING_NO_LEXICON, accepted["sans lexique"])
         assertEquals(CEILING_LEXICON, accepted["lexique"])
         assertEquals(CEILING_NEAR, accepted["lexique + proximité"])
+        val shipped = targets.count { RelaxedSafetyCheck.check(it.raw, it.expected, withShipped).ok }
+        println("  lexique livré (ShippedVocabulary, étape 3.4) : $shipped/${targets.size} cas à corriger acceptés")
+        assertEquals(CEILING_SHIPPED_LEXICON, shipped)
     }
 
     @Test fun everyRawSentenceIsAcceptedUnchanged() {
@@ -131,6 +141,59 @@ class LlmSimulationTest {
         )
     }
 
+    /** Approach 4 as wired in step 3.4: the LLM sees only segments flagged by PolishRules.assess. */
+    @Test fun wiredCombinationCallsTheLlmOnlyWhereTheRulesFlagACase() {
+        val flagged = cases.filter { RuleSignalDetector.classify(it.raw, WiredRules.apply(it.raw, it.language), it.language) == SegmentClass.PROBABLE_CASE }
+        val flaggedTargets = flagged.filter { !it.isControl }
+        val flaggedControls = flagged.filter { it.isControl }
+        println(
+            "Détecteur raccordé (PolishRules.assess : PROBABLE_CASE ou adresse) : LLM appelé sur ${flagged.size}/${cases.size} " +
+                "segments (${flaggedTargets.size}/${targets.size} cas à corriger, ${flaggedControls.size}/${controls.size} contrôles : " +
+                "${flaggedControls.joinToString { it.id }})",
+        )
+        val byCat = flaggedTargets.groupingBy { it.category }.eachCount()
+        println("  par catégorie : $byCat")
+        assertEquals(WIRED_FLAGGED_TARGETS, flaggedTargets.size)
+        assertEquals(WIRED_FLAGGED_CONTROLS, flaggedControls.size)
+        var calls = 0
+        val polisher = wiredCombination(LlmCall { calls++; "n'importe quoi" })
+        for (c in cases) {
+            val r = polisher.polish(c.raw, c.language)
+            // An absurd LLM output is rejected: the result is exactly the deterministic stage.
+            assertEquals(c.id, WiredRules.apply(c.raw, c.language), r.text)
+            assertEquals(c.id, c in flagged, r.llm != null)
+        }
+        assertEquals(flagged.size, calls)
+    }
+
+    /**
+     * Ceiling of the wired combination (the LLM returns exactly the expected text), with and
+     * without the lexicon near match: no real LLM behind the guard can do better on this set.
+     */
+    @Test fun ceilingOfTheWiredCombination() {
+        fun corrected(near: Boolean) = targets.count { c ->
+            wiredCombination(LlmCall { c.expected }, allowLexiconNear = near).polish(c.raw, c.language).text == c.expected
+        }
+        val strict = corrected(false)
+        val near = corrected(true)
+        println("Plafond de la combinaison raccordée (SIMULATION, LLM oracle) : $strict/${targets.size} ; avec proximité : $near/${targets.size}")
+        assertEquals(CEILING_WIRED_COMBINATION, strict)
+        assertEquals(CEILING_WIRED_COMBINATION_NEAR, near)
+        // Upper bound of any guarded variant built on the deterministic stage: LLM on EVERY segment.
+        fun everySegment(near: Boolean) = targets.count { c ->
+            RulesThenLlmPolisher(
+                rules = WiredRules::apply,
+                detector = { _, _, _ -> SegmentClass.PROBABLE_CASE },
+                llm = GuardedLlmPolisher(LlmCall { c.expected }, RelaxedSafetyCheck.Options(ShippedLexicon.names, near)),
+            ).polish(c.raw, c.language).text == c.expected
+        }
+        val all = everySegment(false)
+        val allNear = everySegment(true)
+        println("Plafond règles + vocabulaire puis LLM sur TOUS les segments (SIMULATION) : $all/${targets.size} ; avec proximité : $allNear/${targets.size}")
+        assertEquals(CEILING_EVERY_SEGMENT, all)
+        assertEquals(CEILING_EVERY_SEGMENT_NEAR, allNear)
+    }
+
     @Test fun combinationCallsTheLlmOnlyOnFlaggedSegments() {
         val detector = ProvisionalProbableCaseDetector(lexicon)
         val flagged = cases.filter { detector.classify(it.raw, it.raw, it.language) == SegmentClass.PROBABLE_CASE }
@@ -175,12 +238,10 @@ class LlmSimulationTest {
             GuardedLlmPolisher(LlmCall { llmOut(c) }, opt).polish(c.raw, c.language).text
         }
         fun approach4(llmOut: (EvalCase) -> String) = cases.map { c ->
-            RulesThenLlmPolisher(
-                detector = ProvisionalProbableCaseDetector(lexicon),
-                llm = GuardedLlmPolisher(LlmCall { llmOut(c) }, withLexicon),
-            ).polish(c.raw, c.language).text
+            wiredCombination(LlmCall { llmOut(c) }).polish(c.raw, c.language).text
         }
         val common = "SIMULATION, aucun LLM n'a tourné (MediaPipe : arm64 seulement). Lexique : lexique-simulation.txt (plafond optimiste)."
+        val commonShipped = "SIMULATION, aucun LLM n'a tourné (MediaPipe : arm64 seulement). Lexique : liste livrée (ShippedVocabulary, étape 3.2)."
         val oracleText = "LLM « oracle » simulé : rend exactement le texte attendu."
         val noisyText = "LLM « bruyant » simulé (NoisyLlm, LlmSimulationTest) : cas à corriger 55 % attendu, 15 % attendu abîmé, " +
             "15 % brut, 15 % brut abîmé ; contrôles 70 % intacts, 30 % abîmés (9 modes : hypercorrection, mot retiré, mot ajouté, " +
@@ -206,15 +267,26 @@ class LlmSimulationTest {
                 "$common Approche 3 SANS garde-fou : $noisyText Montre ce que le garde-fou empêche.",
                 cases.map(::noisy),
             ),
+            "simulation-llm-oracle-gardefou-lexique-livre" to tsv(
+                "simulation-llm-oracle-gardefou-lexique-livre",
+                "$commonShipped Approche 3 : $oracleText Garde-fou assoupli avec le lexique livré, sans proximité.",
+                approach3(withShipped, ::oracle),
+            ),
+            "simulation-llm-bruyant-gardefou-lexique-livre" to tsv(
+                "simulation-llm-bruyant-gardefou-lexique-livre",
+                "$commonShipped Approche 3 : $noisyText Garde-fou assoupli avec le lexique livré, sans proximité.",
+                approach3(withShipped, ::noisy),
+            ),
             "simulation-combinaison-oracle" to tsv(
                 "simulation-combinaison-oracle",
-                "$common Approche 4 : règles = identité (celles de l'étape 3.2 ne sont pas encore raccordées), détecteur provisoire, " +
-                    "$oracleText Garde-fou assoupli avec lexique.",
+                "$commonShipped Approche 4 raccordée : règles + vocabulaire livré (étape 3.2), LLM seulement si PolishRules.assess " +
+                    "signale un cas probable ou une adresse, $oracleText Garde-fou assoupli avec le lexique livré.",
                 approach4(::oracle),
             ),
             "simulation-combinaison-bruyant" to tsv(
                 "simulation-combinaison-bruyant",
-                "$common Approche 4 : règles = identité, détecteur provisoire, $noisyText Garde-fou assoupli avec lexique.",
+                "$commonShipped Approche 4 raccordée : règles + vocabulaire livré, LLM seulement si PolishRules.assess signale " +
+                    "un cas probable ou une adresse, $noisyText Garde-fou assoupli avec le lexique livré.",
                 approach4(::noisy),
             ),
         )
@@ -247,6 +319,13 @@ class LlmSimulationTest {
         const val CONTROL_FAULTS_TRIED = 399
         const val DETECTOR_FLAGGED_TARGETS = 56
         const val DETECTOR_FLAGGED_CONTROLS = 19
+        const val CEILING_SHIPPED_LEXICON = 36
+        const val WIRED_FLAGGED_TARGETS = 21
+        const val WIRED_FLAGGED_CONTROLS = 1
+        const val CEILING_WIRED_COMBINATION = 56
+        const val CEILING_WIRED_COMBINATION_NEAR = 56
+        const val CEILING_EVERY_SEGMENT = 57
+        const val CEILING_EVERY_SEGMENT_NEAR = 58
     }
 }
 

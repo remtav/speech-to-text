@@ -24,6 +24,7 @@ object PolishApproaches {
         VocabularyApproach,
         GeneralVocabularyApproach,
         RulesAndVocabularyApproach,
+        RulesAndGeneralVocabularyApproach,
     )
 
     fun recorded(cases: List<EvalCase>): List<RecordedApproach> {

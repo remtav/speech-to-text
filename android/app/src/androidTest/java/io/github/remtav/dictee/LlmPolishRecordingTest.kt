@@ -10,17 +10,17 @@ import com.google.mediapipe.tasks.genai.llminference.LlmInferenceSession
 import io.github.remtav.dictee.cleanup.LlmCatalog
 import io.github.remtav.dictee.cleanup.eval.GuardedLlmPolisher
 import io.github.remtav.dictee.cleanup.eval.LlmCall
-import io.github.remtav.dictee.cleanup.eval.ProvisionalProbableCaseDetector
 import io.github.remtav.dictee.cleanup.eval.RelaxedSafetyCheck
-import io.github.remtav.dictee.cleanup.eval.RulesThenLlmPolisher
+import io.github.remtav.dictee.cleanup.eval.ShippedLexicon
 import io.github.remtav.dictee.cleanup.eval.WidePrompt
+import io.github.remtav.dictee.cleanup.eval.wiredCombination
 import org.junit.Assume.assumeTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import java.io.File
 
 /**
- * Issue #15, lot 3, step 3.3: records the outputs, latency and memory of the
+ * Issue #15, lot 3, steps 3.3 and 3.4: records the outputs, latency and memory of the
  * evaluation-only LLM variants ON A PHONE (MediaPipe runs on arm64 only).
  * Skipped unless the instrumentation argument `llmModel` is given, so the CI
  * emulator run never loads MediaPipe. Nothing here is reachable by a user.
@@ -34,15 +34,19 @@ import java.io.File
  *  - `llmTemplate`: `chatml` (Qwen, default) or `gemma`.
  *  - `nearMatch`: `true` to allow the lexicon near match of the relaxed guard (default false).
  *
+ * The relaxed guard uses the shipped lexicon (ShippedVocabulary, what would
+ * ship), not the simulation lexicon.
+ *
  * Writes into the app's external files, directory `polissage/`
  * (/sdcard/Android/data/io.github.remtav.dictee/files/polissage/), in the
  * format of RecordedApproach (`id`, `brut`, `sortie`, `latence_ms`):
  *  - `llm-<name>-prompt-large.tsv`: approach 3, output after the relaxed guard;
  *  - `llm-<name>-prompt-large-sans-gardefou.tsv`: the same LLM outputs before the guard;
- *  - `llm-<name>-combinaison.tsv`: approach 4 (rules = identity until step 3.2's
- *    rules are plugged in, provisional detector), latency of the whole segment;
+ *  - `llm-<name>-combinaison.tsv`: approach 4 as wired in step 3.4 (PolishRules +
+ *    ShippedVocabulary, LLM only where PolishRules.assess flags a probable case or
+ *    an address), latency of the whole segment;
  *  - `memoire-<name>.txt`: PSS and peak RSS before loading, after loading, after the runs.
- * Procedure: android/DECISIONS.md, issue #15, step 3.3.
+ * Procedure: android/docs/POLISSAGE_LOCAL.md (« Procédure de mesure sur le téléphone »).
  */
 @RunWith(AndroidJUnit4::class)
 class LlmPolishRecordingTest {
@@ -60,7 +64,7 @@ class LlmPolishRecordingTest {
         val name = args.getString("llmName") ?: defaultName(model)
         val template = if (args.getString("llmTemplate") == "gemma") WidePrompt.Template.GEMMA else WidePrompt.Template.CHATML
         val options = RelaxedSafetyCheck.Options(
-            lexicon = readAsset("lexique-simulation.txt").lines().map { it.trim() }.filter { it.isNotEmpty() && !it.startsWith("#") },
+            lexicon = ShippedLexicon.names,
             allowLexiconNear = args.getString("nearMatch") == "true",
         )
         val cases = readCases()
@@ -78,7 +82,7 @@ class LlmPolishRecordingTest {
         try {
             val call = LlmCall { prompt -> generate(llm, prompt) }
             val guarded = GuardedLlmPolisher(call, options, template)
-            val combined = RulesThenLlmPolisher(detector = ProvisionalProbableCaseDetector(options.lexicon), llm = guarded)
+            val combined = wiredCombination(call, options.allowLexiconNear, template)
 
             // Warm-up (first generation pays one-off costs), not recorded.
             guarded.polish("Mon code est sur git hub.", "fr")
@@ -105,11 +109,12 @@ class LlmPolishRecordingTest {
             memory.append("# appels_llm_combinaison: $llmCalls/${cases.size}\n")
 
             val base = "llm-$name"
-            write(outDir, "$base-prompt-large", "Approche 3 mesurée sur téléphone : prompt élargi, garde-fou assoupli ($path).", wide)
+            write(outDir, "$base-prompt-large", "Approche 3 mesurée sur téléphone : prompt élargi, garde-fou assoupli, lexique livré ($path).", wide)
             write(outDir, "$base-prompt-large-sans-gardefou", "Sorties brutes du LLM, AVANT garde-fou (même passage que $base-prompt-large).", unguarded)
             write(
                 outDir, "$base-combinaison",
-                "Approche 4 mesurée sur téléphone : règles = identité, détecteur provisoire, LLM sur les cas probables, garde-fou assoupli.",
+                "Approche 4 mesurée sur téléphone : règles + vocabulaire livré, LLM si PolishRules.assess signale un cas probable " +
+                    "ou une adresse, garde-fou assoupli, lexique livré ($path).",
                 combo,
             )
             File(outDir, "memoire-$name.txt").writeText(memory.toString())

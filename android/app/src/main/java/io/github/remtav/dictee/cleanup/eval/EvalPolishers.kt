@@ -24,16 +24,18 @@ enum class SegmentClass {
 }
 
 /**
- * Classifies a segment after the deterministic rules. Step 3.2 exposes a pure
- * function with this meaning for its rules; the orchestrator or step 3.4
- * plugs it in here in place of [ProvisionalProbableCaseDetector].
+ * Classifies a segment after the deterministic rules. The wired detector is
+ * [RuleSignalDetector] (step 3.4, from step 3.2's `PolishRules.assess`);
+ * [ProvisionalProbableCaseDetector] is the wider step 3.3 stand-in, kept for
+ * comparison.
  */
 fun interface ProbableCaseDetector {
     fun classify(raw: String, afterRules: String, language: String): SegmentClass
 }
 
 /**
- * PROVISIONAL detector, until step 3.2's classifier is plugged in. It looks
+ * Step 3.3 stand-in detector, wider than [RuleSignalDetector] (also flags
+ * spans close to a lexicon name). Not used by the wired combination. It looks
  * only at the text after the rules and flags a probable case when it sees:
  *  - a spoken address: "point|dot" followed by com, ca, org, net, qc, gouv;
  *    "arobase"; "at … dot|point"; "barre oblique"; "slash";

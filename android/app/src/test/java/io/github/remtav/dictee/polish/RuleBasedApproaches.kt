@@ -39,3 +39,12 @@ object RulesAndVocabularyApproach : PolishApproach {
     override fun polish(raw: String, language: String) =
         ShippedVocabulary.apply(PolishRules.polish(raw, language), language)
 }
+
+/** Rules + the list without the OBSERVED forms (step 3.4): the lower bound of the best approach without an LLM. */
+object RulesAndGeneralVocabularyApproach : PolishApproach {
+    override val name = "regles+vocabulaire-general"
+    override val needsLlm = false
+    override val description = "règles, puis vocabulaire livré sans les formes relevées dans le jeu (borne basse de regles+vocabulaire)"
+    override fun polish(raw: String, language: String) =
+        ShippedVocabulary.apply(PolishRules.polish(raw, language), language, setOf(ShippedVocabulary.Origin.GENERAL))
+}

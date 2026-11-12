@@ -33,12 +33,31 @@ class DefaultPathUnchangedTest {
         }
     }
 
+    private val mainSources by lazy {
+        File(System.getProperty("dictee.assetsDir") ?: "src/main/assets").parentFile.resolve("java")
+            .walkTopDown().filter { it.isFile && it.extension == "kt" }.toList()
+    }
+
+    /** Only the evaluation-only package (cleanup/eval, step 3.4 wiring) may use the polishing rules. */
     @Test fun nothingInTheAppCallsThePolishPackage() {
-        val main = File(System.getProperty("dictee.assetsDir") ?: "src/main/assets").parentFile.resolve("java")
-        val offenders = main.walkTopDown().filter { it.isFile && it.extension == "kt" }
-            .filter { !it.path.contains("/text/polish/") }
+        val offenders = mainSources
+            .filter { !it.path.contains("/text/polish/") && !it.path.contains("/cleanup/eval/") }
             .filter { f -> f.readText().let { "text.polish" in it || "PolishRules" in it || "ShippedVocabulary" in it } }
-            .map { it.name }.toList()
+            .map { it.name }
         assertTrue("wired into the app: $offenders", offenders.isEmpty())
+        assertTrue("the polish rules must not depend on the LLM evaluation", mainSources
+            .filter { it.path.contains("/text/polish/") }.none { "cleanup.eval" in it.readText() })
+    }
+
+    /** The LLM evaluation variants (approaches 3 and 4) are reachable from no screen, setting or pipeline. */
+    @Test fun nothingInTheAppCallsTheLlmEvaluationPackage() {
+        val names = listOf(
+            "cleanup.eval", "RelaxedSafetyCheck", "GuardedLlmPolisher", "RulesThenLlmPolisher", "WidePrompt",
+            "RuleSignalDetector", "WiredRules", "ShippedLexicon", "wiredCombination", "ProvisionalProbableCaseDetector",
+        )
+        val offenders = mainSources.filter { !it.path.contains("/cleanup/eval/") }
+            .filter { f -> f.readText().let { text -> names.any { it in text } } }
+            .map { it.name }
+        assertTrue("LLM evaluation wired into the app: $offenders", offenders.isEmpty())
     }
 }

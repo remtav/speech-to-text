@@ -14,7 +14,11 @@ object PolishReport {
 
     private fun ms(v: Double) = String.format(Locale.ROOT, if (v < 1) "%.3f" else "%.1f", v)
 
-    private fun latency(l: Latency?) = if (l == null) "non mesurée" else "${ms(l.p50)} / ${ms(l.p95)} (${l.where})"
+    private fun latency(l: Latency?) = when {
+        l == null -> "non mesurée"
+        l.overBudget != null -> "${ms(l.p50)} / ${ms(l.p95)} (${l.where}, ${l.overBudget}/${l.samples} > 4 s)"
+        else -> "${ms(l.p50)} / ${ms(l.p95)} (${l.where})"
+    }
 
     private fun table(header: List<String>, rows: List<List<String>>): String {
         val widths = header.indices.map { c -> (rows.map { it[c] } + header[c]).maxOf { it.length } }
@@ -82,7 +86,8 @@ object PolishReport {
                 .put("abimes", JSONArray(s.damagedIds))
                 .put("erreurs", JSONArray(s.errorIds))
             s.latency?.let {
-                o.put("latence_ms", JSONObject().put("ou", it.where).put("p50", it.p50).put("p95", it.p95).put("mesures", it.samples))
+                o.put("latence_ms", JSONObject().put("ou", it.where).put("p50", it.p50).put("p95", it.p95).put("mesures", it.samples)
+                    .put("au_dela_4s", it.overBudget ?: JSONObject.NULL))
             } ?: o.put("latence_ms", JSONObject.NULL)
             approaches.put(o)
         }
