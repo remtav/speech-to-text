@@ -54,6 +54,19 @@ class ModelRecommendationTest {
         }
     }
 
+    @Test fun quebecWhisperIsOfferedButParakeetStaysRecommendedForQuebecFrench() {
+        val qc = ModelCatalog.whisperQuebec
+        assertTrue(qc in downloadable)
+        val fr = setOf(DictationLanguage.FRENCH_QUEBEC)
+        assertEquals(ModelCatalog.parakeet, ModelRecommendations.recommend(fr).model)
+        assertTrue(ModelRecommendations.uncovered(qc, fr).isEmpty())
+        // Adding English: the card warns "ne couvre pas ... anglais".
+        val withEnglish = fr + DictationLanguage.ENGLISH
+        assertEquals(listOf(DictationLanguage.ENGLISH), ModelRecommendations.uncovered(qc, withEnglish))
+        assertEquals("anglais", ModelRecommendations.uncovered(qc, withEnglish).single().inSentence)
+        assertEquals(ModelCatalog.parakeet, ModelRecommendations.recommend(withEnglish).model)
+    }
+
     @Test fun quebecFrenchAloneRecommendsParakeet() {
         val rec = ModelRecommendations.recommend(setOf(DictationLanguage.FRENCH_QUEBEC))
         assertEquals(ModelCatalog.parakeet, rec.model)

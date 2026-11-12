@@ -46,13 +46,16 @@ object ModelCatalog {
     private const val WHISPER =
         "https://huggingface.co/csukuangfj/sherpa-onnx-whisper-turbo/resolve/main"
     /**
-     * Base URL of the sherpa-onnx conversion of the Quebec French fine-tune of
-     * Whisper (issue #15, user request). No public conversion exists, so the
-     * files must be uploaded once (android/tools/whisper-hf-vers-sherpa/README.md)
-     * and this set to the `resolve/main` URL of the repository. While it is
-     * empty the model is not offered: the app never lists a download that fails.
+     * Base URL of the sherpa-onnx conversion of the Quebec French fine-tune of Whisper
+     * (issue #15, user request), published on 2026-11-12 under the user's Hugging Face account,
+     * at his request (android/tools/whisper-hf-vers-sherpa/README.md).
      */
-    private const val WHISPER_QC = ""
+    private const val WHISPER_QC =
+        "https://huggingface.co/remiavelo/sherpa-onnx-whisper-large-v3-turbo-fr-quebecois-int8/resolve/main"
+    /** Shown on the Quebec Whisper's card: same size and compute cost as Whisper, hence as slow. */
+    const val WHISPER_QC_NOTE =
+        "Même taille et même coût de calcul que Whisper large-v3-turbo, donc plus lent sur le téléphone " +
+            "(observation de l'utilisateur sur Whisper turbo, pas une mesure sur appareil)."
     private const val QWEN3 =
         "https://huggingface.co/csukuangfj2/sherpa-onnx-qwen3-asr-0.6B-int8-2026-03-25/resolve/main"
 
@@ -131,9 +134,12 @@ object ModelCatalog {
         shortName = "Whisper QC",
         publisher = "ele-sage (communauté), d'après OpenAI",
         family = ModelFamily.WHISPER,
-        description = "Whisper large-v3-turbo affiné sur du français québécois ; français seulement. " +
-            "WER annoncé par son auteur : 6,65 % sur son jeu de validation.",
+        description = "Whisper large-v3-turbo affiné sur du français québécois par ele-sage (communauté). " +
+            "WER annoncé par son auteur : 6,65 % sur son jeu de validation. " +
+            "Mesuré ici : 5 erreurs sur 59 mots (8,5 %) sur six courts extraits, contre 4 pour Parakeet " +
+            "et 6 pour Whisper turbo : un indice, pas une preuve. Français seulement.",
         license = "MIT",
+        note = WHISPER_QC_NOTE,
         files = listOf(
             ModelFile("turbo-encoder.int8.onnx", "$WHISPER_QC/turbo-encoder.int8.onnx",
                 "3f774a722b473fb85fca92e24591afffec5159c53564089fed4dc191fe6fabfc", 674348342),
@@ -144,12 +150,9 @@ object ModelCatalog {
         ),
     )
 
-    /** False until the converted files are published and [WHISPER_QC] is set. */
-    val whisperQuebecHosted: Boolean = WHISPER_QC.isNotEmpty()
-
     /** Downloadable on-device models. */
     val all: List<ModelSpec> =
-        listOfNotNull(parakeet, qwen3, whisperTurbo, whisperQuebec.takeIf { whisperQuebecHosted })
+        listOf(parakeet, qwen3, whisperTurbo, whisperQuebec)
 
     /**
      * A server the user runs (opt-in): nothing to download, "installed" once its

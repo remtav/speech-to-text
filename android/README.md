@@ -30,7 +30,8 @@ bascule vers celui-ci pour dicter.
 | **Développée au Québec** | Affirmation de l'auteur. |
 
 **Origine des modèles.** Les modèles ne sont pas québécois : Parakeet vient de
-NVIDIA, Qwen3-ASR d'Alibaba, Whisper d'OpenAI, et le petit LLM facultatif de
+NVIDIA, Qwen3-ASR d'Alibaba, Whisper d'OpenAI (et sa variante affinée sur le français québécois, de
+ele-sage, une personne de la communauté), et le petit LLM facultatif de
 nettoyage du texte (désactivé par défaut) passe par MediaPipe, une
 bibliothèque de Google. La souveraineté offerte porte sur les **données** (la
 voix reste sur le téléphone par défaut) et sur le **logiciel** (code public,
@@ -253,6 +254,7 @@ Limites connues :
 | Parakeet TDT 0.6b v3 (défaut) | NVIDIA | 671 Mo |
 | Qwen3-ASR 0.6B | Alibaba (Qwen) | 987 Mo |
 | Whisper large-v3-turbo | OpenAI | 1,04 Go |
+| Whisper large-v3-turbo, français québécois | ele-sage (communauté), d'après OpenAI | 1,04 Go |
 
 Whisper : observé par l'utilisateur sur son téléphone, il comprend bien des
 mots d'ici que Parakeet et Qwen3-ASR ratent (un mot isolé deviné en anglais,
@@ -262,12 +264,17 @@ CI, le facteur temps réel indicatif est de 0,07 pour Parakeet, 0,3 pour
 Whisper et 0,6 à 0,9 pour Qwen3-ASR (`DECISIONS.md`, étape 1.2), ce qui ne
 prédit pas l'ordre sur un téléphone. La carte de Whisper le dit.
 
-Un quatrième modèle est préparé mais pas encore proposé : **Whisper large-v3-turbo, français québécois**
-(`ele-sage/whisper-large-v3-turbo-fr-quebecois`, MIT, 1,04 Go, français seulement ; WER annoncé par son auteur :
-6,65 % sur son jeu de validation). Il n'existe aucune conversion sherpa-onnx publique : elle se produit avec
-`android/tools/whisper-hf-vers-sherpa/` et doit être téléversée une fois pour que l'application puisse la
-télécharger (procédure dans le README de ce dossier). Tant que ce n'est pas fait, l'application ne le liste pas.
-Il a la même taille et la même vitesse que Whisper large-v3-turbo.
+**Whisper large-v3-turbo, français québécois** (1,04 Go) est le quatrième modèle proposé : c'est
+`ele-sage/whisper-large-v3-turbo-fr-quebecois` (communauté, MIT, d'après OpenAI), affiné sur du français québécois
+(débats de l'Assemblée nationale, Common Voice). Il ne couvre que le français : choisir l'anglais en plus
+affiche « ce modèle ne couvre pas anglais » sur sa carte. Il n'existait aucune conversion sherpa-onnx publique : la
+conversion int8 (`android/tools/whisper-hf-vers-sherpa/`) est hébergée par l'auteur de l'application, à sa demande, sur
+`huggingface.co/remiavelo/sherpa-onnx-whisper-large-v3-turbo-fr-quebecois-int8` ; l'application la télécharge de là,
+fichier par fichier, vérifiée par SHA-256. WER annoncé par son auteur : 6,65 % sur son jeu de validation. Mesuré ici :
+5 erreurs sur 59 mots (8,5 %) sur six courts extraits québécois, contre 4 pour Parakeet et 6 pour Whisper turbo :
+un indice, pas une preuve. Il a la même taille et le même coût de calcul que Whisper large-v3-turbo, donc il est plus
+lent sur le téléphone (observation de l'utilisateur sur Whisper turbo, pas une mesure sur appareil). Parakeet reste
+recommandé pour le français québécois ; ce modèle est seulement proposé.
 
 Chaque fichier est vérifié par SHA-256 ; les modèles se suppriment depuis
 l'écran principal. **Comparer les modèles** transcrit les extraits de

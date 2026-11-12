@@ -2843,24 +2843,27 @@ Ce que l'utilisateur reproche à Whisper turbo sur son téléphone (trop lent) v
 Non mesuré : le mot « friperie » dicté seul (pas d'enregistrement ; à essayer sur le téléphone une fois le modèle
 publié).
 
-**Hébergement : bloquant, à la charge de l'utilisateur.** Je n'ai aucun compte pour publier et rien n'a été
-publié. L'entrée `ModelCatalog.whisperQuebec` est complète (fichiers, SHA-256, tailles, éditeur, licence), mais
-sa constante d'URL `WHISPER_QC` est vide : tant qu'elle l'est, `ModelCatalog.all` ne contient pas le modèle,
-donc ni l'écran d'installation ni les Réglages ne le proposent (l'application ne propose jamais un
-téléchargement qui échoue). Choix retenu entre « URL à renseigner » et « entrée non listée » : une seule constante,
-un test qui vérifie la cohérence liste / URL. Les fichiers convertis sont dans
-`/home/user/modele-qc-work/sortie/` (hors dépôt, 1,0 Go).
+**Hébergement : publié le 2026-11-12, sous le compte de l'utilisateur, à sa demande.** L'issue mettait l'ajout de
+modèles hors de sa portée ; l'utilisateur l'a demandé explicitement, et a lui-même publié la conversion (dépôt public,
+non restreint) : `https://huggingface.co/remiavelo/sherpa-onnx-whisper-large-v3-turbo-fr-quebecois-int8`. Sommes et
+tailles vérifiées sur le serveur (identiques à `ModelCatalog.whisperQuebec`). `WHISPER_QC` est renseignée, donc
+`ModelCatalog.all` contient le modèle (écran d'installation, Réglages, comparaison). Le test hôte
+`ModelAccuracyHostTest.whisperQuebec`, lancé réellement avec le téléchargeur de l'application, a téléchargé les trois
+fichiers (sommes vérifiées) et mesuré : en 4,5 % (3/66), fr 0 % (0/16), frqc 8,5 % (5/59) ; plafonds identiques à ceux
+de Whisper turbo. Limite : le proxy de cette session ajoute un jeton aux requêtes vers huggingface.co, donc ce test ne
+prouve pas l'accès anonyme (le dépôt est public d'après l'API). Carte : texte honnête (WER annoncé, mesure ici et sa
+limite, français seulement) et note « même coût que Whisper, donc plus lent » (observation sur Whisper turbo, pas une
+mesure sur appareil).
 
 **Couverture de langues** (`ModelRecommendations.coverage`) : français (Québec et France) seulement ; la logique de
 recommandation n'est pas modifiée (un test vérifie que la table ne le recommande jamais). Les mesures ne justifient
 pas de le recommander à la place de Parakeet pour « Français (Québec) » : 8,5 % contre 6,8 %, et un coût cinq
 fois plus élevé.
 
-**CI.** `ModelAccuracyHostTest.whisperQuebec` est ignoré (`assumeTrue`) tant que le modèle n'est pas publié. Une
-fois publié, le job `models` télécharge ~1 Go de plus et décode six extraits de plus (environ +2 minutes ; le
-cache est indexé sur `ModelCatalog.kt`, donc il est de toute façon invalidé à chaque changement du catalogue).
-Le workflow n'est pas modifié (changement soumis à l'approbation de Rémi) : le titre « 3 models » du job reste exact
-tant que le modèle n'est pas publié.
+**CI.** `ModelAccuracyHostTest.whisperQuebec` n'est plus ignoré : le job `models` télécharge ~1 Go de plus (total
+~3,8 Go de modèles, largement dans le disque d'un runner `ubuntu-latest`) et décode six extraits de plus (environ
++2 minutes, très en dessous du délai de 60 min ; le cache est indexé sur `ModelCatalog.kt`, donc invalidé par ce
+changement). Le workflow n'est pas modifié (approbation de Rémi) ; seul son titre « 3 models » est devenu inexact.
 
 **À valider par l'utilisateur** : redistribuer une conversion int8 d'un modèle MIT est permis par la licence ;
 l'auteur est cité sur la carte (éditeur « ele-sage (communauté), d'après OpenAI », licence MIT). Le jeu

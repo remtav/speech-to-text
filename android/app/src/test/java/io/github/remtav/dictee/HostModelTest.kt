@@ -69,8 +69,8 @@ object Host {
         ModelCatalog.parakeet.id to mapOf("en" to 0.12, "fr" to 0.15, "frqc" to 0.60),
         ModelCatalog.qwen3.id to mapOf("en" to 0.12, "fr" to 0.15, "frqc" to 0.60),
         ModelCatalog.whisperTurbo.id to mapOf("en" to 0.12, "fr" to 0.15, "frqc" to 0.60),
-        // Fine-tuned on French only: English is measured and reported but not bounded.
-        ModelCatalog.whisperQuebec.id to mapOf("en" to 1.0, "fr" to 0.15, "frqc" to 0.60),
+        // Same ceilings as Whisper turbo (measured here: en 4.5 %, fr 0 %, frqc 8.5 %).
+        ModelCatalog.whisperQuebec.id to mapOf("en" to 0.12, "fr" to 0.15, "frqc" to 0.60),
     )
 }
 
@@ -150,11 +150,7 @@ class ModelAccuracyHostTest {
 
     @Test fun whisperTurbo() = check(ModelCatalog.whisperTurbo)
 
-    /** Skipped until the converted files are published (ModelCatalog.whisperQuebecHosted). */
-    @Test fun whisperQuebec() {
-        assumeTrue("Whisper QC is not hosted yet", ModelCatalog.whisperQuebecHosted)
-        check(ModelCatalog.whisperQuebec)
-    }
+    @Test fun whisperQuebec() = check(ModelCatalog.whisperQuebec)
 }
 
 /** The whole dictation path with the default model: audio stream → Silero VAD → Parakeet → text. */

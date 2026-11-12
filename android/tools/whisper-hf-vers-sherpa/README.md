@@ -1,6 +1,7 @@
 # Whisper large-v3-turbo « français québécois » → sherpa-onnx
 
-Statut : outil, à lancer à la main (issue #15, demande de l'utilisateur ; voir `android/DECISIONS.md`).
+Statut : outil, à lancer à la main (issue #15, demande de l'utilisateur ; voir `android/DECISIONS.md`). La conversion est
+publiée : `https://huggingface.co/remiavelo/sherpa-onnx-whisper-large-v3-turbo-fr-quebecois-int8` (voir « Publication »).
 
 Le modèle communautaire [`ele-sage/whisper-large-v3-turbo-fr-quebecois`](https://huggingface.co/ele-sage/whisper-large-v3-turbo-fr-quebecois)
 (licence MIT, WER annoncé 6,65 %) n'existe qu'au format transformers, CTranslate2 et GGML : aucune conversion
@@ -34,14 +35,12 @@ l'application) : torch (CPU), openai-whisper, onnx, onnxruntime, onnxscript, saf
 Ces sommes sont celles de `ModelCatalog.whisperQuebec`. La conversion n'est pas garantie reproductible au bit près :
 si on la refait, les sommes sont à reporter dans le catalogue (le test de l'application échoue sinon au téléchargement).
 
-## Publier pour que l'application le propose
+## Publication
 
-Rien n'est publié par ce dépôt. Une fois (compte Hugging Face de l'équipe) :
+Publiée le 2026-11-12, à la demande de l'utilisateur et sous son compte Hugging Face (dépôt public) :
+`https://huggingface.co/remiavelo/sherpa-onnx-whisper-large-v3-turbo-fr-quebecois-int8`. Les trois fichiers ci-dessus y
+sont tels quels ; `WHISPER_QC` de `ModelCatalog.kt` pointe sur `…/resolve/main`, donc l'application propose le modèle
+(écran d'installation, Réglages, comparaison) et `ModelAccuracyHostTest.whisperQuebec` le télécharge (~1 Go) en CI.
+Si la conversion est refaite et republiée, reporter les nouvelles sommes dans le catalogue.
 
-1. Créer un dépôt de modèle, par exemple `<compte>/sherpa-onnx-whisper-turbo-fr-quebecois-int8`, y téléverser les
-   trois fichiers ci-dessus tels quels, avec une fiche qui cite le modèle d'origine (`ele-sage/…`, MIT, l'auteur et le
-   jeu d'entraînement) et la licence MIT de la conversion.
-2. Dans `ModelCatalog.kt`, renseigner `WHISPER_QC` avec `https://huggingface.co/<compte>/<dépôt>/resolve/main`.
-   Le modèle apparaît alors dans l'écran d'installation et les Réglages ; `ModelAccuracyHostTest.whisperQuebec` cesse
-   d'être ignoré (téléchargement de ~1 Go dans la CI).
-3. Vérifier : `./gradlew testDebugUnitTest` puis, hôte, `-PmodelsDir=… --tests '*ModelAccuracyHostTest*'`.
+Vérifier : `./gradlew testDebugUnitTest` puis, hôte, `-PmodelsDir=… --tests '*ModelAccuracyHostTest*'`.

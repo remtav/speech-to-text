@@ -34,7 +34,7 @@ private fun sha(b: ByteArray) = MessageDigest.getInstance("SHA-256").digest(b).j
 
 class CatalogTest {
     @Test fun catalogIsWellFormed() {
-        assertEquals(if (ModelCatalog.whisperQuebecHosted) 4 else 3, ModelCatalog.all.size)
+        assertEquals(4, ModelCatalog.all.size)
         assertEquals("parakeet-tdt-0.6b-v3-int8", ModelCatalog.default.id)
         assertEquals(ModelCatalog.all.size, ModelCatalog.all.map { it.id }.toSet().size)
         val items: List<Downloadable> = ModelCatalog.all.map { object : Downloadable {
@@ -54,14 +54,26 @@ class CatalogTest {
     }
 
     /**
-     * The Quebec French Whisper (issue #15, user request) is offered only once its files are
-     * published: the app never lists a download that cannot succeed.
+     * The Quebec French Whisper (issue #15, user request): offered, with the files published
+     * on the user's Hugging Face account, with the exact sizes and checksums of the server.
      */
-    @Test fun quebecWhisperIsListedOnlyWhenItsFilesAreHosted() {
+    @Test fun quebecWhisperIsListedAndPointsAtThePublishedFiles() {
         val m = ModelCatalog.whisperQuebec
-        assertEquals(ModelCatalog.whisperQuebecHosted, m in ModelCatalog.all)
-        assertEquals(ModelCatalog.whisperQuebecHosted, m in ModelCatalog.selectable)
-        assertEquals(ModelCatalog.whisperQuebecHosted, m.files.none { it.url.startsWith("/") })
+        assertTrue(m in ModelCatalog.all)
+        assertTrue(m in ModelCatalog.selectable)
+        val base = "https://huggingface.co/remiavelo/sherpa-onnx-whisper-large-v3-turbo-fr-quebecois-int8/resolve/main"
+        assertEquals(
+            listOf(
+                Triple("$base/turbo-encoder.int8.onnx", "3f774a722b473fb85fca92e24591afffec5159c53564089fed4dc191fe6fabfc", 674_348_342L),
+                Triple("$base/turbo-decoder.int8.onnx", "9775633c180fa256f096fd97ad8825cfff2d159090d8a6f98542d82ae01e567e", 360_961_539L),
+                Triple("$base/turbo-tokens.txt", "b34b360dbb493e781e479794586d661700670d65564001f23024971d1f2fa126", 816_730L),
+            ),
+            m.files.map { Triple(it.url, it.sha256, it.size) },
+        )
+        assertEquals(ModelCatalog.WHISPER_QC_NOTE, m.note)
+        assertTrue(m.note.contains("plus lent"))
+        assertTrue(m.description.contains("6,65 %"))
+        assertTrue(m.description.contains("un indice, pas une preuve"))
         // Same engine branch, same file names as Whisper large-v3-turbo; its own directory and id.
         assertEquals(ModelFamily.WHISPER, m.family)
         assertEquals(ModelCatalog.whisperTurbo.files.map { it.path }, m.files.map { it.path })
