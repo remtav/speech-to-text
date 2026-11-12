@@ -1848,6 +1848,21 @@ montre les mots dits) : comportement attendu, documenté.
   avant `ime enable` / `ime set`, et `ime enable` relancé avec `ime set` dans la
   boucle. Course au démarrage, donc intermittente : elle explique qu'il passait au
   lot 1.
+- **CI suivante (commit 205d898) : 26 échecs « keyboard not shown », clavier
+  pourtant sélectionné**, `showSoftInput` en échec à `PHASE_CLIENT_VIEW_SERVED`
+  dès le premier test. Cause : une boîte « Pixel Launcher isn't responding »
+  (ANR du lanceur sur l'émulateur à froid) restée au premier plan toute
+  l'exécution ; le champ de test n'avait jamais le focus de fenêtre. Preuve :
+  les captures de `ScreenshotTest` de cette exécution montrent la boîte sur
+  l'écran de configuration ; celles de 7bff6e0 ne l'ont pas. Les tests qui ne
+  passent que par `onActivity` (SetupLanguageTest, la plupart de
+  HowToInstrumentedTest) passaient. Correction dans `ImeTestBase` :
+  `dismissNotRespondingDialogs()` répond « Attendre » (`android:id/aerr_wait`)
+  au démarrage de chaque test, après l'ouverture du champ et dans la boucle de
+  relance ; `ime enable` / `ime set` ne sont appelés que si le clavier n'est pas
+  déjà activé / sélectionné ; l'attente de l'enregistrement du service interroge
+  toutes les secondes (au lieu de 250 ms, pour ne pas charger le système au
+  démarrage) ; le message d'échec donne la fenêtre qui a le focus.
 - **État laissé entre tests** : `HowToInstrumentedTest` accorde le micro
   (permission qu'on ne peut pas retirer sans tuer le processus des tests). Avec
   le clavier activé et le moteur scripté « installé », tout test qui ouvre
