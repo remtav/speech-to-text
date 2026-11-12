@@ -1,0 +1,4 @@
+# file	language	transcript	source
+en1.wav	en	After early nightfall the yellow lamps would light up here and there the squalid quarter of the brothels.	LibriSpeech (public domain), via huggingface.co/csukuangfj/sherpa-onnx-whisper-turbo test_wavs/0.wav
+en2.wav	en	God, as a direct consequence of the sin which man thus punished, had given her a lovely child, whose place was on that same dishonoured bosom, to connect her parent for ever with the race and descent of mortals, and to be finally a blessed soul in heaven.	LibriSpeech (public domain), via huggingface.co/csukuangfj/sherpa-onnx-whisper-turbo test_wavs/1.wav
+fr1.wav	fr	Alice et moi sommes allés à Paris voyager en train au printemps, c'était très amusant.	Qwen3-ASR demo clip, via huggingface.co/csukuangfj2/sherpa-onnx-qwen3-asr-0.6B-int8-2026-03-25 test_wavs/fr1.wav

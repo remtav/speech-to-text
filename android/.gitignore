@@ -1,0 +1,12 @@
+.gradle/
+build/
+local.properties
+app/libs/
+app/src/main/assets/silero_vad.onnx
+.idea/
+*.iml
+captures/
+.cxx/
+# Private release key: never in the repository
+*.p12
+*.jks
