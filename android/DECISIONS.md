@@ -1177,3 +1177,227 @@ la JVM.
 - Largeur des touches (environ 40 dp) : assez confortable au pouce ? Sinon,
   passer à deux rangées.
 - Choisir une licence pour le dépôt si « code source ouvert » doit être écrit.
+
+## Issue #15, lot 2 — étape 2.1 : formulations des dictées d'Apple et de Google
+
+Date de consultation de toutes les sources : 2026-11-12. Aucun code touché.
+
+**Ce qui est « mot pour mot » et ce qui ne l'est pas.** Les pages d'Apple, de
+Google et de l'OQLF ont été téléchargées en HTML et leur texte extrait
+mécaniquement (aucun résumé d'outil) : les formulations des tableaux ci-dessous
+sont donc celles des pages. Les résumés produits par l'outil de lecture ont été
+écartés, sauf pour la lecture initiale. Pour l'usage de France, la seule source
+lue en entier est un guide du CNRS de 1995 (un document de référence
+typographique, pas l'Imprimerie nationale) ; le *Lexique des règles typographiques
+en usage à l'Imprimerie nationale* est un livre et n'a pas pu être consulté
+(voir « Non vérifié »). Les propositions de la partie 2 sont des choix de
+conception, pas des citations.
+
+### 1. Formulations relevées
+
+Convention : le texte entre guillemets est celui de la page ; « non documenté »
+signifie que la page ne liste pas cette commande.
+
+| Signe | Apple FR | Apple EN | Google FR | Google EN |
+| --- | --- | --- | --- | --- |
+| Guillemet ouvrant | Mac fr-afri et fr-fr : « guillemet ouvrant » ; Mac fr-ca : « guillemet » ; iPhone (fr-afri, fr-ca, fr-fr) : « Guillemets » | Mac et iPhone : « quote » | non documenté | non documenté |
+| Guillemet fermant | Mac (fr-afri, fr-ca, fr-fr) : « guillemet fermant » ; iPhone : « Guillemets fermants » | Mac et iPhone : « end quote » | non documenté | non documenté |
+| Deux-points | Mac : « deux-points » ; iPhone : « Deux points » (sans trait d'union) | « colon » | non documenté | non documenté |
+| Point-virgule | « point-virgule » (Mac et iPhone) | « semicolon » | non documenté | non documenté |
+| Parenthèse ouvrante | « parenthèse ouvrante » (Mac et iPhone) | « open parenthesis » | non documenté | non documenté |
+| Parenthèse fermante | « parenthèse fermante » (Mac et iPhone) | « close parenthesis » | non documenté | non documenté |
+| Point d'interrogation | « point d’interrogation » | « question mark » | « Point d'interrogation » (liste de la page Docs et de l'aide Gboard FR) | « Question mark » (Docs, Gboard) |
+| Point d'exclamation | « point d’exclamation » | Mac : « exclamation mark » ; iPhone : « Exclamation point » | « Point d'exclamation » (Docs, Gboard FR) | « Exclamation point » (Docs, Gboard) |
+| Nouvelle ligne | Mac : « nouvelle ligne » ; iPhone (fr-afri, fr-ca, fr-fr) : « À la ligne » | « new line » (Mac et iPhone) | « Nouvelle ligne » (Docs, Gboard FR) | « New line » (Docs, Gboard) |
+| Nouveau paragraphe | « nouveau paragraphe » (Mac et iPhone) | « new paragraph » (Mac et iPhone) | « Nouveau paragraphe » (Docs, Gboard FR) | « New paragraph » (Docs, Gboard) |
+| *(info)* Virgule | « virgule » | « comma » | « Virgule » (Docs, Gboard FR) | « Comma » |
+| *(info)* Point | « point » | Mac : « period/point/dot/full stop » ; iPhone : « Period » | Docs FR : « Période » ; Gboard FR : « Point » | « Period » |
+
+Notes qui changent le sens du tableau :
+
+- **Google FR : les commandes de Google Docs ne sont pas des commandes
+  françaises.** La page française dit : « Les commandes vocales sont disponibles
+  en anglais uniquement. Vous devez choisir l'anglais comme langue du document et
+  du compte. » La liste française (« Période », « Virgule »…) est la
+  traduction de la liste anglaise, pas ce qu'on dicte. La version anglaise dit
+  « Voice commands are available only in English. The account language and
+  document language must both be English. » Les deux pages ajoutent que la
+  ponctuation « might not be available in every language ». Pour Google, il n'y
+  a donc **aucune source française** à reprendre ; la colonne ne décrit que ce que la page affiche.
+- **Google ne documente ni guillemets, ni deux-points, ni point-virgule, ni
+  parenthèses** (Docs et Gboard, FR et EN). Seuls six éléments sont listés : period, comma,
+  exclamation point, question mark, new line, new paragraph. Gboard introduit sa
+  liste par « Some phrases you can use are » / « Voici quelques expressions que
+  vous pouvez utiliser », donc la liste n'est pas présentée comme exhaustive ;
+  on ne peut pas en déduire que le reste est refusé.
+- **Apple Mac, variantes régionales.** fr-afri, fr-fr et fr-ca donnent les
+  mêmes commandes, sauf : fr-ca appelle l'ouvrant simplement « guillemet »
+  (le fermant reste « guillemet fermant ») et écrit « arobas » (hors liste).
+  La page fr-afri (l'URL de l'issue) a « guillemet ouvrant ».
+- **Apple iPhone** (page « Commandes de dictée de texte » de l'iPhone,
+  `iph3bf19d7b9`) : « Guillemets » / « Guillemets fermants » (pluriel), « Deux points »,
+  « À la ligne ». Cette page iPhone et la page Mac ne s'accordent donc pas
+  sur le même mot (Mac : « nouvelle ligne », iPhone : « À la ligne »). La page
+  iPhone « Dicter du texte » écrit : « Dites "nouvelle ligne" ou "nouveau
+  paragraphe" » : les deux sont donc comprises.
+- Les pages d'Apple signalent que, pour certaines langues, la dictée ajoute
+  automatiquement une partie de la ponctuation (« Pour certaines langues, Dictée
+  ajoute automatiquement certains signes de ponctuation »).
+- Le tableau Mac contient aussi, hors liste initiale : « guillemet anglais simple
+  ouvrant / fermant », « apostrophe », « crochet ouvrant / fermant », « points de
+  suspension », « tiret », « trait d'union », « arobase », « barre oblique », etc.
+  Rien de cela n'est repris : l'issue interdit d'ajouter des signes.
+
+Sources (toutes consultées le 2026-11-12) :
+
+- Apple, Mac : https://support.apple.com/fr-afri/guide/mac-help/mh40695/mac ,
+  https://support.apple.com/fr-ca/guide/mac-help/mh40695/mac ,
+  https://support.apple.com/fr-fr/guide/mac-help/mh40695/mac ,
+  https://support.apple.com/en-us/guide/mac-help/mh40695/mac
+- Apple, iPhone : https://support.apple.com/fr-ca/guide/iphone/iph3bf19d7b9/ios ,
+  https://support.apple.com/fr-afri/guide/iphone/iph3bf19d7b9/ios ,
+  https://support.apple.com/fr-fr/guide/iphone/iph3bf19d7b9/ios ,
+  https://support.apple.com/en-us/guide/iphone/iph3bf19d7b9/ios ,
+  https://support.apple.com/fr-afri/guide/iphone/dictate-text-iph2c0651d2/ios
+- Google Docs : https://support.google.com/docs/answer/4492226?hl=fr et `?hl=en`
+  (section « Ajouter des signes de ponctuation » / « Add punctuation »)
+- Gboard : https://support.google.com/gboard/answer/2781851?hl=fr et `?hl=en`
+
+### 2. Formulations à accepter (proposition pour l'étape 2.2)
+
+Dans la liste initiale de l'issue seulement. « Source » dit d'où vient la forme :
+A = page d'Apple, G = page de Google, U = usage courant ajouté pour la tolérance
+(non sourcé, à confirmer par les tests de phrases pièges). Le français d'abord ;
+chaque forme s'accepte avec l'article et l'impératif courants (« ouvrir / ouvrez /
+ouvre »).
+
+| Signe | Forme principale | Variantes à accepter | Source / remarque |
+| --- | --- | --- | --- |
+| Guillemet ouvrant `«` / `“` | « ouvrir les guillemets » | « ouvrez / ouvre les guillemets », « ouvrir guillemet(s) », « guillemet ouvrant », « guillemets ouvrants », « guillemet(s) ouvert(s) » | « guillemet ouvrant » : A (Mac). Les formes avec « ouvrir » : U (issue). **Ne pas accepter « guillemet(s) » seul** pour ouvrir, bien qu'Apple (iPhone, Mac fr-ca) le fasse : c'est le mot le plus exposé aux faux positifs (« il a dit guillemets… »). |
+| Guillemet fermant `»` / `”` | « fermer les guillemets » | « fermez / ferme les guillemets », « fermer guillemet(s) », « guillemet fermant », « guillemets fermants », « guillemet(s) fermé(s) » | « guillemet(s) fermant(s) » : A. Autres : U. |
+| Deux-points `:` | « deux-points » | « deux points » | A (Mac, iPhone). Variante sans trait d'union nécessaire : la transcription l'écrit des deux façons. |
+| Point-virgule `;` | « point-virgule » | « point virgule » | A. |
+| Parenthèse ouvrante `(` | « ouvrir la parenthèse » | « ouvrez / ouvre la parenthèse », « ouvrir parenthèse », « parenthèse ouvrante » | « parenthèse ouvrante » : A. « ouvrir la parenthèse » : U (issue). |
+| Parenthèse fermante `)` | « fermer la parenthèse » | « fermez / ferme la parenthèse », « fermer parenthèse », « parenthèse fermante » | idem. |
+| Point d'interrogation `?` | « point d'interrogation » | (aucune) | A, G. |
+| Point d'exclamation `!` | « point d'exclamation » | (aucune) | A, G. |
+| Nouvelle ligne | « nouvelle ligne » | « à la ligne » | « nouvelle ligne » : A (Mac), G ; « à la ligne » : A (iPhone). **Ne pas ajouter « retour à la ligne »** sans test : pas dans les sources. |
+| Nouveau paragraphe | « nouveau paragraphe » | (aucune) | A, G. |
+
+| Signe | Forme principale (EN) | Variantes à accepter (EN) | Source / remarque |
+| --- | --- | --- | --- |
+| Open quote `“` | « open quote » | « open quotes », « begin quote », « begin quotes », « quote » **seul seulement en début ou fin de segment** | « quote » : A, mais très exposé aux faux positifs ; « open quote » / « begin quote » : U. |
+| Close quote `”` | « close quote » | « close quotes », « end quote », « end quotes », « unquote » | « end quote » : A ; « unquote » : U (non sourcé). |
+| Colon `:` | « colon » | (aucune) | A. |
+| Semicolon `;` | « semicolon » | « semi colon » | A. |
+| Open parenthesis `(` | « open parenthesis » | « open paren », « open parentheses » | A ; autres : U. |
+| Close parenthesis `)` | « close parenthesis » | « close paren », « close parentheses » | idem. |
+| Question mark `?` | « question mark » | (aucune) | A, G. |
+| Exclamation mark `!` | « exclamation mark » | « exclamation point » | « exclamation mark » : A (Mac) ; « exclamation point » : A (iPhone), G. |
+| New line | « new line » | « newline » | A, G ; « newline » : U. |
+| New paragraph | « new paragraph » | (aucune) | A, G. |
+
+Notes de conception pour 2.2 :
+
+- Virgule et point restent hors liste (règle de l'issue). Leurs formulations
+  sont consignées ci-dessus pour mémoire seulement.
+- Les formes les plus à risque (« guillemet(s) » seul, « quote » seul, « point
+  virgule ») sont à protéger par les règles de bord de segment et la liste de
+  phrases pièges de l'issue (« j'ai marqué deux points », « c'est un point
+  d'interrogation pour moi »).
+- Google FR n'offrant aucune commande française, l'alignement sur les
+  habitudes prises ailleurs en français se fait sur Apple seulement ; les
+  six commandes que Google comprend en anglais coïncident avec celles d'Apple.
+
+### 3. Règle d'espacement typographique (à vérifier pour 2.2)
+
+**OQLF — confirmée, avec une précision.** Source :
+Vitrine linguistique, « Espacement avant et après les signes de ponctuation et
+les symboles » (dernière mise à jour affichée : 2024),
+https://vitrinelinguistique.oqlf.gouv.qc.ca/22039/la-typographie/espacement/espacement-avant-et-apres-les-signes-de-ponctuation-et-les-symboles .
+Texte de la page : « L'Office québécois de la langue française opte pour
+l'absence d'espace devant le point-virgule, le point d'exclamation et le point
+d'interrogation. Cette pratique, qui est répandue dans l'usage, tend à devenir
+une convention, notamment parce que certains logiciels ne permettent pas
+d'insérer l'espace fine (espace insécable réduite) de façon conviviale […]. Cela
+dit, on peut opter pour l'espace fine lorsqu'elle est disponible. » Le tableau :
+
+| Signe | Avant | Après |
+| --- | --- | --- |
+| `:` | une espace insécable | une espace (sécable) |
+| `:` dans une heure (13:52:45) | pas d'espace | pas d'espace |
+| `;` | pas d'espace ou une espace fine | une espace |
+| `?` | pas d'espace ou une espace fine | une espace |
+| `!` | pas d'espace ou une espace fine | une espace |
+| `«` | une espace | une espace insécable |
+| `»` | une espace insécable | une espace |
+| `(` | une espace | pas d'espace |
+| `)` | pas d'espace | une espace |
+
+Exemples de la page : « Les étapes sont les suivantes␣: planification… »,
+« un "remède miracle␣"␣: un morceau de gingembre! » (␣ = espace insécable).
+La page précise aussi : « On ne met pas d'espace insécable entre une apostrophe
+et un guillemet ouvrant » et « Les mêmes règles typographiques s'appliquent pour
+les guillemets anglais simples […], les guillemets droits doubles ».
+
+Verdict sur la règle citée de mémoire dans l'issue : **exacte** (rien devant
+`;` `?` `!` ; espace insécable devant `:` ; espaces insécables à l'intérieur des
+« »). Deux précisions à reporter dans 2.2 : (a) l'espace fine est **permise**
+au Québec, pas exigée : « rien » est la valeur par défaut, et mettre une espace
+fine insécable (U+202F) avant `;` `?` `!` reste conforme ; (b) le tableau
+distingue l'espace **sécable** après le signe (`:` `;` `?` `!`) de l'espace
+**insécable** à l'intérieur des guillemets, et prévoit l'espace sécable avant `«`
+et après `»`. Le `:` ne prend rien dans une heure (« 13:52 ») : un risque de
+faux espacement si le `:` est produit par une commande vocale entre deux chiffres ;
+à tester. Il n'y a pas de règle pour les parenthèses dans la partie de
+l'issue : le tableau dit pas d'espace après `(` ni avant `)`.
+
+**Usage de France — confirmé par une source reconnue de second rang, pas par
+l'Imprimerie nationale elle-même.**
+
+- Guide « Règles typographiques de base » du CNRS (délégation aux systèmes
+  d'information, 25 novembre 1995, version 1.1),
+  https://www.pharmacie.universite-paris-saclay.fr/sites/default/files/media/2020-09/regles-typographie_cnrs.pdf :
+  `:` `;` `!` `?` : « espace insécable » avant, « espace sécable » après ;
+  `«` : espace sécable avant, espace insécable après ; `»` : espace insécable
+  avant, espace sécable après. Le guide ne parle pas d'espace fine.
+- Wikipédia, « Espace (typographie) »
+  (https://fr.wikipedia.org/wiki/Espace_(typographie)), qui cite le *Lexique de
+  l'Imprimerie nationale* (p. 51, 145-149) : l'espace fine insécable (U+202F) est
+  la forme « requise en français » devant le point-virgule, le point d'exclamation
+  et le point d'interrogation, et le deux-points dans certaines marches
+  typographiques ; « En France et dans la plupart des pays francophones d'Europe,
+  on a pris l'habitude de remplacer l'espace fine insécable par une espace mots
+  insécable » ; l'usage canadien est décrit comme « l'absence d'espace […] excepté
+  devant le deux-points et avec les guillemets, où c'est l'espace mots insécable
+  qui est la norme », ce qui concorde avec l'OQLF. La page note aussi que
+  « l'usage dans la plupart des entreprises de l'industrie graphique française
+  toutefois est d'utiliser l'espace fine insécable aussi avec le deux-points ».
+  Source de second rang : à lire comme un témoignage de l'usage, pas comme une
+  norme.
+
+Règle proposée à implémenter (point de départ pour 2.2, à valider par tests) :
+
+| Locale | `;` `?` `!` | `:` | `«` … `»` | Anglais |
+| --- | --- | --- | --- | --- |
+| Québec (OQLF) | rien devant (option : U+202F) ; espace sécable après | U+00A0 devant ; espace après | `«` + U+00A0 + texte + U+00A0 + `»` | s.o. |
+| France | U+202F (ou U+00A0 à défaut) devant ; espace après | U+00A0 (ou U+202F) devant ; espace après | `«` + U+00A0 + texte + U+00A0 + `»` | s.o. |
+| Anglais | rien devant, espace après | rien devant, espace après | `“`…`”` sans espace intérieure | s.o. |
+
+### Non vérifié
+
+- **Lexique des règles typographiques en usage à l'Imprimerie nationale** :
+  livre, pas de version en ligne trouvée ; l'usage de France n'est confirmé que par
+  un guide du CNRS (1995) et par Wikipédia qui cite le Lexique. Si une valeur
+  exacte du Lexique est exigée (espace fine insécable ou espace insécable avant
+  `;` `?` `!`), elle reste à lire dans l'ouvrage.
+- **Google, commandes françaises** : aucune page officielle consultée ne documente
+  de commande vocale en français pour Docs ; l'aide Gboard française liste six
+  éléments mais le comportement réel de la saisie vocale de Gboard en français
+  (si elle comprend « ouvrir les guillemets ») n'a pas été testé.
+- **Rendu réel** des commandes sur un iPhone ou un téléphone Android : non
+  essayé ; les formulations viennent des pages d'aide, pas d'un essai.
+- Les pages iPhone fr-afri et fr-fr ont été lues pour le tableau des
+  commandes ; leur page « Dicter du texte » (iph2c0651d2) n'a été lue que sur
+  la version fr-afri.
+- Les formes marquées U ne sont pas tirées d'une source officielle.
