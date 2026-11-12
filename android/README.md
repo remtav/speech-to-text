@@ -1,27 +1,151 @@
-# Dictée locale — clavier vocal Android
+# Kalmia Blabla — clavier vocal Android
 
-Clavier Android (IME) dont la seule fonction est la dictée vocale, en français
-et en anglais. La transcription tourne **entièrement sur le téléphone** avec
-[sherpa-onnx](https://github.com/k2-fsa/sherpa-onnx) : ni l'audio ni le texte
-ne quittent l'appareil, le réseau ne sert qu'à télécharger les modèles — sauf
-si vous choisissez vous-même le « Serveur distant » (voir plus bas).
-Spécification : issue #10. Choix de développement : [`DECISIONS.md`](DECISIONS.md).
+> **Kalmia Blabla** — un clavier vocal conçu au Québec, pour le français d'ici.
+> Votre voix est transcrite sur votre téléphone : elle n'est envoyée à personne.
+> Pas de compte, pas de publicité, pas de télémétrie, et un code source ouvert
+> que chacun peut vérifier.
+
+Kalmia Blabla est un clavier Android (IME) dont la seule fonction est la
+dictée vocale. Il est développé au Québec. La transcription tourne
+**entièrement sur le téléphone** avec
+[sherpa-onnx](https://github.com/k2-fsa/sherpa-onnx) : par défaut, ni l'audio ni
+le texte ne quittent l'appareil, et le réseau ne sert qu'à télécharger les
+modèles. La seule exception est un choix de votre part : le « Serveur distant »
+(un serveur que vous choisissez et hébergez vous-même, voir plus bas).
+Spécification : issue #10 ; positionnement et marque : issue #15. Choix de
+développement : [`DECISIONS.md`](DECISIONS.md).
 
 Ce n'est pas un clavier de frappe : on garde son clavier habituel et on
 bascule vers celui-ci pour dicter.
+
+## Ce que l'application apporte
+
+| Plus-value | Ce qui la rend vraie |
+|---|---|
+| **La voix reste sur le téléphone** | La transcription est faite par un modèle exécuté sur l'appareil ; le réseau ne sert qu'à télécharger les modèles. Fonctionne hors ligne une fois un modèle installé. |
+| **Aucun compte, aucune collecte** | L'application ne demande aucun compte et n'a ni publicité ni télémétrie. Rien n'est envoyé par défaut. |
+| **Pensée pour le français québécois** | « Français (Québec) » est présélectionné ; le modèle recommandé a été mesuré sur des voix « Français du Canada » (voir « Vos langues et le modèle recommandé »). |
+| **Transparente et vérifiable** | Code source dans ce dépôt ; chaque modèle est nommé avec son éditeur et sa licence ; chaque fichier téléchargé est vérifié par somme de contrôle SHA-256. |
+| **Sous votre contrôle** | Vous choisissez le modèle, les langues et, si vous le voulez, un serveur personnel. |
+| **Développée au Québec** | Affirmation de l'auteur. |
+
+**Origine des modèles.** Les modèles ne sont pas québécois : Parakeet vient de
+NVIDIA, Qwen3-ASR d'Alibaba, Whisper d'OpenAI, et le petit LLM facultatif de
+nettoyage du texte (désactivé par défaut) passe par MediaPipe, une
+bibliothèque de Google. La souveraineté offerte porte sur les **données** (la
+voix reste sur le téléphone par défaut) et sur le **logiciel** (ouvert,
+conçu ici), pas sur l'origine des modèles. Ce n'est pas une application
+« 100 % québécoise ».
+
+## Pourquoi pas la saisie vocale de Google ?
+
+Cette section décrit ce que fait **cette application**. Elle ne dit pas ce que
+fait la saisie vocale de Google : où son traitement a lieu varie selon la
+fonction, comme le montre l'aide de Gboard (premier lien ci-dessous), et nous
+n'avons pas cherché à le mesurer. Les deux seules affirmations sur Google
+portent un lien vers une source officielle, lue le 2026-11-12.
+
+- **Ici, la transcription se fait sur le téléphone, par un modèle que vous
+  avez téléchargé et que vous choisissez.** Aucun compte n'est demandé, et le
+  code qui le fait est dans ce dépôt, où chacun peut le lire. Un serveur
+  n'intervient que si vous configurez vous-même le « Serveur distant ».
+- **Chez Google, l'endroit du traitement dépend de la fonction.** Sur la page
+  d'aide de Gboard
+  [« Utiliser les fonctionnalités avancées de saisie vocale »](https://support.google.com/gboard/answer/11197787?hl=fr),
+  la saisie vocale avancée indique : « Le texte dicté est conservé sur votre
+  appareil. », tandis que, pour les modifications détaillées par commande
+  vocale, « la transcription de votre commande vocale et le texte du champ de
+  saisie sont envoyés aux serveurs Google » (la page ajoute « Aucune donnée
+  audio n'est envoyée. »). Ce que fait votre téléphone dépend donc de la
+  fonction utilisée ; consultez cette page et les réglages de votre appareil.
+- **La politique de confidentialité de Google** (
+  [policies.google.com/privacy](https://policies.google.com/privacy?hl=fr),
+  version « À compter du 16 octobre 2026 ») est celle de ses services en
+  général : sous « Informations collectées par Google », « Votre activité », elle
+  cite parmi les informations recueillies les « contenus multimédias (comme des
+  images, des fichiers, des contenus audio et des vidéos) issus de vos
+  interactions ». Elle ne dit pas, à cet endroit, que la saisie vocale en
+  fait partie ; lisez-la pour savoir ce qui s'applique à votre usage.
+
+Nous n'affirmons rien d'autre sur Google : ni précision, ni vitesse, ni
+mode hors ligne, ni usage publicitaire de la voix, faute de source officielle
+lue qui le dise. Si vous voulez comparer, le test est simple : dictez la même
+phrase avec les deux et jugez le texte.
+
+## Vos langues et le modèle recommandé
+
+Sur l'écran de configuration, l'étape **« 3. Vos langues »** propose onze
+langues en cases à cocher : français (Québec), français (France), anglais,
+mandarin, hindi, espagnol, arabe, bengali, portugais, russe et ourdou.
+« Français (Québec) » est présélectionné et il reste toujours au moins une
+langue cochée. Le choix se modifie aussi dans les Réglages. Il sert à :
+
+- **recommander un modèle** : la carte du modèle recommandé porte le badge
+  « Recommandé pour vos langues » et une phrase de raison. Un modèle qui ne
+  couvre pas une langue cochée affiche un avertissement écrit ; rien n'est
+  bloqué, tous les modèles restent téléchargeables ;
+- **régler la langue des moteurs** : avec une seule langue (Québec et France
+  comptent pour `fr`), Whisper local et le serveur distant la reçoivent ;
+  avec plusieurs, la langue est détectée automatiquement.
+
+La table de recommandation (`stt/ModelRecommendation.kt`) se lit de haut en
+bas : Parakeet si toutes vos langues font partie de ses 25 langues
+européennes ; sinon Qwen3-ASR s'il les couvre toutes ; sinon Whisper. La
+couverture vient des fiches des modèles (détail et sources dans `DECISIONS.md`).
+Bengali et ourdou ne sont couverts que par Whisper, et « couvert » ne veut pas
+dire « bien transcrit ».
+
+**Mesure en français québécois, et ses limites.** Six courts extraits Common
+Voice 22.0 (CC0) portant l'accent déclaré « Français du Canada », 59 mots au
+total, ont été transcrits par chaque modèle sur l'ordinateur de la CI :
+
+| Modèle | Mots erronés sur 59 |
+|---|---|
+| Parakeet TDT 0.6b v3 | 6,8 % |
+| Whisper large-v3-turbo | 10,2 % |
+| Qwen3-ASR 0.6B | 13,6 % |
+
+C'est un indice, pas une preuve : l'échantillon est minuscule (un seul clip
+fait échouer les trois modèles) ; une des erreurs de Whisper est un artefact de
+notation (« 18 » contre « dix-huit ») ; le champ d'accent « Français du
+Canada » ne distingue pas le Québec des autres provinces ; **personne n'a
+encore écouté ces six extraits** ; les phrases viennent de Wikipédia et de
+romans, donc la mesure porte sur l'accent et non sur le vocabulaire d'ici ; et
+elle n'a pas été faite sur un téléphone. La recommandation le dit : « mesuré
+sur six courts extraits ». Vous pouvez refaire la mesure avec votre propre voix
+dans **Comparer les modèles**.
+
+## Apparence
+
+L'interface reprend l'image de marque de Kalmia : fond « papier », texte
+« encre », vert et accent « fleur », polices Newsreader et IBM Plex Mono
+embarquées dans l'application (licence SIL OFL, aucun service de polices en
+ligne), angles droits et boutons à ombre décalée. Le thème suit le réglage
+Système, Clair ou Sombre. L'erreur reste en rouge et s'accompagne toujours d'un
+texte ou d'une icône.
 
 ## Aperçu
 
 Captures prises automatiquement par la CI sur un émulateur Pixel 6
 (`ScreenshotTest`) ; le texte vient d'un moteur de test, pas d'un modèle.
+Chaque écran existe en clair (`-light`) et en sombre (`-dark`).
 
-| Prêt | À l'écoute | Texte inséré | Thème sombre |
-|---|---|---|---|
-| ![Clavier prêt](docs/screenshots/keyboard-idle-light.png) | ![Clavier à l'écoute](docs/screenshots/keyboard-listening-light.png) | ![Texte inséré](docs/screenshots/keyboard-text-light.png) | ![Clavier sombre](docs/screenshots/keyboard-listening-dark.png) |
-
-| Configuration | Réglages | Comparaison des modèles |
+| Clavier prêt | À l'écoute | Texte inséré |
 |---|---|---|
-| ![Écran de configuration](docs/screenshots/setup-dark.png) | ![Réglages](docs/screenshots/settings-dark.png) | ![Comparaison](docs/screenshots/compare-light.png) |
+| ![Clavier prêt, clair](docs/screenshots/keyboard-idle-light.png) | ![À l'écoute, clair](docs/screenshots/keyboard-listening-light.png) | ![Texte inséré, clair](docs/screenshots/keyboard-text-light.png) |
+| ![Clavier prêt, sombre](docs/screenshots/keyboard-idle-dark.png) | ![À l'écoute, sombre](docs/screenshots/keyboard-listening-dark.png) | ![Texte inséré, sombre](docs/screenshots/keyboard-text-dark.png) |
+
+Configuration (accueil et étapes ; « Vos langues » ; modèle recommandé avec son badge) :
+
+| Accueil | Vos langues | Modèles |
+|---|---|---|
+| ![Configuration, clair](docs/screenshots/setup-light.png) | ![Vos langues, clair](docs/screenshots/setup-languages-light.png) | ![Modèles, clair](docs/screenshots/setup-models-light.png) |
+| ![Configuration, sombre](docs/screenshots/setup-dark.png) | ![Vos langues, sombre](docs/screenshots/setup-languages-dark.png) | ![Modèles, sombre](docs/screenshots/setup-models-dark.png) |
+
+| Réglages | Comparaison des modèles | Diagnostic serveur |
+|---|---|---|
+| ![Réglages, clair](docs/screenshots/settings-light.png) | ![Comparaison, clair](docs/screenshots/compare-light.png) | ![Diagnostic, clair](docs/screenshots/diagnostic-light.png) |
+| ![Réglages, sombre](docs/screenshots/settings-dark.png) | ![Comparaison, sombre](docs/screenshots/compare-dark.png) | ![Diagnostic, sombre](docs/screenshots/diagnostic-dark.png) |
 
 ## Installation
 
@@ -30,11 +154,12 @@ Captures prises automatiquement par la CI sur un émulateur Pixel 6
    Les releases sont signées avec la clé privée du projet : une nouvelle
    version s'installe par-dessus l'ancienne, et un APK signé par quelqu'un
    d'autre est refusé comme mise à jour.
-2. Ouvrir **Dictée locale** :
-   - « Activer » le clavier « Dictée locale (voix) » dans les réglages Android ;
+2. Ouvrir **Kalmia Blabla** :
+   - « Activer » le clavier « Kalmia Blabla (voix) » dans les réglages Android ;
    - « Autoriser le micro » (un clavier ne peut pas demander la permission lui-même) ;
+   - cocher vos langues (étape « Vos langues ») : le modèle recommandé est mis en avant ;
    - télécharger au moins un modèle (Wi-Fi conseillé, 0,7 à 1 Go chacun).
-3. Dans n'importe quelle application, basculer vers le clavier Dictée locale
+3. Dans n'importe quelle application, basculer vers le clavier Kalmia Blabla
    (icône clavier de la barre de navigation, ou touche micro de votre clavier
    habituel) et appuyer sur le micro. Appuyer de nouveau pour arrêter.
 
@@ -104,7 +229,7 @@ avec un *service token* :
    dont l'action est **Service Auth** et qui inclut ce service token. Avec une
    politique « Allow » ordinaire, Access renvoie le client vers sa page de
    connexion (redirection 302) au lieu de le laisser passer.
-3. Dans Dictée locale → Réglages → Serveur distant : adresse `https://…`,
+3. Dans Kalmia Blabla → Réglages → Serveur distant : adresse `https://…`,
    puis « Cloudflare Access Client ID » et « Cloudflare Access Client Secret ».
    Les en-têtes `CF-Access-Client-Id` et `CF-Access-Client-Secret` sont
    envoyés sur toutes les requêtes dès que les deux champs sont remplis. Le

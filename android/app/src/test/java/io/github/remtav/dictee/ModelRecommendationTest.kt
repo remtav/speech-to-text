@@ -45,7 +45,8 @@ class ModelRecommendationTest {
     @Test fun quebecFrenchAloneRecommendsParakeet() {
         val rec = ModelRecommendations.recommend(setOf(DictationLanguage.FRENCH_QUEBEC))
         assertEquals(ModelCatalog.parakeet, rec.model)
-        assertTrue(rec.reason, rec.reason.contains("observation"))
+        assertTrue(rec.reason, rec.reason.contains("mesuré sur six courts extraits"))
+        assertTrue(rec.reason, !rec.reason.contains("observation"))
     }
 
     @Test fun neverParakeetWithALanguageOutsideItsCoverage() {

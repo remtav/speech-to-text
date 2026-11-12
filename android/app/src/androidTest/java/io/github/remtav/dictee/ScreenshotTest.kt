@@ -1,14 +1,20 @@
 package io.github.remtav.dictee
 
 import android.content.Intent
+import android.view.View
+import android.widget.ScrollView
 import androidx.test.core.app.ActivityScenario
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import io.github.remtav.dictee.dictation.DictationState
 import io.github.remtav.dictee.ime.DicteeImeService
 import io.github.remtav.dictee.settings.ThemeMode
+import io.github.remtav.dictee.stt.DictationLanguage
+import io.github.remtav.dictee.stt.ModelCatalog
 import io.github.remtav.dictee.ui.CompareActivity
+import io.github.remtav.dictee.ui.DiagnosticActivity
 import io.github.remtav.dictee.ui.SettingsActivity
 import io.github.remtav.dictee.ui.SetupActivity
+import io.github.remtav.dictee.ui.languageTag
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -45,6 +51,25 @@ class ScreenshotTest : ImeTestBase() {
         DicteeImeService.instance?.get()?.let { svc -> onMain { svc.rebuildInputView() } }
     }
 
+    /**
+     * Scrolls the screen so the view carrying [tag] sits near the top, [above]
+     * dp below the top edge (to leave its heading in the picture).
+     */
+    private fun ActivityScenario<*>.scrollToTag(tag: String, above: Int) {
+        onActivity { a ->
+            val target = checkNotNull(a.window.decorView.findViewWithTag<View>(tag)) { "no view tagged $tag" }
+            val scroll = generateSequence(target.parent) { it.parent }.filterIsInstance<ScrollView>().first()
+            val content = scroll.getChildAt(0)
+            var y = 0
+            var v: View = target
+            while (v !== content) {
+                y += v.top
+                v = v.parent as View
+            }
+            scroll.scrollTo(0, maxOf(0, y - (above * a.resources.displayMetrics.density).toInt()))
+        }
+    }
+
     @Test
     fun keyboard() {
         for (mode in listOf(ThemeMode.LIGHT, ThemeMode.DARK)) {
@@ -73,11 +98,23 @@ class ScreenshotTest : ImeTestBase() {
         for (mode in listOf(ThemeMode.LIGHT, ThemeMode.DARK)) {
             val suffix = mode.name.lowercase()
             setTheme(mode)
-            ActivityScenario.launch(SetupActivity::class.java).use { shot("setup-$suffix") }
+            // Setup: the top (welcome text, steps), then the "Vos langues" step
+            // and the model card carrying the "Recommandé" badge (the screen is
+            // taller than the phone). Quebec French is preselected: Parakeet is
+            // the recommended model. No network, no model downloaded.
+            ActivityScenario.launch(SetupActivity::class.java).use { s ->
+                shot("setup-$suffix")
+                s.scrollToTag(languageTag(DictationLanguage.FRENCH_QUEBEC), above = 120)
+                shot("setup-languages-$suffix")
+                s.scrollToTag(SetupActivity.modelCardTag(ModelCatalog.parakeet), above = 24)
+                shot("setup-models-$suffix")
+            }
             ActivityScenario.launch(SettingsActivity::class.java).use { shot("settings-$suffix") }
             ActivityScenario.launch<CompareActivity>(Intent(context, CompareActivity::class.java)).use {
                 shot("compare-$suffix")
             }
+            // Not configured: the screen as first opened, nothing is sent anywhere.
+            ActivityScenario.launch(DiagnosticActivity::class.java).use { shot("diagnostic-$suffix") }
         }
     }
 }

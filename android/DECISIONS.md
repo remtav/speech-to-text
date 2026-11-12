@@ -944,3 +944,77 @@ texte de corps seulement.
    éditorial l'exige.
 7. Aucune capture n'a été produite ici (pas d'émulateur) ; les captures claires et sombres sont refaites à l'étape
    1.4 et en CI. Le test `ScreenshotTest` n'a pas changé et reste compilable.
+
+## Issue #15, lot 1 — étape 1.4 : README, captures
+
+### README (`android/README.md`)
+
+Nouveau nom partout (plus aucune occurrence de « Dictée locale » dans
+`android/README.md`, `README.md`, `app/src/main`) ; en-tête repris de la
+formulation de l'issue ; tableau des plus-values ; origine des modèles dite
+simplement (NVIDIA, Alibaba, OpenAI, MediaPipe de Google pour le LLM
+facultatif) ; sections « Vos langues et le modèle recommandé » (avec la mesure
+et ses limites : 6 extraits, 59 mots, non écoutés, hors téléphone) et
+« Apparence ». Le `README.md` de la racine (serveur) ne cite pas l'ancien nom.
+« Rien ne quitte le téléphone » est écrit « par défaut » : le serveur distant
+facultatif existe. Le dépôt n'a pas de fichier de licence : le README dit
+« code source dans ce dépôt » et non un nom de licence.
+
+### Sources Google consultées (2026-11-12, lues par WebFetch)
+
+1. `https://support.google.com/gboard/answer/11197787?hl=fr`, « Utiliser les
+   fonctionnalités avancées de saisie vocale - Aide Gboard » : « Le texte dicté
+   est conservé sur votre appareil. » ; pour les modifications détaillées par
+   commande vocale, « la transcription de votre commande vocale et le texte du
+   champ de saisie sont envoyés aux serveurs Google » et « Aucune donnée audio
+   n'est envoyée. » ; « Corriger » est une exception ; outils d'écriture « sur
+   l'appareil ». Sert à une seule affirmation : l'endroit du traitement dépend
+   de la fonction.
+2. `https://policies.google.com/privacy?hl=fr`, « Règles de confidentialité »,
+   « À compter du 16 octobre 2026 », section « Informations collectées par
+   Google » > « Votre activité » : « Contenus multimédias (comme des images, des
+   fichiers, des contenus audio et des vidéos) issus de vos interactions ».
+   Citée telle quelle, en précisant qu'elle vise les services de Google en
+   général et ne dit pas que la saisie vocale en fait partie.
+
+Les résumés viennent d'un outil de lecture de pages (citations recopiées par
+lui, non vérifiées à la main) : les citations sont à relire à l'occasion.
+
+### Volontairement non affirmé
+
+Faute de source officielle lue qui le dise, le README n'écrit rien sur : la
+précision de la saisie vocale de Google (français québécois compris), sa
+vitesse, un mode hors ligne (la page Gboard lue n'en décrit pas), l'usage de la
+voix à des fins publicitaires, la conservation de l'audio, un compte
+obligatoire, ni « Google envoie votre voix à ses serveurs ». Pages essayées sans
+résultat : `support.google.com/accounts/answer/10000041` (404) ; la page
+`support.google.com/gboard/answer/2781851` ne dit rien du hors ligne ni de
+l'envoi de l'audio. La section « Pourquoi pas la saisie vocale de Google ? »
+décrit donc surtout ce que fait cette application.
+
+### Captures (`ScreenshotTest`)
+
+Noms conservés (`<écran>-<light|dark>.png`), manquants ajoutés. Fichiers
+attendus dans `android/docs/screenshots/` (18) :
+`keyboard-idle`, `keyboard-listening`, `keyboard-text`, `setup`,
+`setup-languages`, `setup-models`, `settings`, `compare`, `diagnostic`, chacun
+en `-light` et en `-dark` (soit 18 ; les captures existantes datent de
+l'ancien thème et sont remplacées). L'écran de configuration est plus haut que
+le téléphone : `setup` montre l'accueil et les étapes, `setup-languages` est
+défilé sur l'étape « Vos langues », `setup-models` sur la carte Parakeet avec
+son badge. Défilement par l'étiquette des vues (`scrollToTag`) ; aucun réseau,
+aucun modèle téléchargé (le diagnostic s'ouvre non configuré). Non exécuté
+ici (pas d'émulateur) : compilé par `assembleDebugAndroidTest`, exécuté en CI.
+
+### Libellé de la recommandation
+
+`quebecFrenchBasis` passe à `MESURE` ; la raison affichée devient « Parakeet
+couvre vos langues et, mesuré sur six courts extraits, transcrit mieux le
+français québécois (671 Mo, le plus léger). » (`RecommendationBasis.phrase`).
+`ModelRecommendationTest` adapté.
+
+### Release
+
+Dans `.github/workflows/android.yml`, seuls le nom et le texte de la release
+changent (« Kalmia Blabla », phrase de positionnement) ; commit séparé, car un
+workflow peut être refusé au push.

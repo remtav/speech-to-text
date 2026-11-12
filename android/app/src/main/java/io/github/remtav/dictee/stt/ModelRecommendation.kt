@@ -33,9 +33,10 @@ enum class DictationLanguage(
 }
 
 /** What backs a recommendation: the user's observation, or a measured word error rate. */
-enum class RecommendationBasis(val word: String) {
-    OBSERVATION("observation"),
-    MESURE("mesure"),
+enum class RecommendationBasis(val word: String, val phrase: String) {
+    OBSERVATION("observation", "d'après une observation"),
+    /** Six short Common Voice excerpts, 59 words (DECISIONS.md, step 1.2): said as such. */
+    MESURE("mesure", "mesuré sur six courts extraits"),
 }
 
 /** A model to put forward, with the sentence that justifies it. */
@@ -44,11 +45,11 @@ data class ModelRecommendation(val model: ModelSpec, val reason: String)
 object ModelRecommendations {
 
     /**
-     * Basis of "Parakeet is better in Quebec French". It is the user's
-     * observation until step 1.2 has numbers; switch to [RecommendationBasis.MESURE]
-     * once the WER per model on the Quebec excerpts is in DECISIONS.md.
+     * Basis of "Parakeet is better in Quebec French": the WER per model on
+     * the six Quebec excerpts (DECISIONS.md, step 1.2: 6.8 % against 10.2 % and
+     * 13.6 %). Small sample, so the wording states its scope.
      */
-    val quebecFrenchBasis: RecommendationBasis = RecommendationBasis.OBSERVATION
+    val quebecFrenchBasis: RecommendationBasis = RecommendationBasis.MESURE
 
     private val parakeetLanguages = setOf(
         DictationLanguage.FRENCH_QUEBEC, DictationLanguage.FRENCH_FRANCE,
@@ -110,7 +111,7 @@ object ModelRecommendations {
         if (outsideParakeet.isEmpty()) {
             val quebec = DictationLanguage.FRENCH_QUEBEC in chosen
             val reason = if (quebec) {
-                "Parakeet couvre vos langues et, sur ${quebecFrenchBasis.word}, " +
+                "Parakeet couvre vos langues et, ${quebecFrenchBasis.phrase}, " +
                     "transcrit mieux le français québécois (671 Mo, le plus léger)."
             } else {
                 "Parakeet couvre vos langues et c'est le plus léger des trois (671 Mo)."
