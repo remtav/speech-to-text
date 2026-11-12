@@ -1578,3 +1578,68 @@ pauses ; « deux-points » suivi d'une liste ; des phrases ordinaires contenant 
 points », « point d'interrogation », « guillemets » ; une dictée en France (réglage
 « Français (France) » seul) pour voir les insécables devant `;` `?` `!` ; l'affichage des
 insécables dans les applications courantes (messagerie, courriel).
+
+## Issue #15, lot 2 — étape 2.4 : commandes en mode serveur, README
+
+Code : `app/src/test/.../ServerCommandsTest.kt` (nouveau). Aucun changement de code
+applicatif ni de serveur (prompt, modèle, garde-fou : hors portée de l'issue).
+`android/README.md` : section « Dicter la ponctuation » (commandes du lot 2, règle,
+faux positifs, doublons, typographie, limites dont celle du mode serveur), lignes
+d'image `howto-light.png` / `howto-dark.png` (PNG déposés après la CI, étape 2.3).
+
+### Ce que fait chaque mode
+
+- **Dictée entière du clavier (modèle « Serveur », issue #13)** : c'est le seul chemin du
+  clavier avec le serveur (`DicteeApp.kt` : `whole` posé pour `ModelFamily.REMOTE`).
+  `RemoteEngine.transcribeDictation` demande `polish=true` (API de ce dépôt) et renvoie
+  `texts = [polished_text ou text]` (`serverResult`). `DictationController.transcribeWhole`
+  passe chaque texte par `TextPipeline.prepare` puis `apply` : **les commandes sont donc
+  interprétées sur le téléphone, après le polissage**, avec la typographie des langues
+  choisies. Si le polissage échoue ou est rejeté, le texte brut suit le même chemin.
+  API compatible OpenAI : une requête, sans polissage, même pipeline.
+- **Repli local** (serveur en panne) : segments transcrits localement, pipeline normal.
+- **Segment par segment transcrit par le serveur** (`RemoteEngine.transcribe`) : n'est plus
+  utilisé par la dictée du clavier ; seulement l'écran de comparaison (sans pipeline).
+  Il envoie `polish` non défini (le serveur applique alors `WHISPER_POLISH`) mais ne lit
+  que `text`, toujours brut (`app/main.py`, docstring de la route). Le chemin reste testé.
+
+### Ce que le polissage du serveur peut faire aux commandes
+
+Prompt (`app/polish.py:96-130`) : il ne parle pas des commandes ; règle 3, « corriger la
+ponctuation… en français, mettre une espace avant ? ! : et ; et laisser les guillemets
+tels que dictés ». Le LLM peut donc écrire lui-même `:` `?` `!` `;` ou « nouvelle ligne »
+en saut de ligne, ou laisser les mots. Le garde-fou `safety_check` (même fichier) juge des
+mots, pas de la ponctuation. Mesuré avec la fonction réelle sur des paires brut/poli
+(non conservées dans un test : elles dépendent du serveur) :
+
+| Remplacement par le LLM | Résultat du garde-fou |
+| --- | --- |
+| « deux-points » → `:` | rejeté dans tous les cas essayés : « deux » est un mot-nombre (`dropped_fact`) |
+| « ouvrir… fermer les guillemets » → « … » | rejeté (`dropped_content` / `short_dropped`) |
+| « point d'interrogation » en fin de dictée → `?` | rejeté (`ending`) |
+| « point d'interrogation », « point d'exclamation », « point-virgule », « nouvelle ligne » au milieu d'une dictée longue (plus de 8 mots) → signe | **accepté** (deux mots de contenu sur beaucoup) |
+| mots laissés tels quels | accepté : ce sont alors des commandes côté téléphone |
+
+Conséquences, fixées par `ServerCommandsTest` :
+
+1. Mots de commande dans le texte reçu (poli ou brut) : interprétés, typographie d'ici.
+2. Signe déjà placé par le LLM : conservé tel quel (`Il a dit : « bonjour »`, espaces
+   ordinaires), jamais de doublon ; **pas de typographie Québec** (ni insécable, ni retrait
+   de l'espace avant `?` `!` `;`), parce que seuls les signes dictés sont typographiés
+   (décision 2.2). Le LLM écrit en outre une espace avant `?` `!` `;` même au Québec.
+3. Signe du LLM suivi des mots de la commande : un seul signe (`DuplicateSign`).
+4. Segments : le polissage éventuel du serveur est ignoré, les commandes s'appliquent.
+
+Pas de correction côté Android : normaliser la ponctuation du texte poli, ou retirer le
+polissage quand des commandes sont dictées, changerait le texte de tous et dépasse la
+portée. **Limite documentée** dans le README (« Mode serveur »). Pistes pour plus tard,
+hors lot 2 : demander au serveur de laisser intactes les formulations de la table, ou lui
+passer l'option `commands=off`.
+
+### À essayer avec son serveur (humain)
+
+Dicter, modèle « Serveur » avec polissage actif : (a) « il a dit deux-points ouvrir les
+guillemets bonjour fermer les guillemets » ; (b) une phrase longue avec « point
+d'exclamation » au milieu ; (c) « nouvelle ligne » au milieu d'une dictée longue ;
+comparer l'état « polissage appliqué » du diagnostic avec le texte inséré, et voir si les
+espaces avant `? ! :` sont celles du Québec.
