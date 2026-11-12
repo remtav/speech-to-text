@@ -17,12 +17,19 @@ import io.github.remtav.dictee.cleanup.LlmCatalog
 import io.github.remtav.dictee.settings.CleanupMode
 import io.github.remtav.dictee.settings.ThemeMode
 import io.github.remtav.dictee.stt.Acceleration
+import io.github.remtav.dictee.stt.ModelCatalog
+import io.github.remtav.dictee.stt.RemoteApi
+import io.github.remtav.dictee.stt.RemoteEngine
 import java.util.Locale
 
 /** Dictation preferences (lots 2 and 3). Every optional feature can be turned off. */
 class SettingsActivity : AppCompatActivity() {
     private lateinit var app: DicteeApp
     private lateinit var vocabulary: EditText
+    private lateinit var remoteUrl: EditText
+    private lateinit var remoteKey: EditText
+    private lateinit var remoteModel: EditText
+    private lateinit var remoteStatus: android.widget.TextView
     private lateinit var llmBox: LinearLayout
     private val refresh: () -> Unit = { renderLlm() }
 
@@ -71,6 +78,8 @@ class SettingsActivity : AppCompatActivity() {
         col.radio(Acceleration.entries.map { it.label }, s.acceleration.ordinal) { s.acceleration = Acceleration.entries[it] }
         col.body(getString(R.string.settings_acceleration_help), small = true)
 
+        buildRemoteSection(col)
+
         col.heading(getString(R.string.settings_cleanup))
         col.body(getString(R.string.settings_cleanup_help), small = true)
         col.radio(CleanupMode.entries.map { it.label }, s.cleanupMode.ordinal) {
@@ -90,11 +99,80 @@ class SettingsActivity : AppCompatActivity() {
 
     override fun onPause() {
         Downloads.removeListener(refresh)
+        saveRemote()
         if (app.settings.vocabularyText != vocabulary.text.toString()) {
             app.settings.vocabularyText = vocabulary.text.toString()
             app.releaseCleaner()
         }
         super.onPause()
+    }
+
+    private fun buildRemoteSection(col: LinearLayout) {
+        val s = app.settings
+        col.heading(getString(R.string.settings_remote))
+        col.body(getString(R.string.settings_remote_help), small = true)
+        fun field(hintText: String, value: String, type: Int) = EditText(this).apply {
+            hint = hintText
+            setText(value)
+            inputType = type
+            isSingleLine = true
+        }.also { col.addView(it) }
+        remoteUrl = field("http://192.168.1.10:8081", s.remoteUrl,
+            InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_URI)
+        col.body(getString(R.string.settings_remote_api), small = true)
+        col.radio(RemoteApi.entries.map { it.label }, s.remoteApi.ordinal) { s.remoteApi = RemoteApi.entries[it] }
+        remoteModel = field(getString(R.string.settings_remote_model_hint), s.remoteModel, InputType.TYPE_CLASS_TEXT)
+        remoteKey = field(getString(R.string.settings_remote_key_hint), s.remoteApiKey,
+            InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD)
+        col.body(getString(R.string.settings_remote_language), small = true)
+        val langs = listOf("" to getString(R.string.settings_remote_lang_auto), "fr" to "Français", "en" to "English")
+        col.radio(langs.map { it.second }, langs.indexOfFirst { it.first == s.remoteLanguage }.coerceAtLeast(0)) {
+            s.remoteLanguage = langs[it].first
+        }
+        col.body(getString(R.string.settings_remote_fallback), small = true)
+        val fallbacks = listOf("" to getString(R.string.settings_remote_no_fallback)) +
+            ModelCatalog.all.map { it.id to it.displayName }
+        col.radio(fallbacks.map { it.second }, fallbacks.indexOfFirst { it.first == s.remoteFallbackId }.coerceAtLeast(0)) {
+            s.remoteFallbackId = fallbacks[it].first
+        }
+        col.button(getString(R.string.settings_remote_test), outlined = true) { testRemote() }
+        remoteStatus = col.body("", small = true)
+        updateRemoteWarning()
+    }
+
+    private fun saveRemote() {
+        val s = app.settings
+        s.remoteUrl = remoteUrl.text.toString()
+        s.remoteApiKey = remoteKey.text.toString()
+        s.remoteModel = remoteModel.text.toString()
+        // Using the server needs a valid address; never leave it selected without one.
+        if (s.activeModel.family == io.github.remtav.dictee.stt.ModelFamily.REMOTE && !s.remoteConfig().isConfigured) {
+            s.activeModelId = ModelCatalog.default.id
+        }
+    }
+
+    private fun updateRemoteWarning() {
+        val c = app.settings.remoteConfig()
+        remoteStatus.text = when {
+            !c.isConfigured && app.settings.remoteUrl.isNotBlank() -> getString(R.string.settings_remote_invalid)
+            c.isInsecurePublic -> getString(R.string.settings_remote_insecure)
+            else -> ""
+        }
+    }
+
+    private fun testRemote() {
+        saveRemote()
+        remoteStatus.text = getString(R.string.settings_remote_testing)
+        val config = app.settings.remoteConfig()
+        kotlin.concurrent.thread(name = "remote-check") {
+            val r = RemoteEngine.check(config)
+            runOnUiThread {
+                remoteStatus.text = r.fold(
+                    { getString(R.string.settings_remote_ok, it) },
+                    { getString(R.string.settings_remote_failed, it.message) },
+                ) + if (config.isInsecurePublic) "\n" + getString(R.string.settings_remote_insecure) else ""
+            }
+        }
     }
 
     private fun renderLlm() {

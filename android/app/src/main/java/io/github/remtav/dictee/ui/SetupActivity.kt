@@ -112,6 +112,34 @@ class SetupActivity : AppCompatActivity() {
     private fun renderModels() {
         modelsBox.removeAllViews()
         for (spec in ModelCatalog.all) renderModel(spec)
+        renderRemote()
+    }
+
+    /** The user's server, shown as one more model once its address is set in the settings. */
+    private fun renderRemote() {
+        val spec = ModelCatalog.remote
+        val card = modelsBox.card()
+        val config = app.settings.remoteConfig()
+        card.addView(RadioButton(this).apply {
+            text = spec.displayName
+            isChecked = app.settings.activeModelId == spec.id
+            isEnabled = config.isConfigured
+            setOnClickListener {
+                app.settings.activeModelId = spec.id
+                renderModels()
+            }
+        })
+        card.body(spec.description, small = true)
+        card.body(
+            if (config.isConfigured) getString(R.string.setup_remote_configured, config.normalizedBase())
+            else getString(R.string.setup_remote_not_configured),
+            small = true,
+        )
+        card.row().apply {
+            button(getString(R.string.setup_remote_configure), outlined = true) {
+                startActivity(Intent(this@SetupActivity, SettingsActivity::class.java))
+            }
+        }
     }
 
     private fun renderModel(spec: ModelSpec) {

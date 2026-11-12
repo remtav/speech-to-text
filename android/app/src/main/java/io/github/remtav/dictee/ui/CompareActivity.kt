@@ -131,7 +131,7 @@ class CompareActivity : AppCompatActivity() {
         if (busy) return
         val samples = references.filter { it.first.isChecked }.map { it.second }.toMutableList()
         recording?.let { samples += BenchSample("enregistrement", "?", it, null) }
-        val models = ModelCatalog.all.filter { app.isInstalled(it) }
+        val models = ModelCatalog.selectable.filter { app.isInstalled(it) }
         if (models.isEmpty() || samples.isEmpty()) {
             Toast.makeText(this, R.string.compare_nothing, Toast.LENGTH_LONG).show()
             return
@@ -141,7 +141,7 @@ class CompareActivity : AppCompatActivity() {
         resultsBox.removeAllViews()
         // Free the keyboard's model: measurements start from a clean slate.
         app.engines.release()
-        val bench = Benchmark(app.engineFactory(), { app.store.dirFor(it.id) }, app.settings.engineOptions())
+        val bench = Benchmark(app.engineFactory(), { app.store.dirFor(it.id) }, app.engineOptions(io.github.remtav.dictee.stt.ModelCatalog.remote).copy(remote = app.settings.remoteConfig().takeIf { it.isConfigured }, remoteFallback = null))
         thread(name = "compare-run") {
             val results = ArrayList<ModelResult>()
             for (spec in models) {

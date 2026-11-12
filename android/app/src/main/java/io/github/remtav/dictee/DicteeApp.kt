@@ -19,7 +19,10 @@ import io.github.remtav.dictee.settings.CleanupMode
 import io.github.remtav.dictee.settings.ThemeMode
 import io.github.remtav.dictee.stt.EngineManager
 import io.github.remtav.dictee.stt.ModelStore
-import io.github.remtav.dictee.stt.SherpaEngine
+import io.github.remtav.dictee.stt.DefaultEngineFactory
+import io.github.remtav.dictee.stt.EngineOptions
+import io.github.remtav.dictee.stt.ModelFamily
+import io.github.remtav.dictee.stt.ModelSpec
 import io.github.remtav.dictee.stt.SttEngineFactory
 import io.github.remtav.dictee.text.RuleCleaner
 import java.io.File
@@ -65,11 +68,17 @@ class DicteeApp : Application() {
         )
     }
 
-    fun isInstalled(spec: io.github.remtav.dictee.stt.ModelSpec) =
-        TestHooks.assumeInstalled || store.isInstalled(spec)
+    fun isInstalled(spec: ModelSpec): Boolean = when {
+        spec.family == ModelFamily.REMOTE -> settings.remoteConfig().isConfigured
+        else -> TestHooks.assumeInstalled || store.isInstalled(spec)
+    }
 
     /** Engine factory in effect (scripted in tests). */
-    fun engineFactory(): SttEngineFactory = TestHooks.engineFactory ?: SherpaEngine.factory
+    fun engineFactory(): SttEngineFactory =
+        TestHooks.engineFactory ?: DefaultEngineFactory { store.dirFor(it.id) }
+
+    fun engineOptions(spec: ModelSpec = settings.activeModel): EngineOptions =
+        settings.engineOptions(spec) { isInstalled(it) }
 
     fun newVad(): VoiceActivityDetector {
         val params = TestHooks.vadParams ?: VadParams(minSilenceSeconds = settings.pauseSeconds)
@@ -106,7 +115,7 @@ class DicteeApp : Application() {
         val spec = settings.activeModel
         if (!isInstalled(spec)) return null to "Modèle ${spec.shortName} non installé : ouvrez les réglages"
         engines.factory = engineFactory()
-        val options = settings.engineOptions()
+        val options = engineOptions(spec)
         engines.load(spec, options)
         val vad = try {
             newVad()
@@ -124,7 +133,8 @@ class DicteeApp : Application() {
             vad = vad,
             pipeline = pipeline,
             transcribe = { samples -> engines.use(spec, options) { it.transcribe(samples) } },
-            partials = settings.partials,
+            // A provisional decode per 0.7 s would be one HTTP request each: off for the server.
+            partials = settings.partials && spec.family != ModelFamily.REMOTE,
         ) to null
     }
 

@@ -5,6 +5,9 @@ import android.content.SharedPreferences
 import io.github.remtav.dictee.stt.Acceleration
 import io.github.remtav.dictee.stt.EngineOptions
 import io.github.remtav.dictee.stt.ModelCatalog
+import io.github.remtav.dictee.stt.ModelFamily
+import io.github.remtav.dictee.stt.RemoteApi
+import io.github.remtav.dictee.stt.RemoteConfig
 import io.github.remtav.dictee.stt.ModelSpec
 import io.github.remtav.dictee.text.Vocabulary
 
@@ -84,9 +87,55 @@ class AppSettings(context: Context) {
         get() = prefs.getInt("keep_loaded_minutes", 5)
         set(v) = prefs.edit().putInt("keep_loaded_minutes", v.coerceIn(0, 60)).apply()
 
-    fun engineOptions(): EngineOptions = EngineOptions(
-        numThreads = threads,
-        acceleration = acceleration,
-        hotwords = vocabulary.favoured,
+    // ---- Remote server (opt-in) ----
+    var remoteUrl: String
+        get() = prefs.getString("remote_url", "") ?: ""
+        set(v) = prefs.edit().putString("remote_url", v.trim()).apply()
+
+    var remoteApi: RemoteApi
+        get() = RemoteApi.fromName(prefs.getString("remote_api", null))
+        set(v) = prefs.edit().putString("remote_api", v.name).apply()
+
+    var remoteApiKey: String
+        get() = prefs.getString("remote_key", "") ?: ""
+        set(v) = prefs.edit().putString("remote_key", v.trim()).apply()
+
+    var remoteModel: String
+        get() = prefs.getString("remote_model", "") ?: ""
+        set(v) = prefs.edit().putString("remote_model", v.trim()).apply()
+
+    /** "", "fr" or "en". */
+    var remoteLanguage: String
+        get() = prefs.getString("remote_language", "") ?: ""
+        set(v) = prefs.edit().putString("remote_language", v).apply()
+
+    /** Local model id used when the server cannot be reached; "" for none. */
+    var remoteFallbackId: String
+        get() = prefs.getString("remote_fallback", ModelCatalog.default.id) ?: ""
+        set(v) = prefs.edit().putString("remote_fallback", v).apply()
+
+    fun remoteConfig() = RemoteConfig(
+        baseUrl = remoteUrl,
+        api = remoteApi,
+        apiKey = remoteApiKey,
+        model = remoteModel,
+        language = remoteLanguage,
     )
+
+    /**
+     * Options for [spec]. Remote settings are only attached to the remote model,
+     * so changing them never reloads an on-device model.
+     */
+    fun engineOptions(spec: ModelSpec = activeModel, fallbackInstalled: (ModelSpec) -> Boolean = { true }): EngineOptions {
+        val remote = spec.family == ModelFamily.REMOTE
+        return EngineOptions(
+            numThreads = threads,
+            acceleration = acceleration,
+            // Only these use hotwords: keeping them out of the other models' options means a
+            // vocabulary edit does not reload an on-device model that ignores them.
+            hotwords = if (spec.family == ModelFamily.QWEN3_ASR || remote) vocabulary.favoured else emptyList(),
+            remote = if (remote) remoteConfig() else null,
+            remoteFallback = if (remote) ModelCatalog.byId(remoteFallbackId)?.takeIf(fallbackInstalled) else null,
+        )
+    }
 }

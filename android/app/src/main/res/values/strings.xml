@@ -35,7 +35,7 @@
     <string name="download_running">Téléchargement des modèles…</string>
     <string name="download_channel">Téléchargements</string>
 
-    <string name="setup_intro">Clavier de dictée vocale. La transcription se fait entièrement sur le téléphone : ni l\'audio ni le texte ne quittent l\'appareil. Le réseau sert uniquement à télécharger les modèles.</string>
+    <string name="setup_intro">Clavier de dictée vocale. La transcription se fait entièrement sur le téléphone : ni l\'audio ni le texte ne quittent l\'appareil. Le réseau sert uniquement à télécharger les modèles, sauf si vous choisissez vous-même un serveur distant.</string>
     <string name="setup_step_keyboard">1. Activer le clavier</string>
     <string name="setup_open_ime_settings">Activer</string>
     <string name="setup_pick_ime">Choisir le clavier</string>
@@ -80,6 +80,24 @@
     <string name="settings_cleanup_help">Retire les hésitations et les autocorrections après chaque segment. Le LLM ne remplace le texte que si un garde-fou vérifie qu\'il n\'a rien ajouté ni retiré ; sinon le texte brut est gardé.</string>
     <string name="settings_llm_note">Le LLM tourne sur l\'appareil (MediaPipe, arm64 uniquement). S\'il est indisponible, le nettoyage par règles est utilisé.</string>
 
+    <string name="settings_remote">Serveur distant (optionnel)</string>
+    <string name="settings_remote_help">Pour transcrire sur un serveur que vous contrôlez (par exemple le serveur speech-to-text de ce dépôt, chez vous) quand les modèles du téléphone ne suffisent pas. Choisissez ensuite « Serveur distant » comme modèle. Attention : avec ce choix, l\'audio de chaque segment est envoyé au serveur. Les autres modèles restent entièrement sur le téléphone.</string>
+    <string name="settings_remote_api">Type d\'API</string>
+    <string name="settings_remote_model_hint">Nom du modèle (API OpenAI uniquement, ex. whisper-1)</string>
+    <string name="settings_remote_key_hint">Clé d\'API / jeton (optionnel)</string>
+    <string name="settings_remote_language">Langue envoyée au serveur</string>
+    <string name="settings_remote_lang_auto">Détection automatique</string>
+    <string name="settings_remote_fallback">Si le serveur ne répond pas</string>
+    <string name="settings_remote_no_fallback">Afficher une erreur</string>
+    <string name="settings_remote_test">Tester la connexion</string>
+    <string name="settings_remote_testing">Test en cours…</string>
+    <string name="settings_remote_ok">✓ Connexion réussie : %1$s</string>
+    <string name="settings_remote_failed">Échec : %1$s</string>
+    <string name="settings_remote_invalid">Adresse invalide : elle doit commencer par http:// ou https://</string>
+    <string name="settings_remote_insecure">⚠ HTTP non chiffré vers une adresse publique : l\'audio traverserait Internet en clair. Utilisez HTTPS ou un VPN (WireGuard, Tailscale).</string>
+    <string name="setup_remote_configured">Configuré : %1$s</string>
+    <string name="setup_remote_not_configured">Non configuré.</string>
+    <string name="setup_remote_configure">Configurer</string>
     <string name="compare_title">Comparer les modèles</string>
     <string name="compare_intro">Transcrit le même audio avec chaque modèle installé, l\'un après l\'autre, et mesure le temps de chargement, le facteur temps réel (RTF = temps de calcul / durée audio) et la mémoire en pointe du processus.</string>
     <string name="compare_audio">Audio</string>

@@ -11,7 +11,7 @@ package io.github.remtav.dictee.stt
  * .tar.bz2 release archives: no 1 GB bzip2 to unpack on the phone, and a
  * download can resume file by file.
  */
-enum class ModelFamily { NEMO_TRANSDUCER, QWEN3_ASR, WHISPER }
+enum class ModelFamily { NEMO_TRANSDUCER, QWEN3_ASR, WHISPER, REMOTE }
 
 data class ModelFile(
     /** Path relative to the model directory. */
@@ -104,9 +104,28 @@ object ModelCatalog {
         ),
     )
 
+    /** Downloadable on-device models. */
     val all: List<ModelSpec> = listOf(parakeet, qwen3, whisperTurbo)
+
+    /**
+     * A server the user runs (opt-in): nothing to download, "installed" once its
+     * address is set. See [RemoteEngine].
+     */
+    val remote = ModelSpec(
+        id = "remote-server",
+        displayName = "Serveur distant",
+        shortName = "Serveur",
+        publisher = "Votre serveur",
+        family = ModelFamily.REMOTE,
+        description = "Transcription sur un serveur que vous contrôlez. L'audio quitte le téléphone.",
+        license = "",
+        files = emptyList(),
+    )
+
+    /** Everything the keyboard can dictate with. */
+    val selectable: List<ModelSpec> = all + remote
 
     val default: ModelSpec = parakeet
 
-    fun byId(id: String?): ModelSpec? = all.firstOrNull { it.id == id }
+    fun byId(id: String?): ModelSpec? = selectable.firstOrNull { it.id == id }
 }

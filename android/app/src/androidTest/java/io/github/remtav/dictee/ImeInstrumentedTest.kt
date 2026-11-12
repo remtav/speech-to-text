@@ -261,6 +261,24 @@ class OptionalFeaturesInstrumentedTest : ImeTestBase() {
     }
 
     @Test
+    fun dictationOnARemoteServer() {
+        // A server on the device's loopback stands in for the home server: the real
+        // RemoteEngine (HTTP, multipart WAV, cleartext to a LAN-style address) is used.
+        RecordingServer { 200 to """{"text": "Bonjour depuis le serveur.", "language": "fr"}""" }.use { server ->
+            app.settings.remoteUrl = "http://127.0.0.1:${server.port}"
+            app.settings.activeModelId = ModelCatalog.remote.id
+            TestHooks.engineFactory = null
+            useAudio("fr1")
+            launchFields()
+            tapMic()
+            waitFor("text from the server", 20_000) { field1() == "Bonjour depuis le serveur." }
+            val req = server.requests.first()
+            assertEquals("/transcribe/streaming", req.path)
+            assertTrue(req.body.size > 100_000) // ~6 s of 16 kHz 16-bit audio
+        }
+    }
+
+    @Test
     fun acceleratorRequestFallsBackToCpuWhenRefused() {
         app.settings.acceleration = Acceleration.NNAPI
         val inner = ScriptedEngine.Factory(listOf("accéléré."), 10)

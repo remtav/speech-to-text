@@ -39,8 +39,12 @@ data class EngineOptions(
     val numThreads: Int = defaultThreads(),
     /** Requested execution provider, see [Acceleration]. */
     val acceleration: Acceleration = Acceleration.CPU,
-    /** Words to favour, for models that accept them (Qwen3-ASR). */
+    /** Words to favour, for models that accept them (Qwen3-ASR, OpenAI-compatible servers). */
     val hotwords: List<String> = emptyList(),
+    /** Server settings, used only by the remote model. */
+    val remote: RemoteConfig? = null,
+    /** Local model used when the server cannot be reached (null: no fallback). */
+    val remoteFallback: ModelSpec? = null,
 ) {
     companion object {
         fun defaultThreads(): Int = Runtime.getRuntime().availableProcessors().coerceIn(1, 4)
@@ -65,4 +69,19 @@ enum class Acceleration(val provider: String, val label: String) {
 
 fun interface SttEngineFactory {
     fun create(spec: ModelSpec, modelDir: File, options: EngineOptions): SttEngine
+}
+
+/**
+ * The app's engine factory: sherpa-onnx for on-device models, [RemoteEngine]
+ * (optionally behind a [FallbackEngine]) for the user's server.
+ */
+class DefaultEngineFactory(private val dirFor: (ModelSpec) -> File) : SttEngineFactory {
+    override fun create(spec: ModelSpec, modelDir: File, options: EngineOptions): SttEngine {
+        if (spec.family != ModelFamily.REMOTE) return SherpaEngine(spec, modelDir, options)
+        val config = options.remote ?: throw IllegalStateException("Serveur distant non configuré")
+        val remote = RemoteEngine(spec, config, options.hotwords)
+        val fallback = options.remoteFallback?.takeIf { it.family != ModelFamily.REMOTE } ?: return remote
+        val localOptions = options.copy(remote = null, remoteFallback = null)
+        return FallbackEngine(remote, { SherpaEngine(fallback, dirFor(fallback), localOptions) })
+    }
 }

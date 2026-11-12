@@ -80,6 +80,7 @@ class SherpaEngine(
                     ),
                     tokens = "",
                 )
+                ModelFamily.REMOTE -> throw IllegalArgumentException("${spec.id} is not a sherpa-onnx model")
                 ModelFamily.WHISPER -> OfflineModelConfig(
                     whisper = OfflineWhisperModelConfig(
                         encoder = path("turbo-encoder.int8.onnx"),

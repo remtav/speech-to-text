@@ -195,7 +195,7 @@ class DicteeImeService : InputMethodService(), DictationListener, EngineManager.
         val spec = app.settings.activeModel
         if (!passwordField && app.isInstalled(spec)) {
             app.engines.factory = app.engineFactory()
-            app.engines.load(spec, app.settings.engineOptions())
+            app.engines.load(spec, app.engineOptions(spec))
         }
         render()
     }
@@ -387,7 +387,7 @@ class DicteeImeService : InputMethodService(), DictationListener, EngineManager.
 
     private fun showModelMenu(anchor: View) {
         val menu = PopupMenu(anchor.context, anchor)
-        val installed = ModelCatalog.all.filter { app.isInstalled(it) }
+        val installed = ModelCatalog.selectable.filter { app.isInstalled(it) }
         if (installed.isEmpty()) {
             showMessage(getString(R.string.msg_no_model), error = true)
             return
@@ -412,7 +412,7 @@ class DicteeImeService : InputMethodService(), DictationListener, EngineManager.
         if (controller.isActive) controller.stop()
         app.settings.activeModelId = spec.id
         app.engines.factory = app.engineFactory()
-        app.engines.load(spec, app.settings.engineOptions())
+        app.engines.load(spec, app.engineOptions(spec))
         render()
     }
 

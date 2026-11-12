@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Cleartext HTTP is allowed so a home server on the local network
+     (http://192.168.x.x:8081) can be used as the optional remote model. Model
+     downloads use HTTPS URLs from the catalog and are verified by SHA-256. The
+     settings screen warns when an HTTP address is not on a private network. -->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="true">
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+</network-security-config>
