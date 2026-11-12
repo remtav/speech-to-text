@@ -150,7 +150,7 @@ class CompareActivity : AppCompatActivity() {
                 results += r
                 main.post { renderResult(r) }
             }
-            val header = "Dictée locale ${BuildConfig.VERSION_NAME} · ${Build.MANUFACTURER} ${Build.MODEL} · Android ${Build.VERSION.RELEASE}" +
+            val header = "Kalmia Blabla ${BuildConfig.VERSION_NAME} · ${Build.MANUFACTURER} ${Build.MODEL} · Android ${Build.VERSION.RELEASE}" +
                 " · ${app.settings.threads} threads"
             report = Benchmark.report(results, header)
             main.post {
@@ -166,19 +166,18 @@ class CompareActivity : AppCompatActivity() {
         val card = resultsBox.card()
         card.heading(r.spec.displayName).setPadding(0, 0, 0, dp(4))
         if (r.error != null) {
-            card.body(getString(R.string.compare_error, r.error))
+            card.body(getString(R.string.compare_error, r.error)).markError()
             return
         }
-        card.body(
+        card.value(
             getString(
                 R.string.compare_summary,
                 r.loadMillis / 1000f, r.meanRtf, r.peakRssMb, r.totalWer?.let { "%.1f %%".format(Locale.ROOT, it * 100) } ?: "—",
             ),
         )
         for (s in r.samples) {
-            card.body(
+            card.value(
                 "${s.sample} · RTF %.3f%s".format(Locale.ROOT, s.rtf, s.wer?.let { " · WER %.1f %%".format(Locale.ROOT, it * 100) } ?: ""),
-                small = true,
             )
             card.body("« ${s.text} »")
         }

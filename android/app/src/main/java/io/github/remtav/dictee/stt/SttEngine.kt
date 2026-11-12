@@ -37,6 +37,8 @@ interface SttEngine {
 /** Options that shape how an engine is built. */
 data class EngineOptions(
     val numThreads: Int = defaultThreads(),
+    /** Language forced on the model ("" for automatic detection); used by Whisper only. */
+    val language: String = "",
     /** Requested execution provider, see [Acceleration]. */
     val acceleration: Acceleration = Acceleration.CPU,
     /** Words to favour, for models that accept them (Qwen3-ASR, OpenAI-compatible servers). */

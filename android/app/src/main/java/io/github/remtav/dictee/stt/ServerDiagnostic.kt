@@ -61,7 +61,7 @@ class ServerDiagnostic(
 
     /** Plain-text report, safe to share: the address, never a token or a Cloudflare credential. */
     fun report(trials: List<Trial>, now: Date = Date()): String = buildString {
-        appendLine("Diagnostic serveur — Dictée locale")
+        appendLine("Diagnostic serveur — Kalmia Blabla")
         appendLine("Date : " + SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.ROOT).format(now))
         appendLine("Serveur : " + (config.normalizedBase() ?: "?") + " (" + config.api.name + ")")
         appendLine("Langue : " + config.language.ifBlank { "détection automatique" })

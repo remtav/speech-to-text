@@ -6,15 +6,27 @@ import android.text.format.Formatter
 import android.util.TypedValue
 import android.view.View
 import android.view.ViewGroup
+import android.widget.CheckBox
+import android.widget.ImageView
 import android.widget.LinearLayout
+import android.widget.Toast
 import android.widget.ScrollView
 import android.widget.TextView
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.card.MaterialCardView
+import io.github.remtav.dictee.R
+import io.github.remtav.dictee.settings.AppSettings
+import io.github.remtav.dictee.stt.DictationLanguage
 
-/** Tiny helpers to build the settings-style screens in code (no layout XML to keep in sync). */
+/**
+ * Tiny helpers to build the settings-style screens in code (no layout XML to keep in sync).
+ *
+ * Look: Kalmia theme (issue #15, step 1.5). Colours come only from theme attributes and fonts only from
+ * the named text styles of `res/values/themes.xml` (headline, title, body, label, value): no colour
+ * or font is written here (checked by `NoHardcodedStyleTest`). A new screen uses these helpers.
+ */
 internal fun Context.dp(v: Int): Int = (v * resources.displayMetrics.density).toInt()
 
 internal fun Context.attrColor(attr: Int): Int {
@@ -43,13 +55,22 @@ internal fun Activity.scrollingColumn(): LinearLayout {
 
 internal fun ViewGroup.title(text: String) = TextView(context).apply {
     this.text = text
-    setTextAppearance(com.google.android.material.R.style.TextAppearance_Material3_HeadlineSmall)
+    setTextAppearance(R.style.TextAppearance_Kalmia_Headline)
     setPadding(0, context.dp(8), 0, context.dp(8))
+}.also { addView(it) }
+
+/** The Kalmia logo (flower and name), from `design/marque/logo` of the Kalmia source; follows light and dark. */
+internal fun ViewGroup.logo() = ImageView(context).apply {
+    setImageResource(R.drawable.kalmia_logo)
+    contentDescription = context.getString(R.string.cd_kalmia_logo)
+    adjustViewBounds = true
+    layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, context.dp(43))
+        .apply { topMargin = context.dp(4); bottomMargin = context.dp(4) }
 }.also { addView(it) }
 
 internal fun ViewGroup.heading(text: String) = TextView(context).apply {
     this.text = text
-    setTextAppearance(com.google.android.material.R.style.TextAppearance_Material3_TitleMedium)
+    setTextAppearance(R.style.TextAppearance_Kalmia_Title)
     setTextColor(context.attrColor(androidx.appcompat.R.attr.colorPrimary))
     setPadding(0, context.dp(20), 0, context.dp(6))
 }.also { addView(it) }
@@ -57,10 +78,24 @@ internal fun ViewGroup.heading(text: String) = TextView(context).apply {
 internal fun ViewGroup.body(text: CharSequence = "", small: Boolean = false) = TextView(context).apply {
     this.text = text
     setTextAppearance(
-        if (small) com.google.android.material.R.style.TextAppearance_Material3_BodySmall
-        else com.google.android.material.R.style.TextAppearance_Material3_BodyMedium,
+        if (small) R.style.TextAppearance_Kalmia_BodySmall else R.style.TextAppearance_Kalmia_Body,
     )
     setTextIsSelectable(false)
+    setPadding(0, context.dp(2), 0, context.dp(2))
+}.also { addView(it) }
+
+/** A technical value (size, score, timing, state) in IBM Plex Mono. */
+internal fun ViewGroup.value(text: CharSequence) = TextView(context).apply {
+    this.text = text
+    setTextAppearance(R.style.TextAppearance_Kalmia_Value)
+    setPadding(0, context.dp(2), 0, context.dp(2))
+}.also { addView(it) }
+
+/** A small label in letter-spaced IBM Plex Mono capitals, in the secondary text colour. */
+internal fun ViewGroup.label(text: CharSequence) = TextView(context).apply {
+    this.text = text
+    setTextAppearance(R.style.TextAppearance_Kalmia_Label)
+    setTextColor(context.attrColor(com.google.android.material.R.attr.colorOnSurfaceVariant))
     setPadding(0, context.dp(2), 0, context.dp(2))
 }.also { addView(it) }
 
@@ -100,4 +135,71 @@ internal fun View.spaced(start: Int = 0, end: Int = 8): View {
         layoutParams = it
     }
     return this
+}
+
+/** A short label in the primary colour (theme attribute), e.g. the "recommended" badge. */
+internal fun ViewGroup.badge(text: CharSequence, viewId: Int = View.NO_ID) = TextView(context).apply {
+    this.text = text
+    if (viewId != View.NO_ID) id = viewId
+    setTextAppearance(R.style.TextAppearance_Kalmia_Label)
+    setTextColor(context.attrColor(androidx.appcompat.R.attr.colorPrimary))
+    setPadding(0, context.dp(2), 0, context.dp(2))
+}.also { addView(it) }
+
+/**
+ * Shows this text as an error (theme error colour, red, plus the error icon: never the colour
+ * alone) or, with [isError] false, back in the normal text colour without the icon.
+ */
+internal fun TextView.markError(isError: Boolean = true) {
+    setTextColor(
+        context.attrColor(
+            if (isError) androidx.appcompat.R.attr.colorError else com.google.android.material.R.attr.colorOnSurface,
+        ),
+    )
+    setCompoundDrawablesRelativeWithIntrinsicBounds(if (isError) R.drawable.ic_error else 0, 0, 0, 0)
+    compoundDrawablePadding = context.dp(8)
+}
+
+/** A warning line: always text and an icon (never only a colour), in the theme's error colour. */
+internal fun ViewGroup.warning(text: CharSequence, tagValue: String) = TextView(context).apply {
+    this.text = text
+    tag = tagValue
+    setTextAppearance(R.style.TextAppearance_Kalmia_BodySmall)
+    markError()
+    setPadding(0, context.dp(2), 0, context.dp(2))
+}.also { addView(it) }
+
+/** Tag of the check box of [language], for tests. */
+internal fun languageTag(language: DictationLanguage) = "lang_${language.name}"
+
+/**
+ * (Re)draws the multiple-choice list of dictation languages into this column and
+ * saves each change. The last checked language cannot be unchecked: an empty
+ * choice would leave the recommendation and the engines without a language, so
+ * the box stays checked and a short message says why. [onChange] runs after a save.
+ */
+internal fun LinearLayout.renderLanguageChoices(settings: AppSettings, onChange: () -> Unit) {
+    removeAllViews()
+    val chosen = settings.languages
+    var updating = false
+    for (language in DictationLanguage.entries) {
+        addView(CheckBox(context).apply {
+            text = language.label
+            tag = languageTag(language)
+            isChecked = language in chosen
+            setOnCheckedChangeListener { box, checked ->
+                if (updating) return@setOnCheckedChangeListener
+                val next = if (checked) settings.languages + language else settings.languages - language
+                if (next.isEmpty()) {
+                    updating = true
+                    box.isChecked = true
+                    updating = false
+                    Toast.makeText(context, R.string.languages_keep_one, Toast.LENGTH_SHORT).show()
+                } else {
+                    settings.languages = next
+                    onChange()
+                }
+            }
+        })
+    }
 }

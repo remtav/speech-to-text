@@ -33,6 +33,8 @@ class SettingsActivity : AppCompatActivity() {
     private lateinit var cfClientSecret: EditText
     private lateinit var remoteStatus: android.widget.TextView
     private lateinit var llmBox: LinearLayout
+    /** Redraws the server-language choice; set once that section exists. */
+    private var refreshRemoteLanguage: () -> Unit = {}
     private val refresh: () -> Unit = { renderLlm() }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -41,6 +43,14 @@ class SettingsActivity : AppCompatActivity() {
         val s = app.settings
         val col = scrollingColumn()
         col.title(getString(R.string.settings_title))
+
+        col.heading(getString(R.string.settings_languages))
+        col.body(getString(R.string.setup_languages_help), small = true)
+        LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }.also {
+            col.addView(it)
+            // The server language follows the languages until set explicitly: keep its radio in step.
+            it.renderLanguageChoices(s) { refreshRemoteLanguage() }
+        }
 
         col.heading(getString(R.string.settings_dictation))
         col.switch(getString(R.string.settings_partials), s.partials) { s.partials = it }
@@ -135,9 +145,10 @@ class SettingsActivity : AppCompatActivity() {
             InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD)
         col.body(getString(R.string.settings_remote_language), small = true)
         val langs = listOf("" to getString(R.string.settings_remote_lang_auto), "fr" to "Français", "en" to "English")
-        col.radio(langs.map { it.second }, langs.indexOfFirst { it.first == s.remoteLanguage }.coerceAtLeast(0)) {
-            s.remoteLanguage = langs[it].first
-        }
+        val remoteLanguageIndex = { langs.indexOfFirst { it.first == s.remoteLanguage }.coerceAtLeast(0) }
+        val onRemoteLanguage: (Int) -> Unit = { s.remoteLanguage = langs[it].first }
+        val remoteLanguageGroup = col.radio(langs.map { it.second }, remoteLanguageIndex(), onRemoteLanguage)
+        refreshRemoteLanguage = { remoteLanguageGroup.checkSilently(remoteLanguageIndex(), onRemoteLanguage) }
         col.body(getString(R.string.settings_remote_fallback), small = true)
         val fallbacks = listOf("" to getString(R.string.settings_remote_no_fallback)) +
             ModelCatalog.all.map { it.id to it.displayName }
@@ -183,11 +194,13 @@ class SettingsActivity : AppCompatActivity() {
             } else null,
         )
         remoteStatus.text = lines.joinToString("\n")
+        remoteStatus.markError(lines.isNotEmpty())
     }
 
     private fun testRemote() {
         saveRemote()
         remoteStatus.text = getString(R.string.settings_remote_testing)
+        remoteStatus.markError(false)
         val config = app.settings.remoteConfig()
         kotlin.concurrent.thread(name = "remote-check") {
             val r = RemoteEngine.check(config)
@@ -196,6 +209,7 @@ class SettingsActivity : AppCompatActivity() {
                     { getString(R.string.settings_remote_ok, it) },
                     { getString(R.string.settings_remote_failed, it.message) },
                 ) + if (config.isInsecurePublic) "\n" + getString(R.string.settings_remote_insecure) else ""
+                remoteStatus.markError(r.isFailure || config.isInsecurePublic)
             }
         }
     }
@@ -222,7 +236,7 @@ class SettingsActivity : AppCompatActivity() {
                     else -> getString(R.string.setup_not_installed, size(spec.file.size))
                 },
                 small = true,
-            )
+            ).apply { if (!Downloads.isBusy(spec.id) && st?.error != null) markError() }
             card.row().apply {
                 when {
                     Downloads.isBusy(spec.id) -> button(getString(R.string.cancel), outlined = true) { Downloads.cancel(spec.id) }
@@ -247,7 +261,7 @@ class SettingsActivity : AppCompatActivity() {
         })
     }
 
-    private fun ViewGroup.radio(labels: List<String>, selected: Int, onChange: (Int) -> Unit) {
+    private fun ViewGroup.radio(labels: List<String>, selected: Int, onChange: (Int) -> Unit): RadioGroup {
         val group = RadioGroup(context)
         labels.forEachIndexed { i, l ->
             group.addView(RadioButton(context).apply { id = 1000 + i; text = l })
@@ -255,6 +269,14 @@ class SettingsActivity : AppCompatActivity() {
         group.check(1000 + selected)
         group.setOnCheckedChangeListener { _, id -> onChange(id - 1000) }
         addView(group)
+        return group
+    }
+
+    /** Checks [index] without running the change callback (it would store the value as an explicit choice). */
+    private fun RadioGroup.checkSilently(index: Int, onChange: (Int) -> Unit) {
+        setOnCheckedChangeListener(null)
+        check(1000 + index)
+        setOnCheckedChangeListener { _, id -> onChange(id - 1000) }
     }
 
     private fun ViewGroup.slider(

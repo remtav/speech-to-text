@@ -18,7 +18,10 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import io.github.remtav.dictee.DicteeApp
 import io.github.remtav.dictee.R
+import io.github.remtav.dictee.stt.DictationLanguage
 import io.github.remtav.dictee.stt.ModelCatalog
+import io.github.remtav.dictee.stt.ModelRecommendation
+import io.github.remtav.dictee.stt.ModelRecommendations
 import io.github.remtav.dictee.stt.ModelSpec
 import io.github.remtav.dictee.stt.asDownloadable
 
@@ -31,6 +34,7 @@ class SetupActivity : AppCompatActivity() {
     private lateinit var keyboardStatus: TextView
     private lateinit var micStatus: TextView
     private lateinit var modelsBox: LinearLayout
+    private lateinit var languagesBox: LinearLayout
     private val refresh: () -> Unit = { renderModels() }
 
     private val askMic = registerForActivityResult(ActivityResultContracts.RequestPermission()) { renderSteps() }
@@ -40,6 +44,7 @@ class SetupActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         app = DicteeApp.from(this)
         val col = scrollingColumn()
+        col.logo()
         col.title(getString(R.string.app_name))
         col.body(getString(R.string.setup_intro))
 
@@ -57,6 +62,11 @@ class SetupActivity : AppCompatActivity() {
         col.heading(getString(R.string.setup_step_mic))
         micStatus = col.body()
         col.button(getString(R.string.setup_grant_mic)) { askMic.launch(Manifest.permission.RECORD_AUDIO) }
+
+        col.heading(getString(R.string.setup_step_languages))
+        col.body(getString(R.string.setup_languages_help), small = true)
+        languagesBox = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        col.addView(languagesBox)
 
         col.heading(getString(R.string.setup_models))
         col.body(getString(R.string.setup_models_note), small = true)
@@ -83,6 +93,8 @@ class SetupActivity : AppCompatActivity() {
         super.onResume()
         Downloads.addListener(refresh)
         renderSteps()
+        // Redrawn on each resume: the languages may have been changed in the settings.
+        languagesBox.renderLanguageChoices(app.settings) { renderModels() }
         renderModels()
     }
 
@@ -111,7 +123,9 @@ class SetupActivity : AppCompatActivity() {
 
     private fun renderModels() {
         modelsBox.removeAllViews()
-        for (spec in ModelCatalog.all) renderModel(spec)
+        val chosen = app.settings.languages
+        val recommendation = ModelRecommendations.recommend(chosen)
+        for (spec in ModelCatalog.all) renderModel(spec, chosen, recommendation)
         renderRemote()
     }
 
@@ -142,8 +156,9 @@ class SetupActivity : AppCompatActivity() {
         }
     }
 
-    private fun renderModel(spec: ModelSpec) {
+    private fun renderModel(spec: ModelSpec, chosen: Set<DictationLanguage>, recommendation: ModelRecommendation) {
         val card = modelsBox.card()
+        card.tag = modelCardTag(spec)
         val installed = app.store.isInstalled(spec)
         val active = app.settings.activeModelId == spec.id
         card.addView(RadioButton(this).apply {
@@ -158,9 +173,22 @@ class SetupActivity : AppCompatActivity() {
                 renderModels()
             }
         })
+        if (spec == recommendation.model) {
+            card.badge(getString(R.string.model_recommended_badge), R.id.recommended_badge)
+            card.body(recommendation.reason, small = true)
+        }
+        val uncovered = ModelRecommendations.uncovered(spec, chosen)
+        if (uncovered.isNotEmpty()) {
+            card.warning(
+                getString(R.string.model_warning_uncovered, uncovered.joinToString(", ") { it.inSentence }),
+                WARNING_TAG,
+            )
+        }
         card.body("${spec.publisher} · ${spec.description}", small = true)
+        card.body(getString(R.string.model_license_runs_local, spec.license), small = true)
         val status = Downloads.status[spec.id]
-        card.body(
+        val failed = !Downloads.isBusy(spec.id) && status?.error != null
+        card.value(
             when {
                 Downloads.isBusy(spec.id) && status != null ->
                     getString(R.string.setup_downloading, status.percent, size(status.downloaded), size(status.total))
@@ -168,8 +196,7 @@ class SetupActivity : AppCompatActivity() {
                 installed -> getString(R.string.setup_installed, size(app.store.installedBytes(spec.asDownloadable())))
                 else -> getString(R.string.setup_not_installed, size(spec.totalBytes))
             },
-            small = true,
-        )
+        ).apply { if (failed) markError() }
         card.row().apply {
             when {
                 Downloads.isBusy(spec.id) -> button(getString(R.string.cancel), outlined = true) { Downloads.cancel(spec.id) }
@@ -200,5 +227,11 @@ class SetupActivity : AppCompatActivity() {
             }
             .setNegativeButton(R.string.cancel, null)
             .show()
+    }
+
+    companion object {
+        /** Tag of a model card, for tests. */
+        fun modelCardTag(spec: ModelSpec) = "model_card_${spec.id}"
+        const val WARNING_TAG = "model_warning"
     }
 }

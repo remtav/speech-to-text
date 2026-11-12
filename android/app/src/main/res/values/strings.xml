@@ -1,9 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">Dictée locale</string>
-    <string name="ime_name">Dictée locale (voix)</string>
+    <string name="app_name">Kalmia Blabla</string>
+    <string name="ime_name">Kalmia Blabla (voix)</string>
     <string name="subtype_label">Dictée FR / EN</string>
 
+    <string name="cd_kalmia_logo">Kalmia</string>
     <string name="cd_start">Commencer la dictée</string>
     <string name="cd_stop">Arrêter la dictée</string>
     <string name="cd_model">Changer de modèle</string>
@@ -27,7 +28,7 @@
     <string name="msg_polish_failed">Texte non poli (%1$s) : texte brut du serveur inséré</string>
 
     <string name="msg_password">Dictée désactivée dans les champs de mot de passe</string>
-    <string name="msg_no_permission">Autorisez le micro dans l\'application Dictée locale</string>
+    <string name="msg_no_permission">Autorisez le micro dans l\'application Kalmia Blabla</string>
     <string name="msg_no_model">Aucun modèle installé : ouvrez les réglages</string>
     <string name="msg_unavailable">Dictée indisponible</string>
     <string name="msg_field_changed">Dictée arrêtée : le champ a changé</string>
@@ -43,18 +44,24 @@
     <string name="download_running">Téléchargement des modèles…</string>
     <string name="download_channel">Téléchargements</string>
 
-    <string name="setup_intro">Clavier de dictée vocale. La transcription se fait entièrement sur le téléphone : ni l\'audio ni le texte ne quittent l\'appareil. Le réseau sert uniquement à télécharger les modèles, sauf si vous choisissez vous-même un serveur distant.</string>
+    <string name="setup_intro">Un clavier vocal conçu au Québec, pour le français d\'ici.\nVotre voix est transcrite sur votre téléphone : elle n\'est envoyée à personne, sauf si vous choisissez vous-même un serveur distant. Le réseau sert à télécharger les modèles.\nPas de compte, pas de publicité, pas de télémétrie.\nLe code source est public : chacun peut le lire et le vérifier. Les modèles de transcription, eux, viennent d\'éditeurs étrangers, nommés plus bas.</string>
     <string name="setup_step_keyboard">1. Activer le clavier</string>
     <string name="setup_open_ime_settings">Activer</string>
     <string name="setup_pick_ime">Choisir le clavier</string>
     <string name="setup_keyboard_current">✓ Activé et sélectionné</string>
-    <string name="setup_keyboard_enabled">✓ Activé. Basculez vers « Dictée locale » depuis votre clavier habituel pour dicter.</string>
-    <string name="setup_keyboard_disabled">Pas encore activé : ouvrez les réglages des claviers et cochez « Dictée locale (voix) ».</string>
+    <string name="setup_keyboard_enabled">✓ Activé. Basculez vers « Kalmia Blabla » depuis votre clavier habituel pour dicter.</string>
+    <string name="setup_keyboard_disabled">Pas encore activé : ouvrez les réglages des claviers et cochez « Kalmia Blabla (voix) ».</string>
     <string name="setup_step_mic">2. Autoriser le micro</string>
     <string name="setup_grant_mic">Autoriser le micro</string>
     <string name="setup_mic_ok">✓ Micro autorisé</string>
     <string name="setup_mic_missing">Le clavier ne peut pas demander le micro lui-même : autorisez-le ici.</string>
-    <string name="setup_models">3. Modèles</string>
+    <string name="setup_step_languages">3. Vos langues</string>
+    <string name="setup_languages_help">Cochez les langues que vous dictez. Elles servent à recommander un modèle et à régler la langue des moteurs : une seule langue, Whisper et le serveur la reçoivent ; plusieurs, la langue est détectée automatiquement. Au moins une langue reste cochée.</string>
+    <string name="languages_keep_one">Au moins une langue doit rester cochée.</string>
+    <string name="setup_models">4. Modèles</string>
+    <string name="model_recommended_badge">Recommandé pour vos langues</string>
+    <string name="model_license_runs_local">Licence %1$s · s\'exécute sur votre téléphone</string>
+    <string name="model_warning_uncovered">Attention : ce modèle ne couvre pas %1$s. Il reste téléchargeable.</string>
     <string name="setup_models_note">Téléchargés depuis Hugging Face, vérifiés par somme de contrôle SHA-256. Un seul est chargé à la fois. Wi-Fi conseillé.</string>
     <string name="setup_default_suffix"> (par défaut)</string>
     <string name="setup_downloading">Téléchargement : %1$d %% (%2$s / %3$s)</string>
@@ -66,9 +73,10 @@
     <string name="setup_compare">Comparer les modèles</string>
     <string name="setup_settings">Réglages</string>
     <string name="setup_try">Zone d\'essai</string>
-    <string name="setup_try_hint">Touchez ici puis basculez vers le clavier Dictée locale</string>
+    <string name="setup_try_hint">Touchez ici puis basculez vers le clavier Kalmia Blabla</string>
 
     <string name="settings_title">Réglages</string>
+    <string name="settings_languages">Vos langues</string>
     <string name="settings_dictation">Dictée</string>
     <string name="settings_partials">Texte provisoire pendant qu\'on parle</string>
     <string name="settings_partials_help">Affiché souligné, remplacé par le texte final à chaque pause. Consomme plus de calcul.</string>
@@ -93,7 +101,7 @@
     <string name="settings_remote_api">Type d\'API</string>
     <string name="settings_remote_model_hint">Nom du modèle (API OpenAI uniquement, ex. whisper-1)</string>
     <string name="settings_remote_key_hint">Clé d\'API / jeton (optionnel)</string>
-    <string name="settings_remote_language">Langue envoyée au serveur</string>
+    <string name="settings_remote_language">Langue envoyée au serveur (par défaut : selon vos langues, « français » ou « anglais » seulement)</string>
     <string name="settings_remote_lang_auto">Détection automatique</string>
     <string name="settings_remote_fallback">Si le serveur ne répond pas</string>
     <string name="settings_remote_no_fallback">Afficher une erreur</string>

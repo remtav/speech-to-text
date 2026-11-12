@@ -73,16 +73,16 @@ class DiagnosticActivity : AppCompatActivity() {
         val card = results.card()
         card.body("Essai $n — ${t.name} (%.1f s)".format(Locale.ROOT, t.audioSeconds))
         if (t.error != null) {
-            card.body("Échec : ${t.error}", small = true).setTextColor(attrColor(androidx.appcompat.R.attr.colorError))
+            card.body("Échec : ${t.error}", small = true).markError()
             return
         }
-        card.body("Envoi ${t.uploadMillis} ms · total ${t.totalMillis} ms · ${t.transport} · polissage : ${t.polishStatus}", small = true)
+        card.value("Envoi ${t.uploadMillis} ms · total ${t.totalMillis} ms · ${t.transport} · polissage : ${t.polishStatus}")
         // Raw and polished side by side.
         val row = card.row()
-        fun column(label: String, text: String) = LinearLayout(this).apply {
+        fun column(heading: String, text: String) = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply { marginEnd = dp(8) }
-            body(label, small = true).setTextColor(attrColor(androidx.appcompat.R.attr.colorPrimary))
+            label(heading)
             body(text, small = true).setTextIsSelectable(true)
         }.also { row.addView(it) }
         column("Brut", t.rawText)

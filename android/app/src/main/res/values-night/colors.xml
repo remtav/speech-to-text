@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Palette Kalmia, thème sombre (voir values/colors.xml). -->
+<resources>
+    <color name="kalmia_paper">#13160F</color>
+    <color name="kalmia_paper_2">#1B1F17</color>
+    <color name="kalmia_ink">#ECE7DA</color>
+    <color name="kalmia_muted">#A9AB9B</color>
+    <color name="kalmia_rule">#3A3E33</color>
+    <color name="kalmia_green">#8DB596</color>
+    <color name="kalmia_button">#8DB596</color>
+    <color name="kalmia_on_button">#13160F</color>
+    <color name="kalmia_flower">#DE85A7</color>
+    <color name="kalmia_on_flower">#13160F</color>
+    <color name="kalmia_error">#FFB4AB</color>
+    <color name="kalmia_on_error">#690005</color>
+    <color name="kalmia_inverse_surface">#ECE7DA</color>
+    <color name="kalmia_on_inverse_surface">#13160F</color>
+    <color name="kalmia_inverse_primary">#3F5E45</color>
+</resources>

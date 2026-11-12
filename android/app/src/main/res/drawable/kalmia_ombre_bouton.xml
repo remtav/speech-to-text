@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Ombre pleine décalée de 4 dp, couleur encre (« box-shadow: 4px 4px 0 ink » du site).
+  Posée en premier plan d'un bouton dont les marges internes droite et bas (insetRight/insetBottom)
+  font 4 dp : elle ne dessine que dans cette bande, jamais sur le texte.
+-->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item
+        android:width="4dp"
+        android:gravity="end|fill_vertical"
+        android:top="4dp">
+        <shape android:shape="rectangle">
+            <solid android:color="?attr/colorOnSurface" />
+        </shape>
+    </item>
+    <item
+        android:height="4dp"
+        android:gravity="bottom|fill_horizontal"
+        android:start="4dp">
+        <shape android:shape="rectangle">
+            <solid android:color="?attr/colorOnSurface" />
+        </shape>
+    </item>
+</layer-list>
