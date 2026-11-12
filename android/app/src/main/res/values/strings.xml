@@ -179,4 +179,52 @@
     <string name="howto_vocabulary">Noms propres et mots techniques</string>
     <string name="howto_vocabulary_help">Un nom propre ou un mot technique mal écrit (« GitHub », le nom d\'une rue) se corrige une fois pour toutes dans le vocabulaire personnalisé.</string>
     <string name="howto_vocabulary_open">Ouvrir le vocabulaire</string>
+
+    <!--
+      Test de lecture en français québécois (issue #15, lot 4, étape 4.1). Textes seulement : les
+      écrans viennent aux étapes 4.2 et 4.3. Trois gestes distincts : déclarer, accepter le test,
+      puis, seulement si le score est sous le seuil, consentir au partage.
+      L'adresse de réception et la durée de conservation ne sont JAMAIS écrites ici : elles arrivent
+      en argument depuis reading/Contribution.kt (RECEIVING_ADDRESS, RETENTION_MAX_YEARS,
+      POLICY_URL). ContributionConsistencyTest le vérifie, avec android/docs/CONTRIBUTION.md.
+    -->
+    <string name="contrib_card_title">Aider à améliorer la dictée en français québécois</string>
+    <string name="contrib_card_body">Lisez à voix haute un court texte d\'ici, environ deux minutes, et voyez à quel point chaque modèle installé comprend votre français. Le test se fait sur votre téléphone : rien n\'est envoyé, sauf si vous choisissez ensuite de partager votre lecture.</string>
+    <string name="contrib_card_start">Faire le test</string>
+    <string name="contrib_card_dismiss">Non merci</string>
+
+    <string name="contrib_declare_title">Avant le test</string>
+    <string name="contrib_declare_question">Parlez-vous un français québécois ?</string>
+    <string name="contrib_declare_help">Le test mesure la dictée en français d\'ici : il ne sert que si c\'est votre façon de parler. Votre réponse n\'est pas vérifiée et reste sur votre téléphone ; vous pourrez la changer dans les Réglages.</string>
+    <string name="contrib_declare_yes">Oui, je parle un français québécois</string>
+    <string name="contrib_declare_no">Non</string>
+    <string name="contrib_declined_title">Merci !</string>
+    <string name="contrib_declined_body">Ce test est conçu pour le français québécois, alors on s\'arrête ici : pas de test, pas d\'enregistrement, rien n\'est partagé. La dictée fonctionne comme avant. Vous pourrez changer votre réponse dans les Réglages.</string>
+    <string name="contrib_declined_close">Fermer</string>
+
+    <string name="contrib_accept_title">Le test de lecture</string>
+    <string name="contrib_accept_body">Vous allez lire %1$d courts paragraphes à voix haute, un à la fois. Chacun est enregistré et transcrit sur votre téléphone par le ou les modèles installés, puis comparé au texte pour calculer un taux de ressemblance. Rien ne quitte le téléphone pendant le test. Vous pouvez réécouter, recommencer ou arrêter quand vous voulez.</string>
+    <string name="contrib_accept_start">Commencer le test</string>
+    <string name="contrib_accept_cancel">Annuler</string>
+
+    <string name="contrib_share_title">Partager votre lecture ?</string>
+    <string name="contrib_share_reason">Votre lecture a été moins bien comprise que prévu : %1$s de ressemblance avec %2$s, le modèle recommandé pour vos langues. La partager aiderait à améliorer la dictée en français québécois. C\'est entièrement facultatif, et refuser ne change rien au fonctionnement de l\'application.</string>
+    <string name="contrib_share_sent_title">Ce qui partirait, et seulement ça</string>
+    <string name="contrib_share_sent">• l\'enregistrement de votre lecture (audio WAV, 16 kHz) ;\n• le texte lu et son numéro de version ;\n• la transcription obtenue et le score ;\n• le nom du modèle, la version de l\'application et le modèle de votre téléphone ;\n• votre réponse « je parle un français québécois » ;\n• la date du test ;\n• votre région, seulement si vous l\'indiquez.</string>
+    <string name="contrib_share_not_sent">Ce qui ne part pas : aucun nom, aucun numéro de téléphone, aucun identifiant de l\'appareil ou de compte, aucune autre dictée, aucun autre fichier.</string>
+    <string name="contrib_share_recipient">Destinataire : %1$s, l\'adresse du projet Kalmia Blabla.</string>
+    <string name="contrib_share_purpose">Pourquoi : repérer les mots et les accents d\'ici que la dictée comprend mal, pour mieux choisir et régler les modèles. Votre lecture ne sert à rien d\'autre sans un nouveau consentement de votre part.</string>
+    <string name="contrib_share_email_reveals">Le partage se fait par courriel : le destinataire verra donc l\'adresse de courriel qui l\'envoie, et le nom qui l\'accompagne dans votre messagerie.</string>
+    <string name="contrib_share_retention">Conservation : %1$d ans au plus à compter de la réception, puis destruction. Plus tôt si vous le demandez ou si l\'enregistrement n\'est plus utile. La destruction se fait à la main, dans la boîte de courriel du destinataire.</string>
+    <string name="contrib_share_voice">Une voix reste reconnaissable : même sans votre nom, cet enregistrement n\'est pas anonyme.</string>
+    <string name="contrib_share_withdraw">Pour retirer votre consentement ou faire supprimer votre lecture, écrivez à %1$s, de préférence depuis la même adresse, en indiquant la date du test. Elle sera détruite, avec le courriel qui l\'accompagnait.</string>
+    <string name="contrib_share_you_send">C\'est vous qui envoyez : l\'application prépare le fichier et ouvre votre messagerie, mais n\'envoie rien elle-même et ne se connecte à aucun serveur. Vous pouvez encore tout annuler avant d\'appuyer sur « Envoyer ».</string>
+    <string name="contrib_share_policy">Politique de contribution complète : %1$s</string>
+    <string name="contrib_share_region_label">Région (facultatif)</string>
+    <string name="contrib_share_region_hint">Par exemple : Saguenay–Lac-Saint-Jean</string>
+    <string name="contrib_share_consent">J\'ai lu ce qui précède et j\'accepte de partager ma lecture.</string>
+    <string name="contrib_share_prepare">Préparer le courriel</string>
+    <string name="contrib_share_listen">Réécouter</string>
+    <string name="contrib_share_redo">Refaire le test</string>
+    <string name="contrib_share_decline">Ne pas partager</string>
 </resources>
