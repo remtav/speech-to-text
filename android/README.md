@@ -115,8 +115,8 @@ gh secret set DICTEE_KEY_ALIAS --body dictee
 Sauvegardez `dictee-release.p12` et son mot de passe hors de GitHub (gestionnaire
 de mots de passe) : sans eux, plus aucune mise à jour ne peut s'installer par-dessus
 l'application. Ne versionnez jamais ce fichier. Sans les secrets, la CI d'une pull
-request construit un APK release non signé, et la publication sur `main` échoue
-avec un message explicite.
+request construit un APK release non signé, et un push sur `main` ne publie aucune
+release (avertissement dans le résumé du workflow).
 
 La CI (`.github/workflows/android.yml`) exécute ces trois suites et publie
 l'APK en release à chaque push sur `main`.

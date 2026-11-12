@@ -36,6 +36,8 @@ jobs:
     name: Build and unit tests
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    outputs:
+      signed: ${{ steps.key.outputs.signed }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
@@ -46,6 +48,7 @@ jobs:
       - name: Unit tests (includes the real sherpa-onnx VAD on the host)
         run: ./gradlew --no-daemon testDebugUnitTest -PversionCode=$VERSION_CODE -PversionName=$VERSION_NAME
       - name: Release key from secrets
+        id: key
         env:
           KEYSTORE_BASE64: ${{ secrets.DICTEE_KEYSTORE_BASE64 }}
           IS_RELEASE: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
@@ -53,9 +56,12 @@ jobs:
           if [ -n "$KEYSTORE_BASE64" ]; then
             echo "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/release.p12"
             echo "DICTEE_KEYSTORE_FILE=$RUNNER_TEMP/release.p12" >> "$GITHUB_ENV"
+            echo "signed=true" >> "$GITHUB_OUTPUT"
           elif [ "$IS_RELEASE" = "true" ]; then
-            echo "::error::DICTEE_KEYSTORE_BASE64 is not set: a release cannot be signed (see android/README.md, 'Clé de signature')."
-            exit 1
+            # Never publish an unsigned or debug-signed APK: skip the release, loudly.
+            echo "::warning::Release key secrets are not set: no release is published (see android/README.md, 'Clé de signature des releases')."
+            echo "### No release published: the release key secrets are not set" >> "$GITHUB_STEP_SUMMARY"
+            echo "signed=false" >> "$GITHUB_OUTPUT"
           else
             echo "::notice::No release key (pull request or fork): the release APK is built unsigned."
           fi
@@ -159,7 +165,8 @@ jobs:
   release:
     name: Publish APK
     needs: [build, models, emulator]
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    # Only with an APK signed by the private release key.
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.build.outputs.signed == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: write

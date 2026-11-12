@@ -278,8 +278,9 @@ Une revue indépendante du code a relevé les points suivants, corrigés :
 - **Signature des releases par une clé privée**, jamais dans le dépôt : la CI la
   reçoit des secrets GitHub `DICTEE_KEYSTORE_BASE64`, `DICTEE_KEYSTORE_PASSWORD`
   et `DICTEE_KEY_ALIAS`, l'écrit dans un fichier temporaire le temps du build et
-  le supprime. Sur `main`, le job échoue si les secrets manquent (jamais de
-  repli silencieux) et refuse un APK signé par la clé de debug ; il affiche
+  le supprime. Sur `main`, si les secrets manquent, aucune release n'est publiée
+  (avertissement dans le résumé du workflow, jamais de repli sur la clé de
+  debug), et un APK signé par la clé de debug est refusé ; il affiche
   l'empreinte SHA-256 du certificat. Sur une pull request sans secrets (fork),
   l'APK release est construit non signé et n'est pas publié.
 - La clé de debug versionnée (`keystore/debug.keystore`, mot de passe `android`)
