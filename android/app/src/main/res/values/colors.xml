@@ -1,5 +1,26 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!--
+  Palette Kalmia, thème clair. Source : kalmia.ca (index.html, variables paper, ink, green, button, flower) et
+  design/marque/tokens.css du dépôt Kalmia.ca, relevées le 2026-11-12. Les valeurs sombres sont dans
+  values-night/colors.xml, sous les mêmes noms. C'est le seul endroit où une couleur s'écrit en
+  hexadécimal ; tout le reste (thème, styles, mises en page, Kotlin) y renvoie.
+-->
 <resources>
-    <color name="launcher_bg">#2E5E8C</color>
-    <color name="seed">#2E5E8C</color>
+    <color name="kalmia_paper">#F5F1E8</color>
+    <color name="kalmia_paper_2">#EDE7DA</color>
+    <color name="kalmia_ink">#23261F</color>
+    <color name="kalmia_muted">#5B5E54</color>
+    <color name="kalmia_rule">#CFC8B8</color>
+    <color name="kalmia_green">#3F5E45</color>
+    <color name="kalmia_button">#8FAE93</color>
+    <color name="kalmia_on_button">#23261F</color>
+    <color name="kalmia_flower">#A9446A</color>
+    <color name="kalmia_on_flower">#FFFFFF</color>
+    <!-- Erreur : rouge Material, jamais le rose fleur. Hors source Kalmia (décision de l'issue #15). -->
+    <color name="kalmia_error">#BA1A1A</color>
+    <color name="kalmia_on_error">#FFFFFF</color>
+    <!-- Surfaces inverses (info-bulles, barres de message) : valeurs du thème opposé. -->
+    <color name="kalmia_inverse_surface">#23261F</color>
+    <color name="kalmia_on_inverse_surface">#F5F1E8</color>
+    <color name="kalmia_inverse_primary">#8DB596</color>
 </resources>

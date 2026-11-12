@@ -1,18 +1,203 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!--
+  Thème Kalmia (issue #15, étape 1.5). Les couleurs viennent de colors.xml (clair) et
+  values-night/colors.xml (sombre) : ce fichier ne contient aucune valeur de couleur, seulement
+  la correspondance « couleur de marque -> rôle Material 3 », pour que tous les composants
+  en héritent. Tout rôle Material 3 utilisé par un composant est défini ici : aucun ne retombe
+  sur la palette violette par défaut. Le test ThemeContrastTest relit ce fichier.
+-->
 <resources>
     <style name="Theme.Dictee" parent="Theme.Material3.DayNight.NoActionBar">
-        <item name="colorPrimary">#2E5E8C</item>
-        <item name="colorOnPrimary">#FFFFFF</item>
-        <item name="colorPrimaryContainer">#D1E4FF</item>
-        <item name="colorOnPrimaryContainer">#001D36</item>
+        <!-- Principal : vert feuille (liens, sélection, badge « Recommandé ») -->
+        <item name="colorPrimary">@color/kalmia_green</item>
+        <item name="colorOnPrimary">@color/kalmia_paper</item>
+        <item name="colorPrimaryInverse">@color/kalmia_inverse_primary</item>
+        <!-- Conteneur principal : couleur bouton (sauge), texte encre -->
+        <item name="colorPrimaryContainer">@color/kalmia_button</item>
+        <item name="colorOnPrimaryContainer">@color/kalmia_on_button</item>
+        <!-- Secondaire : atténué ; conteneur : papier 2 -->
+        <item name="colorSecondary">@color/kalmia_muted</item>
+        <item name="colorOnSecondary">@color/kalmia_paper</item>
+        <item name="colorSecondaryContainer">@color/kalmia_paper_2</item>
+        <item name="colorOnSecondaryContainer">@color/kalmia_ink</item>
+        <!-- Tertiaire : fleur (accent rare : micro à l'écoute, mots surlignés du test) -->
+        <item name="colorTertiary">@color/kalmia_flower</item>
+        <item name="colorOnTertiary">@color/kalmia_on_flower</item>
+        <item name="colorTertiaryContainer">@color/kalmia_flower</item>
+        <item name="colorOnTertiaryContainer">@color/kalmia_on_flower</item>
+        <!-- Erreur : rouge, jamais la fleur -->
+        <item name="colorError">@color/kalmia_error</item>
+        <item name="colorOnError">@color/kalmia_on_error</item>
+        <item name="colorErrorContainer">@color/kalmia_paper_2</item>
+        <item name="colorOnErrorContainer">@color/kalmia_error</item>
+        <!-- Fond et surfaces : papier ; cartes, touches, zones de saisie : papier 2 -->
+        <item name="android:colorBackground">@color/kalmia_paper</item>
+        <item name="colorOnBackground">@color/kalmia_ink</item>
+        <item name="colorSurface">@color/kalmia_paper</item>
+        <item name="colorOnSurface">@color/kalmia_ink</item>
+        <item name="colorSurfaceVariant">@color/kalmia_paper_2</item>
+        <item name="colorOnSurfaceVariant">@color/kalmia_muted</item>
+        <item name="colorSurfaceInverse">@color/kalmia_inverse_surface</item>
+        <item name="colorOnSurfaceInverse">@color/kalmia_on_inverse_surface</item>
+        <item name="colorSurfaceDim">@color/kalmia_paper</item>
+        <item name="colorSurfaceBright">@color/kalmia_paper</item>
+        <item name="colorSurfaceContainerLowest">@color/kalmia_paper</item>
+        <item name="colorSurfaceContainerLow">@color/kalmia_paper</item>
+        <item name="colorSurfaceContainer">@color/kalmia_paper_2</item>
+        <item name="colorSurfaceContainerHigh">@color/kalmia_paper_2</item>
+        <item name="colorSurfaceContainerHighest">@color/kalmia_paper_2</item>
+        <!-- Contour : atténué pour les contrôles (contraste 3:1 exigé), filet pour les séparateurs -->
+        <item name="colorOutline">@color/kalmia_muted</item>
+        <item name="colorOutlineVariant">@color/kalmia_rule</item>
+
         <item name="android:statusBarColor">?attr/colorSurface</item>
         <item name="android:navigationBarColor">?attr/colorSurface</item>
-        <item name="android:windowLightStatusBar">true</item>
-        <item name="android:windowLightNavigationBar">true</item>
-        <item name="colorError">#BA1A1A</item>
+        <item name="android:windowLightStatusBar">@bool/kalmia_light_system_bars</item>
+        <item name="android:windowLightNavigationBar">@bool/kalmia_light_system_bars</item>
+
+        <!-- Typographie : Newsreader partout, IBM Plex Mono pour étiquettes et valeurs -->
+        <item name="android:fontFamily">@font/newsreader</item>
+        <item name="textAppearanceDisplayLarge">@style/TextAppearance.Kalmia.Headline</item>
+        <item name="textAppearanceDisplayMedium">@style/TextAppearance.Kalmia.Headline</item>
+        <item name="textAppearanceDisplaySmall">@style/TextAppearance.Kalmia.Headline</item>
+        <item name="textAppearanceHeadlineLarge">@style/TextAppearance.Kalmia.Headline</item>
+        <item name="textAppearanceHeadlineMedium">@style/TextAppearance.Kalmia.Headline</item>
+        <item name="textAppearanceHeadlineSmall">@style/TextAppearance.Kalmia.Headline</item>
+        <item name="textAppearanceTitleLarge">@style/TextAppearance.Kalmia.Title</item>
+        <item name="textAppearanceTitleMedium">@style/TextAppearance.Kalmia.TitleSmall</item>
+        <item name="textAppearanceTitleSmall">@style/TextAppearance.Kalmia.TitleSmall</item>
+        <item name="textAppearanceBodyLarge">@style/TextAppearance.Kalmia.Body</item>
+        <item name="textAppearanceBodyMedium">@style/TextAppearance.Kalmia.Body</item>
+        <item name="textAppearanceBodySmall">@style/TextAppearance.Kalmia.BodySmall</item>
+        <item name="textAppearanceLabelLarge">@style/TextAppearance.Kalmia.Button</item>
+        <item name="textAppearanceLabelMedium">@style/TextAppearance.Kalmia.Label</item>
+        <item name="textAppearanceLabelSmall">@style/TextAppearance.Kalmia.Label</item>
+
+        <!-- Formes : angles droits partout -->
+        <item name="shapeAppearanceCornerExtraSmall">@style/ShapeAppearance.Kalmia.Square</item>
+        <item name="shapeAppearanceCornerSmall">@style/ShapeAppearance.Kalmia.Square</item>
+        <item name="shapeAppearanceCornerMedium">@style/ShapeAppearance.Kalmia.Square</item>
+        <item name="shapeAppearanceCornerLarge">@style/ShapeAppearance.Kalmia.Square</item>
+        <item name="shapeAppearanceCornerExtraLarge">@style/ShapeAppearance.Kalmia.Square</item>
+        <item name="shapeAppearanceSmallComponent">@style/ShapeAppearance.Kalmia.Square</item>
+        <item name="shapeAppearanceMediumComponent">@style/ShapeAppearance.Kalmia.Square</item>
+        <item name="shapeAppearanceLargeComponent">@style/ShapeAppearance.Kalmia.Square</item>
+
+        <!-- Composants -->
+        <item name="materialButtonStyle">@style/Widget.Kalmia.Button</item>
+        <item name="materialButtonOutlinedStyle">@style/Widget.Kalmia.OutlinedButton</item>
+        <item name="materialCardViewStyle">@style/Widget.Kalmia.CardView</item>
+        <item name="materialCardViewOutlinedStyle">@style/Widget.Kalmia.CardView</item>
+        <item name="sliderStyle">@style/Widget.Kalmia.Slider</item>
     </style>
+
+    <!-- Le clavier se thème comme l'application ; la nuit est choisie par le service (voir DicteeImeService). -->
     <style name="Theme.Dictee.Keyboard" parent="Theme.Dictee"/>
-    <style name="KeyButton" parent="Widget.Material3.Button.TonalButton">
+
+    <!-- ===== Formes ===== -->
+    <style name="ShapeAppearance.Kalmia.Square" parent="">
+        <item name="cornerFamily">rounded</item>
+        <item name="cornerSize">0dp</item>
+    </style>
+
+    <!-- ===== Styles de texte nommés ===== -->
+    <!-- Titre d'écran : Newsreader 400, serré -->
+    <style name="TextAppearance.Kalmia.Headline" parent="">
+        <item name="android:fontFamily">@font/newsreader</item>
+        <item name="android:textSize">28sp</item>
+        <item name="android:letterSpacing">-0.02</item>
+        <item name="android:lineSpacingMultiplier">1.05</item>
+    </style>
+    <!-- Titre de section -->
+    <style name="TextAppearance.Kalmia.Title" parent="">
+        <item name="android:fontFamily">@font/newsreader</item>
+        <item name="android:textSize">22sp</item>
+        <item name="android:letterSpacing">-0.01</item>
+        <item name="android:lineSpacingMultiplier">1.1</item>
+    </style>
+    <style name="TextAppearance.Kalmia.TitleSmall" parent="">
+        <item name="android:fontFamily">@font/newsreader</item>
+        <item name="android:textFontWeight">500</item>
+        <item name="android:textSize">18sp</item>
+        <item name="android:lineSpacingMultiplier">1.1</item>
+    </style>
+    <!-- Corps : Newsreader 400, interligne aéré -->
+    <style name="TextAppearance.Kalmia.Body" parent="">
+        <item name="android:fontFamily">@font/newsreader</item>
+        <item name="android:textSize">17sp</item>
+        <item name="android:lineSpacingMultiplier">1.25</item>
+    </style>
+    <style name="TextAppearance.Kalmia.BodySmall" parent="">
+        <item name="android:fontFamily">@font/newsreader</item>
+        <item name="android:textSize">15sp</item>
+        <item name="android:lineSpacingMultiplier">1.25</item>
+    </style>
+    <!-- Étiquette : IBM Plex Mono, majuscules espacées, 13 sp au minimum (règle de la marque) -->
+    <style name="TextAppearance.Kalmia.Label" parent="">
+        <item name="android:fontFamily">@font/ibm_plex_mono</item>
+        <item name="android:textSize">13sp</item>
+        <item name="android:letterSpacing">0.14</item>
+        <item name="android:textAllCaps">true</item>
+    </style>
+    <!-- Libellé de bouton : IBM Plex Mono 500, majuscules -->
+    <style name="TextAppearance.Kalmia.Button" parent="">
+        <item name="android:fontFamily">@font/ibm_plex_mono</item>
+        <item name="android:textFontWeight">500</item>
+        <item name="android:textSize">14sp</item>
+        <item name="android:letterSpacing">0.1</item>
+        <item name="android:textAllCaps">true</item>
+    </style>
+    <!-- Valeur technique : taille d'un modèle, score, état du clavier -->
+    <style name="TextAppearance.Kalmia.Value" parent="">
+        <item name="android:fontFamily">@font/ibm_plex_mono</item>
+        <item name="android:textSize">14sp</item>
+        <item name="android:lineSpacingMultiplier">1.2</item>
+    </style>
+    <!-- Symbole d'une touche du clavier : Plex Mono 500, 24 sp (lisibilité d'abord, sans serif ni majuscules) -->
+    <style name="TextAppearance.Kalmia.Key" parent="">
+        <item name="android:fontFamily">@font/ibm_plex_mono</item>
+        <item name="android:textFontWeight">500</item>
+        <item name="android:textSize">24sp</item>
+    </style>
+
+    <!-- ===== Composants ===== -->
+    <!-- Bouton d'action : fond sauge, texte encre, ombre pleine décalée encre (4 dp, dessinée par
+         kalmia_ombre_bouton dans les marges internes droite et bas). -->
+    <style name="Widget.Kalmia.Button" parent="Widget.Material3.Button">
+        <item name="shapeAppearance">@style/ShapeAppearance.Kalmia.Square</item>
+        <item name="cornerRadius">0dp</item>
+        <item name="backgroundTint">@color/kalmia_button_bg</item>
+        <item name="iconTint">@color/kalmia_button_text</item>
+        <item name="android:textColor">@color/kalmia_button_text</item>
+        <item name="android:minHeight">48dp</item>
+        <item name="android:insetLeft">0dp</item>
+        <item name="android:insetTop">0dp</item>
+        <item name="android:insetRight">4dp</item>
+        <item name="android:insetBottom">4dp</item>
+        <item name="android:foreground">@drawable/kalmia_ombre_bouton</item>
+        <item name="android:stateListAnimator">@null</item>
+    </style>
+    <!-- Bouton secondaire : filet encre de 1 dp, sans ombre. -->
+    <style name="Widget.Kalmia.OutlinedButton" parent="Widget.Material3.Button.OutlinedButton">
+        <item name="shapeAppearance">@style/ShapeAppearance.Kalmia.Square</item>
+        <item name="cornerRadius">0dp</item>
+        <item name="strokeColor">?attr/colorOnSurface</item>
+        <item name="strokeWidth">1dp</item>
+        <item name="iconTint">@color/kalmia_key_text</item>
+        <item name="android:textColor">@color/kalmia_key_text</item>
+        <item name="android:minHeight">48dp</item>
+    </style>
+    <!-- Micro du clavier : bouton d'action carré ; fleur quand la vue est activée (écoute). -->
+    <style name="Widget.Kalmia.Button.Mic" parent="Widget.Kalmia.Button">
+        <item name="backgroundTint">@color/kalmia_mic_bg</item>
+        <item name="iconTint">@color/kalmia_mic_icon</item>
+        <item name="iconSize">44dp</item>
+        <item name="iconGravity">textStart</item>
+        <item name="iconPadding">0dp</item>
+        <item name="android:padding">0dp</item>
+    </style>
+    <!-- Touche du clavier : papier 2, filet atténué (3:1 sur le papier), pas d'ombre, symbole Plex Mono 24 sp. -->
+    <style name="KeyButton" parent="Widget.Kalmia.OutlinedButton">
         <item name="android:layout_width">0dp</item>
         <item name="android:layout_height">52dp</item>
         <item name="android:layout_weight">1</item>
@@ -23,9 +208,23 @@
         <item name="android:minWidth">0dp</item>
         <item name="android:paddingStart">0dp</item>
         <item name="android:paddingEnd">0dp</item>
-        <item name="android:textSize">20sp</item>
+        <item name="android:textAppearance">@style/TextAppearance.Kalmia.Key</item>
+        <item name="backgroundTint">?attr/colorSurfaceContainer</item>
+        <item name="strokeColor">?attr/colorOutline</item>
         <item name="iconGravity">textStart</item>
         <item name="iconPadding">0dp</item>
-        <item name="cornerRadius">12dp</item>
+        <item name="iconSize">24dp</item>
+    </style>
+    <!-- Carte : papier 2, filet fin, angles droits, sans élévation. -->
+    <style name="Widget.Kalmia.CardView" parent="Widget.Material3.CardView.Outlined">
+        <item name="shapeAppearance">@style/ShapeAppearance.Kalmia.Square</item>
+        <item name="cardCornerRadius">0dp</item>
+        <item name="cardBackgroundColor">?attr/colorSurfaceContainer</item>
+        <item name="cardElevation">0dp</item>
+        <item name="strokeColor">?attr/colorOutlineVariant</item>
+        <item name="strokeWidth">1dp</item>
+    </style>
+    <style name="Widget.Kalmia.Slider" parent="Widget.Material3.Slider">
+        <item name="trackColorInactive">?attr/colorOutlineVariant</item>
     </style>
 </resources>

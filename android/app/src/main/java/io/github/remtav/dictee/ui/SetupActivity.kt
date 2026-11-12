@@ -44,6 +44,7 @@ class SetupActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         app = DicteeApp.from(this)
         val col = scrollingColumn()
+        col.logo()
         col.title(getString(R.string.app_name))
         col.body(getString(R.string.setup_intro))
 
@@ -186,7 +187,7 @@ class SetupActivity : AppCompatActivity() {
         card.body("${spec.publisher} · ${spec.description}", small = true)
         card.body(getString(R.string.model_license_runs_local, spec.license), small = true)
         val status = Downloads.status[spec.id]
-        card.body(
+        card.value(
             when {
                 Downloads.isBusy(spec.id) && status != null ->
                     getString(R.string.setup_downloading, status.percent, size(status.downloaded), size(status.total))
@@ -194,7 +195,6 @@ class SetupActivity : AppCompatActivity() {
                 installed -> getString(R.string.setup_installed, size(app.store.installedBytes(spec.asDownloadable())))
                 else -> getString(R.string.setup_not_installed, size(spec.totalBytes))
             },
-            small = true,
         )
         card.row().apply {
             when {

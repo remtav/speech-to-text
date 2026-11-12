@@ -755,3 +755,192 @@ recommandé pour le français québécois (aussi le plus petit et le plus rapide
 comme une supériorité établie. Pour un chiffre solide, il faudrait des dizaines
 de clips, ce que les 152 clips « Français du Canada » de la seule partition
 `test` permettraient, après écoute.
+
+## Issue #15, lot 1 — étape 1.5 : thème Kalmia
+
+Étape 1.5 de l'issue #15 : l'application et le clavier prennent l'identité visuelle de Kalmia (couleurs
+claires et sombres, polices embarquées, angles droits, ombre décalée, logo). Source Kalmia lue en lecture
+seule le 2026-11-12 (`/home/user/Kalmia.ca`) : `index.html` (feuille de style), `design/marque/tokens.css`,
+`design/marque/README.md`, `design/marque/icone/` et `design/marque/logo/`, `rapport-exemple/polices/`.
+
+### Valeurs relevées (et fichier source)
+
+Clair / sombre, relevées dans `index.html` (variables `--paper`, `--paper-2`, `--ink`, `--muted`, `--rule`,
+`--green`, `--button`, `--on-button`, `--flower`, `--on-accent`, lignes 66 à 84) et confirmées par
+`design/marque/tokens.css` :
+
+| Rôle Kalmia | Clair | Sombre | Ressource (`values/colors.xml`, `values-night/colors.xml`) |
+| --- | --- | --- | --- |
+| Papier | `#F5F1E8` | `#13160F` | `kalmia_paper` |
+| Papier 2 | `#EDE7DA` | `#1B1F17` | `kalmia_paper_2` |
+| Encre | `#23261F` | `#ECE7DA` | `kalmia_ink` |
+| Atténué (lichen) | `#5B5E54` | `#A9AB9B` | `kalmia_muted` |
+| Filet | `#CFC8B8` | `#3A3E33` | `kalmia_rule` |
+| Vert (feuille) | `#3F5E45` | `#8DB596` | `kalmia_green` |
+| Bouton (sauge) | `#8FAE93` | `#8DB596` | `kalmia_button` |
+| Texte sur bouton | `#23261F` | `#13160F` | `kalmia_on_button` |
+| Fleur (kalmia) | `#A9446A` | `#DE85A7` | `kalmia_flower` |
+| Texte sur fleur | `#FFFFFF` | `#13160F` | `kalmia_on_flower` |
+
+Polices : Newsreader (variable : `wght` 200 à 800, `opsz` 6 à 72, défaut 18) et IBM Plex Mono (Regular 400,
+Medium 500), fichiers de `rapport-exemple/polices/`, licence SIL OFL 1.1 vérifiée dans les fichiers de licence
+fournis (`OFL-Newsreader.txt`, `OFL-IBMPlexMono.txt`) et dans la table `name` des polices. Les fichiers sont
+ceux de la source : ils conviennent à Android (TTF, polices variables prises en charge dès l'API 26, `minSdk` = 29),
+donc aucun fichier « officiel » de remplacement. Échelle de la marque : étiquette mono 13 px minimum,
+interlettrage `.14em` (étiquettes) et `.1em` (boutons), texte 19 px / interligne 1,5, boutons
+`box-shadow: 4px 4px 0 var(--ink)`, rayon 0, filets de 1 px.
+
+### Écarts entre la source et l'issue
+
+La source et le tableau de l'issue concordent sur chaque valeur de couleur. Écarts de fond :
+
+- **Filet comme contour** : l'issue range « Filet » dans « bordures, séparateurs ». Le README de la marque le
+  réserve au décor (1,48:1 sur papier), donc le filet ne sert ici qu'aux séparateurs et bordures décoratives
+  (bordure des cartes, piste du niveau sonore, piste inactive du curseur). Les contours de contrôles (touches du
+  clavier, cases, interrupteurs, champs) prennent l'atténué (`colorOutline`, 5,9:1 sur papier) pour atteindre 3:1
+  (WCAG 1.4.11). Testé.
+- **Bouton sauge sur papier** : 2,16:1, le README de la marque l'avait déjà noté ; l'ombre pleine encre et le texte
+  encre (6,32:1) portent le contour, comme sur le site.
+- **Texte de l'étiquette** : le site descend à 11 ou 12 px par endroits ; la marque (`tokens.css`) exige 13 px
+  minimum. L'application suit `tokens.css` (13 sp).
+- **Tailles de corps** : le site fait 19 px / 16 px ; l'application prend 17 sp / 15 sp (les `sp` suivent le réglage
+  de taille du système, et un écran de téléphone est plus proche de l'œil).
+- **Rouge d'erreur** : `#BA1A1A` / `#FFB4AB`, demandé par l'issue, absent de la source Kalmia. `kalmia_on_error`
+  (`#FFFFFF` / `#690005`) vient du jeu Material standard et sert seulement aux composants qui héritent du rôle.
+- **Surfaces inverses** (info-bulles, messages) : valeurs du thème opposé (`kalmia_inverse_*`), absentes de la
+  source ; testées à 4,5:1.
+- **Accent fort** : `--kalmia-profond` (`#7A2F4C`) n'est pas utilisé (aucun texte d'accent fort).
+- **Licences** : l'issue demande « `res/font` avec leur fichier de licence ». Un fichier `.txt` n'est pas une
+  ressource valide dans `res/font` (nom `OFL-…`, majuscules et tiret refusés par aapt2), donc les licences sont dans
+  `app/src/main/assets/licences/`, dans l'APK. Un test vérifie leur présence.
+
+### Correspondance couleurs → rôles Material 3 (`res/values/themes.xml`, `Theme.Dictee`)
+
+Le thème ne contient que des renvois `@color/kalmia_*` (clair et sombre par les qualificatifs de ressources) ; un
+seul fichier de thème remplace `values-night/themes.xml` (supprimé : les barres système claires ou sombres
+passent par `@bool/kalmia_light_system_bars`). Tous les rôles Material 3 utilisés par un composant sont définis
+(un test le vérifie), pour que rien ne retombe sur la palette violette par défaut.
+
+| Rôle Material | Couleur Kalmia | Où on le voit |
+| --- | --- | --- |
+| `colorSurface`, `colorBackground`, `colorSurfaceContainerLowest/Low/Dim/Bright` | papier | fond des écrans et du clavier |
+| `colorSurfaceContainer/High/Highest`, `colorSurfaceVariant` | papier 2 | cartes, touches, zones de saisie |
+| `colorOnSurface`, `colorOnBackground` | encre | texte, filet des boutons secondaires, ombre décalée |
+| `colorOnSurfaceVariant` | atténué | texte secondaire, étiquettes, état du clavier |
+| `colorOutline` / `colorOutlineVariant` | atténué / filet | contours de contrôles / séparateurs |
+| `colorPrimary` / `colorOnPrimary` | vert / papier | titres de section, badge « Recommandé », cases et interrupteurs activés, barre de niveau |
+| `colorPrimaryContainer` / `colorOnPrimaryContainer` | bouton (sauge) / texte sur bouton | boutons d'action, micro au repos |
+| `colorTertiary`, `colorTertiaryContainer` / `colorOn…` | fleur / texte sur fleur | micro à l'écoute ; mots surlignés du lot 4 |
+| `colorSecondary…` | atténué, papier 2, encre | éléments sélectionnés des composants Material |
+| `colorError` / `colorErrorContainer` | rouge / papier 2 | erreurs et avertissements (toujours avec texte et icône) |
+| `colorSurfaceInverse`, `colorPrimaryInverse` | valeurs du thème opposé | messages, info-bulles |
+
+Le clavier choisit toujours son thème par `DicteeImeService.themedInflater()` (réglage système, clair, sombre : un
+contexte de configuration `uiMode` forcé) ; comme les couleurs sont des ressources qualifiées, le clavier prend
+les couleurs sombres ou claires du réglage sans autre code. Le réglage de thème existant n'a pas changé.
+
+### Polices et styles de texte
+
+- `res/font/newsreader.xml` (Newsreader 400, 500, 700 et italiques par `fontVariationSettings`) et
+  `res/font/ibm_plex_mono.xml` (400, 500). `android:fontFamily` du thème = Newsreader : tout texte non stylé est
+  en Newsreader. Aucune police téléchargeable : pas de fournisseur de polices, pas de `fontProviderAuthority`
+  (test `NoHardcodedStyleTest.noDownloadableFontIsDeclared`).
+- Styles nommés (`themes.xml`) : `TextAppearance.Kalmia.Headline` (28 sp), `.Title` (22 sp), `.TitleSmall`
+  (18 sp, graisse 500), `.Body` (17 sp), `.BodySmall` (15 sp), `.Label` (Plex Mono 13 sp, majuscules,
+  interlettrage 0,14), `.Button` (Plex Mono 500, 14 sp, majuscules, 0,1), `.Value` (Plex Mono 14 sp), `.Key`
+  (Plex Mono 500, 24 sp). Les quinze échelles typographiques Material (`textAppearanceBodyMedium`, …) y renvoient,
+  donc les composants Material (boutons, cases, dialogues) les héritent. `ui/Ui.kt` n'utilise plus que ces styles :
+  `title`, `heading`, `body`, `badge`, `warning`, et les nouveaux `value` (taille des modèles, scores, temps du
+  diagnostic) et `label` (« Brut » / « Poli » du diagnostic) ; `logo()` pose le logo sur l'accueil. Les « petites
+  capitales » sont des majuscules espacées (`textAllCaps`) : Android n'a pas de vraies petites capitales, et le site
+  fait de même (`text-transform: uppercase`).
+
+### Formes et ombre
+
+- Angles droits : `shapeAppearanceCorner*` et `…Component` du thème pointent vers `ShapeAppearance.Kalmia.Square`
+  (rayon 0 dp) ; cartes (`Widget.Kalmia.CardView`, papier 2, filet de 1 dp, sans élévation), boutons, champs,
+  dialogues l'héritent. Le curseur, les interrupteurs et les cases gardent leur pouce rond (cercle permis par la marque).
+- Ombre pleine décalée encre de 4 dp sur les boutons d'action (`Widget.Kalmia.Button`, le style
+  `materialButtonStyle` du thème, donc `ViewGroup.button()` sans paramètre de style) : `kalmia_ombre_bouton.xml`
+  (deux bandes encre en premier plan) posée sur un bouton dont les marges internes droite et bas font 4 dp : rien ne
+  recouvre le texte, aucun parent à ne pas rogner. Pas de translation à l'appui (le site en fait une) : l'ondulation
+  Material reste le retour visuel. Les boutons secondaires (`materialButtonOutlinedStyle`) ont un filet encre de 1 dp
+  sans ombre.
+
+### Clavier
+
+- Fond papier ; touches papier 2 avec filet atténué (contour 5,9:1), sans ombre ; micro carré de 100 dp (96 dp
+  visibles + ombre), vert (couleur bouton) au repos, fleur quand la vue est activée (écoute), icône blanche
+  (5,64:1) ou `#13160F` (6,98:1) ; barre de niveau carrée, piste en filet, barre verte (le rose reste à un seul endroit,
+  le micro). Le texte d'état est en Plex Mono (`TextAppearance.Kalmia.Value`, `colorOnSurfaceVariant`) ; une erreur
+  passe en `colorError` avec l'icône `ic_error` devant le texte (ajoutée aussi aux avertissements et aux échecs
+  du diagnostic).
+- **Simplifications de touches (lisibilité d'abord)** : les symboles `, . ? !` sont en **Plex Mono 500, 24 sp**, pas en
+  Newsreader (la virgule et le point d'un serif sont fins et petits à cette taille) ; **aucune ombre décalée sur les
+  touches** (seul le micro et les boutons d'action des écrans en ont : 7 touches voisines avec une ombre de 4 dp
+  mangeraient la largeur et brouilleraient les zones tactiles) ; icônes de touches à 24 dp.
+- **Zones tactiles** : le bouton de modèle, « Annuler », et les réglages passent de 40 dp à 48 dp ; touches 52 dp ;
+  micro 96 dp. Symboles de touches 24 sp (≥ 20 sp). Le clavier gagne 8 dp de hauteur.
+
+### Logo et icône de lancement
+
+- **Logo retenu : celui de la source, sans repli.** `design/marque/logo/kalmia-logo.svg` (coupe + nom vectorisé) est
+  converti en `drawable/kalmia_logo.xml` (tracés identiques, nombres arrondis à 0,1 unité, `@color/` : coupe et
+  « ia » en fleur, cœur en vert, « Klm » en encre, clair et sombre) et affiché sur l'accueil. L'icône de lancement
+  reprend la **coupe** (`design/marque/icone/kalmia-icone.svg`, `kalmia-icone-sombre.svg`) : fond papier,
+  trait de 9 unités à l'échelle 0,34 dans la zone sûre (≈ 3 dp de trait, lisible), cœur vert ; version
+  monochrome (`ic_launcher_monochrome.xml`) pour les icônes thématiques d'Android 13. La version « petite » (trait 16)
+  de la marque n'est pas nécessaire : le trait de 9 ne descend pas sous 3 dp à 48 dp. Fond et couleurs de l'icône
+  suivent le thème clair ou sombre du téléphone si le lanceur applique le mode nuit.
+- Le pictogramme de micro n'est plus l'icône de l'application (il reste le glyphe du bouton micro).
+
+### Tests ajoutés
+
+- `ThemeContrastTest` : lit `values/colors.xml`, `values-night/colors.xml` et `values/themes.xml`, résout rôle →
+  couleur, exige ≥ 4,5:1 pour chaque paire texte / fond utilisée, dans les deux thèmes, et 3:1 pour le contour des
+  contrôles ; vérifie les valeurs de la palette contre la source Kalmia, le rouge d'erreur (`#BA1A1A` / `#FFB4AB`,
+  jamais la fleur), la définition de tous les rôles et d'une valeur sombre pour chaque couleur.
+- `NoHardcodedStyleTest` (garde de CI, tourne dans le job `testDebugUnitTest`) : aucune couleur hexadécimale, constante
+  `Color.*`, entier ARGB, `Typeface` ni police en dur dans `app/src/main/java` ; aucune couleur hexadécimale dans les
+  ressources hors `colors.xml` (mises en page, drawables, thème, manifeste) ; toute `fontFamily` vient de `res/font` ;
+  aucune police téléchargeable ; polices et licences OFL présentes.
+
+Ratios (extraits du test ; clair / sombre) :
+
+| Paire (rôle Material) | Clair | Sombre |
+| --- | --- | --- |
+| encre sur papier (`colorOnSurface` / `colorSurface`) | 13,61 | 14,80 |
+| encre sur papier 2 | 12,45 | 13,55 |
+| atténué sur papier | 5,87 | 7,82 |
+| atténué sur papier 2 | 5,37 | 7,16 |
+| vert sur papier (titres, badge) | 6,43 | 7,99 |
+| vert sur papier 2 (badge dans une carte) | 5,88 | 7,32 |
+| papier sur vert (`colorOnPrimary`) | 6,43 | 7,99 |
+| texte sur bouton sauge | 6,32 | 7,99 |
+| texte sur fleur (micro à l'écoute) | 5,64 | 6,98 |
+| fleur sur papier / papier 2 (mots surlignés, lot 4) | 5,01 / 4,58 | 6,98 / 6,39 |
+| erreur sur papier / papier 2 | 5,73 / 5,24 | 10,76 / 9,86 |
+| encre sur papier 2 (éléments sélectionnés) | 12,45 | 13,55 |
+| texte inverse sur surface inverse | 13,61 | 14,80 |
+
+Paires Kalmia **écartées pour du texte** (non utilisées comme texte, mesurées à la main) : encre sur fleur (2,72 clair,
+2,12 sombre) ; atténué sur sauge (2,72 / 1,02) ; vert sur sauge (2,98 / 1,00) ; encre sombre sur sauge sombre
+(1,85) ; sauge sur papier (2,16 clair : fond de bouton seulement, jamais du texte) ; filet sur papier (1,48 :
+séparateurs). Texte sur bouton : toujours `colorOnPrimaryContainer` (jamais l'encre du thème, qui est claire en
+sombre). Fleur sur papier 2 en clair frôle le seuil (4,58) : usage réservé aux mots surlignés du lot 4, en
+texte de corps seulement.
+
+### À juger sur un vrai écran (clair et sombre, à reporter dans `A_VERIFIER.md`)
+
+1. Les touches `, . ? !` en Plex Mono 24 sp sont-elles bien lisibles ? Le clavier a-t-il toujours l'air de Kalmia ?
+2. Le micro carré de 100 dp avec ombre encre (surtout en sombre, où l'ombre est claire) : trop massif ? À régler :
+   `Widget.Kalmia.Button.Mic` dans `themes.xml`, taille dans `keyboard_view.xml`.
+3. Les étiquettes et libellés de boutons en majuscules espacées : un libellé long (« Télécharger… ») passe-t-il à la
+   ligne proprement ? À régler : `TextAppearance.Kalmia.Button`.
+4. Le filet de 1,48:1 comme bordure de carte et piste du curseur : assez visible sur ton écran ? À régler :
+   `colorOutlineVariant` dans `themes.xml`.
+5. L'icône de lancement (clair, sombre, monochrome Android 13) et le logo de l'accueil.
+6. Les champs de saisie gardent le soulignement Material par défaut (colorés par le thème) : à cadrer si le style
+   éditorial l'exige.
+7. Aucune capture n'a été produite ici (pas d'émulateur) ; les captures claires et sombres sont refaites à l'étape
+   1.4 et en CI. Le test `ScreenshotTest` n'a pas changé et reste compilable.

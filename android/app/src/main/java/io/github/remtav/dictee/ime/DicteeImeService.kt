@@ -545,6 +545,8 @@ class DicteeImeService : InputMethodService(), DictationListener, EngineManager.
         val attr = if (isError) androidx.appcompat.R.attr.colorError else com.google.android.material.R.attr.colorOnSurfaceVariant
         status.context.theme.resolveAttribute(attr, tv, true)
         status.setTextColor(tv.data)
+        // An error is never only red: an icon goes with the text.
+        status.setCompoundDrawablesRelativeWithIntrinsicBounds(if (isError) R.drawable.ic_error else 0, 0, 0, 0)
         if (!listening) meter?.setLevel(0f)
     }
 

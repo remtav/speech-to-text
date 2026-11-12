@@ -169,16 +169,15 @@ class CompareActivity : AppCompatActivity() {
             card.body(getString(R.string.compare_error, r.error))
             return
         }
-        card.body(
+        card.value(
             getString(
                 R.string.compare_summary,
                 r.loadMillis / 1000f, r.meanRtf, r.peakRssMb, r.totalWer?.let { "%.1f %%".format(Locale.ROOT, it * 100) } ?: "—",
             ),
         )
         for (s in r.samples) {
-            card.body(
+            card.value(
                 "${s.sample} · RTF %.3f%s".format(Locale.ROOT, s.rtf, s.wer?.let { " · WER %.1f %%".format(Locale.ROOT, it * 100) } ?: ""),
-                small = true,
             )
             card.body("« ${s.text} »")
         }

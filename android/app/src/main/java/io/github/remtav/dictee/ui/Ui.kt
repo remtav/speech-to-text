@@ -7,6 +7,7 @@ import android.util.TypedValue
 import android.view.View
 import android.view.ViewGroup
 import android.widget.CheckBox
+import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.Toast
 import android.widget.ScrollView
@@ -19,7 +20,13 @@ import io.github.remtav.dictee.R
 import io.github.remtav.dictee.settings.AppSettings
 import io.github.remtav.dictee.stt.DictationLanguage
 
-/** Tiny helpers to build the settings-style screens in code (no layout XML to keep in sync). */
+/**
+ * Tiny helpers to build the settings-style screens in code (no layout XML to keep in sync).
+ *
+ * Look: Kalmia theme (issue #15, step 1.5). Colours come only from theme attributes and fonts only from
+ * the named text styles of `res/values/themes.xml` (headline, title, body, label, value): no colour
+ * or font is written here (checked by `NoHardcodedStyleTest`). A new screen uses these helpers.
+ */
 internal fun Context.dp(v: Int): Int = (v * resources.displayMetrics.density).toInt()
 
 internal fun Context.attrColor(attr: Int): Int {
@@ -48,13 +55,22 @@ internal fun Activity.scrollingColumn(): LinearLayout {
 
 internal fun ViewGroup.title(text: String) = TextView(context).apply {
     this.text = text
-    setTextAppearance(com.google.android.material.R.style.TextAppearance_Material3_HeadlineSmall)
+    setTextAppearance(R.style.TextAppearance_Kalmia_Headline)
     setPadding(0, context.dp(8), 0, context.dp(8))
+}.also { addView(it) }
+
+/** The Kalmia logo (flower and name), from `design/marque/logo` of the Kalmia source; follows light and dark. */
+internal fun ViewGroup.logo() = ImageView(context).apply {
+    setImageResource(R.drawable.kalmia_logo)
+    contentDescription = context.getString(R.string.cd_kalmia_logo)
+    adjustViewBounds = true
+    layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, context.dp(43))
+        .apply { topMargin = context.dp(4); bottomMargin = context.dp(4) }
 }.also { addView(it) }
 
 internal fun ViewGroup.heading(text: String) = TextView(context).apply {
     this.text = text
-    setTextAppearance(com.google.android.material.R.style.TextAppearance_Material3_TitleMedium)
+    setTextAppearance(R.style.TextAppearance_Kalmia_Title)
     setTextColor(context.attrColor(androidx.appcompat.R.attr.colorPrimary))
     setPadding(0, context.dp(20), 0, context.dp(6))
 }.also { addView(it) }
@@ -62,10 +78,24 @@ internal fun ViewGroup.heading(text: String) = TextView(context).apply {
 internal fun ViewGroup.body(text: CharSequence = "", small: Boolean = false) = TextView(context).apply {
     this.text = text
     setTextAppearance(
-        if (small) com.google.android.material.R.style.TextAppearance_Material3_BodySmall
-        else com.google.android.material.R.style.TextAppearance_Material3_BodyMedium,
+        if (small) R.style.TextAppearance_Kalmia_BodySmall else R.style.TextAppearance_Kalmia_Body,
     )
     setTextIsSelectable(false)
+    setPadding(0, context.dp(2), 0, context.dp(2))
+}.also { addView(it) }
+
+/** A technical value (size, score, timing, state) in IBM Plex Mono. */
+internal fun ViewGroup.value(text: CharSequence) = TextView(context).apply {
+    this.text = text
+    setTextAppearance(R.style.TextAppearance_Kalmia_Value)
+    setPadding(0, context.dp(2), 0, context.dp(2))
+}.also { addView(it) }
+
+/** A small label in letter-spaced IBM Plex Mono capitals, in the secondary text colour. */
+internal fun ViewGroup.label(text: CharSequence) = TextView(context).apply {
+    this.text = text
+    setTextAppearance(R.style.TextAppearance_Kalmia_Label)
+    setTextColor(context.attrColor(com.google.android.material.R.attr.colorOnSurfaceVariant))
     setPadding(0, context.dp(2), 0, context.dp(2))
 }.also { addView(it) }
 
@@ -111,17 +141,19 @@ internal fun View.spaced(start: Int = 0, end: Int = 8): View {
 internal fun ViewGroup.badge(text: CharSequence, viewId: Int = View.NO_ID) = TextView(context).apply {
     this.text = text
     if (viewId != View.NO_ID) id = viewId
-    setTextAppearance(com.google.android.material.R.style.TextAppearance_Material3_LabelLarge)
+    setTextAppearance(R.style.TextAppearance_Kalmia_Label)
     setTextColor(context.attrColor(androidx.appcompat.R.attr.colorPrimary))
     setPadding(0, context.dp(2), 0, context.dp(2))
 }.also { addView(it) }
 
-/** A warning line: always text (never only a colour), in the theme's error colour. */
+/** A warning line: always text and an icon (never only a colour), in the theme's error colour. */
 internal fun ViewGroup.warning(text: CharSequence, tagValue: String) = TextView(context).apply {
     this.text = text
     tag = tagValue
-    setTextAppearance(com.google.android.material.R.style.TextAppearance_Material3_BodySmall)
+    setTextAppearance(R.style.TextAppearance_Kalmia_BodySmall)
     setTextColor(context.attrColor(androidx.appcompat.R.attr.colorError))
+    setCompoundDrawablesRelativeWithIntrinsicBounds(R.drawable.ic_error, 0, 0, 0)
+    compoundDrawablePadding = context.dp(8)
     setPadding(0, context.dp(2), 0, context.dp(2))
 }.also { addView(it) }
 
