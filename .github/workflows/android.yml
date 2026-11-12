@@ -45,10 +45,37 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
       - name: Unit tests (includes the real sherpa-onnx VAD on the host)
         run: ./gradlew --no-daemon testDebugUnitTest -PversionCode=$VERSION_CODE -PversionName=$VERSION_NAME
+      - name: Release key from secrets
+        env:
+          KEYSTORE_BASE64: ${{ secrets.DICTEE_KEYSTORE_BASE64 }}
+          IS_RELEASE: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+        run: |
+          if [ -n "$KEYSTORE_BASE64" ]; then
+            echo "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/release.p12"
+            echo "DICTEE_KEYSTORE_FILE=$RUNNER_TEMP/release.p12" >> "$GITHUB_ENV"
+          elif [ "$IS_RELEASE" = "true" ]; then
+            echo "::error::DICTEE_KEYSTORE_BASE64 is not set: a release cannot be signed (see android/README.md, 'Clé de signature')."
+            exit 1
+          else
+            echo "::notice::No release key (pull request or fork): the release APK is built unsigned."
+          fi
       - name: Build APKs
+        env:
+          DICTEE_KEYSTORE_PASSWORD: ${{ secrets.DICTEE_KEYSTORE_PASSWORD }}
+          DICTEE_KEY_ALIAS: ${{ secrets.DICTEE_KEY_ALIAS }}
         run: ./gradlew --no-daemon assembleDebug assembleRelease assembleDebugAndroidTest -PversionCode=$VERSION_CODE -PversionName=$VERSION_NAME
-      - name: Rename release APK
-        run: cp app/build/outputs/apk/release/app-release.apk dictee-$VERSION_NAME.apk
+      - name: Check signature and name the release APK
+        run: |
+          rm -f "$RUNNER_TEMP/release.p12"
+          if [ -f app/build/outputs/apk/release/app-release.apk ]; then
+            APKSIGNER=$(ls -d "$ANDROID_HOME"/build-tools/*/apksigner | sort -V | tail -1)
+            "$APKSIGNER" verify --print-certs app/build/outputs/apk/release/app-release.apk | tee signature.txt
+            # Never publish an APK signed with the public debug key.
+            if grep -q "CN=Android Debug" signature.txt; then echo "::error::release signed with the debug key"; exit 1; fi
+            cp app/build/outputs/apk/release/app-release.apk dictee-$VERSION_NAME.apk
+          else
+            cp app/build/outputs/apk/release/app-release-unsigned.apk dictee-$VERSION_NAME-unsigned.apk
+          fi
       - uses: actions/upload-artifact@v4
         with:
           name: dictee-apk
@@ -145,8 +172,9 @@ jobs:
           tag_name: android-v${{ env.VERSION_NAME }}
           name: Dictée locale ${{ env.VERSION_NAME }}
           target_commitish: ${{ github.sha }}
-          files: dictee-*.apk
+          fail_on_unmatched_files: true
+          files: dictee-${{ env.VERSION_NAME }}.apk
           body: |
             Voice keyboard APK (issue #10), built from ${{ github.sha }}.
-            Signed with the debug key committed in the repository, so it installs over any previous release.
+            Signed with the project's private release key: each release installs over the previous one, and an APK signed by anyone else is refused as an update.
             Install: download the APK on the phone, allow installs from this source, then open "Dictée locale" to enable the keyboard and download a model.

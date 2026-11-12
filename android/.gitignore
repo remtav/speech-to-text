@@ -7,3 +7,6 @@ app/src/main/assets/silero_vad.onnx
 *.iml
 captures/
 .cxx/
+# Private release key: never in the repository
+*.p12
+*.jks

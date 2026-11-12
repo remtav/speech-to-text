@@ -27,8 +27,9 @@ Captures prises automatiquement par la CI sur un émulateur Pixel 6
 
 1. Télécharger l'APK de la dernière release `android-v…` du dépôt sur le
    téléphone et l'ouvrir (autoriser l'installation depuis cette source).
-   Les APK sont signés avec la même clé : une nouvelle version s'installe
-   par-dessus l'ancienne.
+   Les releases sont signées avec la clé privée du projet : une nouvelle
+   version s'installe par-dessus l'ancienne, et un APK signé par quelqu'un
+   d'autre est refusé comme mise à jour.
 2. Ouvrir **Dictée locale** :
    - « Activer » le clavier « Dictée locale (voix) » dans les réglages Android ;
    - « Autoriser le micro » (un clavier ne peut pas demander la permission lui-même) ;
@@ -94,6 +95,28 @@ cd android
                                      # télécharge les 3 modèles et mesure le WER FR/EN
 ./gradlew connectedDebugAndroidTest  # tests du clavier sur émulateur/appareil
 ```
+
+### Clé de signature des releases
+
+Les releases sont signées par une clé privée que seule la CI utilise, fournie
+par trois secrets GitHub. À faire une fois, sur votre machine (JDK requis) :
+
+```bash
+# 1. Générer la clé (le mot de passe demandé est celui de DICTEE_KEYSTORE_PASSWORD)
+keytool -genkeypair -v -keystore dictee-release.p12 -storetype PKCS12 \
+    -alias dictee -keyalg RSA -keysize 4096 -validity 36500 -dname "CN=Dictee locale"
+
+# 2. Créer les secrets (ou Settings → Secrets and variables → Actions → New repository secret)
+base64 -w0 dictee-release.p12 | gh secret set DICTEE_KEYSTORE_BASE64   # macOS : base64 -i dictee-release.p12
+gh secret set DICTEE_KEYSTORE_PASSWORD
+gh secret set DICTEE_KEY_ALIAS --body dictee
+```
+
+Sauvegardez `dictee-release.p12` et son mot de passe hors de GitHub (gestionnaire
+de mots de passe) : sans eux, plus aucune mise à jour ne peut s'installer par-dessus
+l'application. Ne versionnez jamais ce fichier. Sans les secrets, la CI d'une pull
+request construit un APK release non signé, et la publication sur `main` échoue
+avec un message explicite.
 
 La CI (`.github/workflows/android.yml`) exécute ces trois suites et publie
 l'APK en release à chaque push sur `main`.

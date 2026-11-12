@@ -227,13 +227,13 @@ Une revue indépendante du code a relevé les points suivants, corrigés :
   qui pouvait planter sur un téléchargement immédiat ; l'écran de comparaison
   empêche le clavier de charger un second modèle en parallèle ; la CI n'annule
   plus une exécution en cours sur `main`.
-- **Non changé : la clé de signature publique.** La revue signale que la clé de
-  debug versionnée permet à n'importe qui de produire un APK qui s'installe en
-  mise à jour par-dessus celui de l'utilisateur, alors que l'application est un
-  clavier avec accès au micro. C'est une décision arrêtée de l'issue (installer
-  chaque APK par-dessus le précédent sans secret) ; le risque est signalé à
-  l'humain. Passer à une clé privée (secret GitHub) obligera à désinstaller une
-  fois l'application.
+- **Clé de signature : décision de l'issue révisée par l'humain.** La revue
+  signalait que la clé de debug versionnée (dépôt public) permet à n'importe qui
+  de produire un APK qui s'installe en mise à jour par-dessus celui de
+  l'utilisateur, alors que l'application est un clavier avec accès au micro.
+  Après explication, l'humain a choisi une clé privée en secret GitHub (voir
+  « Construction et distribution »). Changé avant la première release : aucune
+  désinstallation nécessaire.
 
 ## Tests et écarts avec l'issue
 
@@ -275,8 +275,17 @@ Une revue indépendante du code a relevé les points suivants, corrigés :
 
 - APK release : arm64-v8a uniquement (le S23 Ultra), ce qui évite d'embarquer
   trois fois onnxruntime. APK debug : arm64-v8a + x86_64 pour l'émulateur.
-- Signature par la clé de debug versionnée (`keystore/debug.keystore`, mot de
-  passe `android`) pour les deux types de build.
+- **Signature des releases par une clé privée**, jamais dans le dépôt : la CI la
+  reçoit des secrets GitHub `DICTEE_KEYSTORE_BASE64`, `DICTEE_KEYSTORE_PASSWORD`
+  et `DICTEE_KEY_ALIAS`, l'écrit dans un fichier temporaire le temps du build et
+  le supprime. Sur `main`, le job échoue si les secrets manquent (jamais de
+  repli silencieux) et refuse un APK signé par la clé de debug ; il affiche
+  l'empreinte SHA-256 du certificat. Sur une pull request sans secrets (fork),
+  l'APK release est construit non signé et n'est pas publié.
+- La clé de debug versionnée (`keystore/debug.keystore`, mot de passe `android`)
+  ne signe que les builds debug et de test, qui ne sont pas distribués.
+- Perdre la clé privée empêche toute mise à jour (il faudrait désinstaller,
+  donc perdre réglages et modèles) : elle doit être sauvegardée hors de GitHub.
 - `versionCode` = numéro d'exécution du workflow, `versionName` = `0.1.<n>` :
   chaque APK publié s'installe par-dessus le précédent.
 - Release GitHub `android-v0.1.<n>` créée à chaque push sur `main`, une fois

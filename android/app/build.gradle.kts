@@ -108,13 +108,28 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
+    // Release key: private, never in the repository. CI writes it from GitHub secrets
+    // (DICTEE_KEYSTORE_BASE64, DICTEE_KEYSTORE_PASSWORD, DICTEE_KEY_ALIAS) and passes it
+    // through these variables. Without them, the release APK is built unsigned.
+    val releaseKeystore = System.getenv("DICTEE_KEYSTORE_FILE")?.takeIf { it.isNotBlank() && file(it).isFile }
+
     signingConfigs {
-        // Debug key committed on purpose (issue #10): every APK installs over the previous one.
+        // Public debug key, committed: debug and test builds only. Anyone can sign with it,
+        // so it must never sign an APK that users install (see DECISIONS.md).
         getByName("debug") {
             storeFile = rootProject.file("keystore/debug.keystore")
             storePassword = "android"
             keyAlias = "androiddebugkey"
             keyPassword = "android"
+        }
+        if (releaseKeystore != null) {
+            create("release") {
+                storeFile = file(releaseKeystore)
+                storePassword = System.getenv("DICTEE_KEYSTORE_PASSWORD")
+                keyAlias = System.getenv("DICTEE_KEY_ALIAS") ?: "dictee"
+                // PKCS12 keystores have a single password for the store and the key.
+                keyPassword = System.getenv("DICTEE_KEY_PASSWORD") ?: System.getenv("DICTEE_KEYSTORE_PASSWORD")
+            }
         }
     }
 
@@ -125,7 +140,7 @@ android {
         }
         getByName("release") {
             isMinifyEnabled = false
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = if (releaseKeystore != null) signingConfigs.getByName("release") else null
             ndk { abiFilters += listOf("arm64-v8a") }
         }
     }
