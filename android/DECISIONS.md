@@ -1874,3 +1874,72 @@ montre les mots dits) : comportement attendu, documenté.
   modifié (hors portée).
 - Vie privée : aucune permission ni requête réseau ajoutée par le lot (manifeste :
   une activité non exportée).
+
+## Issue #15 — demande de l'utilisateur : pouvoir couper le polissage (« friperie »)
+
+Demande : « Le mot "friperie" sortait bien avant que le petit LLM repasse dessus
+pour du polissage. J'ai l'impression que le petit LLM détériore parfois la
+qualité de l'entrée. Ce serait mieux de donner au moins l'option de le
+désactiver. »
+
+### Constaté
+
+- Deux LLM peuvent repasser sur le texte :
+  - **Nettoyage local** (`cleanup/LlmCleaner.kt`, `AppSettings.cleanupMode`) :
+    déjà désactivable (`OFF` par défaut ; `DicteeApp.cleaner()` renvoie
+    `TextCleaner.NONE` en `OFF`, et `DicteeApp` ne crée même pas de
+    `LazyCleaner`). Son garde-fou (`text/Filters.kt`) est local ; il ne s'active
+    que si l'utilisateur a choisi « LLM ».
+  - **Polissage du serveur** (modèle « Serveur », dictée entière, #13) :
+    `RemoteEngine` envoyait toujours `polish=true` et insérait `polished_text`.
+    **Aucun réglage ne permettait de le couper.** C'est le suspect principal.
+- Le serveur (`app/main.py`, champ `polish: Optional[bool]`) retombe sur
+  `WHISPER_POLISH` quand le champ est absent : un serveur démarré avec
+  `WHISPER_POLISH=on` polirait même si le client n'envoie rien. Le client
+  envoie donc **`polish=false` explicitement** quand le réglage est coupé.
+- Sans polissage, le serveur ne renvoie ni `polish` ni `polished_text` utile :
+  l'ancien code aurait lu « not returned » et affiché « Texte non poli ».
+
+### Ajouté
+
+- Réglage **« Polissage par le serveur »** (Réglages, section Serveur distant ;
+  `AppSettings.remotePolish` → `RemoteConfig.polish`). Coupé : `polish=false`
+  (API à tâches et repli synchrone), texte brut inséré, `polishStatus =
+  "not requested"` (aucun message d'erreur), `polished_text` ignoré même si le
+  serveur en renvoie un. Le texte d'aide dit que le polissage corrige ponctuation
+  et hésitations mais qu'un LLM peut remplacer un mot bien transcrit.
+- Texte d'aide du nettoyage local complété par la même mise en garde.
+- Tests (`WholeDictationTest`) : `polish=false` envoyé et texte brut inséré ;
+  cas « friperie » (le serveur renvoie « fripperie » poli : coupé → « friperie »,
+  actif → mot altéré) ; repli synchrone ; réglage actif inchangé.
+
+### Défaut retenu : activé
+
+Le comportement par défaut de l'application ne change pas dans cette itération,
+et l'utilisateur coupe lui-même le réglage. **À trancher par l'utilisateur** :
+passer le défaut à désactivé (le plus sûr pour la fidélité des mots, au prix de
+la ponctuation et des hésitations non retirées). Un changement d'une ligne
+(`getBoolean("remote_polish", true)`).
+
+### Non fait
+
+- **Retour au texte brut après coup** : le clavier garde `rawText` et
+  `polishedText` dans `DictationResult` (`lastDictation`), mais rien ne permet de
+  remplacer le texte déjà inséré (il faudrait suivre la plage insérée dans le
+  champ, qui peut avoir été modifiée entre-temps) : plus qu'un petit changement.
+  Piste : bouton « Texte brut » à côté de « Annuler » juste après l'insertion,
+  qui remplace la plage insérée tant que le curseur n'a pas bougé.
+- **Cause côté serveur** : le garde-fou de `app/polish.py` laisse passer certaines
+  substitutions de mots (« friperie » → un mot voisin). Hors portée (#6, #13) :
+  à traiter dans une issue séparée sur le serveur.
+- Test instrumenté du réglage : aucun test existant des Réglages ne s'y prête
+  sans fragilité.
+
+### Ce que l'utilisateur doit dire
+
+Avec quel modèle le mot a été changé : **« Serveur »** (donc le polissage du
+serveur, désormais coupable) ou un **modèle du téléphone** (Parakeet, Qwen3-ASR,
+Whisper) avec le nettoyage réglé sur « LLM » (le nettoyage est `OFF` par défaut :
+à vérifier dans Réglages > Nettoyage du texte). Test simple : couper le
+polissage, redicter « friperie » ; si le mot sort bien, le LLM du serveur était
+en cause.

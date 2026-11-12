@@ -275,6 +275,9 @@ transcrit (chemin rapide) puis la polit avec son LLM, et le texte poli est
 inséré d'un bloc. Pendant l'attente, le clavier affiche « Transcription et
 polissage… » avec un bouton **Annuler**.
 
+- Le polissage se coupe dans les Réglages (« Polissage par le serveur », activé
+  par défaut) : un LLM peut parfois remplacer un mot bien transcrit. Coupé, le
+  clavier demande `polish=false` et insère le texte brut de la transcription.
 - Si le polissage échoue, le texte brut du serveur est inséré (message
   discret, pas d'erreur).
 - Si le serveur est injoignable, en erreur, refuse l'accès ou ne répond pas à

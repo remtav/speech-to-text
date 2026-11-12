@@ -159,6 +159,8 @@ class SettingsActivity : AppCompatActivity() {
         val onRemoteLanguage: (Int) -> Unit = { s.remoteLanguage = langs[it].first }
         val remoteLanguageGroup = col.radio(langs.map { it.second }, remoteLanguageIndex(), onRemoteLanguage)
         refreshRemoteLanguage = { remoteLanguageGroup.checkSilently(remoteLanguageIndex(), onRemoteLanguage) }
+        col.switch(getString(R.string.settings_remote_polish), s.remotePolish) { s.remotePolish = it }
+        col.body(getString(R.string.settings_remote_polish_help), small = true)
         col.body(getString(R.string.settings_remote_fallback), small = true)
         val fallbacks = listOf("" to getString(R.string.settings_remote_no_fallback)) +
             ModelCatalog.all.map { it.id to it.displayName }

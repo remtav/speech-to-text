@@ -94,11 +94,13 @@
     <string name="settings_acceleration">Accélération matérielle</string>
     <string name="settings_acceleration_help">Le CPU est le choix sûr. NNAPI peut utiliser le NPU/GPU du Snapdragon ; s\'il n\'est pas pris en charge, le moteur revient automatiquement au CPU. Comparez avec l\'écran de comparaison.</string>
     <string name="settings_cleanup">Nettoyage du texte</string>
-    <string name="settings_cleanup_help">Retire les hésitations et les autocorrections après chaque segment. Le LLM ne remplace le texte que si un garde-fou vérifie qu\'il n\'a rien ajouté ni retiré ; sinon le texte brut est gardé.</string>
+    <string name="settings_cleanup_help">Retire les hésitations et les autocorrections après chaque segment. Le LLM ne remplace le texte que si un garde-fou vérifie qu\'il n\'a rien ajouté ni retiré ; sinon le texte brut est gardé. Aucun garde-fou n\'est parfait : un LLM peut parfois remplacer un mot bien transcrit par un autre. Si vous voyez des mots changés, choisissez « Désactivé » (aucun traitement après la transcription).</string>
     <string name="settings_llm_note">Le LLM tourne sur l\'appareil (MediaPipe, arm64 uniquement). S\'il est indisponible, le nettoyage par règles est utilisé.</string>
 
     <string name="settings_remote">Serveur distant (optionnel)</string>
-    <string name="settings_remote_help">Pour transcrire sur un serveur que vous contrôlez (par exemple le serveur speech-to-text de ce dépôt, chez vous) quand les modèles du téléphone ne suffisent pas. Choisissez ensuite « Serveur distant » comme modèle. Attention : avec ce choix, toute la dictée est envoyée au serveur en une fois à la fin, puis le texte transcrit et poli par le serveur est inséré. Les autres modèles restent entièrement sur le téléphone.</string>
+    <string name="settings_remote_help">Pour transcrire sur un serveur que vous contrôlez (par exemple le serveur speech-to-text de ce dépôt, chez vous) quand les modèles du téléphone ne suffisent pas. Choisissez ensuite « Serveur distant » comme modèle. Attention : avec ce choix, toute la dictée est envoyée au serveur en une fois à la fin, puis le texte transcrit par le serveur est inséré (poli par son LLM si le réglage « Polissage par le serveur » est actif). Les autres modèles restent entièrement sur le téléphone.</string>
+    <string name="settings_remote_polish">Polissage par le serveur</string>
+    <string name="settings_remote_polish_help">Le serveur repasse sur la dictée entière avec un LLM : il corrige la ponctuation et retire les hésitations. Mais un LLM peut parfois remplacer un mot bien transcrit par un autre. Si vous voyez des mots changés, coupez ce réglage : le texte brut de la transcription est alors inséré tel quel.</string>
     <string name="settings_remote_api">Type d\'API</string>
     <string name="settings_remote_model_hint">Nom du modèle (API OpenAI uniquement, ex. whisper-1)</string>
     <string name="settings_remote_key_hint">Clé d\'API / jeton (optionnel)</string>

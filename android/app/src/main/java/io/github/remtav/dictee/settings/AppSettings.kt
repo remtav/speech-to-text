@@ -145,6 +145,11 @@ class AppSettings(context: Context) {
         get() = prefs.getString("remote_fallback", ModelCatalog.default.id) ?: ""
         set(v) = prefs.edit().putString("remote_fallback", v).apply()
 
+    /** Server-side LLM polish of a whole dictation (issue #15). On by default; off = raw transcript. */
+    var remotePolish: Boolean
+        get() = prefs.getBoolean("remote_polish", true)
+        set(v) = prefs.edit().putBoolean("remote_polish", v).apply()
+
     fun remoteConfig() = RemoteConfig(
         baseUrl = remoteUrl,
         api = remoteApi,
@@ -153,6 +158,7 @@ class AppSettings(context: Context) {
         language = remoteLanguage,
         cfAccessClientId = cfAccessClientId,
         cfAccessClientSecret = cfAccessClientSecret,
+        polish = remotePolish,
     )
 
     /**
