@@ -191,11 +191,13 @@ class SetupLanguageTest {
         s.remoteLanguage = "" // explicit automatic detection is kept too
         s.languages = setOf(DictationLanguage.FRENCH_QUEBEC)
         assertEquals("", s.remoteLanguage)
-        // Whisper is forced only with a single code; other models never get one.
+        // Whisper and Qwen3-ASR are forced only with a single code; Parakeet takes no language.
         s.languages = setOf(DictationLanguage.FRENCH_QUEBEC, DictationLanguage.FRENCH_FRANCE)
         assertEquals("fr", s.engineOptions(ModelCatalog.whisperTurbo).language)
+        assertEquals("French", s.engineOptions(ModelCatalog.qwen3).language)
         assertEquals("", s.engineOptions(ModelCatalog.parakeet).language)
         s.languages = setOf(DictationLanguage.FRENCH_QUEBEC, DictationLanguage.ENGLISH)
         assertEquals("", s.engineOptions(ModelCatalog.whisperTurbo).language)
+        assertEquals("", s.engineOptions(ModelCatalog.qwen3).language)
     }
 }

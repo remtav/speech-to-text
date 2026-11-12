@@ -111,6 +111,17 @@ class ModelRecommendationTest {
         assertTrue(reason, reason.contains("ourdou") && !reason.contains("Ourdou"))
     }
 
+    @Test fun whisperIsPresentedAsALastResortFromAnObservation() {
+        // Issue #15: the user's observation on his phone, not a measured latency.
+        assertTrue(ModelCatalog.whisperTurbo.note.contains("dernier recours"))
+        assertTrue(ModelCatalog.whisperTurbo.note.startsWith("Observé"))
+        assertEquals("", ModelCatalog.parakeet.note)
+        assertEquals("", ModelCatalog.qwen3.note)
+        val rec = ModelRecommendations.recommend(setOf(DictationLanguage.BENGALI))
+        assertEquals(ModelCatalog.whisperTurbo, rec.model)
+        assertTrue(rec.reason, rec.reason.contains("plus lent") && rec.reason.contains("observé"))
+    }
+
     @Test fun parakeetCoversExactlySixOfTheEleven() {
         assertEquals(6, langs.count { ModelRecommendations.covers(ModelCatalog.parakeet, it) })
     }

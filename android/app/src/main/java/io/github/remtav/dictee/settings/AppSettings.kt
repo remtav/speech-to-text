@@ -169,8 +169,13 @@ class AppSettings(context: Context) {
         val remote = spec.family == ModelFamily.REMOTE
         return EngineOptions(
             numThreads = threads,
-            // Forced only on Whisper, and only when a single language is chosen.
-            language = if (spec.family == ModelFamily.WHISPER) DictationLanguages.whisperLanguage(languages) else "",
+            // Forced only when a single language is chosen, on the models that take one:
+            // Whisper (code) and Qwen3-ASR (name). Parakeet takes none (sherpa-onnx 2.0.1).
+            language = when (spec.family) {
+                ModelFamily.WHISPER -> DictationLanguages.whisperLanguage(languages)
+                ModelFamily.QWEN3_ASR -> DictationLanguages.qwen3Language(languages)
+                else -> ""
+            },
             acceleration = acceleration,
             // Only these use hotwords: keeping them out of the other models' options means a
             // vocabulary edit does not reload an on-device model that ignores them.

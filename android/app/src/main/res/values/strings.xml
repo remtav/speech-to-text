@@ -94,7 +94,7 @@
     <string name="settings_acceleration">Accélération matérielle</string>
     <string name="settings_acceleration_help">Le CPU est le choix sûr. NNAPI peut utiliser le NPU/GPU du Snapdragon ; s\'il n\'est pas pris en charge, le moteur revient automatiquement au CPU. Comparez avec l\'écran de comparaison.</string>
     <string name="settings_cleanup">Nettoyage du texte</string>
-    <string name="settings_cleanup_help">Retire les hésitations et les autocorrections après chaque segment. Le LLM ne remplace le texte que si un garde-fou vérifie qu\'il n\'a rien ajouté ni retiré ; sinon le texte brut est gardé. Aucun garde-fou n\'est parfait : un LLM peut parfois remplacer un mot bien transcrit par un autre. Si vous voyez des mots changés, choisissez « Désactivé » (aucun traitement après la transcription).</string>
+    <string name="settings_cleanup_help">Retire les hésitations et les autocorrections après chaque segment. Le texte du LLM n\'est gardé que si un garde-fou vérifie que chaque mot restant est identique à la lettre près, dans le même ordre, et que seuls des hésitations, des répétitions ou une autocorrection (« lundi, non, mardi ») ont été retirés ; sinon le texte nettoyé par les règles simples est gardé. Le nettoyage ne corrige donc jamais un mot mal entendu par le modèle de transcription. « Désactivé » : aucun traitement après la transcription.</string>
     <string name="settings_llm_note">Le LLM tourne sur l\'appareil (MediaPipe, arm64 uniquement). S\'il est indisponible, le nettoyage par règles est utilisé.</string>
 
     <string name="settings_remote">Serveur distant (optionnel)</string>

@@ -85,8 +85,10 @@ langue cochée. Le choix se modifie aussi dans les Réglages. Il sert à :
   couvre pas une langue cochée affiche un avertissement écrit ; rien n'est
   bloqué, tous les modèles restent téléchargeables ;
 - **régler la langue des moteurs** : avec une seule langue (Québec et France
-  comptent pour `fr`), Whisper local et le serveur distant la reçoivent ;
-  avec plusieurs, la langue est détectée automatiquement.
+  comptent pour `fr`), Whisper local, Qwen3-ASR et le serveur distant la
+  reçoivent ; avec plusieurs, la langue est détectée automatiquement.
+  Parakeet ne prend aucune langue (sherpa-onnx 2.0.1 n'a pas d'entrée pour
+  elle) : il la devine, ce qui peut mal tourner sur un mot dicté seul.
 
 La table de recommandation (`stt/ModelRecommendation.kt`) se lit de haut en
 bas : Parakeet si toutes vos langues font partie de ses 25 langues
@@ -251,6 +253,14 @@ Limites connues :
 | Parakeet TDT 0.6b v3 (défaut) | NVIDIA | 671 Mo |
 | Qwen3-ASR 0.6B | Alibaba (Qwen) | 987 Mo |
 | Whisper large-v3-turbo | OpenAI | 1,04 Go |
+
+Whisper : observé par l'utilisateur sur son téléphone, il comprend bien des
+mots d'ici que Parakeet et Qwen3-ASR ratent (un mot isolé deviné en anglais,
+par exemple), mais il est trop lent pour un usage courant : à garder en
+dernier recours. Ce n'est pas une mesure sur appareil ; sur l'ordinateur de la
+CI, le facteur temps réel indicatif est de 0,07 pour Parakeet, 0,3 pour
+Whisper et 0,6 à 0,9 pour Qwen3-ASR (`DECISIONS.md`, étape 1.2), ce qui ne
+prédit pas l'ordre sur un téléphone. La carte de Whisper le dit.
 
 Chaque fichier est vérifié par SHA-256 ; les modèles se suppriment depuis
 l'écran principal. **Comparer les modèles** transcrit les extraits de

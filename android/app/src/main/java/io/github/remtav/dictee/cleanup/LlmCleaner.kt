@@ -8,6 +8,7 @@ import io.github.remtav.dictee.dictation.TextCleaner
 import io.github.remtav.dictee.stt.Downloadable
 import io.github.remtav.dictee.stt.ModelFile
 import io.github.remtav.dictee.stt.ModelStore
+import io.github.remtav.dictee.text.CleanupGuard
 import io.github.remtav.dictee.text.RuleCleaner
 import io.github.remtav.dictee.text.SafetyCheck
 import java.io.File
@@ -49,14 +50,15 @@ object LlmCatalog {
  * Optional clean-up of each finished segment by a local LLM (lot 3, in the
  * spirit of issue #6): hesitations and self-corrections removed, nothing else
  * changed. The rule-based clean-up runs first; the LLM result replaces it only
- * if [SafetyCheck] accepts it, within [timeoutMillis]. Any failure (missing
+ * if [guard] accepts it (by default [SafetyCheck]: every word kept unchanged and
+ * in order, only hesitations, repetitions and spoken corrections dropped), within [timeoutMillis]. Any failure (missing
  * native library on this device, model error, timeout, rejected output) keeps
  * the rule-cleaned text: this never throws and never blocks dictation for long.
  */
 class LlmCleaner private constructor(
     private val llm: LlmInference,
-    private val dictionary: Collection<String>,
     private val timeoutMillis: Long,
+    private val guard: CleanupGuard,
 ) : TextCleaner {
     private val executor = Executors.newSingleThreadExecutor { Thread(it, "llm-cleanup") }
     /** A generation cannot be interrupted: while one runs (even timed out), new segments skip the LLM. */
@@ -72,7 +74,7 @@ class LlmCleaner private constructor(
                 try { generate(base) } finally { busy.set(false) }
             }
             val out = future.get(timeoutMillis, TimeUnit.MILLISECONDS).trim().trim('"', '«', '»').trim()
-            val verdict = SafetyCheck.check(base, out, dictionary)
+            val verdict = guard.check(base, out)
             if (verdict.ok) out else { Log.i(TAG, "rejected: ${verdict.rule}"); base }
         } catch (e: Throwable) {
             Log.w(TAG, "cleanup failed: ${e.javaClass.simpleName}")
@@ -112,7 +114,8 @@ class LlmCleaner private constructor(
                 "You clean up dictated text. Remove hesitations (euh, um, uh), stutters and false starts. " +
                     "When the speaker corrects themselves (\"lundi, non, mardi\" / \"Monday, no, Tuesday\"), keep only " +
                     "the correction. Fix punctuation. Keep the same language, words, tone and meaning. Never add, " +
-                    "answer, translate or summarize. If the text is a question, output the question. Output only " +
+                    "answer, translate or summarize. Never change, correct or respell a word you keep, even if it " +
+                    "looks misspelled or unusual: copy it letter for letter. If the text is a question, output the question. Output only " +
                     "the cleaned text.",
             )
             append("<|im_end|>\n<|im_start|>user\n")
@@ -128,18 +131,17 @@ class LlmCleaner private constructor(
             context: Context,
             store: ModelStore,
             spec: LlmSpec,
-            dictionary: Collection<String>,
             timeoutMillis: Long = 4000,
         ): LlmCleaner? {
             if (!store.isInstalled(spec)) return null
-            return createFromPath(context, File(store.dirFor(spec.id), spec.file.path).absolutePath, dictionary, timeoutMillis)
+            return createFromPath(context, File(store.dirFor(spec.id), spec.file.path).absolutePath, timeoutMillis)
         }
 
         fun createFromPath(
             context: Context,
             path: String,
-            dictionary: Collection<String> = emptyList(),
             timeoutMillis: Long = 4000,
+            guard: CleanupGuard = SafetyCheck,
         ): LlmCleaner? {
             return try {
                 val options = LlmInference.LlmInferenceOptions.builder()
@@ -147,7 +149,7 @@ class LlmCleaner private constructor(
                     .setMaxTokens(512)
                     .setMaxTopK(1)
                     .build()
-                LlmCleaner(LlmInference.createFromOptions(context, options), dictionary, timeoutMillis)
+                LlmCleaner(LlmInference.createFromOptions(context, options), timeoutMillis, guard)
             } catch (e: Throwable) {
                 // UnsatisfiedLinkError on x86_64 / armv7 builds, IllegalStateException on bad model...
                 Log.w(TAG, "LLM unavailable: $e")
