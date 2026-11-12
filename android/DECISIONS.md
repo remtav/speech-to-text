@@ -518,3 +518,73 @@ dictée), le statut du polissage, et le texte brut et le texte poli côte à
 côte. « Exporter le rapport » permet de joindre le résultat à l'issue. Pour
 la fiabilité, couper le serveur (ou le tunnel) pendant l'attente : la dictée
 doit être insérée par le modèle local, avec le message « Serveur non utilisé ».
+
+## Issue #15, lot 1 — étape 1.1 : table de recommandation
+
+Code : `stt/ModelRecommendation.kt` (Kotlin pur, à côté de `ModelCatalog`) ;
+tests : `ModelRecommendationTest` (les 2047 combinaisons non vides).
+
+### Couverture vérifiée (2026-11-12)
+
+| Langue | Parakeet v3 | Qwen3-ASR 0.6B | Whisper turbo |
+|---|---|---|---|
+| Français (Québec et France), anglais, espagnol, portugais, russe | oui | oui | oui |
+| Mandarin, arabe, hindi | non | oui | oui |
+| Bengali, ourdou | non | **non** | oui |
+
+Sources :
+
+- Parakeet : fiche `https://huggingface.co/nvidia/parakeet-tdt-0.6b-v3`, 25
+  langues européennes (dont anglais, français, espagnol, portugais, russe) ;
+  ni mandarin, ni hindi, ni arabe, ni bengali, ni ourdou. La fiche précise que
+  le portugais d'entraînement est européen alors que la plupart des
+  références sont en portugais brésilien.
+- Qwen3-ASR : fiche `https://huggingface.co/Qwen/Qwen3-ASR-0.6B`, 30 langues
+  plus 22 dialectes chinois. « Chinese » figure sans distinction du mandarin
+  (retenu comme mandarin). Hindi et arabe sont listés. **Bengali et ourdou ne
+  le sont pas** (le persan l'est, pas l'ourdou) : la mention « non confirmé »
+  du tableau de l'issue devient « non couvert ».
+- Whisper large-v3-turbo : la fiche `https://huggingface.co/openai/whisper-large-v3-turbo`
+  ne nomme aucune langue (« 99 languages », « strong ASR results in ~10
+  languages », précision moindre pour les langues peu dotées). La couverture
+  des onze langues vient de la liste `LANGUAGES` du code officiel,
+  `https://raw.githubusercontent.com/openai/whisper/main/whisper/tokenizer.py`
+  (zh, hi, ar, bn, ur, ru, pt, es, fr, en). **Être listé n'est pas être bon** :
+  bengali et ourdou sont couverts mais probablement moins bien transcrits ; la
+  table ne mesure pas la qualité.
+
+Aucune fiche n'était inaccessible. Les lectures ont été faites par un outil de
+résumé de pages, non à la main : la couverture est à relire à l'occasion.
+
+### Règles de la table (`ModelRecommendations.recommend`)
+
+Lues de haut en bas, la première qui s'applique gagne :
+
+1. aucune langue : Parakeet (choix prudent : le plus léger, 671 Mo, et le
+   modèle de la langue présélectionnée) ;
+2. toutes les langues sont dans les 25 de Parakeet : Parakeet ;
+3. sinon Qwen3-ASR (987 Mo) s'il couvre tout ;
+4. sinon Whisper (1 037 Mo), le seul qui couvre les onze.
+
+À couverture égale, le plus petit téléchargement l'emporte. Résultat : la
+recommandation couvre toujours toutes les langues choisies (testé). Rien n'est
+bloqué : les autres modèles restent téléchargeables.
+
+### Français québécois : observation, puis mesure
+
+Parakeet est recommandé pour le français québécois sur la foi de l'observation
+de l'utilisateur. La raison affichée dit « observation ». `quebecFrenchBasis`
+passe à `RecommendationBasis.MESURE` (une ligne) quand l'étape 1.2 aura chiffré
+le WER ; la raison dira alors « mesure ». Sans mesure ni observation sur Qwen3
+et Whisper en français québécois, la table ne les départage pas sur ce critère.
+
+### Autres choix
+
+- Québec et France : deux valeurs distinctes de `DictationLanguage`, même
+  `engineCode` (`fr`). Québec est en tête de liste et `default`.
+- `covers(modèle, langue)` sert à l'avertissement de l'étape 1.3. Le serveur
+  distant n'est jamais signalé (c'est le serveur de l'utilisateur, on ne peut
+  pas juger) ; tout autre modèle inconnu compte comme non couvert.
+- Les raisons sont des phrases en français construites par la table (pas de
+  chaînes en ressources) : l'étape 1.3 peut les afficher telles quelles ou les
+  déplacer dans `strings.xml`.
