@@ -136,7 +136,8 @@ object ModelCatalog {
         family = ModelFamily.WHISPER,
         description = "Whisper large-v3-turbo affiné sur du français québécois par ele-sage (communauté). " +
             "WER annoncé par son auteur : 6,65 % sur son jeu de validation. " +
-            "Mesuré ici : 5 erreurs sur 59 mots (8,5 %) sur six courts extraits, contre 4 pour Parakeet " +
+            "Mesuré ici : 5 erreurs sur 59 mots (8,5 %) sur six courts extraits Common Voice " +
+            "(une de ses sources d'entraînement : il a pu les entendre), contre 4 pour Parakeet " +
             "et 6 pour Whisper turbo : un indice, pas une preuve. Français seulement.",
         license = "MIT",
         note = WHISPER_QC_NOTE,

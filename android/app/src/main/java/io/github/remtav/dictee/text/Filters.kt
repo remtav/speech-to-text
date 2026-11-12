@@ -70,13 +70,23 @@ fun interface CleanupGuard {
  * - Unicode NFC, typographic apostrophe and hyphen unified (same characters);
  * - punctuation and spaces ignored (they are not words);
  * - the case of a word's **first letter** ignored (sentence capitals,
- *   "friperie" / "Friperie"); the rest of the word must match exactly.
+ *   "friperie" / "Friperie"); the rest of the word must match exactly. A capital
+ *   of the input may only be lowered at the start of a sentence ("Bon. Donc" ->
+ *   "Bon, donc"): "j'ai vu Pierre" -> "j'ai vu pierre" is a changed word.
+ *
+ * Numbers keep their digits and their separators ("3,5" is not "3, 5"), and a
+ * question mark of the input is never dropped (a question is not a statement).
  *
  * Words of the input missing from the output must form runs that are each:
  * only hesitations ([FILLERS]); a repetition of the words right before or
  * after ("on va, on va"); a false start that the next words restart ("on va
  * au, on va à"); or a spoken correction ending with a marker set off by a
  * comma ("lundi, non," / "Monday, no,"). Anything else is a dropped word.
+ * A repetition or false start never spans a sentence end ("Je vois Marie.
+ * Marie arrive") and never removes a spelled letter, a number word or a
+ * doubling that grammar requires ([NO_DEDUP]: "c o i f f e", "cinq cinq cinq",
+ * "vous vous lavez", "had had"); a correction stays inside its sentence
+ * ("Il pleut, enfin. Je reste" drops a sentence, it corrects nothing).
  *
  * Variants (for instance a looser guard evaluated for proper nouns, lot 3
  * step 3.3) implement [CleanupGuard] beside this object, never by loosening it.
@@ -97,6 +107,20 @@ object SafetyCheck : CleanupGuard {
         listOf("non"), listOf("no"), listOf("pardon"), listOf("sorry"), listOf("enfin"),
         listOf("je", "veux", "dire"), listOf("i", "mean"),
     )
+    /**
+     * Words a repetition or false start may not remove even when doubled (independent review of
+     * lot 3): number words (a phone number, "cinq cinq cinq"), and words grammar doubles. Spelled
+     * letters (any one-character word) are handled by [noDedup]. "un" and "une" are left out:
+     * "une une maison" is a common stutter, and digits are checked separately.
+     */
+    private val NO_DEDUP = setOf(
+        "zéro", "deux", "trois", "quatre", "cinq", "six", "sept", "huit", "neuf", "dix", "onze", "douze",
+        "treize", "quatorze", "quinze", "seize", "vingt", "trente", "quarante", "cinquante", "soixante",
+        "cent", "mille",
+        "zero", "oh", "one", "two", "three", "four", "five", "seven", "eight", "nine", "ten", "eleven",
+        "twelve", "twenty", "thirty", "forty", "fifty", "sixty", "hundred", "thousand",
+        "nous", "vous", "had", "that",
+    )
     private const val MAX_RUN = 12
     private const val MAX_REPEAT = 6
     private const val MAX_FALSE_START = 4
@@ -107,22 +131,45 @@ object SafetyCheck : CleanupGuard {
     private val CORRECTION = Regex("(?i)[,;]\\s*(non|no|pardon|sorry|je veux dire|i mean|enfin)\\s*[,;]")
     private val WORD = Regex("[\\p{L}\\p{N}]+(?:['-][\\p{L}\\p{N}]+)*")
     private val SET_OFF = Regex("[,;:—–]")
+    /** A sentence end: ? ! or a single period (an ellipsis "…" / "..." is a hesitation, not an end). */
+    private val SENTENCE_END = Regex("[?!\\n]|(?<!\\.)\\.(?!\\.)")
+    private val NUMBER = Regex("\\d+(?:[.,:]\\d+)*")
 
     data class Verdict(val ok: Boolean, val rule: String? = null)
 
-    private class Word(val text: String, val range: IntRange) {
+    private class Word(val text: String, val range: IntRange, val sentenceStart: Boolean) {
         val lower = text.lowercase()
     }
 
     private fun prepare(s: String) = java.text.Normalizer.normalize(s, java.text.Normalizer.Form.NFC)
         .replace('’', '\'').replace('‘', '\'').replace('‐', '-').replace('‑', '-')
 
-    private fun words(s: String) = WORD.findAll(s).map { Word(it.value, it.range) }.toList()
+    private fun words(s: String): List<Word> {
+        var previousEnd = -1
+        return WORD.findAll(s).map {
+            val start = previousEnd < 0 || SENTENCE_END.containsMatchIn(s.substring(previousEnd + 1, it.range.first))
+            previousEnd = it.range.last
+            Word(it.value, it.range, start)
+        }.toList()
+    }
 
-    /** Same word: identical, except for the case of the first letter. */
-    private fun same(a: Word, b: Word) = a.text == b.text ||
-        (a.text.length == b.text.length && a.text.substring(1) == b.text.substring(1) &&
-            a.text[0].lowercaseChar() == b.text[0].lowercaseChar())
+    /**
+     * Same word: identical, except for the case of the first letter; an input capital
+     * may only be lowered where the input word starts a sentence.
+     */
+    private fun same(input: Word, output: Word) = input.text == output.text ||
+        (input.text.length == output.text.length && input.text.substring(1) == output.text.substring(1) &&
+            input.text[0].lowercaseChar() == output.text[0].lowercaseChar() &&
+            (!input.text[0].isUpperCase() || input.sentenceStart))
+
+    /** One-character words (spelled letters, digits) and [NO_DEDUP] words are never dropped as doubles. */
+    private fun noDedup(word: String) = word.length == 1 || word in NO_DEDUP
+
+    private fun spansSentenceEnd(raw: String, rw: List<Word>, from: Int, to: Int): Boolean {
+        val a = minOf(from, to)
+        val b = maxOf(from, to)
+        return a < b && SENTENCE_END.containsMatchIn(raw.substring(rw[a].range.last + 1, rw[b].range.first))
+    }
 
     /** Loose tokens, only for counting negations (as before). */
     private fun looseTokens(s: String) = Normalize.fold(s)
@@ -143,10 +190,10 @@ object SafetyCheck : CleanupGuard {
         val negRaw = looseTokens(CORRECTION.replace(r, ",")).count { it in NEGATIONS }
         if (negRaw != looseTokens(c).count { it in NEGATIONS }) return Verdict(false, "negation")
 
-        val digits = Regex("\\d+")
-        if (digits.findAll(c).map { it.value }.toList() != digits.findAll(r).map { it.value }.toList()) {
+        if (NUMBER.findAll(c).map { it.value }.toList() != NUMBER.findAll(r).map { it.value }.toList()) {
             return Verdict(false, "numbers")
         }
+        if (c.count { it == '?' } < r.count { it == '?' }) return Verdict(false, "question")
 
         if (!isSubsequence(rw, cw)) return Verdict(false, "changed_words")
         if (!align(r, rw, cw)) return Verdict(false, "dropped_content")
@@ -186,20 +233,27 @@ object SafetyCheck : CleanupGuard {
         val kept = (i until k).filter { rw[it].lower !in FILLERS }
         if (kept.isEmpty()) return true
         val run = kept.map { rw[it].lower }
-        val after = (k until rw.size).filter { rw[it].lower !in FILLERS }.map { rw[it].lower }
-        val before = (0 until i).filter { rw[it].lower !in FILLERS }.map { rw[it].lower }
+        val afterIdx = (k until rw.size).filter { rw[it].lower !in FILLERS }
+        val beforeIdx = (0 until i).filter { rw[it].lower !in FILLERS }
+        val after = afterIdx.map { rw[it].lower }
+        val before = beforeIdx.map { rw[it].lower }
+        // Neither a repetition nor a false start crosses a sentence end, inside the run or towards its echo.
+        val runCrossesEnd = spansSentenceEnd(raw, rw, kept.first(), kept.last())
         // Repetition: "on va, on va à la plage", "le le chat".
-        if (run.size <= MAX_REPEAT) {
-            if (after.take(run.size) == run) return true
-            if (before.takeLast(run.size) == run) return true
+        if (run.size <= MAX_REPEAT && !runCrossesEnd && run.none { noDedup(it) }) {
+            if (after.take(run.size) == run && !spansSentenceEnd(raw, rw, kept.last(), afterIdx.first())) return true
+            if (before.takeLast(run.size) == run && !spansSentenceEnd(raw, rw, beforeIdx.last(), kept.first())) return true
         }
         // False start restarted by the next words: "on va au, on va à la plage".
-        if (run.size <= MAX_FALSE_START) {
+        if (run.size <= MAX_FALSE_START && !runCrossesEnd) {
             val p = run.zip(after).takeWhile { (a, b) -> a == b }.size
-            if (p >= 1 && run.drop(p).all { it in FUNCTION_WORDS }) return true
+            if (p >= 1 && p < run.size && run.take(p).none { noDedup(it) } &&
+                run.drop(p).all { it in FUNCTION_WORDS } &&
+                !spansSentenceEnd(raw, rw, kept.last(), afterIdx.first())
+            ) return true
         }
-        // Spoken correction: "lundi, non, mardi", the marker set off by a comma.
-        if (k < rw.size) {
+        // Spoken correction: "lundi, non, mardi", the marker set off by a comma, inside one sentence.
+        if (k < rw.size && !spansSentenceEnd(raw, rw, kept.first(), k)) {
             for (marker in MARKERS) {
                 if (run.size <= marker.size || run.takeLast(marker.size) != marker) continue
                 if (run.size - marker.size > MAX_CORRECTED) continue

@@ -109,7 +109,7 @@ object ModelRecommendations {
         if (chosen.isEmpty()) {
             return ModelRecommendation(
                 ModelCatalog.parakeet,
-                "Aucune langue choisie : Parakeet, le plus léger des trois (671 Mo).",
+                "Aucune langue choisie : Parakeet, le plus léger des quatre modèles (671 Mo).",
             )
         }
         val outsideParakeet = uncovered(ModelCatalog.parakeet, chosen)
@@ -118,11 +118,11 @@ object ModelRecommendations {
             // Worded to the scope of the evidence: fewest errors on 59 words, not an established superiority
             // (DECISIONS.md, step 1.2: Whisper is one error away once a notation artefact is removed).
             val reason = if (quebec) {
-                "Parakeet couvre vos langues et c'est le plus léger des trois (671 Mo). " +
-                    "En français québécois, il a fait le moins d'erreurs des trois, ${quebecFrenchBasis.phrase} : " +
+                "Parakeet couvre vos langues et c'est le plus léger des quatre modèles (671 Mo). " +
+                    "En français québécois, il a fait le moins d'erreurs des quatre, ${quebecFrenchBasis.phrase} : " +
                     "un indice, pas une preuve."
             } else {
-                "Parakeet couvre vos langues et c'est le plus léger des trois (671 Mo)."
+                "Parakeet couvre vos langues et c'est le plus léger des quatre modèles (671 Mo)."
             }
             return ModelRecommendation(ModelCatalog.parakeet, reason)
         }
@@ -138,7 +138,7 @@ object ModelRecommendations {
         return ModelRecommendation(
             ModelCatalog.whisperTurbo,
             "$parakeetNote Qwen3-ASR ne couvre pas : $qwenMissing. " +
-                "Whisper est le seul des trois qui couvre toutes vos langues (1,04 Go). " +
+                "Whisper turbo est le seul des quatre qui couvre toutes vos langues (1,04 Go). " +
                 "Il est plus lent que les deux autres (observé sur un téléphone).",
         )
     }

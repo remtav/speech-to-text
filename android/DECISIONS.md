@@ -2527,7 +2527,8 @@ désactiver. »
     que si l'utilisateur a choisi « LLM ».
   - **Polissage du serveur** (modèle « Serveur », dictée entière, #13) :
     `RemoteEngine` envoyait toujours `polish=true` et insérait `polished_text`.
-    **Aucun réglage ne permettait de le couper.** C'est le suspect principal.
+    **Aucun réglage ne permettait de le couper.** C'était le suspect principal
+    à ce moment (écarté ensuite : voir « Suite du diagnostic » plus bas).
 - Le serveur (`app/main.py`, champ `polish: Optional[bool]`) retombe sur
   `WHISPER_POLISH` quand le champ est absent : un serveur démarré avec
   `WHISPER_POLISH=on` polirait même si le client n'envoie rien. Le client
@@ -2573,7 +2574,7 @@ la ponctuation et des hésitations non retirées). Un changement d'une ligne
 ### Ce que l'utilisateur doit dire
 
 Avec quel modèle le mot a été changé : **« Serveur »** (donc le polissage du
-serveur, désormais coupable) ou un **modèle du téléphone** (Parakeet, Qwen3-ASR,
+serveur ; question posée avant la suite du diagnostic, qui l'a écarté) ou un **modèle du téléphone** (Parakeet, Qwen3-ASR,
 Whisper) avec le nettoyage réglé sur « LLM » (le nettoyage est `OFF` par défaut :
 à vérifier dans Réglages > Nettoyage du texte). Test simple : couper le
 polissage, redicter « friperie » ; si le mot sort bien, le LLM du serveur était
@@ -2634,9 +2635,10 @@ français québécois. Aucune mesure n'a été faite sur un enregistrement de
     `DictationLanguages.qwen3Language`), avec la même règle que Whisper : un
     seul code de langue choisi. Le nom vient d'une table (fr → French,
     en → English, zh, hi, es, ar, pt, ru). Bengali et ourdou ne sont pas des
-    langues de Qwen3-ASR : détection automatique. **Effet non mesuré** : la
-    mesure sur l'hôte a été interrompue (mémoire, puis arrêt de l'enquête).
-    C'est l'usage documenté par sherpa-onnx, rien de plus n'est affirmé.
+    langues de Qwen3-ASR : détection automatique. **Effet non mesuré** à ce
+    stade : la mesure sur l'hôte a été interrompue (mémoire, puis arrêt de
+    l'enquête). Mesuré ensuite par la revue indépendante du lot 3 (dernière
+    section) : pas de dégradation sur les sept extraits français.
   - **Parakeet TDT v3** : aucune entrée de langue. `OfflineTransducerModelConfig`
     n'a qu'encodeur, décodeur, joiner et `qnnConfig`, et
     `offline-recognizer-transducer-nemo-impl.h` ne lit aucune option de flux.
@@ -2788,8 +2790,9 @@ mesure sur le téléphone ne peut pas renverser ce plafond.
 - Changements « friperie », relus dans les commits `fc65b55` et `8c1eb05` :
   - **un seul changement de défaut**, la langue transmise à Qwen3-ASR quand une
     seule langue est choisie (le choix initial, « Français (Québec) » seul,
-    est dans ce cas). Il n'a pas été mesuré ; le rapport le dit dans une
-    section à part ;
+    est dans ce cas). Il n'avait pas été mesuré à cette étape ; le rapport le
+    dit dans une section à part (mesuré depuis par la revue indépendante :
+    voir la dernière section) ;
   - `remote_polish` vaut `true` par défaut, et le client envoie `polish=true`
     comme avant ;
   - le garde-fou strict et le nouveau prompt ne jouent qu'en mode LLM, qui
@@ -2949,3 +2952,127 @@ Décisions 1 et 2 ci-dessus appliquées à la demande de l'utilisateur ; la 3 re
 - **À mesurer sur le téléphone** : temps et texte de « friperie », d'une phrase de 5 s et de 15 s à 1 000, 600 et 300 (écran
   « Comparer les modèles », une exécution par valeur) ; ne passer le défaut à 600 que sans répétition ni mot manquant sur
   5 essais par valeur (ce serait un changement de défaut, donc une nouvelle décision) ; puis les threads (3 à 5).
+
+## Issue #15, lot 3 — revue indépendante
+
+Revue du diff `origin/main...HEAD` (branche du lot 3, PR #18) contre les critères du lot 3, la section
+« Positionnement » et la règle 8 de l'issue, sans les comptes rendus des agents. Les changements demandés par
+l'utilisateur en cours de route (interrupteur du polissage serveur, garde-fou strict, langue de Qwen3-ASR, modèle
+québécois, vitesse de Whisper) ont été relus en priorité : ils touchent le comportement réel.
+
+### Critères du lot 3
+
+- **Jeu et noteur exécutables en CI sans modèle ni réseau** : oui (`PolishEvaluationTest`, `LlmSimulationTest` dans
+  `testDebugUnitTest`). Relancé : `app/build/reports/polissage/resultats.md` donne exactement les chiffres du rapport
+  (55, 36, 17, 38, 19 ; 36, 44, 13, 39/28/13 ; 56) et les plafonds 56 / 57 / 58 ; les fichiers de simulation
+  régénérés sont identiques à ceux du dépôt. Seules les latences d'ordinateur diffèrent (le rapport le dit).
+- **Rapport** (`docs/POLISSAGE_LOCAL.md`) : mesuré / simulé / à faire sur téléphone séparés dans chaque tableau ;
+  aucun chiffre simulé présenté comme mesure ; recommandation (ne rien activer, ne pas livrer de LLM) cohérente avec
+  les plafonds. Corrigé : la réponse courte disait « 58 sur 79 s'il passait sur tous les segments », or 58 exige la
+  proximité (désactivée par défaut) : 57, 58 avec proximité.
+- **Aucune approche branchée** : `DefaultPathUnchangedTest` cherche les noms des classes de `text/polish/` et de
+  `cleanup/eval/` dans tout `src/main/java` ; vérifié aussi à la main (aucun appel depuis `DicteeApp`,
+  `TextPipeline`, `SettingsActivity`, `DicteeImeService`). C'est suffisant tant que personne ne passe par la
+  réflexion. Le code d'évaluation est compilé dans l'APK (permis par l'issue : « code hors du chemin par défaut ») ;
+  le jeu et le lexique de simulation ne sont que dans l'APK de test (vérifié par `unzip -l` sur les deux APK).
+
+### Garde-fou strict du LLM local : huit trous trouvés et fermés
+
+Cas adverses écrits dans `SafetyCheckAdversarialTest` ; tous **passaient** avant la correction (`text/Filters.kt`,
+`SafetyCheck`) :
+
+1. Pronoms réfléchis et doublements grammaticaux pris pour une répétition : « Vous vous lavez » → « Vous lavez »,
+   « nous nous », « had had », « that that ».
+2. Nombres épelés : « cinq cinq cinq, un deux trois quatre » → « cinq, un deux trois quatre » (numéro de téléphone).
+3. Lettres épelées : « c o i f f e r i m o u s k i » → « c o i f e r… » (le cas même du lot 3), « a n n e » →
+   « a n e ». Le faux départ laissait aussi passer ces cas (préfixe répété sans reste).
+4. Répétition à travers une fin de phrase : « Je vois Marie. Marie arrive » → « Je vois Marie. Arrive » (sujet
+   supprimé).
+5. Autocorrection qui n'en est pas une : « Il pleut, enfin. Je reste » → « Je reste » (phrase entière supprimée).
+6. Majuscule abaissée au milieu d'une phrase : « j'ai vu Pierre » → « j'ai vu pierre », « Apple » → « apple ».
+7. Séparateur d'un nombre : « 3, 5 kilos » ↔ « 3,5 kilos » (seuls les chiffres étaient comparés).
+8. Question changée en affirmation : « Tu viens demain? » → « Tu viens demain. ».
+
+Correction : répétition et faux départ refusés s'ils traversent une fin de phrase (`?`, `!`, point simple ; les
+points de suspension restent une hésitation) ou s'ils retirent un mot d'un caractère, un nombre en lettres ou un
+doublement grammatical (`NO_DEDUP`) ; autocorrection limitée à sa phrase ; une majuscule de l'entrée ne s'abaisse
+qu'en début de phrase (la mettre reste permis partout, « pierre » → « Pierre ») ; nombres comparés avec leurs
+séparateurs internes ; un `?` de l'entrée ne disparaît pas. Les nettoyages légitimes passent toujours (hésitations,
+« Je… je pense », « très très », « Bon. Donc » → « Bon, donc », « Une une maison », autocorrections avec virgule,
+majuscule de phrase). Un cas de `SafetyCheckTest` attendait l'inverse (« la Friperie » → « la friperie » accepté) :
+désormais refusé, c'est le même mécanisme que « Pierre » → « pierre ». Le prix est faible : un refus garde le texte
+nettoyé par les règles.
+
+Non corrigé, connu : une virgule de sens (« Mange, Marie » / « Mange Marie ») n'est pas contrôlée, puisque le prompt
+demande de corriger la ponctuation ; « un un » et « une une » restent retirables (bégaiement fréquent ; les chiffres
+sont contrôlés à part) ; un doublement de nom sans ponctuation (« Paul aime Marie Marie aime Paul ») reste ambigu.
+
+### Interrupteur « Polissage par le serveur »
+
+Relu dans `RemoteEngine` : coupé, `polish=false` explicite sur l'API à tâches et sur le repli synchrone, texte brut
+inséré même si le serveur renvoie `polished_text`, statut « not requested » (le clavier n'affiche alors aucun
+message) ; activé, requêtes identiques à avant. Le chemin OpenAI et le décodage par segment n'ont jamais demandé de
+polissage. Le serveur lit bien `polish=false` (`app/main.py`). Ajouté : `polishOffStillAppliesVoiceCommandsToTheRawText`
+(les commandes vocales s'appliquent au texte brut).
+
+### Langue transmise à Qwen3-ASR : vérifiée et mesurée
+
+- `javap` sur `app/libs/sherpa-onnx-2.0.1.aar` : `OfflineStream.setOption(String, String)` existe ;
+  `OfflineQwen3AsrModelConfig` n'a pas de champ de langue. Sources au tag `v2.0.1`
+  (`offline-recognizer-qwen3-asr-impl.cc`) : l'option de flux `language` est écrite telle quelle dans le prompt
+  (`"language " + language`), puis le préfixe « language X<asr_text> » est retiré de la sortie ; l'exemple officiel
+  passe « Korean, Chinese, English ». Les noms viennent de la liste officielle de Qwen3-ASR
+  (`qwen_asr/inference/utils.py`, `SUPPORTED_LANGUAGES`) : French, English, Chinese, Hindi, Spanish, Arabic,
+  Portuguese, Russian y sont tous, à la casse près ; bengali et ourdou n'y sont pas et ne reçoivent rien. Table exacte.
+- **Mesure** (hôte x86-64, sherpa-onnx 2.0.1, 4 threads, `fr1` + `frqc1..6`, 75 mots, une exécution) : détection
+  automatique **8 erreurs (10,7 %)**, « French » forcé **6 erreurs (8,0 %)**. Écarts : `frqc2` 3 → 2, `frqc3` 4 → 3,
+  le reste identique. Pas de dégradation : le défaut est gardé. Trop peu pour parler d'un gain ; les mots dits seuls
+  ne sont pas mesurés. Épinglé par `ModelAccuracyHostTest.qwen3ForcedFrenchDoesNotDegradeTheFrenchReferences`
+  (au plus 2 erreurs de plus que l'automatique), placé dans `ModelAccuracyHostTest` pour que le job `models` de la CI
+  le lance (il ne sélectionne que `*ModelAccuracyHostTest*` et `*EndToEndHostTest*`).
+
+### Modèle québécois
+
+- API publique Hugging Face (`?blobs=true`) : tailles et SHA-256 des deux `.onnx` identiques au catalogue ; dépôt
+  public, non restreint ; `turbo-tokens.txt` (hors LFS, sans somme dans l'API) téléchargé et vérifié : `b34b360d…a126`.
+  Fiche d'origine (`ele-sage`) : MIT, WER 6,65 % sur sa validation, données Assemblée nationale + Common Voice.
+- **Corrigé** : nos six extraits québécois viennent de Common Voice « Français du Canada », une des sources
+  d'entraînement du modèle : il a pu les entendre. La carte et le README le disent maintenant à côté du « 5 erreurs
+  sur 59 mots ». La raison de recommandation disait « le plus léger des trois », « le moins d'erreurs des trois »,
+  « le seul des trois » : il y a quatre modèles (toujours vrai à quatre : 4 erreurs contre 5, 6 et 8). Jamais
+  recommandé (test unitaire et instrumenté), français seulement, lenteur donnée comme observation.
+- Scripts de conversion : aucun secret, aucun chemin absolu de cette machine, crédit et licence corrects. Corrigé
+  dans leur README une phrase sur « le `package-lock.json` et `requirements.txt` de kalmia.ca », sans rapport avec
+  ce dépôt. Reste : `convertir.sh` télécharge `export-onnx.py` depuis `master` (somme vérifiée, mais seulement
+  avertie si elle change).
+- Portée : l'issue mettait l'ajout de modèles hors portée ; la demande explicite de l'utilisateur l'a levée pour ce
+  modèle seul (section plus haut).
+
+### Whisper
+
+- `WhisperTuning.provisionalAllowed` : coupé pour Whisper et le serveur, réglage respecté ailleurs ;
+  `tailPaddingsFor` : la valeur du réglage pour la famille Whisper seulement, 1 000 sinon (donc pas de rechargement
+  des autres moteurs) ; valeur stockée invalide → 1 000 (tests `WhisperTuningTest`, `StoreTest`). L'écran de
+  comparaison passe les options de la dictée à chaque modèle et les nomme dans l'en-tête.
+- `docs/ACCELERER_WHISPER.md` : mesures étiquetées « mesuré hôte ». Corrigé : l'étape 6 de la procédure demandait
+  de comparer « texte provisoire activé puis désactivé » alors qu'il est toujours coupé avec Whisper (et une phrase
+  finale « l'étape ne compare plus que les autres modèles, ou l'état avant cette mise à jour ») : réécrite (temps
+  jusqu'au texte final, comparé à la version précédente si on l'a). Le tableau des changements disait
+  `whisperTailPaddings = 0` et « exécuter Whisper en double » comme faits : corrigé (1 000 ; fait en partie).
+
+### Thème, exactitude, vie privée
+
+Aucune couleur ni police en dur dans le diff (la note de modèle utilise `body(…, small = true)`). Aucune permission
+ajoutée, aucune nouvelle requête réseau hors du téléchargement du modèle québécois depuis huggingface.co. Rien sur
+Google. Les textes d'aide des réglages ajoutés sont vrais au regard du code.
+
+### DECISIONS.md
+
+Chronologie « friperie » rendue cohérente : la section de l'interrupteur disait le polissage serveur « suspect
+principal » puis « désormais coupable », alors que la suite l'écarte ; renvois ajoutés vers la mesure de la langue
+de Qwen3-ASR (ex-« non mesuré »).
+
+### Vérification
+
+`./gradlew testDebugUnitTest assembleDebug assembleDebugAndroidTest lintDebug` : code de retour 0. Mesure Qwen3 :
+`--tests '*ModelAccuracyHostTest.qwen3Forced*' -PmodelsDir=…`.

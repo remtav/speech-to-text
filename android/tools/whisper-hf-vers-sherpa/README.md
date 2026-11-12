@@ -21,8 +21,8 @@ donc mêmes noms de fichiers et même branche `ModelFamily.WHISPER` dans `Sherpa
 3. `quantifier_int8.py` : quantification int8 des `MatMul` (équivalente à `quantize_dynamic` d'onnxruntime, mais
    en lisant les poids un à un : ~1 Go de mémoire au lieu de plus de 7 Go).
 
-Dépendances de l'outil (hors du `package-lock.json` et de `requirements.txt` de kalmia.ca, car sans rapport avec
-l'application) : torch (CPU), openai-whisper, onnx, onnxruntime, onnxscript, safetensors, numpy.
+Dépendances de l'outil (installées dans un environnement virtuel par `convertir.sh`, hors des dépendances de
+l'application et du serveur) : torch (CPU), openai-whisper, onnx, onnxruntime, onnxscript, safetensors, numpy.
 
 ## Fichiers produits (conversion du 2026-11-12)
 

@@ -379,14 +379,12 @@ Whisper (et Parakeet en repère) ; temps de chargement ; mémoire en pointe ; fo
 | 3. XNNPACK | « Accélération matérielle » : XNNPACK | Temps de (a), (b) contre l'étape 1 ; fournisseur affiché | Attendu : égal ou plus lent (voir section 5). Si le moteur échoue, le message d'erreur est à noter |
 | 4. NNAPI | « Accélération matérielle » : NNAPI | idem | Attendu : égal ou nettement plus lent. Remettre ensuite sur CPU |
 | 5. Marge de fin | Réglages > « Silence ajouté pour Whisper » : 1 000 (défaut), 600, 300 ; une exécution de « Comparer les modèles » par valeur (le rapport indique la valeur utilisée) | Temps de (a), (b), (c) **et le texte** (répétitions, mots manquants) | Garder 600 seulement si le texte de (a), (b), (c) est identique ou meilleur sur 5 essais par valeur ; refuser toute répétition |
-| 6. Texte provisoire | Réglages : « Texte provisoire pendant qu'on parle » activé puis désactivé, **dans le clavier** (pas dans l'écran de comparaison) | Chronomètre ou enregistrement d'écran : temps entre la fin de la phrase (5 s) et l'apparition du texte final, 5 essais par réglage | Attendu : gain moyen d'environ la moitié d'un décodage provisoire, jusqu'à un décodage entier (section 2). Noter aussi la chaleur du téléphone après 1 minute |
+| 6. Texte provisoire | Aucun réglage : avec Whisper, le texte provisoire est toujours coupé. Dicter **dans le clavier** (pas dans l'écran de comparaison) une phrase de ~5 s, avec cette version, puis, si on l'a encore, avec la version précédente (qui affichait le texte provisoire) | Chronomètre ou enregistrement d'écran : temps entre la fin de la phrase et l'apparition du texte final, 5 essais par version | Attendu : gain moyen d'environ la moitié d'un décodage provisoire, jusqu'à un décodage entier (section 2). Sans la version précédente, noter seulement le temps obtenu. Noter aussi la chaleur du téléphone après 1 minute |
 
 Limites de cet écran (mises à jour 2026-11-12) : il utilise désormais **les mêmes options de moteur que la dictée** (langue forcée
 quand une seule langue est choisie, nombre de threads, accélération, silence ajouté pour Whisper) ; l'en-tête du rapport
 « Copier » indique le silence ajouté et la langue de Whisper. Il décode toujours des extraits entiers (marge de fin comprise),
-pas des segments VAD en direct, et ne mesure ni le texte provisoire ni la pause de fin : l'étape 6 se fait dans le clavier
-(le texte provisoire est maintenant toujours coupé avec Whisper ; l'étape ne compare plus que les autres modèles, ou l'état avant
-cette mise à jour).
+pas des segments VAD en direct, et ne mesure ni le texte provisoire ni la pause de fin : l'étape 6 se fait donc dans le clavier.
 
 **Résultat à rapporter** : les rapports « Copier » de chaque étape, la valeur de threads retenue, et pour les étapes 5 et 6
 les textes obtenus et les temps chronométrés.
@@ -396,11 +394,11 @@ les textes obtenus et les temps chronométrés.
 | Fichier | Nature | Raison / lien |
 | --- | --- | --- |
 | **FAIT** `app/src/main/java/io/github/remtav/dictee/DicteeApp.kt` (ligne 145) | `partials = settings.partials && spec.family != ModelFamily.REMOTE && spec.family != ModelFamily.WHISPER` (ou un réglage « texte provisoire pour Whisper », désactivé par défaut) | Section 2. Ajouter dans `res/values/strings.xml` une phrase d'aide (`settings_partials_help`) disant que Whisper n'affiche pas de texte provisoire |
-| **FAIT** `stt/SttEngine.kt` (`EngineOptions`) | Ajouter `whisperTailPaddings: Int = 0` (0 = défaut sherpa, 1 000) | Section 1 ; fait partie de la clé de `EngineManager`, donc le moteur est rechargé au changement |
+| **FAIT** `stt/SttEngine.kt` (`EngineOptions`) | Ajouter `whisperTailPaddings: Int = 1000` (le défaut de sherpa-onnx) | Section 1 ; fait partie de la clé de `EngineManager`, donc le moteur est rechargé au changement |
 | **FAIT** `stt/SherpaEngine.kt` (`buildConfig`, branche `WHISPER`) | Passer `tailPaddings = options.whisperTailPaddings` à `OfflineWhisperModelConfig` | Section 1 ; champ présent dans l'AAR 2.0.1 [vérifié] |
 | **FAIT** `settings/AppSettings.kt` | Réglage avancé `whisperTailPaddings` (non exposé dans l'interface principale au début ; lu par `engineOptions` pour la famille Whisper seulement) | Pour l'étape 5 de mesure ; changer le défaut à 600 seulement après la mesure téléphone |
 | **NON FAIT** `text/` (filtre, par exemple `Filters.kt`) | Filtre « phrase répétée deux fois » pour la sortie de Whisper (texte = X + espace + X, ou répétition de la fin) avec tests | Filet de sécurité si 300 à 600 est retenu (section 1) |
-| **FAIT** `ui/CompareActivity.kt` | Faire passer la langue de dictée à Whisper (comme `engineOptions` du clavier) et exécuter Whisper en double (marge par défaut et réduite) ; afficher threads et fournisseur dans chaque carte | Rend les étapes 1 à 5 faisables sans build de mesure |
+| **FAIT en partie** `ui/CompareActivity.kt` | Fait : les options de la dictée (langue forcée, silence ajouté) passées à chaque modèle, et l'en-tête du rapport qui les nomme. Non fait : exécuter Whisper en double (marge par défaut et réduite) dans une même comparaison, afficher threads et fournisseur dans chaque carte (on change le réglage et on relance) | Rend les étapes 1 à 5 faisables sans build de mesure |
 | **NON FAIT** `stt/EngineManager.kt` | Décodage à blanc (1 s de silence, résultat ignoré) après le chargement de Whisper | Section 9, à garder seulement si la mesure téléphone montre un premier décodage nettement plus lent |
 | **NON FAIT** `stt/SttEngine.kt` (`defaultThreads`) | Après l'étape 2 : valeur par défaut propre à l'appareil (nombre de gros cœurs) | Section 4 |
 

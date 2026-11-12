@@ -209,6 +209,14 @@ class WholeDictationTest {
         assertEquals("sync", rec.results.single().transport)
     }
 
+    /** Independent review of lot 3: the voice commands do not depend on the server polish. */
+    @Test fun polishOffStillAppliesVoiceCommandsToTheRawText() {
+        raw = "Première ligne. Nouvelle ligne. Deuxième ligne."
+        polishJson = """"polished_text": "Première ligne, nouvelle ligne, deuxième ligne.", "polish": {"applied": true}"""
+        val (sink, _, _) = dictate(remote(config(polish = false)))
+        assertEquals("Première ligne.\nDeuxième ligne.", sink.text)
+    }
+
     @Test fun polishOnStillAsksForPolish() {
         assertTrue(RemoteConfig("http://h").polish) // default of the client config
         dictate(remote(config(polish = true)))

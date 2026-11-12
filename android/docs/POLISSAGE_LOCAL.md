@@ -24,7 +24,8 @@ probables (4).
   de formes tirées du jeu lui-même : sans elles, 36 sur 79.
 - **Un petit LLM n'ajoute presque rien.** Même un LLM parfait (simulé),
   derrière le garde-fou, ne porte la combinaison qu'à 56 sur 79 (un cas de
-  plus), et 58 sur 79 s'il passait sur tous les segments. Seul, le LLM parfait
+  plus), et 57 sur 79 s'il passait sur tous les segments (58 avec la
+  proximité, désactivée par défaut). Seul, le LLM parfait
   atteint 36 sur 79. Ce sont des plafonds : aucun vrai modèle ne fera mieux
   sur ce jeu.
 - **Sans garde-fou, un LLM abîme des mots corrects** : le LLM « bruyant »
@@ -384,11 +385,16 @@ combinaison ne peut pas dépasser 56, avec ou sans proximité.
 Ils sont hors de l'évaluation, et un seul change le comportement par défaut.
 
 - **Langue transmise à Qwen3-ASR : changement du comportement par défaut,
-  non mesuré.** Quand une seule langue de dictée est choisie, Qwen3-ASR reçoit
+  mesuré ensuite sur sept extraits.** Quand une seule langue de dictée est choisie, Qwen3-ASR reçoit
   désormais son nom (« French »), comme Whisper reçoit son code. Le choix
   initial étant « Français (Québec) » seul, **toute personne qui utilise
   Qwen3-ASR sans toucher aux langues dicte maintenant en français forcé.**
-  L'effet n'a pas été mesuré : la mesure sur l'ordinateur a été interrompue.
+  Mesure faite par la revue indépendante (ordinateur, sherpa-onnx 2.0.1, les
+  sept extraits français de référence, 75 mots) : 6 erreurs avec « French »
+  forcé contre 8 en détection automatique (8,0 % contre 10,7 %). Pas de
+  dégradation sur ces extraits ; c'est trop peu pour parler d'un gain, et les
+  mots dits seuls n'ont pas été mesurés (épinglé par
+  `ModelAccuracyHostTest.qwen3ForcedFrenchDoesNotDegradeTheFrenchReferences`).
   Risque possible : un mot anglais dans une phrase française pourrait être
   francisé. Code : `DictationLanguages.qwen3Language`, `AppSettings.engineOptions`,
   `SherpaEngine`. Parakeet, le modèle recommandé, n'a pas d'entrée de langue
@@ -410,7 +416,7 @@ Ils sont hors de l'évaluation, et un seul change le comportement par défaut.
 | **A. Rien de plus** (recommandé pour cette itération) | Comportement actuel, aucun risque nouveau sur les mots | « coiffe rimouski point com » reste en toutes lettres |
 | **B. Option « règles » désactivée par défaut**, puis vocabulaire livré | Adresses dites et épellations recollées, noms courants corrigés pour qui l'active | Un réglage de plus ; une liste à entretenir ; non validé sur de vraies dictées |
 | **C. Mesurer le LLM sur le téléphone** (procédure ci-dessus) | Vraies sorties et coût réel de Qwen2.5 | Une à deux heures ; ne peut pas renverser la conclusion sur la qualité (plafond 56 sur 79) |
-| **D. Garder la langue forcée sur Qwen3-ASR ou revenir à la détection automatique** | Garder : moins de mots devinés en anglais (non mesuré) | Garder : risque de franciser les mots anglais dictés en français |
+| **D. Garder la langue forcée sur Qwen3-ASR ou revenir à la détection automatique** | Garder : 6 erreurs contre 8 sur sept extraits français (mesuré sur ordinateur) ; mots dits seuls non mesurés | Garder : risque de franciser les mots anglais dictés en français |
 
 À trancher aussi, hors de ce lot : le défaut de « Polissage par le serveur »
 (activé aujourd'hui) et la priorité donnée au modèle de transcription affiné
