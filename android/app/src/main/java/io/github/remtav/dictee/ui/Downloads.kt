@@ -88,12 +88,25 @@ class DownloadService : Service() {
         } else {
             startForeground(ID, n)
         }
-        if (!Downloads.anyBusy()) stopSelf()
+        running = this
+        if (!Downloads.anyBusy()) stopIdle()
         return START_NOT_STICKY
+    }
+
+    override fun onDestroy() {
+        if (running === this) running = null
+        super.onDestroy()
+    }
+
+    private fun stopIdle() {
+        stopForeground(STOP_FOREGROUND_REMOVE)
+        stopSelf()
     }
 
     companion object {
         private const val ID = 1
+        /** Set once startForeground() ran: only then may the service be stopped. */
+        @Volatile private var running: DownloadService? = null
         private const val CHANNEL = "downloads"
 
         private fun channel(context: Context) {
@@ -131,8 +144,14 @@ class DownloadService : Service() {
             }
         }
 
-        fun stop(context: Context) {
-            context.stopService(Intent(context, DownloadService::class.java))
+        /**
+         * Stopping a service started with startForegroundService() before it called
+         * startForeground() crashes the app; if it has not started yet, its own
+         * onStartCommand() sees there is nothing left to do and stops itself.
+         */
+        fun stop(@Suppress("UNUSED_PARAMETER") context: Context) {
+            val svc = running ?: return
+            android.os.Handler(android.os.Looper.getMainLooper()).post { if (!Downloads.anyBusy()) svc.stopIdle() }
         }
     }
 }

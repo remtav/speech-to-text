@@ -103,9 +103,10 @@ class EngineManager(
         val millis = (System.nanoTime() - start) / 1_000_000
         synchronized(lock) {
             if (pending !== future) {
-                // Superseded while loading.
+                // Superseded while loading (another model, or release()).
                 created.release()
                 future.cancel(false)
+                if (pending == null && engine == null) publish(State.Empty)
                 return
             }
             engine = created
@@ -152,17 +153,18 @@ class EngineManager(
     /** Frees the loaded model (memory pressure, idle). Safe to call any time. */
     fun release() {
         val toRelease: SttEngine?
+        val hadPending: Boolean
         synchronized(lock) {
             toRelease = engine
             engine = null
             engineKey = null
+            hadPending = pending != null
             pending?.cancel(false)
             pending = null
             pendingKey = null
         }
-        if (toRelease != null) {
-            loader.execute { useLock.writeLock().withLock { toRelease.release() } }
-            publish(State.Empty)
-        }
+        if (toRelease != null) loader.execute { useLock.writeLock().withLock { toRelease.release() } }
+        // Also when only a load was cancelled, or the keyboard would show "Loading…" forever.
+        if (toRelease != null || hadPending) publish(State.Empty)
     }
 }

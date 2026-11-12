@@ -163,6 +163,37 @@ class RobustnessInstrumentedTest : ImeTestBase() {
     }
 
     @Test
+    fun changingBetweenFieldsWithTheSameKeyStillCancels() {
+        // Like two inputs of one web page: same package, same (absent) id, same hint and type.
+        useAudio("en1", "fr1", realTime = true)
+        useScript("never shown.", "never shown either.", delayMillis = 4_000)
+        launchFields()
+        focus(4)
+        waitFor("no-id field active", 5_000) { onMain { service.currentInputEditorInfo?.fieldId } == android.view.View.NO_ID }
+        tapMic()
+        waitFor("first segment being decoded", 20_000) { (factory.last?.calls?.get() ?: 0) >= 1 }
+        focus(5)
+        awaitIdle(10_000)
+        Thread.sleep(5_000)
+        var t1 = ""; var t2 = ""
+        scenario.onActivity { t1 = it.noId1.text.toString(); t2 = it.noId2.text.toString() }
+        assertEquals("", t1)
+        assertEquals("", t2)
+    }
+
+    @Test
+    fun modelSwitchIsRefusedWhileDictating() {
+        useAudio("en2", realTime = true)
+        useScript("x.")
+        launchFields()
+        tapMic()
+        waitFor("listening", 5_000) { state() == DictationState.LISTENING }
+        onMain { service.switchModel(ModelCatalog.qwen3.id) }
+        assertEquals(ModelCatalog.parakeet.id, app.settings.activeModelId)
+        onMain { service.controller.cancel() }
+    }
+
+    @Test
     fun audioFocusLossStopsAndKeepsWhatWasSaid() {
         useAudio("en1", "fr1", "en2", realTime = true)
         useScript("before the interruption.", "after.", "after.")

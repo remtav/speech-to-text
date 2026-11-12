@@ -113,6 +113,7 @@ class DicteeApp : Application() {
     /** A dictation session for the active model, or null with a reason. */
     fun newSession(): Pair<DictationSession?, String?> {
         val spec = settings.activeModel
+        if (benchmarkRunning) return null to "Comparaison des modèles en cours"
         if (!isInstalled(spec)) return null to "Modèle ${spec.shortName} non installé : ouvrez les réglages"
         engines.factory = engineFactory()
         val options = engineOptions(spec)
@@ -143,7 +144,8 @@ class DicteeApp : Application() {
         // The IME keeps the model while visible; when hidden, memory pressure frees it.
         @Suppress("DEPRECATION")
         if (level >= ComponentCallbacks2.TRIM_MEMORY_BACKGROUND || level == ComponentCallbacks2.TRIM_MEMORY_RUNNING_CRITICAL) {
-            if (!keyboardVisible) {
+            // Nor while a dictation still has segments to transcribe.
+            if (!keyboardVisible && !dictationActive) {
                 engines.release()
                 releaseCleaner()
             }
@@ -151,6 +153,9 @@ class DicteeApp : Application() {
     }
 
     @Volatile var keyboardVisible = false
+    @Volatile var dictationActive = false
+    /** The comparison screen loads models itself: the keyboard must not load another meanwhile. */
+    @Volatile var benchmarkRunning = false
 
     companion object {
         fun from(context: Context) = context.applicationContext as DicteeApp

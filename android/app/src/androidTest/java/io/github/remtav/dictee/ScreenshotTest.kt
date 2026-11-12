@@ -25,6 +25,11 @@ class ScreenshotTest : ImeTestBase() {
         File(context.getExternalFilesDir(null), "screenshots").apply { mkdirs() }
     }
 
+    @org.junit.Before
+    fun portrait() {
+        device.setOrientationNatural() // and stays frozen for the captures
+    }
+
     private fun shot(name: String) {
         instrumentation.waitForIdleSync()
         Thread.sleep(700) // animations, ripple, level meter

@@ -117,7 +117,7 @@ abstract class ImeTestBase {
 
     protected fun focus(which: Int) {
         scenario.onActivity {
-            val f = when (which) { 1 -> it.field1; 2 -> it.field2; else -> it.password }
+            val f = when (which) { 1 -> it.field1; 2 -> it.field2; 4 -> it.noId1; 5 -> it.noId2; else -> it.password }
             f.requestFocus()
         }
         instrumentation.waitForIdleSync()

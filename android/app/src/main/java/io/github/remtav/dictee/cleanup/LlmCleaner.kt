@@ -59,12 +59,18 @@ class LlmCleaner private constructor(
     private val timeoutMillis: Long,
 ) : TextCleaner {
     private val executor = Executors.newSingleThreadExecutor { Thread(it, "llm-cleanup") }
+    /** A generation cannot be interrupted: while one runs (even timed out), new segments skip the LLM. */
+    private val busy = java.util.concurrent.atomic.AtomicBoolean(false)
+    @Volatile private var closed = false
 
     override fun clean(text: String): String {
         val base = RuleCleaner.clean(text)
         if (base.split(' ').size < 4) return base // nothing worth rewriting
+        if (closed || !busy.compareAndSet(false, true)) return base
         return try {
-            val future = executor.submit<String> { generate(base) }
+            val future = executor.submit<String> {
+                try { generate(base) } finally { busy.set(false) }
+            }
             val out = future.get(timeoutMillis, TimeUnit.MILLISECONDS).trim().trim('"', '«', '»').trim()
             val verdict = SafetyCheck.check(base, out, dictionary)
             if (verdict.ok) out else { Log.i(TAG, "rejected: ${verdict.rule}"); base }
@@ -83,9 +89,18 @@ class LlmCleaner private constructor(
         }
     }
 
+    /**
+     * Frees the model once any running generation has finished: closing the native
+     * engine under a generation would crash the keyboard. Returns at once.
+     */
     fun close() {
-        executor.shutdownNow()
-        try { llm.close() } catch (_: Throwable) {}
+        if (closed) return
+        closed = true
+        executor.shutdown()
+        Thread({
+            try { executor.awaitTermination(2, TimeUnit.MINUTES) } catch (_: InterruptedException) {}
+            try { llm.close() } catch (_: Throwable) {}
+        }, "llm-close").start()
     }
 
     companion object {

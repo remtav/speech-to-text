@@ -5,6 +5,10 @@
         <item name="colorOnPrimary">#FFFFFF</item>
         <item name="colorPrimaryContainer">#D1E4FF</item>
         <item name="colorOnPrimaryContainer">#001D36</item>
+        <item name="android:statusBarColor">?attr/colorSurface</item>
+        <item name="android:navigationBarColor">?attr/colorSurface</item>
+        <item name="android:windowLightStatusBar">true</item>
+        <item name="android:windowLightNavigationBar">true</item>
         <item name="colorError">#BA1A1A</item>
     </style>
     <style name="Theme.Dictee.Keyboard" parent="Theme.Dictee"/>

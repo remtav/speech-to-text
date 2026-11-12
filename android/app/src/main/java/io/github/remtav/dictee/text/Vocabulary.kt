@@ -24,7 +24,7 @@ class Vocabulary(val favoured: List<String>, val corrections: List<Pair<String, 
                 "(?<![\\p{L}\\p{N}])" + Regex.escape(from) + "(?![\\p{L}\\p{N}])",
                 setOf(RegexOption.IGNORE_CASE),
             )
-            out = pattern.replace(out) { to.replace("$", "\\$") }
+            out = pattern.replace(out) { to } // lambda result is inserted literally
         }
         if (favoured.isNotEmpty()) out = fuzzyFix(out)
         return out

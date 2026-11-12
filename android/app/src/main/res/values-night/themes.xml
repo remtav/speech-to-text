@@ -5,6 +5,10 @@
         <item name="colorOnPrimary">#003258</item>
         <item name="colorPrimaryContainer">#00497D</item>
         <item name="colorOnPrimaryContainer">#D1E4FF</item>
+        <item name="android:statusBarColor">?attr/colorSurface</item>
+        <item name="android:navigationBarColor">?attr/colorSurface</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowLightNavigationBar">false</item>
         <item name="colorError">#FFB4AB</item>
     </style>
 </resources>

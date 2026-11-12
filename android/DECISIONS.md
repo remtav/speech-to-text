@@ -159,6 +159,82 @@ sont pas répétées ; chaque entrée ci-dessous donne le choix et sa raison.
     qu'en arm64 et armv7 : pas sur l'émulateur x86_64), le texte nettoyé par
     règles est gardé. Rien ne peut planter.
 
+## Serveur distant (ajouté après les trois lots, à la demande de l'utilisateur)
+
+L'issue avait arrêté « jamais d'audio ni de texte envoyé ». L'utilisateur a
+ensuite demandé de pouvoir transcrire sur son propre serveur quand les modèles
+du téléphone ne suffisent pas. Choix faits :
+
+- **Option explicite, désactivée par défaut.** « Serveur distant » est une
+  entrée de plus du catalogue (`ModelCatalog.remote`). Elle n'est sélectionnable
+  qu'une fois une adresse saisie, et le texte des réglages dit clairement que
+  l'audio de chaque segment part alors vers ce serveur. Les modèles du téléphone
+  n'envoient toujours rien.
+- **Deux API** (`RemoteEngine`) :
+  - le serveur de ce dépôt, `POST /transcribe/streaming` (chemin rapide : pas
+    d'alignement ni de diarisation), champ `language` facultatif ;
+  - l'API de transcription d'OpenAI, `POST /v1/audio/transcriptions`, parlée par
+    la plupart des serveurs auto-hébergés (faster-whisper-server/speaches,
+    serveur whisper.cpp, LocalAI, vLLM…). Les mots favoris du vocabulaire
+    partent dans `prompt`.
+- Chaque segment du VAD est envoyé en WAV 16 kHz 16 bits mono, ce qui garde les
+  commandes vocales, le vocabulaire et l'assemblage du texte identiques. Le
+  texte provisoire est désactivé avec le serveur : une requête toutes les 0,7 s
+  n'aurait pas de sens.
+- Jeton facultatif envoyé en `Authorization: Bearer` (proxy inverse, API hébergée).
+- **Repli** : si le serveur ne répond pas, le modèle local choisi prend le
+  relais (Parakeet par défaut), chargé seulement à la première panne ; le
+  serveur est réessayé après 60 s. On peut aussi choisir d'afficher une erreur.
+- **HTTP en clair autorisé** (`network_security.xml`) : un serveur domestique est
+  typiquement `http://192.168.x.x:8081`. Les réglages préviennent quand une
+  adresse HTTP n'est pas sur un réseau privé (10/8, 172.16/12, 192.168/16,
+  100.64/10 de Tailscale, `.local`, `.lan`, nom sans point) et recommandent
+  HTTPS ou un VPN. Les téléchargements de modèles restent en HTTPS et vérifiés.
+- Bouton « Tester la connexion » : `GET /health` (serveur du dépôt, qui affiche
+  le modèle et le périphérique) ou `GET /v1/models`.
+- L'écran de comparaison inclut le serveur s'il est configuré : on compare
+  directement qualité et latence avec les modèles du téléphone.
+- Tests : `RemoteEngineTest` (serveur HTTP local : format multipart, WAV, jeton,
+  `prompt`, erreurs HTTP, serveur injoignable, repli et nouvel essai) et un test
+  instrumenté qui dicte dans l'IME vers un serveur sur l'émulateur. Le serveur
+  Python n'est pas lancé en CI (torch + WhisperX) : le contrat (`file`
+  multipart, réponse JSON avec `text`) est celui de `app/main.py`.
+
+## Revue indépendante (Claude Opus) et corrections
+
+Une revue indépendante du code a relevé les points suivants, corrigés :
+
+- **Identification du champ** : `packageName#fieldId` ne distingue pas deux
+  champs d'une page web (même id) ni deux champs sans id. Désormais, tout
+  nouveau champ pendant une dictée l'annule, sauf le seul cas « clavier masqué
+  il y a moins de 4 s et retour sur le même champ avec un id » (rotation).
+  Test instrumenté avec deux champs sans id.
+- **Texte perdu pendant une rotation** : un segment terminé pendant l'entrée
+  fictive est maintenant gardé et inséré quand le champ revient.
+- **Changement de modèle pendant une dictée** : refusé avec un message (les
+  segments en attente rechargeaient l'ancien modèle).
+- **Pression mémoire pendant la fin d'une dictée** : le modèle n'est plus libéré
+  tant que des segments restent à transcrire.
+- **LLM de nettoyage** : une génération qui dépasse le délai n'est plus empilée
+  (les segments suivants sautent le LLM tant qu'elle tourne) et le modèle n'est
+  libéré qu'une fois la génération finie (évite un plantage natif).
+- Plus petits : texte provisoire effacé en fin de session même sur erreur ;
+  état « chargement » qui pouvait rester affiché ; VAD libéré à la fin de chaque
+  session ; `$` dans une correction du vocabulaire ; une modification du
+  vocabulaire ne recharge plus que Qwen3-ASR ; reprise HTTP mal alignée
+  recommencée ; redirection HTTPS → HTTP refusée ; dictée non démarrée si le
+  système refuse le focus audio (appel) ; arrêt du service de téléchargement
+  qui pouvait planter sur un téléchargement immédiat ; l'écran de comparaison
+  empêche le clavier de charger un second modèle en parallèle ; la CI n'annule
+  plus une exécution en cours sur `main`.
+- **Non changé : la clé de signature publique.** La revue signale que la clé de
+  debug versionnée permet à n'importe qui de produire un APK qui s'installe en
+  mise à jour par-dessus celui de l'utilisateur, alors que l'application est un
+  clavier avec accès au micro. C'est une décision arrêtée de l'issue (installer
+  chaque APK par-dessus le précédent sans secret) ; le risque est signalé à
+  l'humain. Passer à une clé privée (secret GitHub) obligera à désinstaller une
+  fois l'application.
+
 ## Tests et écarts avec l'issue
 
 - **Les modèles ne tournent pas sur l'émulateur de la CI** (1 Go par modèle à
@@ -205,7 +281,7 @@ sont pas répétées ; chaque entrée ci-dessous donne le choix et sa raison.
   chaque APK publié s'installe par-dessus le précédent.
 - Release GitHub `android-v0.1.<n>` créée à chaque push sur `main`, une fois
   les trois jobs de tests passés.
-- Permissions : micro ; Internet (téléchargement des modèles uniquement) ;
+- Permissions : micro ; Internet (téléchargement des modèles, et serveur distant s'il est choisi) ;
   service au premier plan + notifications pour que les téléchargements de
   1 Go survivent à la mise en arrière-plan. Aucune télémétrie, `allowBackup`
   désactivé.

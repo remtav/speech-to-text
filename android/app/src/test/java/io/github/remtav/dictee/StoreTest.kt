@@ -61,6 +61,7 @@ class ModelStoreTest {
     private val requests = AtomicInteger()
     private val ranges = AtomicInteger()
     @Volatile private var failOnceAt = -1
+    @Volatile private var badRangeOnce = false
 
     @Before fun setUp() {
         root = Files.createTempDirectory("store").toFile()
@@ -73,6 +74,7 @@ class ModelStoreTest {
                     if (range != null) {
                         ranges.incrementAndGet()
                         from = range.removePrefix("bytes=").substringBefore('-').toInt()
+                        if (badRangeOnce) { badRangeOnce = false; from = 0 } // claims 206 but restarts at 0
                         out.write(("HTTP/1.1 206 Partial Content\r\nContent-Range: bytes $from-${content.size - 1}/${content.size}\r\n" +
                             "Content-Length: ${content.size - from}\r\n\r\n").toByteArray())
                     } else {
@@ -145,6 +147,14 @@ class ModelStoreTest {
         store.download(item())
         assertTrue(store.isInstalled(item()))
         assertEquals(1, ranges.get())
+    }
+
+    @Test fun misalignedPartialResponseRestartsFromScratch() {
+        failOnceAt = 1_000_000
+        badRangeOnce = true
+        val store = ModelStore(root)
+        store.download(item())
+        assertTrue(store.isInstalled(item()))
     }
 
     @Test fun cancelStopsDownload() {

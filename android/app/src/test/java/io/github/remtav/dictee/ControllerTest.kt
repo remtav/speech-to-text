@@ -147,6 +147,53 @@ class DictationControllerTest {
         assertEquals("", field1.text)
     }
 
+    @Test fun fieldAwayMidDictationHoldsTextUntilItIsBack() {
+        val field = StringSink()
+        var available = true
+        val l = RecordingListener()
+        val engine = ScriptedEngine(spec, listOf("un.", "deux.", "trois."), 0)
+        lateinit var c: DictationController
+        c = DictationController({ if (available) field else null }, { it.run() }, object : DictationListener by l {
+            override fun onSegment(transcription: Transcription, inserted: String) {
+                l.onSegment(transcription, inserted)
+                // After the first segment, the field goes away (activity recreated) for a while.
+                if (inserted.contains("Un.")) available = false
+            }
+        }, partialIntervalMillis = 100)
+        val audio = PcmAudioSource(listOf(burst(0.5f), burst(0.5f), burst(0.5f)), realTime = false)
+        c.start(session(audio, engine))
+        l.awaitEnd()
+        assertEquals("Un.", field.text)
+        available = true
+        c.deliverPending()
+        assertEquals("Un. Deux. Trois.", field.text)
+    }
+
+    @Test fun cancelAfterFieldChangeDropsHeldText() {
+        val field = StringSink()
+        var available = false
+        val l = RecordingListener()
+        val c = controller({ if (available) field else null }, l)
+        c.start(session(PcmAudioSource(listOf(burst(0.5f)), realTime = false), ScriptedEngine(spec, listOf("perdu."), 0)))
+        l.awaitEnd()
+        c.cancel() // no-op once idle: held text stays tied to the finished session
+        available = true
+        c.deliverPending()
+        assertEquals("Perdu.", field.text)
+        // A new session discards anything older.
+        val field2 = StringSink()
+        var avail2 = false
+        val l2 = RecordingListener()
+        val c2 = controller({ if (avail2) field2 else null }, l2)
+        c2.start(session(PcmAudioSource(listOf(burst(0.5f)), realTime = true), ScriptedEngine(spec, listOf("jamais."), 400)))
+        Thread.sleep(300)
+        c2.cancel()
+        Thread.sleep(800)
+        avail2 = true
+        c2.deliverPending()
+        assertEquals("", field2.text)
+    }
+
     @Test fun silencedMicrophoneStopsWithMessageAndKeepsSpeech() {
         val sink = StringSink()
         val l = RecordingListener()

@@ -58,6 +58,19 @@ class DictationController(
         private set
 
     private val sessionId = AtomicInteger(0)
+
+    private class PendingText(val session: Int, val pipeline: TextPipeline, val pieces: List<Piece>, val t: Transcription)
+
+    /** Finals decoded while no field was available. Main thread only. */
+    private val pending = ArrayList<PendingText>()
+
+    /** Inserts text held back while the field was away. Call on the main thread when it is back. */
+    fun deliverPending() {
+        val sink = sinkProvider() ?: return
+        val items = pending.filter { it.session == sessionId.get() }
+        pending.clear()
+        for (p in items) listener.onSegment(p.t, p.pipeline.apply(p.pieces, sink))
+    }
     @Volatile private var run: Run? = null
 
     private sealed interface Job {
@@ -98,6 +111,7 @@ class DictationController(
     fun cancel() {
         if (!isActive) return
         sessionId.incrementAndGet()
+        mainExecutor.execute { pending.clear() }
         run?.abort()
         run = null
         mainExecutor.execute { sinkProvider()?.clearComposing() }
@@ -210,6 +224,8 @@ class DictationController(
                 if (error != null) setState(DictationState.FINISHING, error)
                 jobs.offer(Job.End(id, error))
             }
+            // The VAD belongs to this session: free its native memory now, not at GC.
+            try { s.vad.release() } catch (_: Throwable) {}
             post { listener.onSpeech(false); listener.onLevel(0f) }
         }
 
@@ -250,8 +266,14 @@ class DictationController(
                             val pieces: List<Piece> = s.pipeline.prepare(t.text, s.spec.family)
                             post(id) {
                                 val sink = sinkProvider()
-                                val inserted = if (sink != null) s.pipeline.apply(pieces, sink) else ""
-                                listener.onSegment(t, inserted)
+                                if (sink != null && pending.isEmpty()) {
+                                    listener.onSegment(t, s.pipeline.apply(pieces, sink))
+                                } else {
+                                    // No field right now (activity being recreated): keep the text
+                                    // until the same field is back, see deliverPending().
+                                    pending += PendingText(id, s.pipeline, pieces, t)
+                                    if (sink != null) deliverPending()
+                                }
                             }
                         }
                         is Job.End -> {
@@ -268,7 +290,8 @@ class DictationController(
             }
             if (sessionId.get() == id) {
                 post(id) {
-                    synchronized(this) {
+                    synchronized(this@DictationController) {
+                        sinkProvider()?.clearComposing()
                         if (sessionId.get() == id) {
                             setStateNow(if (error != null) DictationState.ERROR else DictationState.IDLE, error)
                         }

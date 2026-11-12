@@ -26,6 +26,8 @@
     <string name="msg_unavailable">Dictée indisponible</string>
     <string name="msg_field_changed">Dictée arrêtée : le champ a changé</string>
     <string name="msg_audio_focus">Dictée arrêtée : une autre application utilise le son</string>
+    <string name="msg_audio_busy">Son indisponible (appel en cours ?) : dictée non démarrée</string>
+    <string name="msg_stop_to_switch">Arrêtez la dictée pour changer de modèle</string>
     <string name="msg_call">Dictée arrêtée : appel en cours</string>
     <string name="cancel">Annuler</string>
     <string name="delete">Supprimer</string>

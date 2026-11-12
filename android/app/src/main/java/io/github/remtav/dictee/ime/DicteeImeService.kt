@@ -12,6 +12,7 @@ import android.media.AudioManager
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
+import android.os.SystemClock
 import android.text.InputType
 import android.util.Log
 import android.view.ContextThemeWrapper
@@ -62,6 +63,8 @@ class DicteeImeService : InputMethodService(), DictationListener, EngineManager.
     private var dictationField: String? = null
     private var currentField: String? = null
     private var passwordField = false
+    /** When the keyboard was last hidden (uptime ms), 0 while shown. */
+    private var hiddenAt = 0L
 
     private var lastMessage: String? = null
     private var lastMessageIsError = false
@@ -167,33 +170,50 @@ class DicteeImeService : InputMethodService(), DictationListener, EngineManager.
 
     override fun onStartInput(attribute: EditorInfo?, restarting: Boolean) {
         super.onStartInput(attribute, restarting)
-        val field = attribute?.let { "${it.packageName}#${it.fieldId}" }
-        currentField = field
-        Log.i(TAG, "startInput field=$field type=${attribute?.inputType} restarting=$restarting dictation=$dictationField")
-        passwordField = attribute != null && isPassword(attribute)
-        currentInputConnection?.let { sink = ImeTextSink(it) } ?: run { sink = null }
-        // While an activity is recreated (rotation) the system briefly starts a placeholder
-        // input with no editor (TYPE_NULL): not a field change. Results are only delivered
-        // to the dictation's own field anyway (see currentSink).
         val realEditor = attribute != null && attribute.inputType != InputType.TYPE_NULL
-        if (controller.isActive && realEditor && field != dictationField) {
+        Log.i(TAG, "startInput field=${attribute?.let { fieldKey(it) }} restarting=$restarting dictation=$dictationField")
+        if (!realEditor) {
+            // Placeholder input with no editor (during an activity recreation, or a screen
+            // without text field): not a field change. Results wait until a field is back.
+            currentField = null
+            sink = null
+            return
+        }
+        val field = fieldKey(attribute!!)
+        currentField = field
+        passwordField = isPassword(attribute)
+        currentInputConnection?.let { sink = ImeTextSink(it) } ?: run { sink = null }
+        if (controller.isActive && !restarting && !isSameFieldAfterRotation(attribute, field)) {
             // Focus moved to another field mid-dictation: never type into the wrong one.
+            // The key alone cannot tell fields apart (WebView inputs and fields without an
+            // id share it), so any new input is a change, except the one case where the
+            // keyboard was hidden a moment ago and comes back on the same field (rotation).
             Log.i(TAG, "field changed: cancel")
             controller.cancel()
             showMessage(getString(R.string.msg_field_changed), error = false)
+        } else if (field == dictationField) {
+            controller.deliverPending()
         }
     }
+
+    private fun fieldKey(info: EditorInfo) =
+        "${info.packageName}#${info.fieldId}#${info.fieldName}#${info.inputType}#${info.hintText}"
+
+    private fun isSameFieldAfterRotation(info: EditorInfo, field: String): Boolean =
+        field == dictationField && info.fieldId != View.NO_ID &&
+            hiddenAt > 0 && SystemClock.uptimeMillis() - hiddenAt < HIDE_GRACE_MS
 
     override fun onStartInputView(info: EditorInfo?, restarting: Boolean) {
         super.onStartInputView(info, restarting)
         app.keyboardVisible = true
+        hiddenAt = 0
         Log.i(TAG, "startInputView")
         main.removeCallbacks(idleRelease)
         main.removeCallbacks(stopIfHidden)
         if (passwordField && controller.isActive) controller.cancel()
         // Preload the model so the first tap is fast.
         val spec = app.settings.activeModel
-        if (!passwordField && app.isInstalled(spec)) {
+        if (!passwordField && !app.benchmarkRunning && app.isInstalled(spec)) {
             app.engines.factory = app.engineFactory()
             app.engines.load(spec, app.engineOptions(spec))
         }
@@ -203,6 +223,7 @@ class DicteeImeService : InputMethodService(), DictationListener, EngineManager.
     override fun onFinishInputView(finishingInput: Boolean) {
         super.onFinishInputView(finishingInput)
         app.keyboardVisible = false
+        hiddenAt = SystemClock.uptimeMillis()
         Log.i(TAG, "finishInputView finishing=$finishingInput")
         // Hidden keyboard: stop listening (what was said is still inserted if the field stays).
         // Delayed, because a rotation hides and re-shows the keyboard on the same field.
@@ -258,13 +279,17 @@ class DicteeImeService : InputMethodService(), DictationListener, EngineManager.
             showMessage(reason ?: getString(R.string.msg_unavailable), error = true)
             return
         }
+        if (!requestAudioFocus()) {
+            showMessage(getString(R.string.msg_audio_busy), error = true)
+            return
+        }
         dictationField = currentField
         lastMessage = null
-        requestAudioFocus()
         controller.start(session)
     }
 
     override fun onState(state: DictationState, message: String?) {
+        app.dictationActive = state == DictationState.LISTENING || state == DictationState.FINISHING
         Log.i(TAG, "dictation $state ${message ?: ""}")
         when (state) {
             DictationState.LISTENING -> lastMessage = null
@@ -305,7 +330,8 @@ class DicteeImeService : InputMethodService(), DictationListener, EngineManager.
 
     // ------------------------------------------------------------ audio focus
 
-    private fun requestAudioFocus() {
+    /** False when the system refuses the audio focus (a call is in progress). */
+    private fun requestAudioFocus(): Boolean {
         val req = AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_EXCLUSIVE)
             .setAudioAttributes(
                 AudioAttributes.Builder()
@@ -316,7 +342,9 @@ class DicteeImeService : InputMethodService(), DictationListener, EngineManager.
             .setOnAudioFocusChangeListener({ change -> onAudioFocusChange(change) }, main)
             .build()
         audioFocus = req
-        audioManager.requestAudioFocus(req)
+        val granted = audioManager.requestAudioFocus(req) != AudioManager.AUDIOFOCUS_REQUEST_FAILED
+        if (!granted) audioFocus = null
+        return granted
     }
 
     private fun abandonAudioFocus() {
@@ -409,7 +437,12 @@ class DicteeImeService : InputMethodService(), DictationListener, EngineManager.
     /** Quick model switch from the keyboard itself. */
     fun switchModel(id: String) {
         val spec = ModelCatalog.byId(id) ?: return
-        if (controller.isActive) controller.stop()
+        if (controller.isActive) {
+            // Queued segments still need the current model: switching now would make the
+            // two models load in turn. Ask to stop first.
+            showMessage(getString(R.string.msg_stop_to_switch), error = false)
+            return
+        }
         app.settings.activeModelId = spec.id
         app.engines.factory = app.engineFactory()
         app.engines.load(spec, app.engineOptions(spec))

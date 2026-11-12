@@ -137,6 +137,7 @@ class CompareActivity : AppCompatActivity() {
             return
         }
         busy = true
+        app.benchmarkRunning = true
         runButton.isEnabled = false
         resultsBox.removeAllViews()
         // Free the keyboard's model: measurements start from a clean slate.
@@ -156,6 +157,7 @@ class CompareActivity : AppCompatActivity() {
                 progress.text = getString(R.string.compare_done)
                 runButton.isEnabled = true
                 busy = false
+                app.benchmarkRunning = false
             }
         }
     }

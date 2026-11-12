@@ -130,11 +130,23 @@ class ModelStore(private val root: File) {
                 val code = conn.responseCode
                 if (code in 300..399) {
                     val location = conn.getHeaderField("Location") ?: throw IOException("redirect without Location")
-                    url = URL(url, location)
+                    val next = URL(url, location)
+                    // The hash protects integrity anyway, but never step down from HTTPS.
+                    if (url.protocol == "https" && next.protocol != "https") throw IOException("redirection vers HTTP refusée")
+                    url = next
                     if (++redirects > 10) throw IOException("too many redirects")
                     continue
                 }
                 val append = code == HttpURLConnection.HTTP_PARTIAL
+                if (append) {
+                    // A 206 must resume exactly where the partial file ends; otherwise start over.
+                    val start = conn.getHeaderField("Content-Range")?.removePrefix("bytes ")?.substringBefore('-')?.toLongOrNull()
+                    if (start != part.length()) {
+                        conn.disconnect()
+                        part.delete()
+                        continue
+                    }
+                }
                 if (code != HttpURLConnection.HTTP_OK && !append) {
                     throw IOException("HTTP $code pour ${file.url}")
                 }

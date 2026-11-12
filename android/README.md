@@ -3,7 +3,8 @@
 Clavier Android (IME) dont la seule fonction est la dictée vocale, en français
 et en anglais. La transcription tourne **entièrement sur le téléphone** avec
 [sherpa-onnx](https://github.com/k2-fsa/sherpa-onnx) : ni l'audio ni le texte
-ne quittent l'appareil, le réseau ne sert qu'à télécharger les modèles.
+ne quittent l'appareil, le réseau ne sert qu'à télécharger les modèles — sauf
+si vous choisissez vous-même le « Serveur distant » (voir plus bas).
 Spécification : issue #10. Choix de développement : [`DECISIONS.md`](DECISIONS.md).
 
 Ce n'est pas un clavier de frappe : on garde son clavier habituel et on
@@ -47,6 +48,18 @@ l'écran principal. **Comparer les modèles** transcrit les extraits de
 référence (ou votre enregistrement) avec chaque modèle installé et affiche
 texte, temps de chargement, facteur temps réel, mémoire en pointe et WER ;
 « Partager » exporte les résultats.
+
+### Serveur distant (optionnel)
+
+Si les modèles du téléphone ne suffisent pas, la dictée peut se faire sur un
+serveur que vous contrôlez : dans les Réglages, section « Serveur distant »,
+saisir l'adresse (par exemple `http://192.168.1.10:8081` pour le serveur
+speech-to-text de ce dépôt, ou l'adresse d'un serveur compatible avec l'API
+OpenAI `/v1/audio/transcriptions`), tester la connexion, puis choisir
+« Serveur distant » comme modèle (écran principal ou bouton du clavier).
+Avec ce choix, l'audio de chaque segment est envoyé au serveur. Si le serveur
+ne répond pas, un modèle local prend le relais (réglable). En dehors du réseau
+local, utilisez HTTPS ou un VPN (WireGuard, Tailscale).
 
 Réglages : texte provisoire, commandes vocales, pause de fin de segment,
 vocabulaire personnalisé, thème, vibrations, durée de maintien du modèle en
