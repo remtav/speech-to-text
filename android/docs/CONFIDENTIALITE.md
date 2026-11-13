@@ -31,6 +31,13 @@ s'affiche masqué et n'apparaît pas dans les journaux.
 La personne qui exploite le serveur est responsable de ce qu'il en fait ; avec un serveur autre que
 celui de ce dépôt, lisez sa propre politique.
 
+## Test rapide (1 minute)
+
+Le test rapide de l'installation enregistre une lecture d'une quarantaine de mots, la transcrit **sur le
+téléphone** avec un ou deux modèles téléchargés, puis l'efface dès le score affiché. Elle n'est écrite
+dans aucun fichier et n'est envoyée nulle part, même quand un serveur est configuré dans les réglages
+avancés.
+
 ## Test de lecture
 
 Le test de lecture en français québécois reste sur le téléphone ; un envoi de vos enregistrements

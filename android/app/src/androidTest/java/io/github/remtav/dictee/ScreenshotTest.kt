@@ -303,4 +303,55 @@ class ScreenshotTest : ImeTestBase() {
             }
         }
     }
+
+    /**
+     * Issue #36, recentred on the phone: the quick test's result (English alone: the light model reads as well and
+     * the best one is slow, so the light one is recommended), and « Modèles et performances » in « Avancé »
+     * (issue #37). Scripted engines, a silent clip: nothing is downloaded, recorded or sent.
+     */
+    @Test
+    fun quickTest() {
+        val reference = io.github.remtav.dictee.reading.QuickReading.load(DictationLanguage.ENGLISH) { path ->
+            context.assets.open(path).bufferedReader().use { it.readText() }
+        }.text.paragraphs[0]
+        try {
+            for (mode in listOf(ThemeMode.LIGHT, ThemeMode.DARK)) {
+                val suffix = mode.name.lowercase()
+                setTheme(mode)
+                app.settings.languages = setOf(DictationLanguage.ENGLISH)
+                app.settings.activeModelId = ModelCatalog.whisperTurbo.id
+                TestHooks.installedModelIds = setOf(ModelCatalog.whisperTurbo.id, ModelCatalog.parakeet.id)
+                TestHooks.engineFactory = io.github.remtav.dictee.stt.SttEngineFactory { spec, _, _ ->
+                    ScriptedEngine(spec, List(10) { reference }, if (spec.id == ModelCatalog.whisperTurbo.id) 5_600 else 50)
+                }
+                TestHooks.audioSourceFactory = io.github.remtav.dictee.audio.AudioSourceFactory {
+                    io.github.remtav.dictee.audio.PcmAudioSource(
+                        listOf(io.github.remtav.dictee.audio.PcmAudio(FloatArray(3 * 16000) { 0.05f }, 16000)),
+                        realTime = false, leadSeconds = 0f, tailSeconds = 0f,
+                    )
+                }
+                ActivityScenario.launch(io.github.remtav.dictee.ui.QuickTestActivity::class.java).use { s ->
+                    shot("quick-test-reading-$suffix", s)
+                    s.onActivity { a ->
+                        a.window.decorView.findViewWithTag<View>(io.github.remtav.dictee.ui.QuickTestActivity.TAG_RECORD).performClick()
+                    }
+                    waitFor("quick test result", 60_000) {
+                        var done = false
+                        s.onActivity { a -> done = a.window.decorView.findViewWithTag<View>(io.github.remtav.dictee.ui.QuickTestActivity.TAG_VERDICT) != null }
+                        done
+                    }
+                    shot("quick-test-result-$suffix", s)
+                }
+                app.engines.release()
+                ActivityScenario.launch(SettingsActivity::class.java).use { s ->
+                    s.onActivity { a -> a.window.decorView.findViewWithTag<View>(SettingsActivity.MODELS_SECTION_TAG).performClick() }
+                    instrumentation.waitForIdleSync()
+                    s.scrollToTag(SettingsActivity.MODELS_SECTION_TAG, above = 8)
+                    shot("settings-models-$suffix", s)
+                }
+            }
+        } finally {
+            TestHooks.installedModelIds = null
+        }
+    }
 }

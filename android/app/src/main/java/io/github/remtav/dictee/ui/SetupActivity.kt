@@ -30,6 +30,8 @@ import io.github.remtav.dictee.stt.ModelVisibility
 import io.github.remtav.dictee.stt.ModelRecommendation
 import io.github.remtav.dictee.stt.ModelRecommendations
 import io.github.remtav.dictee.stt.ModelSpec
+import io.github.remtav.dictee.stt.ModelPlainNames
+import io.github.remtav.dictee.stt.TranscriptionAdvisor
 import io.github.remtav.dictee.stt.asDownloadable
 
 /**
@@ -95,13 +97,9 @@ class SetupActivity : AppCompatActivity() {
         col.addView(participationBox)
 
         col.heading(getString(R.string.setup_more))
-        col.row().apply {
-            button(getString(R.string.setup_compare), outlined = true) {
-                startActivity(Intent(this@SetupActivity, CompareActivity::class.java))
-            }.spaced()
-            button(getString(R.string.setup_settings), outlined = true) {
-                startActivity(Intent(this@SetupActivity, SettingsActivity::class.java))
-            }
+        // « Comparer les modèles » names the models: it is in « Avancé » of the settings (issue #37).
+        col.button(getString(R.string.setup_settings), outlined = true) {
+            startActivity(Intent(this@SetupActivity, SettingsActivity::class.java))
         }
 
         col.heading(getString(R.string.setup_try))
@@ -284,6 +282,20 @@ class SetupActivity : AppCompatActivity() {
         // Issue #22: only the models offered for the chosen languages (experimental ones are in the settings).
         val modelIsNext = currentStep() == SetupStep.GET_MODEL
         for (spec in ModelCatalog.offered(chosen)) renderModel(spec, chosen, recommendation, modelIsNext && spec == recommendation.model)
+        renderQuickTest(chosen)
+    }
+
+    /**
+     * « Faire le test (1 minute) » (issue #36, recentred on the phone): optional, outlined, under the model cards.
+     * Only for the five languages that have a text, and once a model to test is on the phone.
+     */
+    private fun renderQuickTest(chosen: Set<DictationLanguage>) {
+        if (TranscriptionAdvisor.quickTestLanguage(chosen) == null) return
+        if (TranscriptionAdvisor.choice(chosen).candidates.none { app.isInstalled(it) }) return
+        modelsBox.body(getString(R.string.quick_open_help), small = true)
+        modelsBox.button(getString(R.string.quick_open), outlined = true) {
+            startActivity(Intent(this, QuickTestActivity::class.java))
+        }.tag = QUICK_TEST_BUTTON_TAG
     }
 
     /**
@@ -297,23 +309,24 @@ class SetupActivity : AppCompatActivity() {
         val card = modelsBox.card()
         card.tag = RETIRED_NOTICE_TAG
         card.heading(getString(R.string.model_notice_title))
-        card.body(getString(R.string.model_notice_replaced, retired.displayName, replacement.displayName))
+        // Issue #37: no model name here either.
+        card.body(getString(R.string.model_notice_replaced, ModelPlainNames.inSentence(replacement)))
         val missing = !app.store.isInstalled(replacement) && !Downloads.isBusy(replacement.id)
-        if (missing) card.body(getString(R.string.model_notice_download, replacement.displayName), small = true)
+        if (missing) card.body(getString(R.string.model_notice_download), small = true)
         val deletable = retired.visibility == ModelVisibility.HIDDEN && app.store.isInstalled(retired)
         if (missing) {
-            card.button(getString(R.string.model_notice_download_button, replacement.displayName), outlined = true) {
+            card.button(getString(R.string.model_notice_download_button, size(replacement.totalBytes)), outlined = true) {
                 startDownload(replacement)
             }.tag = RETIRED_DOWNLOAD_TAG
         }
         if (deletable) {
             card.button(
-                getString(R.string.model_notice_delete_button, retired.displayName, size(app.store.installedBytes(retired.asDownloadable()))),
+                getString(R.string.model_notice_delete_button, size(app.store.installedBytes(retired.asDownloadable()))),
                 outlined = true,
             ) {
                 if (app.engines.current()?.spec?.id == retired.id) app.engines.release()
                 app.store.delete(retired)
-                Toast.makeText(this, getString(R.string.model_notice_deleted, retired.displayName), Toast.LENGTH_SHORT).show()
+                Toast.makeText(this, getString(R.string.model_notice_deleted), Toast.LENGTH_SHORT).show()
                 renderModels()
             }.tag = RETIRED_DELETE_TAG
         }
@@ -332,10 +345,8 @@ class SetupActivity : AppCompatActivity() {
         val installed = app.store.isInstalled(spec)
         val active = app.settings.activeModelId == spec.id && app.shownSpec().family != ModelFamily.REMOTE
         card.addView(RadioButton(this).apply {
-            text = buildString {
-                append(spec.displayName)
-                if (spec == ModelCatalog.default) append(' ').append(getString(R.string.setup_default_suffix).trim())
-            }
+            // Issue #37: described by its effect, never by its name.
+            text = ModelPlainNames.of(spec)
             isChecked = active
             isEnabled = installed
             setOnClickListener {
@@ -355,7 +366,8 @@ class SetupActivity : AppCompatActivity() {
                 WARNING_TAG,
             )
         }
-        card.body("${spec.publisher} · ${spec.description}", small = true)
+        // The publisher, not the model's name (issue #37); the technical description is in « Avancé ».
+        card.body(getString(R.string.model_publisher, spec.publisher), small = true)
         if (spec.note.isNotEmpty()) card.body(spec.note, small = true).tag = modelNoteTag(spec)
         card.body(getString(R.string.model_license_runs_local, spec.license), small = true)
         val status = Downloads.status[spec.id]
@@ -384,13 +396,13 @@ class SetupActivity : AppCompatActivity() {
         ) {
             askNotifications.launch(Manifest.permission.POST_NOTIFICATIONS)
         }
-        Downloads.start(this, spec.asDownloadable(), getString(R.string.setup_downloading_label, spec.displayName))
+        Downloads.start(this, spec.asDownloadable(), getString(R.string.setup_downloading_label, ModelPlainNames.inSentence(spec)))
         renderModels()
     }
 
     private fun confirmDelete(spec: ModelSpec) {
         AlertDialog.Builder(this)
-            .setTitle(getString(R.string.delete_title, spec.displayName))
+            .setTitle(getString(R.string.delete_title, ModelPlainNames.inSentence(spec)))
             .setMessage(getString(R.string.delete_message))
             .setPositiveButton(R.string.delete) { _, _ ->
                 if (app.engines.current()?.spec?.id == spec.id) app.engines.release()
@@ -420,6 +432,7 @@ class SetupActivity : AppCompatActivity() {
         const val STEP_MIC = "setup_step_mic"
         const val SERVER_STATUS_TAG = "setup_server_status"
         const val SERVER_SETTING_BUTTON_TAG = "setup_server_setting"
+        const val QUICK_TEST_BUTTON_TAG = "setup_quick_test"
         /** Opacity of a step that waits for the previous one. */
         const val DIMMED_ALPHA = 0.5f
     }

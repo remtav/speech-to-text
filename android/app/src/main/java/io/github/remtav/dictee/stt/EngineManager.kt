@@ -76,7 +76,7 @@ class EngineManager(
         }
         if (old != null) useLock.writeLock().withLock { old.release() }
         if (!isInstalled(spec)) {
-            val msg = "Modèle ${spec.shortName} non installé"
+            val msg = "${ModelPlainNames.inSentence(spec).replaceFirstChar { it.uppercase() }} n'est pas installé"
             publish(State.Failed(spec, msg))
             future.completeExceptionally(IllegalStateException(msg))
             return
@@ -123,8 +123,8 @@ class EngineManager(
             if (pending === future) { pending = null; pendingKey = null }
         }
         val msg = when (e) {
-            is OutOfMemoryError -> "Mémoire insuffisante pour ${spec.shortName}"
-            else -> "Échec du chargement de ${spec.shortName} : ${e.message ?: e.javaClass.simpleName}"
+            is OutOfMemoryError -> "Mémoire insuffisante pour ${ModelPlainNames.inSentence(spec)}"
+            else -> "Échec du chargement (${ModelPlainNames.inSentence(spec)}) : ${e.message ?: e.javaClass.simpleName}"
         }
         publish(State.Failed(spec, msg))
         future.completeExceptionally(e)

@@ -4092,3 +4092,106 @@ avancés. » Elle tient à deux conditions, chacune testée :
 - Avec un serveur déjà configuré avant la mise à jour : les dictées vont-elles toujours au serveur, et la
   ligne « Transcription : serveur distant » est-elle visible ?
 - Lecteur d'écran (TalkBack) : l'en-tête replié annonce-t-il son état ?
+
+## Issues #36 (recentrée sur le téléphone) et #37 : le modèle choisi pour la personne, test rapide, mots simples (PR 2)
+
+Empilée sur la PR de #55 et #57 (branche `claude/installation-local-d-abord-36b`, partie de
+`claude/installation-local-d-abord`). Le serveur n'est plus une option du produit (décision du
+2026-11-13 au soir) : de #36 il ne reste que « une personne sait en une minute quoi utiliser, sans
+jargon » ; de #37, tout sauf le serveur préconfiguré.
+
+### Le modèle choisi à la place de la personne
+
+- **`TranscriptionAdvisor`** est réécrit pour le téléphone seul : `choice(langues)` donne le meilleur
+  modèle (`best`, toujours Whisper large-v3-turbo, la recommandation de #22 et le défaut demandé par #37)
+  et, quand il est possible, un modèle plus léger (`light`, Parakeet) : français de France, anglais,
+  espagnol, portugais, sans le Québec. Québec, ou toute autre langue : le meilleur seul. Plus aucun mode,
+  plus aucune raison « serveur ».
+- **Choix tranché : le plus précis reste le défaut, même quand un modèle léger est possible.** Lecture
+  possible de la consigne : recommander le léger d'emblée pour ces quatre langues (la table de #36a le
+  faisait en mode téléphone). Écartée : #37 demande « large-v3-turbo sur le téléphone » par défaut, #22
+  l'a retenu pour sa précision, et la table de #36a n'est pas mesurée. Le léger est proposé à côté
+  (« Plus léger et plus rapide », 671 Mo) et c'est le test rapide, avec la voix de la personne, qui peut
+  le recommander.
+- L'étape « 5. Modèle » affiche donc une carte (Québec, autres langues) ou deux (quatre langues),
+  chacune décrite par son effet, avec l'éditeur et la licence, mais sans nom de modèle ni description
+  technique.
+
+### Le test rapide : deux modèles du téléphone
+
+- **`QuickTestAdvice` adaptée, pas dupliquée** : mêmes `ModeOutcome` et même budget, la règle devient
+  « léger contre meilleur ». Le léger est recommandé seulement s'il fait au moins 90 %, à 5 points ou
+  moins du meilleur, **et** si le meilleur a mis plus de 5 s ; sinon le meilleur reste (il est le défaut).
+  Un seul modèle évalué : c'est lui. Aucun : pas de recommandation. **Seuils : estimations acceptées
+  comme telles par l'utilisateur, rien n'est mesuré sur un téléphone.**
+- **Budget** : lecture ≤ 25 s ; transcription ≤ 30 s **pour les deux modèles ensemble**, le léger
+  d'abord (il est rapide et laisse le reste au meilleur). Un modèle qui dépasse ce qui reste est noté
+  « trop lent » et le test se termine sans l'attendre (le moteur finit en arrière-plan, puis est libéré).
+  Le chargement d'un modèle ne compte pas, comme le téléchargement : c'est de la préparation, pas la
+  vitesse de dictée.
+- **Un seul modèle a du sens** (Québec, ou une langue sans modèle léger) : le test donne simplement le
+  score, et un bouton seulement si le modèle actif est un autre (un modèle expérimental choisi dans
+  « Avancé »).
+- **Modèle pas téléchargé** : noté « Pas encore téléchargé » avec « Télécharger (taille) pour
+  comparer » ; le test se refait ensuite. L'enregistrement n'est pas gardé pour le rejouer : #36 veut
+  qu'il soit effacé dès le score affiché, et une relecture coûte vingt secondes, hors de la minute comme
+  le téléchargement.
+- **Rien n'est gardé ni envoyé** : la lecture est en mémoire entre la fin de l'enregistrement et la fin du
+  calcul, puis effacée (et à la fermeture de l'écran). Les modèles sont cherchés dans
+  `ModelCatalog.all`, jamais par `byId` qui connaît aussi le serveur : même configuré et choisi, le
+  serveur n'est jamais utilisé, et le test n'écrit jamais le mode de transcription (test instrumenté
+  avec un faux serveur, et `ServerOnlyByChoiceTest`).
+- **Où** : un bouton en contour sous les cartes de l'étape « Modèle » (jamais le bouton plein de #55),
+  seulement pour les cinq langues qui ont un texte et une fois un modèle à tester téléchargé ; et dans
+  les Réglages, section « Vos langues », pour le refaire.
+- **Simplification retenue par rapport à #36** : pas d'écran « Où transcrire ? », pas de consentement,
+  pas de case « téléphone seul » (il n'y a plus que le téléphone), pas de choix « garder l'autre » : le
+  modèle reste changeable sur l'écran principal, et le résultat affiche les deux scores.
+
+### #37 : mots simples, réglages techniques dans « Avancé »
+
+- **Noms par effet** (`ModelPlainNames`) : « Plus précis » et « Plus léger et plus rapide » sur l'écran
+  principal, dans le test rapide, le menu des modèles du clavier ; « Précis » et « Léger » sur le bouton
+  du modèle du clavier ; « le modèle plus précis » dans les messages (chargement, modèle absent, avis de
+  remplacement, suppression, notification de téléchargement). Les noms techniques restent dans
+  « Avancé », la comparaison, le diagnostic et les tests hôtes (`shortName` ne change pas : il étiquette
+  les mesures).
+- **`PlainWordsTest`** refuse « Whisper », « Parakeet », « large-v3 », « turbo », « quantification »,
+  « int8 », « Qwen », « Hugging Face », « SHA-256 » dans toutes les chaînes du parcours normal
+  (`setup_`, `quick_`, avis de modèle, états du clavier) et dans les raisons de recommandation ; le test
+  instrumenté de l'installation lit tout l'écran.
+- **« Avancé » → « Modèles et performances »**, sous-section repliée, en un seul bloc après les réglages
+  Whisper de #49 (non réorganisés) et avant le serveur : les noms des deux modèles, « Comparer les
+  modèles » (retiré des « Outils » de l'écran principal), les modèles expérimentaux et la section
+  « Performances » (modèle gardé en mémoire, threads, accélération), qui étaient au premier niveau.
+- **Formulation de « open source »** : « Code ouvert : tout le monde peut vérifier ce que l'application
+  fait de votre voix. Le code est public ; vos dictées, elles, restent privées. » En anglais : « Open
+  code: anyone can check what the app does with your voice. The code is public; your dictations stay
+  private. » « Code ouvert » plutôt que « logiciel libre » ou « open source » : le dépôt n'a pas de
+  fichier de licence. « Conçu au Québec » devient « développé au Québec », les mots de #37.
+- **Accueil** : vrai et simple (« Votre voix est transcrite sur votre téléphone : elle n'est envoyée à
+  personne »). Avec un serveur configuré et choisi dans « Avancé », la variante de la PR 1 garde
+  « développé au Québec » et « Code ouvert » mais pas « vos dictées restent privées », qui ne serait pas
+  sûr avec un serveur tiers.
+- **Fiche du Play Store** : proposée dans `docs/FICHE_PLAY_STORE.md` (français et anglais, rien publié).
+- **Pas de traduction anglaise de l'application** : elle n'a que des écrans en français ; l'anglais est
+  livré pour la fiche du Play Store.
+
+### Hors de cette PR, à noter
+
+- « Comment dicter » affiche encore le nom du modèle actif (#56, hors de portée ici).
+- Le test de lecture long (#15, lot 4) nomme les modèles dans son résultat : c'est un parcours facultatif
+  de participation, laissé tel quel.
+- Le nettoyage par petit LLM (Réglages, « Nettoyage du texte ») garde ses noms ; il est désactivé par
+  défaut.
+- Les textes de lecture espagnol et portugais n'ont pas été relus par une personne de langue maternelle
+  (accepté par l'utilisateur).
+
+### À vérifier par un humain (rien n'a tourné sur un vrai téléphone)
+
+- Le test rapide sur un vrai téléphone, chronomètre en main : la minute tient-elle (lecture,
+  transcription des deux modèles) ? Les délais réels du modèle plus précis pour 20 s de lecture
+  (le seuil de 5 s en dépend).
+- Une personne qui n'a jamais vu l'application comprend-elle « Plus précis » / « Plus léger et plus
+  rapide » et la phrase de recommandation ?
+- Le bouton du modèle du clavier (« Précis », « Léger ») reste lisible.
