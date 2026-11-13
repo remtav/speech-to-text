@@ -102,7 +102,7 @@ class HowToActivity : AppCompatActivity() {
         col.body(recommendation.reason, small = true)
         val ready = app.isInstalled(recommendation.model)
         col.value(getString(if (ready) R.string.howto_model_installed else R.string.howto_model_missing))
-        if (!ready || s.activeModel.family == ModelFamily.REMOTE) {
+        if (!ready || app.shownSpec().family == ModelFamily.REMOTE) {
             col.button(getString(R.string.howto_model_choose), outlined = true) {
                 startActivity(
                     Intent(this, SetupActivity::class.java)

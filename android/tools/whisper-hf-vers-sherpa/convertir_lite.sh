@@ -23,6 +23,8 @@ cd work
 # Échec possible à l'étape int8 du script sherpa sur une machine modeste : refaite ci-dessous.
 ../venv/bin/python -I "$ici/exporter_lite.py" ../export-onnx.py "$PWD/lite.pt" || true
 ../venv/bin/python -I "$ici/quantifier_int8.py" turbo-decoder.onnx ../sortie/turbo-decoder.int8.onnx
-../venv/bin/python -I "$ici/quantifier_int8.py" turbo-encoder.onnx ../sortie/turbo-encoder.int8.onnx
+# Encodeur : l'int8 par tenseur de toutes les MatMul casse le modèle (sortie « ... », issue #25) ;
+# comme la version publiée, les MatMul h @ W2 des couches factorisées restent en fp32.
+../venv/bin/python -I "$ici/quantifier_lite.py" turbo-encoder.onnx ../sortie/turbo-encoder.int8.onnx --w2 fp32
 cp turbo-tokens.txt ../sortie/
 cd ../sortie && sha256sum * | tee SHA256SUMS && stat -c '%n %s' *

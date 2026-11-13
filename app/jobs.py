@@ -37,6 +37,7 @@ class Job:
     filename: str | None = None
     file_size: int | None = None
     audio_path: str | None = None
+    owner: str | None = None  # hash of the caller's token when DICTEE_TOKENS is set (app/security.py)
     id: str = field(default_factory=lambda: uuid.uuid4().hex)
     status: str = "queued"
     progress: float = 0.0
@@ -115,8 +116,9 @@ class JobManager:
 
     # ---------------------------------------------------------------- public
 
-    def submit(self, kind, params=None, filename=None, file_size=None, audio_path=None):
-        job = Job(kind=kind, params=params or {}, filename=filename, file_size=file_size, audio_path=audio_path)
+    def submit(self, kind, params=None, filename=None, file_size=None, audio_path=None, owner=None):
+        job = Job(kind=kind, params=params or {}, filename=filename, file_size=file_size, audio_path=audio_path,
+                  owner=owner)
         with self._lock:
             ahead = sum(1 for j in self._jobs.values() if not j.finished)
             if ahead:
@@ -247,8 +249,14 @@ class JobManager:
                 if polishing:  # leave the end of the bar to the polish stage
                     def whisper_progress(fraction, message, stage):
                         progress(fraction * POLISH_PROGRESS_START, message, stage)
-                result = self.backend.call("transcribe", {"audio_path": job.audio_path, "options": options},
-                                           whisper_progress)
+                try:
+                    result = self.backend.call("transcribe", {"audio_path": job.audio_path, "options": options},
+                                               whisper_progress)
+                finally:
+                    # The audio is deleted as soon as Whisper is done with it (issue #23), before the
+                    # polish step; _finish removes it too on every other path (error, cancel, shutdown).
+                    with self._lock:
+                        self._remove_audio(job)
                 if polishing:
                     try:
                         self._polish(job, result, progress)

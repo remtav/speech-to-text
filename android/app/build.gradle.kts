@@ -106,6 +106,13 @@ android {
         versionCode = (project.findProperty("versionCode") as String?)?.toInt() ?: 1
         versionName = (project.findProperty("versionName") as String?) ?: "0.1.0-dev"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        // Issue #23: server address the app uses by default (empty: phone only until the user sets one).
+        // `-PdefaultServerUrl=https://dictee.example.ca`. Never a token: each person enters their own.
+        val defaultServerUrl = ((project.findProperty("defaultServerUrl") as String?) ?: "").trim()
+        require(defaultServerUrl.isEmpty() || Regex("^https?://[^\\s\"\\\\]+$").matches(defaultServerUrl)) {
+            "defaultServerUrl must be an http(s):// address"
+        }
+        buildConfigField("String", "DEFAULT_SERVER_URL", "\"$defaultServerUrl\"")
     }
 
     // Release key: private, never in the repository. CI writes it from GitHub secrets

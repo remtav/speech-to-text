@@ -24,6 +24,8 @@ import io.github.remtav.dictee.stt.Acceleration
 import io.github.remtav.dictee.stt.ModelCatalog
 import io.github.remtav.dictee.stt.RemoteApi
 import io.github.remtav.dictee.stt.RemoteEngine
+import io.github.remtav.dictee.stt.TranscriptionMode
+import io.github.remtav.dictee.stt.ServerTimeout
 import io.github.remtav.dictee.stt.WhisperTuning
 import io.github.remtav.dictee.stt.asDownloadable
 import java.util.Locale
@@ -134,6 +136,12 @@ class SettingsActivity : AppCompatActivity() {
         col.addView(llmBox)
 
         // Opened from the "Comment dicter" screen: show the vocabulary straight away.
+        if (intent.getBooleanExtra(EXTRA_SCROLL_TO_SERVER_MODE, false)) {
+            col.post {
+                val heading = col.findViewWithTag<View>(SERVER_MODE_TAG)
+                (col.parent as? ScrollView)?.scrollTo(0, heading?.top ?: 0)
+            }
+        }
         if (intent.getBooleanExtra(EXTRA_SCROLL_TO_VOCABULARY, false)) {
             col.post {
                 val heading = col.findViewWithTag<View>(VOCABULARY_TAG)
@@ -239,13 +247,33 @@ class SettingsActivity : AppCompatActivity() {
         refreshRemoteLanguage = { remoteLanguageGroup.checkSilently(remoteLanguageIndex(), onRemoteLanguage) }
         col.switch(getString(R.string.settings_remote_polish), s.remotePolish) { s.remotePolish = it }
         col.body(getString(R.string.settings_remote_polish_help), small = true)
-        col.body(getString(R.string.settings_remote_fallback), small = true)
-        val fallbacks = listOf("" to getString(R.string.settings_remote_no_fallback)) +
-            ModelCatalog.listed(s.languages).map { it.id to it.displayName }
-        col.radio(fallbacks.map { it.second }, fallbacks.indexOfFirst { it.first == s.remoteFallbackId }.coerceAtLeast(0)) {
-            s.remoteFallbackId = fallbacks[it].first
-            if (::remoteStatus.isInitialized) updateRemoteWarning()
+        // Issue #23: the mode (server / phone), also chosen at installation (#36). Choosing "server" here, under
+        // a text that says what happens to the audio, is the consent; not chosen yet = phone.
+        col.heading(getString(R.string.settings_server_use)).tag = SERVER_MODE_TAG
+        col.body(getString(R.string.settings_server_mode_help), small = true)
+        val modeGroup = RadioGroup(this)
+        val serverButton = RadioButton(this).apply {
+            id = View.generateViewId(); tag = MODE_SERVER_TAG
+            text = getString(R.string.settings_mode_server)
+            isChecked = s.transcriptionMode == TranscriptionMode.SERVER
         }
+        val phoneButton = RadioButton(this).apply {
+            id = View.generateViewId(); tag = MODE_PHONE_TAG
+            text = getString(R.string.settings_mode_phone)
+            isChecked = s.transcriptionMode == TranscriptionMode.PHONE
+        }
+        modeGroup.addView(serverButton)
+        modeGroup.addView(phoneButton)
+        modeNote = col.body("", small = true)
+        modeGroup.setOnCheckedChangeListener { _, checkedId ->
+            s.transcriptionMode = if (checkedId == serverButton.id) TranscriptionMode.SERVER else TranscriptionMode.PHONE
+            updateModeNote()
+        }
+        col.addView(modeGroup, col.indexOfChild(modeNote))
+        updateModeNote()
+        col.slider(getString(R.string.settings_server_timeout), ServerTimeout.MIN_SECONDS.toFloat(), 30f, 1f,
+            s.serverTimeoutSeconds.toFloat(), { "${it.toInt()} s" }) { s.serverTimeoutSeconds = it.toInt() }
+        col.body(getString(R.string.settings_server_timeout_help, s.activeModel.displayName), small = true)
         col.row().apply {
             button(getString(R.string.settings_remote_test), outlined = true) { testRemote() }.spaced()
             button(getString(R.string.settings_diagnostic), outlined = true) {
@@ -264,10 +292,20 @@ class SettingsActivity : AppCompatActivity() {
         s.remoteModel = remoteModel.text.toString()
         s.cfAccessClientId = cfClientId.text.toString()
         s.cfAccessClientSecret = cfClientSecret.text.toString()
-        // Using the server needs a valid address; never leave it selected without one.
-        if (s.activeModel.family == io.github.remtav.dictee.stt.ModelFamily.REMOTE && !s.remoteConfig().isConfigured) {
-            s.activeModelId = ModelCatalog.default.id
+    }
+
+    private lateinit var modeNote: android.widget.TextView
+
+    /** Why dictations stay on the phone despite the choice (no address) or for lack of one. */
+    private fun updateModeNote() {
+        val s = app.settings
+        val text = when {
+            s.transcriptionMode == TranscriptionMode.UNSET -> getString(R.string.settings_mode_unset)
+            s.transcriptionMode == TranscriptionMode.SERVER && !s.remoteConfig().isConfigured -> getString(R.string.settings_mode_no_address)
+            else -> ""
         }
+        modeNote.text = text
+        modeNote.visibility = if (text.isEmpty()) View.GONE else View.VISIBLE
     }
 
     private fun updateRemoteWarning() {
@@ -279,7 +317,7 @@ class SettingsActivity : AppCompatActivity() {
                 else -> null
             },
             // Without an installed local model, a server failure loses the dictation.
-            if (c.isConfigured && ModelCatalog.byId(app.settings.remoteFallbackId)?.let { app.isInstalled(it) } != true) {
+            if (c.isConfigured && !app.isInstalled(app.settings.activeModel)) {
                 getString(R.string.settings_remote_no_fallback_warning)
             } else null,
         )
@@ -390,13 +428,12 @@ class SettingsActivity : AppCompatActivity() {
         llmBox.body(getString(R.string.settings_llm_note), small = true)
     }
 
-    private fun ViewGroup.switch(label: String, value: Boolean, onChange: (Boolean) -> Unit) {
-        addView(MaterialSwitch(context).apply {
+    private fun ViewGroup.switch(label: String, value: Boolean, onChange: (Boolean) -> Unit): MaterialSwitch =
+        MaterialSwitch(context).apply {
             text = label
             isChecked = value
             setOnCheckedChangeListener { _, v -> onChange(v) }
-        })
-    }
+        }.also { addView(it) }
 
     private fun ViewGroup.radio(labels: List<String>, selected: Int, onChange: (Int) -> Unit): RadioGroup {
         val group = RadioGroup(context)
@@ -438,6 +475,11 @@ class SettingsActivity : AppCompatActivity() {
         /** Intent extra: scroll to the personal vocabulary on opening. */
         const val EXTRA_SCROLL_TO_VOCABULARY = "scroll_to_vocabulary"
         const val VOCABULARY_TAG = "settings_vocabulary"
+        /** Intent extra: scroll to the server / phone choice on opening (issue #23). */
+        const val EXTRA_SCROLL_TO_SERVER_MODE = "scroll_to_server_mode"
+        const val SERVER_MODE_TAG = "settings_server_mode"
+        const val MODE_SERVER_TAG = "settings_mode_server"
+        const val MODE_PHONE_TAG = "settings_mode_phone"
         const val PARTICIPATION_YES_TAG = "settings_participation_yes"
         const val PARTICIPATION_NO_TAG = "settings_participation_no"
         const val PARTICIPATION_EXCLUDED_TAG = "settings_participation_excluded"

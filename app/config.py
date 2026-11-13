@@ -8,6 +8,8 @@ import math
 import os
 from dataclasses import dataclass, field, replace
 
+from app.security import parse_tokens
+
 log = logging.getLogger(__name__)
 
 VALID_MODELS = ["tiny", "base", "small", "medium", "large", "large-v2", "large-v3", "large-v3-turbo"]
@@ -100,6 +102,10 @@ class Settings:
     polish_timeout: float = 5.0
     polish_dictionary: str | None = None  # path to a newline-separated list of names/jargon
     polish_log: str | None = None  # path to the local JSONL tuning log
+    # Issue #23: access control for a server exposed on the internet (see app/security.py)
+    tokens: tuple = field(default=(), repr=False)  # DICTEE_TOKENS; never logged
+    auth_required: bool = False  # True as soon as DICTEE_TOKENS is set (even to an unusable value)
+    rate_limit: int = 30  # transcription requests per minute and per token; 0 = no limit
 
     @property
     def diarize_model_name(self):
@@ -110,6 +116,19 @@ class Settings:
 
 
 def load_settings():
+    raw_tokens = os.getenv("DICTEE_TOKENS")
+    tokens = parse_tokens(raw_tokens)
+    auth_required = bool((raw_tokens or "").strip())
+    if auth_required and not tokens:
+        log.warning("DICTEE_TOKENS is set but holds no token: every API request will be refused")
+    short = sum(1 for t in tokens if len(t) < 16)
+    if short:
+        log.warning("%d token(s) in DICTEE_TOKENS are shorter than 16 characters: use long random tokens", short)
+    polish_log = (os.getenv("POLISH_LOG") or "").strip() or None
+    if polish_log and auth_required:
+        # The tuning log keeps transcripts on disk: never on a shared, internet-facing server.
+        log.warning("POLISH_LOG is ignored while DICTEE_TOKENS is set: transcripts are never written to disk")
+        polish_log = None
     origins = tuple(o.strip() for o in (os.getenv("WHISPER_CORS_ORIGINS") or "*").split(",") if o.strip())
     return Settings(
         host=os.getenv("WHISPER_HOST") or "0.0.0.0",
@@ -133,5 +152,8 @@ def load_settings():
         polish_api_key=(os.getenv("POLISH_API_KEY") or "").strip() or None,
         polish_timeout=env_float("POLISH_TIMEOUT", 5.0, 0.5, 120),
         polish_dictionary=(os.getenv("POLISH_DICTIONARY") or "").strip() or None,
-        polish_log=(os.getenv("POLISH_LOG") or "").strip() or None,
+        polish_log=polish_log,
+        tokens=tokens,
+        auth_required=auth_required,
+        rate_limit=env_int("DICTEE_RATE_LIMIT", 30, 0, 100000),
     )
