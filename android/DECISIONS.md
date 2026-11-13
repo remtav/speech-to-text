@@ -3072,7 +3072,45 @@ Chronologie « friperie » rendue cohérente : la section de l'interrupteur disa
 principal » puis « désormais coupable », alors que la suite l'écarte ; renvois ajoutés vers la mesure de la langue
 de Qwen3-ASR (ex-« non mesuré »).
 
+### Échecs de `RobustnessInstrumentedTest` sur 1d0e815 (verts sur c63f218)
+
+Trois échecs dans la CI émulateur de 1d0e815, aucun sur c63f218 ni sur `main`. **c63f218 ne les a pas corrigés** :
+il ne touche ni `ime/`, ni `dictation/`, ni les réglages de session. Le lot 3 non plus, sur ce chemin : avec
+Parakeet (modèle des tests), `WhisperTuning.provisionalAllowed` rend exactement l'ancienne valeur
+(`partials && famille != REMOTE`), `tailPaddingsFor` rend 1 000 pour tout modèle non Whisper donc la clé du moteur
+ne change pas, la langue de Parakeet reste vide, et `CleanupGuard` ne joue qu'en mode LLM (désactivé). Lecture du
+code exercé (`DicteeImeService.onStartInput`, `onFinishInputView`, `stopIfHidden`) :
+
+- `changingFieldMidDictation…` et `changingBetweenFieldsWithTheSameKey…` : la dictée reste en LISTENING et, dans le
+  premier, le texte arrive **dans le champ 1** : le clavier n'a jamais reçu le `onStartInput` du nouveau champ. Or
+  le test déplaçait le focus par `requestFocus()` sans vérifier que le clavier l'avait vu ; Android ne signale un
+  changement de focus au clavier que dans une fenêtre qui a le focus de fenêtre. Cause la plus probable : une fenêtre
+  système (boîte « isn't responding » d'un émulateur chargé, déjà rencontrée par `ImeTestBase`) au-dessus de
+  l'activité à ce moment. Le produit se comporte alors correctement (il écrit dans le champ que le clavier sert).
+- `rotationDuringDictationKeepsDictating` : état IDLE, journal « dictation IDLE » : `stopIfHidden` a arrêté la dictée,
+  c'est-à-dire que le clavier est resté caché plus de `HIDE_GRACE_MS` (4 s) pendant la rotation. Sur un émulateur
+  chargé, rotation + réaffichage (plus les 3 s d'attente d'`ensureKeyboardShown` avant de toucher le champ) peut
+  dépasser 4 s. C'est une limite connue du produit (une rotation de plus de 4 s arrête la dictée, le texte déjà dit
+  est gardé), pas une régression.
+
+Conclusion : fragilité des tests sous charge, pas de course nouvelle dans le produit ; je ne peux pas le prouver
+sans journal (le message d'échec ne gardait que 60 lignes de logcat avant filtrage, d'où une seule ligne utile).
+Changé dans `ImeTestBase`, sans affaiblir aucun test : `focus()` attend le focus de fenêtre (en répondant « Wait » à
+une boîte « isn't responding ») puis **exige** que le clavier ait reçu la nouvelle entrée (`EditorInfo` neuf) avant de
+continuer, avec un échec explicite sinon ; le message d'échec de `waitFor` donne maintenant la fenêtre qui a le focus
+et les 40 dernières lignes `DicteeIme` (dont « keyboard still hidden: stop »), pour trancher au prochain échec. Le
+délai de grâce de rotation n'est pas allongé : ce serait changer le produit sans mesure.
+
 ### Vérification
 
 `./gradlew testDebugUnitTest assembleDebug assembleDebugAndroidTest lintDebug` : code de retour 0. Mesure Qwen3 :
-`--tests '*ModelAccuracyHostTest.qwen3Forced*' -PmodelsDir=…`.
+`--tests '*ModelAccuracyHostTest.qwen3Forced*' -PmodelsDir=…`. Les tests instrumentés ne tournent que dans la CI
+(pas d'émulateur ici) : `ImeTestBase` modifié compile, son effet se verra à la prochaine exécution.
+
+### État de la revue
+
+- Fait : points 1 à 9 de la consigne (critères du lot 3, garde-fou, interrupteur serveur, langue de Qwen3-ASR mesurée,
+  modèle québécois, Whisper, thème et exactitude, tests instrumentés, cohérence de ce fichier) ; analyse des échecs de
+  `RobustnessInstrumentedTest`.
+- Reste : confirmer dans la CI que `ImeTestBase` modifié passe ; corrections à reporter dans `docs/A_VERIFIER.md`
+  (listées dans le rapport de revue à l'orchestrateur, ce fichier-là n'est pas modifié par la revue).
