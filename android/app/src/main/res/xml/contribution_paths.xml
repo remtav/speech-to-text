@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  FileProvider of the reading-test contribution (issue #15, lot 4, step 4.3): it serves ONLY the archive
+  folder, files/contribution/ in private storage, and only to the app the person hands the archive to.
+-->
+<paths>
+    <files-path name="contribution" path="contribution/" />
+</paths>

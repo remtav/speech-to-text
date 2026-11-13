@@ -1,0 +1,27 @@
+# Texte de lecture du test « français québécois » de Kalmia Blabla (issue #15, lot 4, étape 4.1).
+# Format : les lignes qui commencent par « # » sont des commentaires ; la ligne « version: » donne
+# l'identifiant stable du texte ; chaque paragraphe tient sur une ligne, séparé du suivant par une
+# ligne vide. Espace insécable (U+00A0) avant le deux-points et à l'intérieur des guillemets,
+# aucune avant « ! » : typographie québécoise de l'OQLF, comme au lot 2.
+# Ne jamais modifier ce fichier une fois des contributions reçues : créer lecture-qc-2.txt (et sa
+# table d'équivalences) pour que chaque contribution reste rattachée au texte qu'elle a lu.
+# Couverture de la liste de départ et sources : android/DECISIONS.md (étape 4.1).
+version: lecture-qc-1
+
+À matin, il faisait frette et la poudrerie couvrait les bancs de neige. J'ai mis ma tuque et mes mitaines, puis je suis allé au dépanneur acheter du lait pour le déjeuner.
+
+Sur mon cellulaire, un courriel de ma blonde : son père a soixante ans mardi, et on lui fait une fête en fin de semaine à Rimouski. Elle me l'avait dit tantôt, mais j'avais oublié.
+
+On a décidé d'aller magasiner un cadeau. On a pris le char de Sherbrooke jusqu'à Magog, et on a pogné tous les feux rouges.
+
+Dans une petite friperie, j'ai trouvé une belle chemise à carreaux pour son père, à vingt piastres.
+
+Ma blonde a jasé avec la vendeuse. Moi, chu pas bon pour choisir : j'ai toujours de la misère à me décider. Elle m'a dit : « Y'a rien là, t'sais, c'est correct. »
+
+Au dîner, chez mon chum Mathieu, on a mangé des pâtes. Il aime niaiser et achaler ma blonde, mais elle était pas tannée pantoute.
+
+Toute la famille a confirmé par clavardage : sa sœur arrive de Chicoutimi, au Saguenay, son oncle du Lac-Saint-Jean, et ses cousins de Trois-Rivières et de l'Abitibi.
+
+Sa tante d'Hochelaga veut aller à la cabane à sucre au printemps, puis en Gaspésie cet été.
+
+Ce soir, on soupe tranquille. Si tu veux mon avis, j'ai juste une chose à dire : tiguidou!

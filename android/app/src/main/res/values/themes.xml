@@ -78,6 +78,8 @@
     <style name="TextAppearance.Dictee.Label" parent="TextAppearance.Material3.LabelMedium"/>
     <!-- Valeur technique : taille d'un modèle, score, état du clavier. -->
     <style name="TextAppearance.Dictee.Value" parent="TextAppearance.Material3.BodyMedium"/>
+    <!-- Texte à lire à voix haute (test de lecture) : grand ; l'interligne est posé dans le code. -->
+    <style name="TextAppearance.Dictee.Reading" parent="TextAppearance.Material3.TitleLarge"/>
     <!-- Symbole d'une touche du clavier : 24 sp (lisibilité d'abord, 20 sp au minimum). -->
     <style name="TextAppearance.Dictee.Key" parent="TextAppearance.Material3.LabelLarge">
         <item name="android:textSize">24sp</item>

@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Backups (issue #15, lot 4, review 4.R). android:allowBackup="false" stops the cloud backup, but on
+  Android 12 and later it does NOT stop a device-to-device transfer (new phone): these rules do. The
+  reading-test contribution archive (files/contribution/, see contribution_paths.xml) never leaves the
+  phone that way, in either case: it leaves only by the mail the person sends, after consent.
+-->
+<data-extraction-rules>
+    <cloud-backup>
+        <exclude domain="file" path="contribution/" />
+    </cloud-backup>
+    <device-transfer>
+        <exclude domain="file" path="contribution/" />
+    </device-transfer>
+</data-extraction-rules>

@@ -178,4 +178,137 @@
     <string name="howto_vocabulary">Noms propres et mots techniques</string>
     <string name="howto_vocabulary_help">Un nom propre ou un mot technique mal écrit (« GitHub », le nom d\'une rue) se corrige une fois pour toutes dans le vocabulaire personnalisé.</string>
     <string name="howto_vocabulary_open">Ouvrir le vocabulaire</string>
+
+    <!--
+      Test de lecture en français québécois (issue #15, lot 4, étape 4.1). Textes seulement : les
+      écrans viennent aux étapes 4.2 et 4.3. Trois gestes distincts : déclarer, accepter le test,
+      puis, seulement si le score est sous le seuil, consentir au partage.
+      L'adresse de réception et la durée de conservation ne sont JAMAIS écrites ici : elles arrivent
+      en argument depuis reading/Contribution.kt (RECEIVING_ADDRESS, RETENTION_MAX_YEARS,
+      POLICY_URL). ContributionConsistencyTest le vérifie, avec android/docs/CONTRIBUTION.md.
+    -->
+    <string name="contrib_card_title">Aider à améliorer la dictée en français québécois</string>
+    <string name="contrib_card_body">Lisez à voix haute un court texte d\'ici, environ deux minutes, et voyez à quel point chaque modèle installé comprend votre français. Le test se fait sur votre téléphone : rien n\'est envoyé, sauf si vous choisissez ensuite de partager votre lecture.</string>
+    <string name="contrib_card_start">Faire le test</string>
+    <string name="contrib_card_dismiss">Non merci</string>
+
+    <string name="contrib_declare_title">Avant le test</string>
+    <string name="contrib_declare_question">Parlez-vous un français québécois ?</string>
+    <string name="contrib_declare_help">Le test mesure la dictée en français d\'ici : il ne sert que si c\'est votre façon de parler. Votre réponse n\'est pas vérifiée et reste sur votre téléphone ; vous pourrez la changer dans les Réglages.</string>
+    <string name="contrib_declare_yes">Oui, je parle un français québécois</string>
+    <string name="contrib_declare_no">Non</string>
+    <string name="contrib_declined_title">Merci !</string>
+    <string name="contrib_declined_body">Ce test est conçu pour le français québécois, alors on s\'arrête ici : pas de test, pas d\'enregistrement, rien n\'est partagé. La dictée fonctionne comme avant. Vous pourrez changer votre réponse dans les Réglages.</string>
+    <string name="contrib_declined_close">Fermer</string>
+
+    <string name="contrib_accept_title">Le test de lecture</string>
+    <string name="contrib_accept_body">Vous allez lire %1$d courts paragraphes à voix haute, un à la fois. Chacun est enregistré et transcrit sur votre téléphone par le ou les modèles installés, puis comparé au texte pour calculer un taux de ressemblance. Rien ne quitte le téléphone pendant le test. Vous pouvez réécouter, recommencer ou arrêter quand vous voulez.</string>
+    <string name="contrib_accept_start">Commencer le test</string>
+    <string name="contrib_accept_cancel">Annuler</string>
+
+    <string name="contrib_share_title">Partager votre lecture ?</string>
+    <string name="contrib_share_reason">Votre lecture a été moins bien comprise que prévu : %1$s de ressemblance avec %2$s, le modèle recommandé pour vos langues. La partager aiderait à améliorer la dictée en français québécois. C\'est entièrement facultatif, et refuser ne change rien au fonctionnement de l\'application.</string>
+    <string name="contrib_share_sent_title">Ce qui partirait, et seulement ça</string>
+    <string name="contrib_share_not_sent">Ce qui ne part pas : aucun nom, aucun numéro de téléphone, aucun identifiant de l\'appareil ou de compte, aucune autre dictée, aucun autre fichier.</string>
+    <string name="contrib_share_recipient">Destinataire : %1$s, l\'adresse du projet Kalmia Blabla.</string>
+    <string name="contrib_share_purpose">Pourquoi : repérer les mots et les accents d\'ici que la dictée comprend mal, pour mieux choisir et régler les modèles. Votre lecture ne sert à rien d\'autre sans un nouveau consentement de votre part.</string>
+    <string name="contrib_share_email_reveals">Le partage se fait par courriel : le destinataire verra donc l\'adresse de courriel qui l\'envoie, et le nom qui l\'accompagne dans votre messagerie.</string>
+    <string name="contrib_share_retention">Conservation : %1$d ans au plus à compter de la réception, puis destruction. Plus tôt si vous le demandez ou si l\'enregistrement n\'est plus utile. La destruction se fait à la main, dans la boîte de courriel du destinataire.</string>
+    <string name="contrib_share_voice">Une voix reste reconnaissable : même sans votre nom, cet enregistrement n\'est pas anonyme.</string>
+    <string name="contrib_share_withdraw">Pour retirer votre consentement ou faire supprimer votre lecture, écrivez à %1$s, de préférence depuis la même adresse, en indiquant la date du test. Elle sera détruite, avec le courriel qui l\'accompagnait.</string>
+    <string name="contrib_share_you_send">C\'est vous qui envoyez : l\'application prépare le fichier et ouvre votre messagerie, mais n\'envoie rien elle-même et ne se connecte à aucun serveur. Vous pouvez encore tout annuler avant d\'appuyer sur « Envoyer ».</string>
+    <string name="contrib_share_policy">Politique de contribution complète : %1$s</string>
+    <string name="contrib_share_region_label">Région (facultatif)</string>
+    <string name="contrib_share_region_hint">Par exemple : Saguenay–Lac-Saint-Jean</string>
+    <string name="contrib_share_consent">J\'ai lu ce qui précède et j\'accepte de partager ma lecture.</string>
+    <string name="contrib_share_prepare">Préparer le courriel</string>
+    <string name="contrib_share_listen">Réécouter</string>
+    <string name="contrib_share_redo">Refaire le test</string>
+    <string name="contrib_share_decline">Ne pas partager</string>
+
+    <!--
+      Étape 4.3 : la liste « ce qui partirait » est générée depuis reading/ArchiveField (une ligne par
+      élément de l'archive) ; chaque élément a son libellé contrib_field_<nom>. Même source que l'archive.
+    -->
+    <string name="contrib_field_audio">Enregistrement de votre lecture</string>
+    <string name="contrib_field_text_version">Numéro de version du texte lu</string>
+    <string name="contrib_field_text">Texte lu</string>
+    <string name="contrib_field_transcription">Transcription obtenue (par %1$s, le modèle recommandé)</string>
+    <string name="contrib_field_score">Score</string>
+    <string name="contrib_field_model">Modèle de transcription</string>
+    <string name="contrib_field_app_version">Version de l\'application</string>
+    <string name="contrib_field_phone_model">Modèle de votre téléphone</string>
+    <string name="contrib_field_declaration">Votre réponse à la question</string>
+    <string name="contrib_field_date">Date du test (le jour seulement, sans l\'heure)</string>
+    <string name="contrib_field_region">Votre région (facultative)</string>
+    <string name="contrib_value_audio">%1$d fichiers audio WAV, 16 kHz, mono (%2$d s en tout) :</string>
+    <string name="contrib_value_paragraph">%1$d. %2$s</string>
+    <string name="contrib_value_score">Ressemblance %1$d %% : %2$d erreurs sur %3$d mots (détail par paragraphe dans le fichier)</string>
+    <string name="contrib_value_region_none">Non indiquée : rien n\'est inclus.</string>
+    <string name="contrib_share_only_recommended">Seuls la transcription et le score du modèle recommandé sont inclus : les résultats des autres modèles installés restent sur votre téléphone.</string>
+    <string name="contrib_share_listen_stop">Arrêter l\'écoute</string>
+    <string name="contrib_share_ready">Fichier prêt : %1$s (%2$s)</string>
+    <string name="contrib_share_ready_where">Ce fichier est dans l\'espace privé de l\'application, sur votre téléphone. Rien n\'est envoyé tant que vous n\'appuyez pas sur « Envoyer » dans votre messagerie. Il est supprimé quand vous fermez cet écran, quand vous refaites le test, quand vous choisissez de ne pas partager ou avec le bouton « Supprimer le fichier ».</string>
+    <string name="contrib_share_mail_opened">Votre messagerie a été ouverte avec le fichier joint. Rien n\'est parti tant que vous n\'y avez pas appuyé sur « Envoyer ». Une fois le courriel envoyé, vous pouvez supprimer le fichier ici.</string>
+    <string name="contrib_share_email">Envoyer par courriel</string>
+    <string name="contrib_share_other">Partager le fichier autrement</string>
+    <string name="contrib_share_chooser_title">Partager votre lecture</string>
+    <string name="contrib_share_delete">Supprimer le fichier</string>
+    <string name="contrib_share_deleted">Fichier supprimé : il n\'existe plus sur votre téléphone.</string>
+    <string name="contrib_share_declined">Vous avez choisi de ne pas partager : aucun fichier n\'est conservé et rien n\'est envoyé. La dictée fonctionne comme avant.</string>
+    <string name="contrib_share_no_email_app">Aucune application de courriel n\'est installée sur ce téléphone. Vous pouvez partager le fichier autrement, ou le supprimer.</string>
+    <string name="contrib_share_write_failed">Le fichier n\'a pas pu être préparé : %1$s. Rien n\'a été conservé.</string>
+    <string name="contrib_email_subject">Kalmia Blabla : test de lecture %1$s</string>
+    <string name="contrib_email_body">Bonjour,\n\nVoici ma lecture du test de Kalmia Blabla, dans le fichier joint %1$s. Il contient seulement :\n%2$s\n\nPolitique de contribution : %3$s</string>
+
+    <!--
+      Écran du test de lecture et réglages de participation (issue #15, lot 4, étape 4.2).
+      Les textes de la carte, de la déclaration et de l'acceptation sont plus haut (contrib_*).
+    -->
+    <string name="settings_participation">Test de lecture en français québécois</string>
+    <string name="settings_participation_answer">Votre réponse à « Parlez-vous un français québécois ? »</string>
+    <string name="settings_participation_yes">Oui</string>
+    <string name="settings_participation_no">Non</string>
+    <string name="settings_participation_unanswered">Pas encore répondu : la question vous sera posée avant le test.</string>
+    <string name="settings_participation_excluded">Vous avez répondu non : le test de lecture n\'est pas proposé, et rien n\'est enregistré. Changez votre réponse pour le retrouver.</string>
+
+    <string name="reading_title">Test de lecture</string>
+    <string name="reading_models_used">Modèles utilisés : %1$s.</string>
+    <string name="reading_no_model">Aucun modèle n\'est installé sur ce téléphone. Téléchargez-en un depuis l\'écran principal, puis revenez faire le test.</string>
+    <string name="reading_progress">Paragraphe %1$d sur %2$d</string>
+    <string name="reading_hint">Lisez à voix haute, à votre rythme. L\'enregistrement s\'arrête tout seul après %1$d secondes.</string>
+    <string name="reading_record">Enregistrer</string>
+    <string name="reading_stop">Arrêter</string>
+    <string name="reading_redo">Refaire ce paragraphe</string>
+    <string name="reading_recording">Enregistrement : %1$d s sur %2$d s</string>
+    <string name="reading_recorded">Paragraphe enregistré (%1$d s).</string>
+    <string name="reading_previous">Précédent</string>
+    <string name="reading_next">Suivant</string>
+    <string name="reading_score">Voir le score</string>
+    <string name="reading_mic_missing">Le microphone n\'est pas autorisé : autorisez-le depuis l\'écran principal, puis revenez.</string>
+    <string name="reading_too_short">Rien n\'a été entendu : recommencez, un peu plus près du micro.</string>
+    <string name="reading_mic_error">Microphone indisponible : %1$s</string>
+    <string name="reading_scoring_title">Calcul du score</string>
+    <string name="reading_scoring_progress">%1$s (%2$d sur %3$d) : paragraphe %4$d sur %5$d</string>
+    <string name="reading_scoring_note">Chaque modèle est chargé à tour de rôle sur votre téléphone : cela peut prendre une ou deux minutes.</string>
+    <string name="reading_scoring_failed">Le calcul du score a échoué : %1$s</string>
+    <string name="reading_scoring_cancel">Annuler</string>
+    <string name="reading_result_title">Votre score</string>
+    <string name="reading_result_global">Ressemblance globale : %1$d %%</string>
+    <string name="reading_result_partial">Paragraphes lus : %1$d sur %2$d. Le score porte sur ces paragraphes seulement.</string>
+    <string name="reading_result_model_line">%1$s : %2$d %%</string>
+    <string name="reading_result_detail_for">Détail pour le modèle</string>
+    <string name="reading_result_paragraph">Paragraphe %1$d · ressemblance %2$d %%</string>
+    <string name="reading_result_heard">Entendu : « %1$s »</string>
+    <string name="reading_result_misheard">Mots mal compris : %1$s</string>
+    <string name="reading_result_all_good">Tous les mots ont été reconnus.</string>
+    <string name="reading_result_legend">Les mots surlignés et soulignés n\'ont pas été reconnus par le modèle.</string>
+    <string name="reading_result_unread">Paragraphe non lu</string>
+    <string name="reading_result_error">%1$s n\'a pas pu transcrire votre lecture : %2$s</string>
+    <string name="reading_better_title">Un autre modèle vous comprend mieux</string>
+    <string name="reading_better_body">%1$s a compris %2$d %% de votre lecture, contre %3$d %% pour %4$s, le modèle que vous utilisez.</string>
+    <string name="reading_better_choose">Choisir %1$s</string>
+    <string name="reading_better_chosen">%1$s est maintenant votre modèle pour la dictée.</string>
+    <string name="reading_result_kept">Votre lecture n\'est conservée nulle part : l\'enregistrement est effacé dès que vous fermez cet écran.</string>
+    <string name="reading_close">Fermer</string>
 </resources>

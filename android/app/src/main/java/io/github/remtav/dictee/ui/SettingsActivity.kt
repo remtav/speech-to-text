@@ -16,6 +16,7 @@ import com.google.android.material.slider.Slider
 import io.github.remtav.dictee.DicteeApp
 import io.github.remtav.dictee.R
 import io.github.remtav.dictee.cleanup.LlmCatalog
+import io.github.remtav.dictee.reading.Declaration
 import io.github.remtav.dictee.settings.CleanupMode
 import io.github.remtav.dictee.settings.ThemeMode
 import io.github.remtav.dictee.stt.Acceleration
@@ -36,6 +37,7 @@ class SettingsActivity : AppCompatActivity() {
     private lateinit var cfClientSecret: EditText
     private lateinit var remoteStatus: android.widget.TextView
     private lateinit var llmBox: LinearLayout
+    private lateinit var participationBox: LinearLayout
     /** Redraws the server-language choice; set once that section exists. */
     private var refreshRemoteLanguage: () -> Unit = {}
     private val refresh: () -> Unit = { renderLlm() }
@@ -52,8 +54,16 @@ class SettingsActivity : AppCompatActivity() {
         LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }.also {
             col.addView(it)
             // The server language follows the languages until set explicitly: keep its radio in step.
-            it.renderLanguageChoices(s) { refreshRemoteLanguage() }
+            it.renderLanguageChoices(s) {
+                refreshRemoteLanguage()
+                // The reading-test offer follows the languages (Québec French).
+                if (::participationBox.isInitialized) renderParticipation()
+            }
         }
+
+        participationBox = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        col.addView(participationBox)
+        renderParticipation()
 
         col.heading(getString(R.string.settings_dictation))
         col.switch(getString(R.string.settings_partials), s.partials) { s.partials = it }
@@ -125,6 +135,54 @@ class SettingsActivity : AppCompatActivity() {
         super.onResume()
         Downloads.addListener(refresh)
         renderLlm()
+        // Back from the reading test, where the question may have been answered.
+        renderParticipation()
+    }
+
+    /**
+     * The reading-test section (issue #15, lot 4): the answer to « Parlez-vous un français québécois ? »,
+     * which can be corrected here, and the participation card (kept here even if closed on the main screen).
+     */
+    private fun renderParticipation() {
+        participationBox.removeAllViews()
+        val s = app.settings
+        val p = s.participation
+        if (!p.declarationInSettings && !p.cardInSettings) return
+        participationBox.heading(getString(R.string.settings_participation))
+        if (p.declarationInSettings) {
+            participationBox.body(getString(R.string.settings_participation_answer), small = true)
+            val group = RadioGroup(this)
+            val yes = RadioButton(this).apply {
+                id = View.generateViewId(); tag = PARTICIPATION_YES_TAG
+                text = getString(R.string.settings_participation_yes)
+                isChecked = p.declaration == Declaration.YES
+            }
+            val no = RadioButton(this).apply {
+                id = View.generateViewId(); tag = PARTICIPATION_NO_TAG
+                text = getString(R.string.settings_participation_no)
+                isChecked = p.declaration == Declaration.NO
+            }
+            group.addView(yes)
+            group.addView(no)
+            group.setOnCheckedChangeListener { _, checkedId ->
+                s.quebecDeclaration = if (checkedId == yes.id) Declaration.YES else Declaration.NO
+                // Redrawn after the click is handled: the card comes back after "oui", goes after "non".
+                participationBox.post { renderParticipation() }
+            }
+            participationBox.addView(group)
+            when (p.declaration) {
+                Declaration.UNANSWERED -> participationBox.body(getString(R.string.settings_participation_unanswered), small = true)
+                Declaration.NO -> participationBox.body(getString(R.string.settings_participation_excluded), small = true)
+                    .tag = PARTICIPATION_EXCLUDED_TAG
+                Declaration.YES -> Unit
+            }
+        }
+        if (p.cardInSettings) {
+            participationBox.participationCard(
+                onStart = { startActivity(android.content.Intent(this, ReadingTestActivity::class.java)) },
+                onDismiss = null,
+            )
+        }
     }
 
     override fun onPause() {
@@ -321,5 +379,8 @@ class SettingsActivity : AppCompatActivity() {
         /** Intent extra: scroll to the personal vocabulary on opening. */
         const val EXTRA_SCROLL_TO_VOCABULARY = "scroll_to_vocabulary"
         const val VOCABULARY_TAG = "settings_vocabulary"
+        const val PARTICIPATION_YES_TAG = "settings_participation_yes"
+        const val PARTICIPATION_NO_TAG = "settings_participation_no"
+        const val PARTICIPATION_EXCLUDED_TAG = "settings_participation_excluded"
     }
 }

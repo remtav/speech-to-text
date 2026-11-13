@@ -2,6 +2,8 @@ package io.github.remtav.dictee.settings
 
 import android.content.Context
 import android.content.SharedPreferences
+import io.github.remtav.dictee.reading.Declaration
+import io.github.remtav.dictee.reading.Participation
 import io.github.remtav.dictee.stt.Acceleration
 import io.github.remtav.dictee.stt.DictationLanguage
 import io.github.remtav.dictee.stt.DictationLanguages
@@ -47,6 +49,20 @@ class AppSettings(context: Context) {
     var languages: Set<DictationLanguage>
         get() = DictationLanguages.parse(prefs.getStringSet("languages", null))
         set(v) = prefs.edit().putStringSet("languages", DictationLanguages.serialize(v)).apply()
+
+    /** « Parlez-vous un français québécois ? » (issue #15, lot 4): self-declared, kept on the phone, editable in the settings. */
+    var quebecDeclaration: Declaration
+        get() = Declaration.fromName(prefs.getString("qc_declaration", null))
+        set(v) = prefs.edit().putString("qc_declaration", v.name).apply()
+
+    /** The participation card was closed on the main screen (it stays in the settings). */
+    var participationCardDismissed: Boolean
+        get() = prefs.getBoolean("participation_card_dismissed", false)
+        set(v) = prefs.edit().putBoolean("participation_card_dismissed", v).apply()
+
+    /** The three inputs of the reading-test offer, as the value the screens and the tests read. */
+    val participation: Participation
+        get() = Participation(languages, quebecDeclaration, participationCardDismissed)
 
     val activeModel: ModelSpec get() = ModelCatalog.byId(activeModelId) ?: ModelCatalog.default
 
