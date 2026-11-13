@@ -73,12 +73,24 @@ class ContributionContent internal constructor(
         /** Longest region kept, in characters: a region, not an address. */
         const val REGION_MAX_CHARS = 60
 
-        /** The optional region as written: trimmed, on one line, without control characters, at most [REGION_MAX_CHARS]; blank is null. */
+        /**
+         * The optional region as written: trimmed, on one line, without control or invisible formatting
+         * characters, at most [REGION_MAX_CHARS] characters; blank is null. Line and paragraph separators
+         * (U+2028, U+2029) and every other Unicode space count as spaces (review 4.R), and the cut never
+         * splits a surrogate pair (a lone half would become « ? » in the UTF-8 file).
+         */
         fun normalizeRegion(raw: String?): String? {
             if (raw == null) return null
-            val cleaned = raw.map { if (it.isISOControl() || Character.getType(it) == Character.FORMAT.toInt()) ' ' else it }
-                .joinToString("").replace(Regex("\\s+"), " ").trim()
-            return cleaned.take(REGION_MAX_CHARS).trim().ifEmpty { null }
+            val cleaned = raw.map {
+                when {
+                    it.isISOControl() || Character.getType(it) == Character.FORMAT.toInt() -> ' '
+                    Character.isWhitespace(it) || Character.isSpaceChar(it) -> ' '
+                    else -> it
+                }
+            }.joinToString("").replace(Regex(" +"), " ").trim()
+            var end = minOf(cleaned.length, REGION_MAX_CHARS)
+            if (end in 1 until cleaned.length && Character.isHighSurrogate(cleaned[end - 1])) end--
+            return cleaned.substring(0, end).trim().ifEmpty { null }
         }
 
         /**

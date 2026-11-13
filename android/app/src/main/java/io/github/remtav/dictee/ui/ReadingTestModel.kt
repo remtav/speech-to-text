@@ -12,6 +12,7 @@ import io.github.remtav.dictee.TestHooks
 import io.github.remtav.dictee.audio.AudioSourceException
 import io.github.remtav.dictee.audio.PcmAudio
 import io.github.remtav.dictee.reading.ContributionArchive
+import io.github.remtav.dictee.reading.DeviceFacts
 import io.github.remtav.dictee.reading.ParagraphRecorder
 import io.github.remtav.dictee.reading.ReadingProgress
 import io.github.remtav.dictee.reading.ReadingSession
@@ -60,6 +61,14 @@ class ReadingTestModel(private val app: DicteeApp, val session: ReadingSession) 
     }
 
     private var offer: ShareOffer? = null
+
+    /**
+     * What the phone adds to the contribution of the current result (application version, phone model, day),
+     * taken ONCE with the offer: the list shown before consent and the archive written after it use these same
+     * values, even if the day changes in between (review 4.R).
+     */
+    var shareFacts: DeviceFacts = ContributionShare.deviceFacts()
+        private set
 
     /** The contribution archive, once created with consent; null otherwise. */
     var archive: File? = null
@@ -172,13 +181,14 @@ class ReadingTestModel(private val app: DicteeApp, val session: ReadingSession) 
 
     /** Display name of a model of the test. */
     fun labelOf(modelId: String): String =
-        session.models.firstOrNull { it.id == modelId }?.label ?: ModelCatalog.byId(modelId)?.displayName ?: modelId
+        session.models.firstOrNull { it.id == modelId }?.label ?: onDevice(modelId)?.displayName ?: modelId
 
     /** The sharing offer of the current result, or null when nothing is offered (below the threshold). */
     fun shareOffer(): ShareOffer? {
         val result = session.result ?: return null
         if (offer?.result !== result) {
             offer = ShareOffer(result, session.declaration, session.material.text.paragraphs, labelOf(result.recommendedModelId))
+            shareFacts = ContributionShare.deviceFacts()
             resetShareState()
         }
         return offer?.takeIf { it.offered }
@@ -195,7 +205,7 @@ class ReadingTestModel(private val app: DicteeApp, val session: ReadingSession) 
         val o = shareOffer() ?: return
         shareNotice = null
         archive = try {
-            o.createArchive(archiveDir, ContributionShare.deviceFacts())
+            o.createArchive(archiveDir, shareFacts)
         } catch (e: Exception) {
             ContributionArchive.deleteAll(archiveDir)
             shareNotice = app.getString(R.string.contrib_share_write_failed, e.message ?: e.javaClass.simpleName)
@@ -272,11 +282,15 @@ class ReadingTestModel(private val app: DicteeApp, val session: ReadingSession) 
     fun cancelScoring() { cancelRequested = true }
 
     private fun transcriber() = ReadingTranscriber { modelId, audio ->
-        val spec = checkNotNull(ModelCatalog.byId(modelId)) { "modèle inconnu : $modelId" }
+        // Looked up among the on-device models only (`ModelCatalog.all`), never `byId`, which also knows the
+        // user's server: even a wrong id can never make the reading test send the voice over the network.
+        val spec = checkNotNull(onDevice(modelId)) { "modèle inconnu ou hors du téléphone : $modelId" }
         // The same engine factory and options as the dictation (forced language, Whisper padding), never the server.
         app.engines.factory = app.engineFactory()
         app.engines.use(spec, app.engineOptions(spec)) { engine -> engine.transcribe(audio.samples, audio.sampleRate).text }
     }
+
+    private fun onDevice(modelId: String) = ModelCatalog.all.firstOrNull { it.id == modelId }
 
     override fun onCleared() {
         cleared = true

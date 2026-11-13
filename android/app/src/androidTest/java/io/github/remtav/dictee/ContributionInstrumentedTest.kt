@@ -66,6 +66,17 @@ class ContributionInstrumentedTest : ImeTestBase() {
     private val qwen = ModelCatalog.qwen3.id
     private lateinit var network: NetworkGuard
 
+    /**
+     * The monitor that blocks the mail and the share sheet, removed in [cleanUp] whatever happens: left
+     * behind by a failed assertion, it would block EVERY later activity start of the run (review 4.R).
+     */
+    private val catcher = IntentCatcher()
+    private var catching = false
+
+    /** Instrumentation.removeMonitor throws when no monitor was ever added in the process: only remove ours. */
+    private fun startCatching() { instrumentation.addMonitor(catcher); catching = true }
+    private fun stopCatching() { if (catching) instrumentation.removeMonitor(catcher); catching = false }
+
     @Before
     fun prepare() {
         instrumentation.uiAutomation.grantRuntimePermission(context.packageName, Manifest.permission.RECORD_AUDIO)
@@ -84,6 +95,7 @@ class ContributionInstrumentedTest : ImeTestBase() {
 
     @After
     fun cleanUp() {
+        stopCatching()
         TestHooks.installedModelIds = null
         try {
             network.assertNoTraffic()
@@ -259,7 +271,6 @@ class ContributionInstrumentedTest : ImeTestBase() {
     fun withConsentTheArchiveHoldsExactlyTheListedElementsAndTheMailIntentIsRight() {
         // Parakeet (recommended) loses a quarter of the words; Qwen3-ASR hears everything (its results stay here).
         useModels(parakeet, qwen) { model, _, text -> if (model == parakeet) ScriptedReadingModels.dropEveryFourthWord(text) else text }
-        val catcher = IntentCatcher()
         ActivityScenario.launch(ReadingTestActivity::class.java).use { s ->
             val d = ReadingDriver(instrumentation, s, material)
             readAndScore(d)
@@ -309,7 +320,7 @@ class ContributionInstrumentedTest : ImeTestBase() {
             }
 
             // « Envoyer par courriel »: caught, never started.
-            instrumentation.addMonitor(catcher)
+            startCatching()
             d.click(ReadingTestActivity.TAG_SHARE_EMAIL)
             d.await("mail intent") { catcher.caught.size == 1 }
             val mail = catcher.caught.single()
@@ -353,7 +364,7 @@ class ContributionInstrumentedTest : ImeTestBase() {
             assertFalse(archiveDir.exists())
             assertFalse(consentBox(d).isChecked)
             assertFalse(prepareEnabled(d))
-            instrumentation.removeMonitor(catcher)
+            stopCatching()
         }
         assertEquals("no other activity was started", 2, catcher.caught.size)
     }

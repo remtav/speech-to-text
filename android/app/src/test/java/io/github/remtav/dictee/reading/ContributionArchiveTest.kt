@@ -254,6 +254,21 @@ class ContributionArchiveTest {
         assertEquals("Côte Nord", ContributionContent.normalizeRegion("Côte\u0000​ Nord"))
         val long = ContributionContent.normalizeRegion("x".repeat(500))!!
         assertEquals(ContributionContent.REGION_MAX_CHARS, long.length)
+        // Review 4.R: line and paragraph separators, non-breaking and other Unicode spaces are spaces.
+        assertEquals("Bas Saint Laurent Est", ContributionContent.normalizeRegion("Bas\u2028Saint\u2029Laurent\u00A0\u3000Est"))
+        // The cut never leaves half of a surrogate pair.
+        val emoji = "\uD83C\uDF41" // one maple leaf, two chars
+        val cut = ContributionContent.normalizeRegion("x".repeat(ContributionContent.REGION_MAX_CHARS - 1) + emoji)!!
+        assertEquals("x".repeat(ContributionContent.REGION_MAX_CHARS - 1), cut)
+        assertFalse(cut.any { Character.isSurrogate(it) })
+        // Whatever is typed, the JSON stays valid and on one line per value.
+        val nasty = "\"}, \"android_id\": \"x\n\u2028\\u0041"
+        val o = offer().apply { region = nasty }
+        val json = checkNotNull(o.preview(facts)).metadataJson()
+        val region = JSONObject(json).getString("region")
+        assertEquals(ContributionContent.normalizeRegion(nasty), region)
+        assertFalse(JSONObject(json).has("android_id"))
+        assertFalse(region.contains('\n'))
     }
 
     @Test

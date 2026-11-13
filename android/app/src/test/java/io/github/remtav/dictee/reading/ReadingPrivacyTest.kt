@@ -47,6 +47,8 @@ class ReadingPrivacyTest {
             "java.net", "HttpURLConnection", "HttpsURLConnection", "okhttp", "Socket", "openStream", "openConnection",
             "WebView", "URL(", "DownloadManager", "javax.net", "Volley", "Retrofit",
             "RemoteEngine", "ModelFamily.REMOTE", "ModelCatalog.remote", "ModelCatalog.selectable",
+            // byId also finds the user's server (review 4.R): the test looks models up in ModelCatalog.all only.
+            "ModelCatalog.byId",
         )
         val problems = offenders(network, allowedIn = emptySet())
         assertTrue("accès réseau dans le test de lecture ou son partage :\n" + problems.joinToString("\n"), problems.isEmpty())
@@ -134,5 +136,23 @@ class ReadingPrivacyTest {
             .replace(Regex("<!--[\\s\\S]*?-->"), "")
         val entries = Regex("<([a-z-]+-path)\\s[^>]*>").findAll(paths).map { it.value }.toList()
         assertEquals(listOf("<files-path name=\"contribution\" path=\"contribution/\" />"), entries)
+    }
+
+    @Test
+    fun theArchiveIsInNoBackupNorDeviceTransfer() {
+        // Review 4.R: allowBackup="false" stops the cloud backup but, from Android 12, not the transfer to a
+        // new phone; the extraction rules exclude the archive folder from both.
+        val manifest = ReadingTestSupport.mainDir.resolve("AndroidManifest.xml").readText()
+        val application = Regex("<application[\\s\\S]*?>").find(manifest)!!.value
+        assertTrue(application.contains("android:allowBackup=\"false\""))
+        assertTrue(application.contains("android:dataExtractionRules=\"@xml/data_extraction_rules\""))
+        val rules = ReadingTestSupport.mainDir.resolve("res/xml/data_extraction_rules.xml").readText()
+            .replace(Regex("<!--[\\s\\S]*?-->"), "")
+        for (section in listOf("cloud-backup", "device-transfer")) {
+            val body = Regex("<$section>([\\s\\S]*?)</$section>").find(rules)?.groupValues?.get(1)
+            assertTrue("section $section absente", body != null)
+            assertTrue("$section : dossier des archives non exclu", body!!.contains("<exclude domain=\"file\" path=\"contribution/\" />"))
+            assertTrue("$section : aucune inclusion attendue", !body.contains("<include"))
+        }
     }
 }

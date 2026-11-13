@@ -334,7 +334,7 @@ class ReadingTestActivity : AppCompatActivity() {
         card.body(getString(R.string.contrib_share_reason, "${global.similarityPercent} %", modelLabel), small = true)
 
         // Exactly what would leave: the same content the archive is written from (one source).
-        val facts = ContributionShare.deviceFacts()
+        val facts = model.shareFacts
         val content = checkNotNull(offer.preview(facts))
         card.heading(getString(R.string.contrib_share_sent_title)).tag = TAG_SHARE_LIST
         var regionValue: android.widget.TextView? = null
