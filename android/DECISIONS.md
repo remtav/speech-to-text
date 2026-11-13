@@ -4081,14 +4081,42 @@ avancés. » Elle tient à deux conditions, chacune testée :
    L'installation ne peut plus l'enregistrer (la carte qui y menait a disparu), et la PR suivante (test
    rapide) ne l'enregistre pas non plus.
 
+### Revue indépendante de la PR (corrections)
+
+Revue par un autre agent, relayée par l'orchestrateur ; chaque constat vérifié dans le code avant correction.
+
+- **Saut vers les étapes** : il se faisait à chaque `onResume`, et `setupSeen` était posé même pendant une
+  rotation. Une rotation à la première visite sautait l'accueil, et un retour (Réglages, dialogue de
+  notification d'Android 13+ ouvert par « Télécharger ») ramenait en haut une personne qui avait fait
+  défiler. Désormais : seulement à une **nouvelle ouverture** de l'écran (`savedInstanceState == null`), et
+  `setupSeen` n'est pas posé pendant un changement de configuration. Limite connue : rouvrir
+  l'application depuis le lanceur alors que l'écran est encore en mémoire ne relance pas le saut.
+- **Étape 2, « choisi »** (décision de l'orchestrateur pour lever l'ambiguïté de #55) : faite si Kalmia est
+  le clavier actif **ou** l'a déjà été une fois (`keyboardChosenOnce`, mémorisé dès que c'est constaté). Une
+  personne qui garde son clavier habituel et ne bascule que pour dicter a fait l'étape ; l'état dit alors
+  « ✓ Fait (un autre clavier est actif en ce moment) », sans bouton plein. « Complète » suit la même règle.
+- **Ligne du serveur** : « Le modèle du téléphone sert de repli » n'est dite que si un modèle est installé ;
+  sinon, la ligne dit qu'une dictée est perdue si le serveur ne répond pas.
+- **Textes** : la politique de confidentialité redit, en tête de « Sur le téléphone », l'exception du serveur
+  configuré dans les réglages avancés ; le README et le commentaire du clavier disent que le serveur figure
+  dans le menu des modèles dès qu'une adresse est configurée, compilée avec `-PdefaultServerUrl` comprise.
+- **Comparaison des modèles** (code déjà dans `main`) : elle incluait le serveur dès qu'une adresse était
+  configurée, quel que soit le mode, et lui aurait envoyé l'audio de la comparaison. Elle ne l'inclut plus
+  que s'il est utilisé (adresse **et** mode « serveur », `EngineChoice.comparedModels`), testé.
+- **`ServerOnlyByChoiceTest`** : le test par recherche de texte est renommé
+  `noSourceFileButTheSettingsAssignsTheServerMode` et son commentaire dit sa limite (il manquerait une
+  écriture par `valueOf` ou par un `.name` stocké).
+
 ### À vérifier par un humain (rien n'a tourné sur un vrai téléphone)
 
 - Refaire l'installation sur un téléphone remis à zéro, idéalement avec une personne qui n'a jamais vu
   l'application, sans l'aider : l'ordre des deux gestes est-il évident ? L'avertissement d'Android
   fait-il reculer ?
-- Au retour de la liste des claviers d'Android, l'écran revient-il bien sur l'étape 2, coche à l'étape 1 ?
-  Après le sélecteur de clavier, l'étape 2 passe-t-elle à « Fait » sans relancer l'application
+- Au retour de la liste des claviers d'Android, l'étape 1 a-t-elle sa coche ? Au retour du sélecteur de
+  clavier, l'étape 2 passe-t-elle tout de suite à « Fait », ou faut-il quitter et revenir
   (`onWindowFocusChanged`) ?
+- Revenir à son clavier habituel : l'étape 2 affiche-t-elle « Fait (un autre clavier est actif en ce
+  moment) » ?
 - Avec un serveur déjà configuré avant la mise à jour : les dictées vont-elles toujours au serveur, et la
   ligne « Transcription : serveur distant » est-elle visible ?
 - Lecteur d'écran (TalkBack) : l'en-tête replié annonce-t-il son état ?

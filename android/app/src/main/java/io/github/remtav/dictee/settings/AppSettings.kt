@@ -129,6 +129,11 @@ class AppSettings(context: Context, private val defaultServerUrl: String = io.gi
         get() = prefs.getBoolean("setup_seen", false)
         set(v) = prefs.edit().putBoolean("setup_seen", v).apply()
 
+    /** Kalmia Blabla has been seen as the current keyboard once (issue #55: step 2 stays done afterwards). */
+    var keyboardChosenOnce: Boolean
+        get() = prefs.getBoolean("keyboard_chosen_once", false)
+        set(v) = prefs.edit().putBoolean("keyboard_chosen_once", v).apply()
+
     var voiceCommands: Boolean
         get() = prefs.getBoolean("voice_commands", true)
         set(v) = prefs.edit().putBoolean("voice_commands", v).apply()

@@ -72,11 +72,14 @@
     <string name="setup_step_choose_title">2. Choisir Kalmia Blabla</string>
     <string name="setup_step_choose_text">Android demande quel clavier utiliser. Touchez « Kalmia Blabla ».</string>
     <string name="setup_step_done">✓ Fait</string>
+    <string name="setup_step_done_other_keyboard">✓ Fait (un autre clavier est actif en ce moment)</string>
     <string name="setup_step_todo">À faire</string>
     <string name="setup_step_after_previous">À faire après l\'étape précédente</string>
     <!-- Issue #57: shown only when dictations go to a server configured in the advanced settings. -->
     <string name="setup_server_in_use">Transcription : serveur distant</string>
-    <string name="setup_server_in_use_text">Vos dictées sont envoyées pour être transcrites au serveur que vous avez configuré dans les réglages avancés (%1$s). Le modèle du téléphone sert de repli.</string>
+    <string name="setup_server_in_use_text">Vos dictées sont envoyées pour être transcrites au serveur que vous avez configuré dans les réglages avancés (%1$s).</string>
+    <string name="setup_server_fallback">Le modèle du téléphone sert de repli.</string>
+    <string name="setup_server_no_fallback">Aucun modèle n\'est installé sur le téléphone : si le serveur ne répond pas, la dictée est perdue.</string>
     <string name="setup_server_open_setting">Voir le réglage</string>
     <string name="setup_step_mic">3. Autoriser le micro</string>
     <string name="setup_grant_mic">Autoriser le micro</string>

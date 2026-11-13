@@ -192,26 +192,69 @@ class SetupStepsInstrumentedTest {
         }
     }
 
-    /** Issue #55, point 6: the first visit starts on the welcome text; coming back with a step missing, on the steps. */
+    private fun ActivityScenario<*>.stepsTop(): Int {
+        var top = -1
+        onActivity { a -> top = a.window.decorView.findViewWithTag<View>(SetupActivity.STEPS_TAG).top }
+        return top
+    }
+
+    /**
+     * Issue #55, point 6: the first visit starts on the welcome text; a return to the screen (settings, a system
+     * dialog) does not scroll; a new opening with a step missing starts on the steps.
+     */
     @Test
-    fun comingBackWithAMissingStepStartsOnTheSteps() {
+    fun reopeningWithAMissingStepStartsOnTheSteps() {
         state(enabled = true, chosen = false, mic = true)
         ActivityScenario.launch(SetupActivity::class.java).use { s ->
             instrumentation.waitForIdleSync()
             assertEquals("first visit: welcome first", 0, s.scrollY())
-            s.moveToState(Lifecycle.State.CREATED) // left (onStop), as for Android's keyboard list
+            s.moveToState(Lifecycle.State.CREATED) // left (onStop), as for the settings
             assertTrue(app.settings.setupSeen)
             s.moveToState(Lifecycle.State.RESUMED)
             instrumentation.waitForIdleSync()
-            var top = -1
-            var scrollY = -2
-            s.onActivity { a ->
-                val steps = a.window.decorView.findViewWithTag<View>(SetupActivity.STEPS_TAG)
-                val scroll = generateSequence(steps.parent) { it.parent }.filterIsInstance<ScrollView>().first()
-                top = steps.top
-                scrollY = scroll.scrollY
-            }
-            assertTrue("scrolled to the steps: scrollY=$scrollY top=$top", scrollY > 0 && scrollY <= top)
+            assertEquals("a return does not scroll", 0, s.scrollY())
+        }
+        ActivityScenario.launch(SetupActivity::class.java).use { s ->
+            instrumentation.waitForIdleSync()
+            val y = s.scrollY()
+            assertTrue("reopened: scrolled to the steps, scrollY=$y top=${s.stepsTop()}", y > 0 && y <= s.stepsTop())
+        }
+    }
+
+    /** A rotation at the first visit is not a visit: the welcome text stays first. */
+    @Test
+    fun aRotationAtTheFirstVisitDoesNotJump() {
+        state(enabled = false, chosen = false, mic = false)
+        ActivityScenario.launch(SetupActivity::class.java).use { s ->
+            instrumentation.waitForIdleSync()
+            s.recreate()
+            instrumentation.waitForIdleSync()
+            assertFalse(app.settings.setupSeen)
+            assertEquals(0, s.scrollY())
+        }
+    }
+
+    /** Step 2: done when Kalmia is the current keyboard, and stays done once it has been (decision for #55). */
+    @Test
+    fun chosenOnceStaysDoneWhenAnotherKeyboardIsActive() {
+        // Never chosen: to do.
+        state(enabled = true, chosen = false, mic = true)
+        ActivityScenario.launch(SetupActivity::class.java).use { s ->
+            assertEquals(context.getString(R.string.setup_step_todo), s.stateText(STEP_CHOOSE))
+            assertEquals(listOf("${STEP_CHOOSE}_button"), s.filledButtons())
+        }
+        assertFalse(app.settings.keyboardChosenOnce)
+        // Chosen and current: done, remembered.
+        state(enabled = true, chosen = true, mic = true)
+        ActivityScenario.launch(SetupActivity::class.java).use { s ->
+            assertEquals(done, s.stateText(STEP_CHOOSE))
+        }
+        assertTrue(app.settings.keyboardChosenOnce)
+        // Back to another keyboard: still done, said apart, no filled button for it.
+        state(enabled = true, chosen = false, mic = false)
+        ActivityScenario.launch(SetupActivity::class.java).use { s ->
+            assertEquals(context.getString(R.string.setup_step_done_other_keyboard), s.stateText(STEP_CHOOSE))
+            assertEquals(listOf("${STEP_MIC}_button"), s.filledButtons())
         }
     }
 
@@ -264,9 +307,16 @@ class SetupStepsInstrumentedTest {
             val text = s.allText()
             assertTrue(text.contains(context.getString(R.string.setup_server_in_use)))
             assertTrue(text.contains("dictee.example.ca"))
+            // No model on the phone here: the line does not promise a fallback.
+            assertTrue(text.contains(context.getString(R.string.setup_server_no_fallback)))
+            assertFalse(text.contains(context.getString(R.string.setup_server_fallback)))
             // No sentence says the voice is sent to no one.
             assertFalse(text, text.contains("n'est envoyée à personne"))
             assertFalse(text, text.contains("reste sur votre téléphone"))
+        }
+        TestHooks.installedModelIds = setOf(ModelCatalog.whisperTurbo.id)
+        ActivityScenario.launch(SetupActivity::class.java).use { s ->
+            assertTrue(s.allText().contains(context.getString(R.string.setup_server_fallback)))
         }
     }
 }

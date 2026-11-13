@@ -630,7 +630,8 @@ class DicteeImeService : InputMethodService(), DictationListener, EngineManager.
         if (spec.family == ModelFamily.REMOTE) {
             // Issue #23: the "server" mode is the consent to send the audio; it is only recorded where its text
             // is shown (the folded server section of the advanced settings, issue #57), never by a tap in this menu.
-            // The server is in this menu only once its address is set there.
+            // The server is in this menu as soon as an address is configured (typed in that section, or compiled in
+            // with -PdefaultServerUrl); without the "server" mode, this tap only opens that section.
             if (s.transcriptionMode != TranscriptionMode.SERVER) {
                 showMessage(getString(R.string.msg_server_mode_in_settings), error = false)
                 openSettingsScreen()

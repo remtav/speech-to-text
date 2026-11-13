@@ -23,6 +23,13 @@ class ServerOnlyByChoiceTest {
     private val main = File(System.getProperty("dictee.assetsDir")!!).parentFile
 
     @Test
+    fun theComparisonIncludesTheServerOnlyWhenItIsInUse() {
+        val local = listOf(io.github.remtav.dictee.stt.ModelCatalog.whisperTurbo)
+        assertEquals(local, EngineChoice.comparedModels(local, serverInUse = false))
+        assertEquals(local + io.github.remtav.dictee.stt.ModelCatalog.remote, EngineChoice.comparedModels(local, serverInUse = true))
+    }
+
+    @Test
     fun aDictationGoesToTheServerOnlyWithAnAddressAndTheServerMode() {
         for (configured in listOf(false, true)) for (mode in TranscriptionMode.entries) for (network in listOf(false, true)) {
             val expected = if (configured && mode == TranscriptionMode.SERVER && network) EngineRoute.SERVER else EngineRoute.LOCAL
@@ -30,8 +37,13 @@ class ServerOnlyByChoiceTest {
         }
     }
 
+    /**
+     * A search of the source text, not a proof: it catches an assignment that names `SERVER` or a direct write of
+     * the preference, but would miss a write through `TranscriptionMode.valueOf(…)` or a stored `.name`. Its name
+     * says what it checks.
+     */
     @Test
-    fun theServerModeIsRecordedOnlyByTheSettingsChoice() {
+    fun noSourceFileButTheSettingsAssignsTheServerMode() {
         val writers = main.resolve("java").walkTopDown()
             .filter { it.isFile && it.extension == "kt" }
             .filter { f ->
@@ -44,6 +56,10 @@ class ServerOnlyByChoiceTest {
             .map { it.name }
             .toList()
         assertEquals(listOf("SettingsActivity.kt"), writers)
+        // The comparison screen sends audio to the server only through EngineChoice.comparedModels.
+        val compare = main.resolve("java/io/github/remtav/dictee/ui/CompareActivity.kt").readText()
+        assertTrue(compare.contains("EngineChoice.comparedModels("))
+        assertTrue(!compare.contains("+ ModelCatalog.remote"))
     }
 
     @Test
