@@ -213,13 +213,15 @@ object ModelCatalog {
 
     /**
      * The models offered for [languages] (issue #22): visible, covering every chosen language,
-     * and Parakeet only when the languages are English alone. In catalogue order.
+     * and Parakeet only when the languages are all among [TranscriptionAdvisor.lightPhoneLanguages]
+     * (French (France), English, Spanish, Portuguese, issue #36: the light phone model of the installation
+     * path; it was English alone). In catalogue order.
      */
     fun offered(languages: Set<DictationLanguage>): List<ModelSpec> =
         all.filter { spec ->
             spec.visibility == ModelVisibility.VISIBLE &&
                 ModelRecommendations.uncovered(spec, languages).isEmpty() &&
-                (spec != parakeet || languages == setOf(DictationLanguage.ENGLISH))
+                (spec != parakeet || (languages.isNotEmpty() && TranscriptionAdvisor.lightPhoneLanguages.containsAll(languages)))
         }
 
     /** What the keyboard's picker, the settings and the comparison list: [offered] then [experimental]. */

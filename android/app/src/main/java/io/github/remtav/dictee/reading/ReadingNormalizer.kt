@@ -17,30 +17,39 @@ data class ReadingToken(val text: String, val range: IntRange)
  *    for « tantôt » is a spelling the user would have to fix.
  * 2. **Numbers**: a token made of digits is written in French words (« 60 » → `soixante`), so a
  *    model that writes digits is not penalised against a text written in letters.
+ *
+ * [language] (engine code: `fr` by default, `en`, `es`, `pt`; issue #36a) changes two things: the digits are
+ * spelled in that language ([NumberWords]), and outside French an apostrophe inside a word is kept in the token
+ * (« don't » is one word; French keeps « l' » apart). Accents stay significant in every language.
+ *
  * 3. **Accepted spellings**: the phrases of [Equivalences] (« je suis » → « chu », « tsé » → « t'sais »…),
  *    longest first, each replaced by one token. Both sides go through it, so it is symmetric.
  */
-class ReadingNormalizer(val equivalences: Equivalences) {
+class ReadingNormalizer(val equivalences: Equivalences, val language: String = "fr") {
 
-    fun tokens(s: String): List<ReadingToken> = equivalences.apply(numbersToWords(baseTokens(s)))
+    fun tokens(s: String): List<ReadingToken> =
+        equivalences.apply(numbersToWords(baseTokens(s, language), language))
 
     /** Token texts only. */
     fun normalize(s: String): List<String> = tokens(s).map { it.text }
 
     companion object {
         private val TOKEN = Regex("[\\p{L}\\p{N}]+['’]?")
+        private val CONTRACTION_TOKEN = Regex("[\\p{L}\\p{N}]+(?:['’][\\p{L}]+)?")
         private val DIGITS = Regex("[0-9]+")
 
-        /** Same token texts as [Normalize.werTokens] (checked by the tests), with their ranges. */
-        fun baseTokens(s: String): List<ReadingToken> = TOKEN.findAll(s).map { m ->
+        /** Same token texts as [Normalize.werTokens] for French (checked by the tests), with their ranges. */
+        fun baseTokens(s: String, language: String = "fr"): List<ReadingToken> =
+            (if (language == "fr") TOKEN else CONTRACTION_TOKEN).findAll(s).map { m ->
             ReadingToken(Normalizer.normalize(m.value, Normalizer.Form.NFC).lowercase().replace('’', '\''), m.range)
         }.toList()
 
-        /** Replaces each all-digit token by the tokens of its French spelling, with the same range. */
-        fun numbersToWords(tokens: List<ReadingToken>): List<ReadingToken> = tokens.flatMap { t ->
+        /** Replaces each all-digit token by the tokens of its spelling in [language], with the same range. */
+        fun numbersToWords(tokens: List<ReadingToken>, language: String = "fr"): List<ReadingToken> = tokens.flatMap { t ->
             val n = if (DIGITS.matches(t.text) && t.text.length <= 9) t.text.toLongOrNull() else null
-            if (n == null) listOf(t)
-            else FrenchNumbers.words(n).split(' ', '-').filter { it.isNotEmpty() }.map { ReadingToken(it, t.range) }
+            val words = n?.let { NumberWords.words(language, it) }
+            if (words == null) listOf(t)
+            else words.split(' ', '-').filter { it.isNotEmpty() }.map { ReadingToken(it, t.range) }
         }
     }
 }
@@ -51,9 +60,12 @@ class ReadingNormalizer(val equivalences: Equivalences) {
  * (the form itself and each variant) maps to one canonical token, so « je suis », « chus » and
  * « chu » all count as the same word. A phrase may belong to one row only.
  */
-class Equivalences(val version: String, val entries: List<Entry>) {
+class Equivalences(val version: String, val entries: List<Entry>, val language: String = "fr") {
 
     data class Entry(val reference: String, val variants: List<String>, val reason: String)
+
+    private fun phraseTokens(p: String): List<String> =
+        ReadingNormalizer.numbersToWords(ReadingNormalizer.baseTokens(p, language), language).map { it.text }
 
     /** Normalised phrase (base tokens, numbers in words) → canonical token. */
     val phrases: Map<List<String>, String>
@@ -98,9 +110,6 @@ class Equivalences(val version: String, val entries: List<Entry>) {
 
     companion object {
         private const val VERSION_KEY = "version:"
-
-        private fun phraseTokens(p: String): List<String> =
-            ReadingNormalizer.numbersToWords(ReadingNormalizer.baseTokens(p)).map { it.text }
 
         /** Parses the TSV: `#` comments, one `version:` line, rows `form<TAB>v1 | v2<TAB>reason`. */
         fun parse(content: String): Equivalences {

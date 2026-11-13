@@ -26,7 +26,8 @@ class ReadingTextTest {
         assertTrue(texts.isNotEmpty())
         val versions = texts.map { f -> ReadingText.parse(f.readText()).version.also { assertEquals(f.nameWithoutExtension, it) } }
         assertEquals(versions.size, versions.toSet().size)
-        for (v in versions) {
+        // The quick texts of the installation test (issue #36a) have no table of accepted spellings.
+        for (v in versions.filterNot { it.startsWith("rapide-") }) {
             val eq = Equivalences.parse(File(dir, "$v.equivalences.tsv").readText())
             assertEquals(v, eq.version)
         }

@@ -1,0 +1,6 @@
+# Texte de lecture du test rapide de l'installation de Kalmia Blabla (issue #36a), portugais.
+# Un seul paragraphe d'environ 40 mots, écrit pour ce projet (libre de droits). Non relu par une
+# personne de langue portugaise. Ne jamais modifier une version publiée : créer rapide-pt-2.txt à la place.
+version: rapide-pt-1
+
+No sábado de manhã chovia um pouco, por isso levei o guarda-chuva e fui à padaria. Comprei um pão, dois croissants e um jornal. Quando cheguei em casa, estacionei o carro e preparei o café da manhã.
