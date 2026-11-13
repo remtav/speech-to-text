@@ -2949,3 +2949,114 @@ Décisions 1 et 2 ci-dessus appliquées à la demande de l'utilisateur ; la 3 re
 - **À mesurer sur le téléphone** : temps et texte de « friperie », d'une phrase de 5 s et de 15 s à 1 000, 600 et 300 (écran
   « Comparer les modèles », une exécution par valeur) ; ne passer le défaut à 600 que sans répétition ni mot manquant sur
   5 essais par valeur (ce serait un changement de défaut, donc une nouvelle décision) ; puis les threads (3 à 5).
+
+## Issue #15, lot 4 — étape 4.1 : texte de lecture, normalisation, consentement
+
+État au 2026-11-13. **Fait** : texte `lecture-qc-1` et sa table d'équivalences (`app/src/main/assets/lecture/`),
+paquet pur `reading/` (`ReadingText`, `ReadingMaterial`, `ReadingNormalizer`, `Equivalences`, `FrenchNumbers`,
+`ReadingScoring`, `ReadingThresholds`, `Contribution`), `Levenshtein.align` dans `text/Normalize.kt`, chaînes
+`contrib_*`, `docs/CONTRIBUTION.md`, tests JVM (`app/src/test/.../reading/`, 36 tests). **Reste à faire (autres
+étapes)** : écrans (4.2), consentement au partage, archive et courriel (4.3), README (4.3), revue (4.R). Aucun écran ni
+export dans cette étape.
+
+### Texte de lecture (`lecture-qc-1`)
+
+Petit récit du quotidien, 9 paragraphes, **224 mots** affichés (16 à 34 mots par paragraphe, soit 7 à 14 s à
+2,5 mots/s : sous la limite de 20 s d'un segment ; plafond codé `ReadingText.MAX_PARAGRAPH_WORDS = 40`). Registre
+familier, sans sacre, nombres en lettres, espaces insécables avant le deux-points et dans les guillemets, aucune avant
+« ! » (typographie québécoise du lot 2).
+
+**Format** : un fichier texte par version dans les *assets* (`lecture/<version>.txt` : commentaires `#`, une ligne
+`version:`, paragraphes séparés par une ligne vide), lu par `ReadingMaterial.load(readAsset)`. Pas des chaînes :
+le texte est une donnée, pas une interface ; il ne doit pas être traduit ni réparti en clés, et sa version doit
+voyager avec lui (l'archive de 4.3 pourra le citer tel quel). Un texte publié n'est jamais modifié : une nouvelle
+version est un nouveau fichier (`lecture-qc-2.txt`), ce que `ReadingTextTest` encadre (version = nom de fichier,
+unique).
+
+Couverture de la liste de départ :
+
+| Élément | Présent / écarté | Forme dans le texte |
+| --- | --- | --- |
+| dépanneur, magasiner, tuque, mitaines, char, cellulaire, courriel, clavardage, poudrerie, cabane à sucre, blonde, chum | présent | tel quel |
+| fin de semaine | présent | « en fin de semaine » |
+| banc de neige | présent | au pluriel, « les bancs de neige » |
+| déjeuner / dîner / souper | présent | « pour le déjeuner », « Au dîner », « on soupe » (verbe) |
+| piastre | présent | « vingt piastres » (pluriel) |
+| friperie (ajout de l'utilisateur) | présent | « une petite friperie » |
+| avoir de la misère | présent | « j'ai toujours de la misère à me décider » |
+| il fait frette | présent | « il faisait frette » (imparfait du récit) |
+| à matin, pantoute, tiguidou, c'est correct, tantôt | présent | « Elle me l'avait dit tantôt » : sens québécois « plus tôt aujourd'hui » (Usito) |
+| jaser, niaiser, achaler, être tanné, pogner | présent | « a jasé », « aime niaiser et achaler », « était pas tannée », « on a pogné tous les feux rouges » |
+| Rimouski, Saguenay, Chicoutimi, Trois-Rivières, Abitibi, Gaspésie, Lac-Saint-Jean, Sherbrooke, Magog, Hochelaga | présent | tous |
+| tu, dire, petit, mardi (affrication) | présent | « Si tu veux », « à dire », « petite », « mardi » |
+| père, fête, neige, pâte (voyelles longues) | présent | « son père », « une fête », « bancs de neige », « des pâtes » |
+| chu, y'a, t'sais | présent, **deux phrases seulement** | « Moi, chu pas bon pour choisir… » et « Y'a rien là, t'sais, c'est correct. » |
+| Hors liste, ajoutés pour le naturel | — | « Y'a rien là » (« ce n'est pas grave »), « chemise à carreaux », la négation sans « ne » (« elle était pas ») |
+
+Rien n'a été écarté. Limite assumée : « je suis allé » (premier paragraphe) est normalisé comme « chu », voir plus bas.
+
+**Sources consultées** (Usito, Université de Sherbrooke, le 2026-11-12) : pantoute (Q/C fam.), tiguidou (var.
+tigidou), frette (adj. Q/C, « il fait frette »), piastre (var. piasse), friperie, tantôt (Q/C : plus tôt dans la
+journée), achaler, poudrerie (Q/C), tanné (« être tanné de », fam.), clavardage (Q/C), niaiser, magasiner, misère
+(« avoir de la misère à »), jaser (Q/C fam.). « pogner » : entrée Usito `pogner_ou_poigner` vue seulement par un
+résumé de recherche (« attraper, saisir », Q/C fam.). « à matin » : absent d'Usito ; attesté « fam., ce matin » par le
+Dictionnaire historique du français québécois (dhfq.org, vu par un résumé de recherche). « chu », « tsé » : Lexique du
+français québécois (Wikipédia) et je-parle-quebecois.com, vus par des résumés de recherche, sources secondaires.
+
+### Normalisation et équivalences
+
+`ReadingNormalizer` = jetons de `Normalize.werTokens` (même WER que `Benchmark`, vérifié par un test) avec leur
+position dans le texte ; nombres en chiffres écrits en lettres (`FrenchNumbers`, orthographe traditionnelle) ;
+puis la table `lecture/lecture-qc-1.equivalences.tsv` (forme, variantes, raison), appliquée des deux côtés,
+plus longue variante d'abord, chaque groupe devenant un seul jeton. Accents gardés (comme `Benchmark`).
+
+| Forme du texte | Variantes acceptées | Raison |
+| --- | --- | --- |
+| chu | chus, chui, chuis, j'suis, je suis | même mot dit, graphies des modèles |
+| y'a | y a, ya, il y a | idem ; « il n'y a » refusé (« ne » ajouté) |
+| t'sais | t'sé, tsé, tsais, tu sais | idem |
+| tiguidou | tigidou | variante d'Usito |
+| piastre(s) | piasse(s) | variante d'Usito |
+| saint / sainte | st / ste | abréviation des toponymes (« Lac-St-Jean ») |
+
+**Refusées volontairement** (testées comme erreurs) : courriel/email, char/auto, piastres/dollars ou « $ »,
+à matin/ce matin, fin de semaine/week-end, dépanneur/dep, pantoute/pas du tout, frette/froid, négation complétée
+(« n'était pas », « je ne suis pas »). Reconnaître le mot d'ici est ce que le test mesure. Aucune variante
+non attestée pour pantoute ou frette. Effet de bord accepté : « je suis » du premier paragraphe devient « chu » des
+deux côtés (symétrique, donc sans effet sur le score, mais le dénominateur perd un mot).
+
+### Score et seuils (`ReadingScoring`, `ReadingThresholds`)
+
+- Score de paragraphe : `Levenshtein.align` (nouveau, même distance que `Levenshtein.distance`, testé) ; ressemblance
+  = 1 − WER bornée à [0, 1] ; mots mal compris = jetons de référence substitués ou omis, avec leur position dans le
+  paragraphe (surlignage) et ce qui a été entendu ; mots en trop à part.
+- Score global : somme des erreurs sur somme des mots des paragraphes lus (pas une moyenne de taux) ; `complete`
+  quand tous les paragraphes sont lus.
+- **Partage proposé** : `SHARE_WER_THRESHOLD_PERCENT = 20`, WER **strictement** supérieur, calculé avec le **modèle
+  recommandé**, sur le texte **complet**. Repli prudent : si le modèle recommandé n'est pas installé ou n'a pas tourné,
+  rien n'est proposé (on ne propose pas de partager une voix sur la foi d'un autre modèle). Comparaison en entiers.
+- **« Nettement mieux »** : les deux à la fois, sur le texte complet et le même nombre de mots : au moins
+  `BETTER_MODEL_MIN_GAIN_POINTS = 5` points de WER de moins (10 mots sur 200, plus qu'une hésitation ou un bruit) **et**
+  au moins `BETTER_MODEL_MIN_RELATIVE_GAIN_PERCENT = 30` % d'erreurs en moins. `betterModel` donne le meilleur de ceux-là.
+
+### Consentement et politique
+
+- Constantes uniques : `Contribution.RECEIVING_ADDRESS` (`remi@kalmia.ca`), `RETENTION_MAX_YEARS` (2), `POLICY_URL`.
+  Les chaînes les reçoivent en argument (`%1$s`, `%1$d`) et n'en contiennent aucune copie ; `CONTRIBUTION.md` (texte
+  libre) les cite, et `ContributionConsistencyTest` vérifie que la politique et le consentement affiché annoncent la
+  même adresse et la même durée, et qu'aucune autre n'apparaît.
+- Chaînes : `contrib_card_*`, `contrib_declare_*`, `contrib_declined_*`, `contrib_accept_*`, `contrib_share_*`.
+  Le consentement promet aussi « ne sert à rien d'autre sans un nouveau consentement » (ni publication, ni vente, ni
+  entraînement) : engagement fort, conforme à la portée de l'issue, à valider.
+- Sources juridiques lues (texte officiel de la Loi 25 en PDF, pages de la CAI) : listées dans `docs/CONTRIBUTION.md`.
+  Légis Québec a refusé l'accès à l'outil : le texte consolidé en vigueur n'est **pas vérifié**.
+
+### À valider par un humain
+
+1. **Naturel du texte** : se lit-il comme du français d'ici, sans effet « liste » ? « on a pogné tous les feux
+   rouges », « d'Hochelaga », « Y'a rien là » sonnent-ils juste ?
+2. **Consentement** : clarté, ton, et l'engagement « rien d'autre sans nouveau consentement ».
+3. **Cadre juridique, avant toute diffusion** : durée de 2 ans, accès à la boîte `remi@kalmia.ca`, hébergement de
+   la messagerie (art. 17), statut de la voix (sensible ou biométrique), responsable de la protection des
+   renseignements personnels, mineurs. Liste dans `docs/CONTRIBUTION.md`, « Ce qui reste à valider ».
+4. Seuils (20 %, 5 points et 30 %) après les premiers essais réels.
