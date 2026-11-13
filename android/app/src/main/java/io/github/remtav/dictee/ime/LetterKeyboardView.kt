@@ -178,6 +178,8 @@ class LetterKeyboardView @JvmOverloads constructor(
                 showAccents(key, alternates)
             }
         }
+        // A real touch is consumed by the listener below; this click only answers TalkBack's "click" action.
+        key.setOnClickListener { onTap() }
         key.setOnTouchListener { v, e ->
             when (e.actionMasked) {
                 MotionEvent.ACTION_DOWN -> {

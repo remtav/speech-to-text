@@ -4028,7 +4028,15 @@ pendant la dictée ». Le contrat du serveur est celui de la PR #46 (`POST /poli
   `+ ( ) - espace`. Date/heure : `/ -` (date), `:` (heure), les deux et l'espace sinon. Tout le reste : les vues
   habituelles.
 - **Disposition par défaut** : AZERTY si « Français (France) » est dans les langues choisies, QWERTY sinon, tant
-  que l'utilisateur n'a pas choisi lui-même (`AppSettings.keyboardLayout`).
+  que l'utilisateur n'a pas choisi lui-même (`AppSettings.keyboardLayout`). **Nouvelles installations seulement** :
+  une installation qui a déjà des réglages mais jamais choisi de disposition garde QWERTY, inscrit une fois au
+  premier démarrage de cette version (`LayoutDefault`, testé sur la JVM et sur l'appareil).
+- **Limites connues du pavé** (relecture indépendante) : il est plus étroit que ce que certains champs acceptent
+  (heure sur 12 h avec « pm », dates en « jj.mm.aaaa »), et on ne rejoint pas le clavier à lettres depuis le pavé
+  (seulement « clavier précédent »). Le pavé suit `inputType` à la lettre ; un champ de texte reste un champ de texte.
+- **Accessibilité** : une touche gère aussi l'action « cliquer » de TalkBack (en plus du toucher, que la vue consomme).
+- **Séparateur** : succès reconnu seulement si le texte avant le curseur grandit exactement du séparateur ; ordre
+  appris conservé au redémarrage du même champ (rotation) ; jamais de lecture du texte dans un mot de passe numérique.
 - **Pas de test de la regex** : rien dans ce lot n'utilise d'expression régulière. Le piège de PR #52 (`(?U)`
   accepté par la JVM et refusé par Android) est traité par des tests instrumentés pour tout ce qui dépend du
   système : pavé dans un champ nombre, montant et téléphone (`TextKeyboardInstrumentedTest`).

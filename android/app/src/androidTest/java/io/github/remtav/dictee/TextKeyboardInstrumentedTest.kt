@@ -272,4 +272,49 @@ class TextKeyboardInstrumentedTest : ImeTestBase() {
         assertNotNull("microphone, as left", device.wait(Until.findObject(res("mic")), 5_000))
         assertNull(device.findObject(res("letters")))
     }
+
+    // A pad built after the field started must still hold the keys (review of #59).
+
+    @Test
+    fun padHasItsKeysWhenTheVeryFirstFieldIsNumeric() {
+        launchFields(focus = "decimal")
+        assertNotNull("pad", device.wait(Until.findObject(res("pad")), 5_000))
+        assertNotNull("digit key", device.wait(Until.findObject(By.text("7").pkg(BuildConfig.APPLICATION_ID)), 5_000))
+        assertNotNull("decimal key", device.findObject(res("pad_decimal")))
+        assertNotNull("enter", device.findObject(res("pad_enter")))
+        tap("7")
+        waitFor("typed on the very first field", 5_000) { fieldText { it.decimal } == "7" }
+    }
+
+    @Test
+    fun padHasItsKeysAfterTheThemeChangedAndTheViewWasRebuilt() {
+        launchFields()
+        // The theme setting changed in the app since the view was built: the next input rebuilds it.
+        app.settings.theme = io.github.remtav.dictee.settings.ThemeMode.DARK
+        focus(8)
+        assertNotNull("pad after a rebuild", device.wait(Until.findObject(res("pad")), 5_000))
+        assertNotNull("digit key", device.wait(Until.findObject(By.text("5").pkg(BuildConfig.APPLICATION_ID)), 5_000))
+        tap("+", "5")
+        waitFor("typed after the rebuild", 5_000) { fieldText { it.phone } == "+5" }
+        // And an explicit rebuild while a digit field is focused.
+        onMain { service.rebuildInputView() }
+        assertNotNull(device.wait(Until.findObject(By.text("9").pkg(BuildConfig.APPLICATION_ID)), 5_000))
+    }
+
+    @Test
+    fun layoutDefaultIsAzertyForANewInstallAndKeptForAnExistingOne() {
+        val fr = setOf(io.github.remtav.dictee.stt.DictationLanguage.FRENCH_FRANCE)
+        app.settings.prefs.edit().clear().commit()
+        val fresh = io.github.remtav.dictee.settings.AppSettings(context)
+        fresh.languages = fr
+        assertEquals(LayoutKind.AZERTY, fresh.keyboardLayout)
+        // An install that already has settings but never chose a layout keeps QWERTY.
+        app.settings.prefs.edit().clear().putString("active_model", ModelIdForTest).commit()
+        val existing = io.github.remtav.dictee.settings.AppSettings(context)
+        existing.languages = fr
+        assertEquals(LayoutKind.QWERTY, existing.keyboardLayout)
+        app.settings.prefs.edit().clear().commit()
+    }
+
+    private companion object { val ModelIdForTest = io.github.remtav.dictee.stt.ModelCatalog.parakeet.id }
 }

@@ -19,6 +19,10 @@ class TestFieldActivity : AppCompatActivity() {
     lateinit var decimal: EditText
     lateinit var phone: EditText
 
+    companion object {
+        const val EXTRA_FOCUS = "focus"
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         val col = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(32, 16, 32, 16) }
@@ -55,6 +59,12 @@ class TestFieldActivity : AppCompatActivity() {
         col.addView(decimal)
         col.addView(phone)
         setContentView(col)
-        field1.requestFocus()
+        // A test can start on another field: the keyboard's very first input is then that field's.
+        when (intent.getStringExtra(EXTRA_FOCUS)) {
+            "number" -> number.requestFocus()
+            "decimal" -> decimal.requestFocus()
+            "phone" -> phone.requestFocus()
+            else -> field1.requestFocus()
+        }
     }
 }

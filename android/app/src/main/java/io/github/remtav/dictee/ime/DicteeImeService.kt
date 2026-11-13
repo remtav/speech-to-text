@@ -276,6 +276,16 @@ class DicteeImeService : InputMethodService(), DictationListener, EngineManager.
                 }
             }
         }
+        // A pad built after the field started (first input of the service, theme change rebuilding the view)
+        // must show the keys the current field asked for, not wait for the next onStartInput.
+        applyPadPage()
+    }
+
+    /** Gives the pad the keys and the decimal label of the current field, when it is a digit field. */
+    private fun applyPadPage() {
+        val p = inputPage as? InputPage.Pad ?: return
+        pad?.decimalLabel = decimalOrder.first()
+        pad?.page = p
     }
 
     /**
@@ -286,11 +296,16 @@ class DicteeImeService : InputMethodService(), DictationListener, EngineManager.
      */
     private fun typeDecimal() {
         val ic = currentInputConnection ?: return
-        val text = (ic.getTextBeforeCursor(64, 0)?.toString() ?: "") + (ic.getTextAfterCursor(64, 0)?.toString() ?: "")
-        val hadSeparator = '.' in text || ',' in text
+        // A numeric password is never read back: the preferred separator is typed as is.
+        if (passwordField) { ic.commitText(decimalOrder.first(), 1); return }
+        val around = (ic.getTextBeforeCursor(64, 0)?.toString() ?: "") + (ic.getTextAfterCursor(64, 0)?.toString() ?: "")
+        val hadSeparator = '.' in around || ',' in around
         for (sep in decimalOrder) {
+            val before = ic.getTextBeforeCursor(64, 0)?.toString() ?: ""
             ic.commitText(sep, 1)
-            if (ic.getTextBeforeCursor(1, 0)?.toString() == sep) {
+            // Accepted only if the text before the cursor grew by exactly this separator: a field already
+            // ending with it ("12.") that refuses a second one leaves the text unchanged.
+            if ((ic.getTextBeforeCursor(64, 0)?.toString() ?: "") == before + sep) {
                 if (sep != decimalOrder.first()) decimalOrder = decimalOrder.reversed()
                 pad?.decimalLabel = sep
                 return
@@ -340,14 +355,13 @@ class DicteeImeService : InputMethodService(), DictationListener, EngineManager.
             return
         }
         val field = fieldKey(attribute!!)
+        val sameField = field == currentField
         currentField = field
         passwordField = isPassword(attribute)
         inputPage = InputPages.forInputType(attribute.inputType)
-        (inputPage as? InputPage.Pad)?.let { p ->
-            decimalOrder = DecimalSeparator.order(java.util.Locale.getDefault())
-            pad?.decimalLabel = decimalOrder.first()
-            pad?.page = p
-        }
+        // The separator learned in this field stays through a restart of the same field (rotation).
+        if (!sameField) decimalOrder = DecimalSeparator.order(java.util.Locale.getDefault())
+        applyPadPage()
         letters?.apply {
             kind = app.settings.keyboardLayout
             languages = KeyLanguage.forDictation(app.settings.languages)

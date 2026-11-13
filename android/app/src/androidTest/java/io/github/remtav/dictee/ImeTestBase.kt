@@ -120,8 +120,11 @@ abstract class ImeTestBase {
         TestHooks.engineFactory = factory
     }
 
-    protected fun launchFields() {
-        scenario = ActivityScenario.launch(TestFieldActivity::class.java)
+    /** [focus]: "number", "decimal" or "phone" to start on that field instead of the first one. */
+    protected fun launchFields(focus: String? = null) {
+        val intent = android.content.Intent(context, TestFieldActivity::class.java)
+        if (focus != null) intent.putExtra(TestFieldActivity.EXTRA_FOCUS, focus)
+        scenario = ActivityScenario.launch(intent)
         dismissNotRespondingDialogs()
         val shown = {
             val svc = DicteeImeService.instance?.get()

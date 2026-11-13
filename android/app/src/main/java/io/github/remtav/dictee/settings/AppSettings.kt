@@ -2,6 +2,7 @@ package io.github.remtav.dictee.settings
 
 import android.content.Context
 import android.content.SharedPreferences
+import io.github.remtav.dictee.ime.LayoutDefault
 import io.github.remtav.dictee.ime.LayoutKind
 import io.github.remtav.dictee.reading.Declaration
 import io.github.remtav.dictee.reading.Participation
@@ -47,6 +48,16 @@ enum class ThemeMode(val label: String) {
  */
 class AppSettings(context: Context, private val defaultServerUrl: String = io.github.remtav.dictee.BuildConfig.DEFAULT_SERVER_URL) {
     val prefs: SharedPreferences = context.getSharedPreferences("dictee", Context.MODE_PRIVATE)
+
+    init {
+        // Issue #42: the layout default now follows the languages, for new installs only (see [LayoutDefault]).
+        if (LayoutDefault.CHECKED_KEY !in prefs.all) {
+            prefs.edit().apply {
+                LayoutDefault.pinnedFor(prefs.all)?.let { putString(LayoutDefault.LAYOUT_KEY, it.name) }
+                putBoolean(LayoutDefault.CHECKED_KEY, true)
+            }.apply()
+        }
+    }
 
     /**
      * The on-device model (#22): used when the server is not (see [route]), and as the server's fallback.

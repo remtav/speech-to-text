@@ -15,6 +15,19 @@ enum class LayoutKind(val label: String) {
     }
 }
 
+/**
+ * The default letter arrangement must not change under people who already use the keyboard: an install that
+ * has stored settings but no layout keeps QWERTY, written down once; only a fresh install follows its languages.
+ */
+object LayoutDefault {
+    const val CHECKED_KEY = "layout_default_checked"
+    const val LAYOUT_KEY = "keyboard_layout"
+
+    /** The layout to pin for these stored preferences, or null (new install, already pinned, already chosen). */
+    fun pinnedFor(stored: Map<String, *>): LayoutKind? =
+        if (CHECKED_KEY in stored || LAYOUT_KEY in stored || stored.isEmpty()) null else LayoutKind.QWERTY
+}
+
 /** Shift key state: off, one capital letter, or locked (double tap). */
 enum class ShiftState {
     OFF, ONCE, LOCKED;

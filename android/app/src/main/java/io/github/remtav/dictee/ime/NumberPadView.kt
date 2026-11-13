@@ -87,6 +87,8 @@ class NumberPadView @JvmOverloads constructor(
             contentDescription = context.getString(R.string.cd_space)
             setCompoundDrawablesWithIntrinsicBounds(0, R.drawable.ic_space, 0, 0)
         }
+        // A real touch is consumed by the listener below; this click only answers TalkBack's "click" action.
+        setOnClickListener { onTap() }
         setOnTouchListener { v, e ->
             when (e.actionMasked) {
                 MotionEvent.ACTION_DOWN -> { v.background = background(false, pressed = true); onKeyPressed?.invoke(v) }
