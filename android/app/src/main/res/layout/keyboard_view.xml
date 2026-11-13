@@ -231,7 +231,9 @@
                 android:id="@+id/kb_symbols"
                 style="@style/KeyButton"
                 android:contentDescription="@string/cd_symbols"
-                android:text="123" />
+                android:maxLines="1"
+                android:text="123"
+                android:textSize="18sp" />
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/kb_comma"
