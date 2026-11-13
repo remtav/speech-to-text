@@ -3765,3 +3765,69 @@ de doute) :
   (l'application interroge toutes les 0,4 s). L'audio est supprimé dès que Whisper l'a lu, avant le polissage.
   `POLISH_LOG` (qui contient des transcriptions) est ignoré quand `DICTEE_TOKENS` est défini.
 - Politique de confidentialité : `docs/CONFIDENTIALITE.md` (il n'y en avait pas).
+
+## Issue #49 : filtre de répétition pour Whisper, marge de fin courte (300)
+
+Décisions de l'utilisateur (2026-11-13), appliquées telles quelles : choix « Automatique » dans « Silence ajouté pour
+Whisper » (= marge 300 + filtre), réglage « Correction des répétitions (Whisper) » (Redécoder à 1 000 par défaut / Couper),
+nouvelle section « Avancé », **défaut inchangé à 1 000**. Choix faits pendant la mise en œuvre :
+
+- **Filtre** : `text/WhisperRepetition.kt`, objet distinct de `SafetyCheck` (non modifié), appelé par `SherpaEngine` pour
+  la famille `WHISPER` seulement, et seulement quand `EngineOptions.whisperRepetitionFix` n'est pas nul (mode
+  « Automatique »). Détection = `repetition()` de `reprise.py` (#40) : plafond de jetons de sherpa-onnx (6 par seconde
+  d'audio, marge exclue, à une unité près), X + X, bloc d'au moins 3 mots répété aussitôt, fin qui reprend le début.
+  Mots comparés avec la normalisation de `wer.py`. Deux gardes ajoutées, sans perte sur le jeu de 172 extraits (mêmes
+  13 déclenchements que la référence : plafond 11, X + X 2) :
+  - **X + X** exige que la première moitié finisse par `. ? ! …` : « oui oui », « Oui, oui. », « C'est ça, c'est ça. »,
+    « vous vous » ne déclenchent rien. Whisper recommence une phrase *après l'avoir finie* ; une répétition voulue est
+    séparée par une virgule ou rien. Risque assumé : « Oui. Oui. » serait coupé en « Oui. » (redécodé, en option
+    Redécoder, ce qui redonne le texte à 1 000).
+  - **Fin = début** exige une fin de phrase juste avant la reprise (« Du reste sa mère. Du »), et **au moins 4 mots**.
+    La référence l'excluait déjà à 1 ou 2 mots (texte de plus de 2k mots) ; à 3 mots, un seul mot commun sur trois n'est
+    pas une preuve (« Oui. Non. Oui », « Allô. Oui allô ») et la coupe retirerait un tiers du texte : la règle est
+    coupée sous 4 mots. Un mot isolé répété après un point (« Friperie. Friperie. ») reste détecté par X + X.
+- **Couper** : X + X → première moitié ; bloc répété → répétitions retirées, reste gardé, reprise tronquée finale
+  retirée (y compris un dernier mot coupé : « Elle s » pour « Elle s'est ») ; fin = début → mots repris retirés, avec,
+  pour la coupe seulement (une règle a déjà déclenché, souvent le plafond), une reprise qui s'arrête au milieu d'un mot
+  (« … les localités. Le mode … les local »). Plafond sans structure répétée : texte gardé tel quel (issue « détectée,
+  texte gardé » dans le rapport). La coupe se fait sur les morceaux du texte d'origine : orthographe et ponctuation
+  gardées.
+- **Redécoder** : `OfflineRecognizer.setConfig` avec la configuration à 1 000, décodage, puis `setConfig` à 300 (dans un
+  `finally`, sous le verrou de `transcribe`). **Vérifié sur l'hôte** (JAR Linux x86-64 de sherpa-onnx 2.0.1,
+  `WhisperRepetitionHostTest.setConfigChangesThePaddingOfTheLoadedModel`) : sur les 7 extraits français, le recognizer
+  chargé à 300 donne après `setConfig(1000)` exactement le texte d'un recognizer construit à 1 000, puis de nouveau celui
+  de 300 ; 3 extraits sur 7 changent de texte entre 300 et 1 000, donc le changement est réel. Aucun second modèle.
+- **Réglages** : préférence séparée `whisper_tail_auto` (faux par défaut) à côté de `whisper_tail_paddings`, plutôt
+  qu'une valeur sentinelle : une marge enregistrée (1 000, 600, 300) reste telle quelle et revient si l'on quitte
+  « Automatique » ; une ancienne version de l'app ignore la nouvelle clé. `whisper_repetition_fix` (REDECODE par défaut ;
+  valeur inconnue → REDECODE). Le mode et la correction font partie de `EngineOptions`, donc de la clé de `EngineManager` :
+  les changer recharge Whisper (comme la marge), jamais les autres modèles.
+- **Section « Avancé »** : générique (titre « Avancé » + texte d'aide, conteneur `ADVANCED_TAG`), placée en bas de l'écran ;
+  elle contient pour l'instant les deux réglages Whisper (« Silence ajouté pour Whisper » quitte « Performance », sans le
+  suffixe « (avancé) »). #37 y ajoutera les choix de modèle et de serveur. Choix de la marge : 1 000, 600, 300, puis
+  « Automatique » (le défaut en premier, comme avant). La correction est **grisée** hors « Automatique », avec une ligne
+  qui le dit (plutôt que masquée : on voit ce qu'« Automatique » apporte).
+- **« Comparer les modèles »** : mêmes options que la dictée (déjà le cas) ; l'en-tête du rapport dit « silence ajouté
+  Whisper automatique (300 + correction des répétitions : redécoder à 1 000 / couper le texte répété) » ou la valeur fixe ;
+  une ligne par modèle compte les segments redécodés, coupés ou détectés sans coupure ; chaque extrait concerné est marqué.
+  Le temps d'un extrait redécodé compte les deux décodages.
+- **Tests** : `WhisperRepetitionTest` (exemples de l'issue, répétitions voulues, même mot au début et à la fin avec
+  ponctuation, textes d'un à trois mots), `WhisperAutoSettingsTest` (défauts, préférences existantes gardées, correction
+  sans effet hors « Automatique », autres modèles, rapport), `AdvancedSettingsInstrumentedTest` (section, grisé),
+  `WhisperRepetitionHostTest` (`setConfig` réel, mode automatique de `SherpaEngine`, banc des 172 extraits, rejeu d'un TSV
+  de `banc_rapide.py`), sautés sans `-PmodelsDir` / `-PquebecSetDir` / `-PrepetitionTsv`.
+- **Banc hôte** (x86-64 4 cœurs, 4 threads, langue `fr` forcée, 172 extraits québécois, 1 673 mots, WER de `wer.py`),
+  `WhisperRepetitionHostTest.quebecSetBench` : `SherpaEngine` de l'app, turbo à 1 000 remesuré dans la même exécution, en
+  alternance clip par clip avec les deux options (1 passage, une chauffe) :
+
+  | Variante | Temps | WER | Segments corrigés |
+  | --- | --- | --- | --- |
+  | Turbo, marge 1 000 (défaut) | 259,8 s | 14,5 % | — |
+  | Automatique + Redécoder à 1 000 | 199,6 s (**−23,2 %**) | **14,8 %** | 13 redécodés |
+  | Automatique + Couper | 182,8 s (**−29,6 %**) | **15,1 %** | 13 coupés |
+
+  Les deux options remplissent le critère de l'issue (au moins 10 % sous turbo, WER ≤ turbo + 2 points). Rejeu du TSV
+  d'une exécution séparée de `banc_rapide.py` (turbo 431,6 s / 14,5 %, marge 300 seule −31,3 % / 22,0 %) par le filtre de
+  l'app : Redécoder −21,3 % / 14,8 %, Couper −31,3 % / 15,1 % (16,3 % avant l'extension de la coupe aux reprises arrêtées au
+  milieu d'un mot, le chiffre de l'issue). Mesures hôte seulement : la mesure sur le téléphone reste à faire (procédure
+  dans la PR de #49).

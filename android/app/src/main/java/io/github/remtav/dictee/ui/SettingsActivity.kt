@@ -24,6 +24,7 @@ import io.github.remtav.dictee.stt.Acceleration
 import io.github.remtav.dictee.stt.ModelCatalog
 import io.github.remtav.dictee.stt.RemoteApi
 import io.github.remtav.dictee.stt.RemoteEngine
+import io.github.remtav.dictee.stt.RepetitionFix
 import io.github.remtav.dictee.stt.TranscriptionMode
 import io.github.remtav.dictee.stt.ServerTimeout
 import io.github.remtav.dictee.stt.WhisperTuning
@@ -43,6 +44,8 @@ class SettingsActivity : AppCompatActivity() {
     private lateinit var llmBox: LinearLayout
     private lateinit var participationBox: LinearLayout
     private lateinit var experimentalBox: LinearLayout
+    /** « Avancé » section (issue #49): generic, other advanced settings are added to it (#37). */
+    private lateinit var advancedBox: LinearLayout
     /** Redraws the server-language choice; set once that section exists. */
     private var refreshRemoteLanguage: () -> Unit = {}
     private val refresh: () -> Unit = { renderLlm(); renderExperimental() }
@@ -115,13 +118,6 @@ class SettingsActivity : AppCompatActivity() {
         col.body(getString(R.string.settings_acceleration), small = false)
         col.radio(Acceleration.entries.map { it.label }, s.acceleration.ordinal) { s.acceleration = Acceleration.entries[it] }
         col.body(getString(R.string.settings_acceleration_help), small = true)
-        col.body(getString(R.string.settings_whisper_tail), small = false)
-        val tailLabels = listOf(R.string.settings_whisper_tail_1000, R.string.settings_whisper_tail_600, R.string.settings_whisper_tail_300)
-            .map { getString(it) }
-        col.radio(tailLabels, WhisperTuning.TAIL_PADDING_CHOICES.indexOf(s.whisperTailPaddings).coerceAtLeast(0)) {
-            s.whisperTailPaddings = WhisperTuning.TAIL_PADDING_CHOICES[it]
-        }
-        col.body(getString(R.string.settings_whisper_tail_help), small = true)
 
         buildRemoteSection(col)
 
@@ -134,6 +130,13 @@ class SettingsActivity : AppCompatActivity() {
         }
         llmBox = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         col.addView(llmBox)
+
+        // Issue #49: generic « Avancé » section, last on the screen; #37 adds the model and server choices to it.
+        advancedBox = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; tag = ADVANCED_TAG }
+        col.addView(advancedBox)
+        advancedBox.heading(getString(R.string.settings_advanced))
+        advancedBox.body(getString(R.string.settings_advanced_help), small = true)
+        buildWhisperAdvanced(advancedBox)
 
         // Opened from the "Comment dicter" screen: show the vocabulary straight away.
         if (intent.getBooleanExtra(EXTRA_SCROLL_TO_SERVER_MODE, false)) {
@@ -283,6 +286,49 @@ class SettingsActivity : AppCompatActivity() {
         }
         remoteStatus = col.body("", small = true)
         updateRemoteWarning()
+    }
+
+    /**
+     * Whisper's padding (issue #15) and, since issue #49, its « Automatique » choice and the repetition
+     * correction, which only applies in automatic mode (greyed out otherwise).
+     */
+    private fun buildWhisperAdvanced(box: LinearLayout) {
+        val s = app.settings
+        box.body(getString(R.string.settings_whisper_tail), small = false)
+        val tailLabels = listOf(
+            R.string.settings_whisper_tail_1000, R.string.settings_whisper_tail_600, R.string.settings_whisper_tail_300,
+            R.string.settings_whisper_tail_auto,
+        ).map { getString(it) }
+        // Fixed paddings first (TAIL_PADDING_CHOICES order), then « Automatique ».
+        val autoIndex = WhisperTuning.TAIL_PADDING_CHOICES.size
+        val tailIndex = if (s.whisperTailAuto) autoIndex else WhisperTuning.TAIL_PADDING_CHOICES.indexOf(s.whisperTailPaddings).coerceAtLeast(0)
+        lateinit var fixGroup: RadioGroup
+        lateinit var fixNote: android.widget.TextView
+        val renderFix = {
+            for (i in 0 until fixGroup.childCount) fixGroup.getChildAt(i).isEnabled = s.whisperTailAuto
+            fixNote.visibility = if (s.whisperTailAuto) View.GONE else View.VISIBLE
+        }
+        box.radio(tailLabels, tailIndex) {
+            if (it == autoIndex) {
+                // The stored fixed value is kept: it comes back if the user leaves « Automatique ».
+                s.whisperTailAuto = true
+            } else {
+                s.whisperTailAuto = false
+                s.whisperTailPaddings = WhisperTuning.TAIL_PADDING_CHOICES[it]
+            }
+            renderFix()
+        }.tag = WHISPER_TAIL_TAG
+        box.body(getString(R.string.settings_whisper_tail_help), small = true)
+        box.body(getString(R.string.settings_whisper_repetition), small = false)
+        val fixes = listOf(RepetitionFix.REDECODE, RepetitionFix.CUT)
+        val fixLabels = listOf(R.string.settings_whisper_repetition_redecode, R.string.settings_whisper_repetition_cut).map { getString(it) }
+        fixGroup = box.radio(fixLabels, fixes.indexOf(s.whisperRepetitionFix).coerceAtLeast(0)) {
+            s.whisperRepetitionFix = fixes[it]
+        }
+        fixGroup.tag = WHISPER_REPETITION_TAG
+        fixNote = box.body(getString(R.string.settings_whisper_repetition_inactive), small = true)
+        box.body(getString(R.string.settings_whisper_repetition_help), small = true)
+        renderFix()
     }
 
     private fun saveRemote() {
@@ -483,6 +529,10 @@ class SettingsActivity : AppCompatActivity() {
         const val PARTICIPATION_YES_TAG = "settings_participation_yes"
         const val PARTICIPATION_NO_TAG = "settings_participation_no"
         const val PARTICIPATION_EXCLUDED_TAG = "settings_participation_excluded"
+        /** « Avancé » section and its Whisper settings (issue #49), for tests. */
+        const val ADVANCED_TAG = "settings_advanced"
+        const val WHISPER_TAIL_TAG = "settings_whisper_tail"
+        const val WHISPER_REPETITION_TAG = "settings_whisper_repetition"
         /** Tag of an experimental model's card, for tests. */
         fun experimentalCardTag(spec: io.github.remtav.dictee.stt.ModelSpec) = "experimental_card_${spec.id}"
     }

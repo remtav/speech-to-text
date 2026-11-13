@@ -7,6 +7,7 @@ import com.k2fsa.sherpa.onnx.OfflineRecognizer
 import com.k2fsa.sherpa.onnx.OfflineRecognizerConfig
 import com.k2fsa.sherpa.onnx.OfflineTransducerModelConfig
 import com.k2fsa.sherpa.onnx.OfflineWhisperModelConfig
+import io.github.remtav.dictee.text.WhisperRepetition
 import java.io.File
 
 /** [SttEngine] backed by a sherpa-onnx offline recognizer, on files in [modelDir]. */
@@ -16,8 +17,22 @@ class SherpaEngine(
     options: EngineOptions,
 ) : SttEngine {
 
-    private var recognizer: OfflineRecognizer? =
-        OfflineRecognizer(config = buildConfig(spec, modelDir, options))
+    private val config: OfflineRecognizerConfig = buildConfig(spec, modelDir, options)
+
+    private var recognizer: OfflineRecognizer? = OfflineRecognizer(config = config)
+
+    /** Whisper « Automatique » padding (issue #49): the repetition filter's correction, null when the filter is off. */
+    private val repetitionFix: RepetitionFix? = options.whisperRepetitionFix.takeIf { spec.family == ModelFamily.WHISPER }
+
+    /**
+     * Same model, padding [WhisperTuning.REDECODE_TAIL_PADDINGS]: swapped in with `OfflineRecognizer.setConfig`
+     * for one decode, so no second model is loaded. sherpa-onnx 2.0.1 replaces only the Whisper block of the
+     * loaded recognizer's config (`OfflineRecognizerWhisperImpl::SetConfig`) and reads the padding again at each
+     * decode (`DecodeStream`); checked on the host by WhisperRepetitionHostTest.
+     */
+    private val redecodeConfig: OfflineRecognizerConfig? = if (repetitionFix == RepetitionFix.REDECODE) {
+        buildConfig(spec, modelDir, options.copy(whisperTailPaddings = WhisperTuning.REDECODE_TAIL_PADDINGS))
+    } else null
 
     override val provider: String = options.acceleration.provider
 
@@ -30,6 +45,47 @@ class SherpaEngine(
         val audioSeconds = samples.size / sampleRate.toFloat()
         if (samples.isEmpty()) return Transcription("", audioSeconds = 0f)
         val start = System.nanoTime()
+        val first = decodeOnce(rec, samples, sampleRate)
+        var final = first
+        var outcome = RepetitionOutcome.NONE
+        val fix = repetitionFix
+        if (fix != null) {
+            val ceiling = WhisperRepetition.tokenCeiling(samples.size, sampleRate)
+            if (WhisperRepetition.detect(first.text, first.tokens, ceiling) != null) {
+                when (fix) {
+                    RepetitionFix.REDECODE -> {
+                        rec.setConfig(checkNotNull(redecodeConfig))
+                        try {
+                            final = decodeOnce(rec, samples, sampleRate)
+                        } finally {
+                            rec.setConfig(config)
+                        }
+                        outcome = RepetitionOutcome.REDECODED
+                    }
+                    RepetitionFix.CUT -> {
+                        val cut = WhisperRepetition.cut(first.text)
+                        if (cut != null) {
+                            final = first.copy(text = cut)
+                            outcome = RepetitionOutcome.CUT
+                        } else {
+                            outcome = RepetitionOutcome.DETECTED
+                        }
+                    }
+                }
+            }
+        }
+        return Transcription(
+            text = final.text,
+            language = final.language,
+            decodeMillis = (System.nanoTime() - start) / 1_000_000,
+            audioSeconds = audioSeconds,
+            repetition = outcome,
+        )
+    }
+
+    private data class Decoded(val text: String, val language: String, val tokens: Int)
+
+    private fun decodeOnce(rec: OfflineRecognizer, samples: FloatArray, sampleRate: Int): Decoded {
         val stream = rec.createStream()
         try {
             // "language French" is then written into the prompt instead of being guessed
@@ -38,13 +94,7 @@ class SherpaEngine(
             stream.acceptWaveform(samples, sampleRate)
             rec.decode(stream)
             val result = rec.getResult(stream)
-            val millis = (System.nanoTime() - start) / 1_000_000
-            return Transcription(
-                text = result.text.trim(),
-                language = result.lang.trim('<', '>', '|', ' '),
-                decodeMillis = millis,
-                audioSeconds = audioSeconds,
-            )
+            return Decoded(result.text.trim(), result.lang.trim('<', '>', '|', ' '), result.tokens.size)
         } finally {
             stream.release()
         }
