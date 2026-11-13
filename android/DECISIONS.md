@@ -3117,6 +3117,24 @@ délai de grâce de rotation n'est pas allongé : ce serait changer le produit s
 
 `--tests '*ModelAccuracyHostTest.qwen3Forced*' -PmodelsDir=…`.
 
+### Échec de CI : `HowToInstrumentedTest.opensAtTheEndOfTheFirstSetupAndNotTheSecondTime` (« only once »)
+
+Diagnostic : pas un défaut du produit. `maybeOpenHowTo` pose `howToShown` (`SetupActivity.kt`, avant
+`startActivity`) ; `apply()` met la valeur à jour en mémoire tout de suite dans l'instance de `SharedPreferences`
+unique du processus (seule l'écriture disque est asynchrone), et tout se passe sur le fil principal : un deuxième appel
+(`onResume`, `onWindowFocusChanged`, fin de téléchargement) voit déjà le drapeau. Le tutoriel ne peut donc pas
+s'ouvrir deux fois pour l'utilisateur. Le test, lui, était fragile : le moniteur `second` est enregistré pendant que la
+`HowToActivity` de l'étape 2 est encore vivante (seul `SetupActivity` est fermé) ; un moniteur d'activité compte aussi
+la création d'une instance par `Instrumentation.newActivity`, donc la recréation de cet ancien écran (mode nuit
+appliqué par `ScreenshotTest`, rotation laissée par un autre test) ou sa destruction concurrente au lancement
+NEW_TASK|CLEAR_TASK suffit à lui faire « voir » une instance. Cela correspond à l'apparition de l'échec après
+`bd7f6e5` et `2911387` (durée et ordre des autres tests changés), sans autre cause dans le chemin d'ouverture.
+Cause exacte non reproductible sans émulateur : le test est corrigé sans l'affaiblir.
+
+Correction : à l'étape 3, le moniteur de l'étape 2 est retiré, le premier écran est fermé et on attend sa
+destruction, puis seulement le moniteur `second` est posé ; on attend 3 s sans instance (`assertNull`) et on vérifie
+`hits == 0`. L'assertion reste : une seconde arrivée sur l'écran de configuration n'ouvre pas le tutoriel.
+
 ## Issue #15 — demande de l'utilisateur : retour au style générique
 
 Date : 2026-11-13. Demande : « Retire tout le style lié à Kalmia. Reviens au style générique. » Elle remplace la
