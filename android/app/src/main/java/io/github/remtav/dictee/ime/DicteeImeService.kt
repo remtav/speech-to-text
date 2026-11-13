@@ -62,6 +62,12 @@ class DicteeImeService : InputMethodService(), DictationListener, EngineManager.
     private var modelButton: MaterialButton? = null
     private var meter: LevelMeterView? = null
     private var cancelWaitButton: MaterialButton? = null
+    private var micSmall: MaterialButton? = null
+    private var dictationGroup: View? = null
+    private var textGroup: View? = null
+    private var toggleView: ImageButton? = null
+    private var letters: LetterKeyboardView? = null
+    private var symbolsButton: MaterialButton? = null
 
     private var sink: ImeTextSink? = null
     /** Field the current dictation types into: package + field id. */
@@ -148,6 +154,7 @@ class DicteeImeService : InputMethodService(), DictationListener, EngineManager.
         cancelWaitButton = v.findViewById<MaterialButton>(R.id.cancel_wait).apply {
             setOnClickListener { haptic(it); onCancelWaitTapped() }
         }
+        bindTextKeyboard(v)
         v.findViewById<ImageButton>(R.id.settings).setOnClickListener { openSettings() }
         v.findViewById<ImageButton>(R.id.help).setOnClickListener { haptic(it); openHowTo() }
         v.findViewById<View>(R.id.key_switch).setOnClickListener {
@@ -165,6 +172,88 @@ class DicteeImeService : InputMethodService(), DictationListener, EngineManager.
         backspace.setOnTouchListener(RepeatListener { haptic(backspace); deleteBackward() })
         render()
         return v
+    }
+
+    /** The text keyboard (issue #21): letters, symbols, and a bottom row that keeps the microphone. */
+    @SuppressLint("ClickableViewAccessibility")
+    private fun bindTextKeyboard(v: View) {
+        dictationGroup = v.findViewById(R.id.dictation_group)
+        textGroup = v.findViewById(R.id.text_group)
+        toggleView = v.findViewById<ImageButton>(R.id.toggle_view).apply {
+            setOnClickListener { haptic(it); setTextKeyboardShown(!app.settings.textKeyboardShown) }
+        }
+        micSmall = v.findViewById<MaterialButton>(R.id.mic_small).apply { setOnClickListener { onMicTapped() } }
+        val keys = v.findViewById<LetterKeyboardView>(R.id.letters)
+        letters = keys
+        keys.kind = app.settings.keyboardLayout
+        keys.onKeyPressed = { haptic(it) }
+        keys.listener = object : LetterKeyboardView.Listener {
+            override fun onText(text: String) = typeKey(text)
+        }
+        keys.backspaceTouchListener = RepeatListener { typedBackspace() }
+        symbolsButton = v.findViewById<MaterialButton>(R.id.kb_symbols).apply {
+            setOnClickListener {
+                haptic(it)
+                val k = letters ?: return@setOnClickListener
+                k.symbols = !k.symbols
+                updateSymbolsButton()
+            }
+        }
+        v.findViewById<View>(R.id.kb_switch).setOnClickListener {
+            haptic(it)
+            if (!switchToPreviousInputMethod()) {
+                getSystemService(InputMethodManager::class.java).showInputMethodPicker()
+            }
+        }
+        v.findViewById<View>(R.id.kb_space).setOnClickListener { haptic(it); typeKey(" ") }
+        v.findViewById<View>(R.id.kb_comma).setOnClickListener { haptic(it); typeKey(",") }
+        v.findViewById<View>(R.id.kb_period).setOnClickListener { haptic(it); typeKey(".") }
+        v.findViewById<View>(R.id.kb_enter).setOnClickListener { haptic(it); stopDictationForTyping(); pressEnter() }
+        applyView()
+    }
+
+    private fun updateSymbolsButton() {
+        val symbols = letters?.symbols == true
+        symbolsButton?.text = if (symbols) "ABC" else "123"
+        symbolsButton?.contentDescription = getString(if (symbols) R.string.cd_letters else R.string.cd_symbols)
+    }
+
+    /** Text keys are shown in a password field (no dictation there) or when the user last left them open. */
+    private fun textViewShown(): Boolean = passwordField || app.settings.textKeyboardShown
+
+    fun setTextKeyboardShown(shown: Boolean) {
+        app.settings.textKeyboardShown = shown
+        applyView()
+        render()
+    }
+
+    /** Shows the dictation view or the text view, as [textViewShown] says. */
+    private fun applyView() {
+        val text = textViewShown()
+        dictationGroup?.visibility = if (text) View.GONE else View.VISIBLE
+        textGroup?.visibility = if (text) View.VISIBLE else View.GONE
+        toggleView?.apply {
+            // In a password field the microphone is refused: nothing to go back to.
+            visibility = if (passwordField) View.GONE else View.VISIBLE
+            setImageResource(if (text) R.drawable.ic_mic else R.drawable.ic_text_fields)
+            contentDescription = getString(if (text) R.string.cd_to_dictation else R.string.cd_to_keyboard)
+        }
+        updateSymbolsButton()
+    }
+
+    /** What was already said is inserted first, so the typed character lands after it. */
+    private fun stopDictationForTyping() {
+        if (controller.isActive) controller.stop()
+    }
+
+    private fun typeKey(text: String) {
+        stopDictationForTyping()
+        typeText(text)
+    }
+
+    private fun typedBackspace() {
+        stopDictationForTyping()
+        deleteBackward()
     }
 
     override fun onEvaluateFullscreenMode(): Boolean = false
@@ -195,6 +284,8 @@ class DicteeImeService : InputMethodService(), DictationListener, EngineManager.
         val field = fieldKey(attribute!!)
         currentField = field
         passwordField = isPassword(attribute)
+        letters?.apply { kind = app.settings.keyboardLayout; reset() }
+        applyView()
         currentInputConnection?.let { sink = ImeTextSink(it) } ?: run { sink = null }
         if (controller.isActive && !restarting && !isSameFieldAfterRotation(attribute, field)) {
             // Focus moved to another field mid-dictation: never type into the wrong one.
@@ -532,6 +623,12 @@ class DicteeImeService : InputMethodService(), DictationListener, EngineManager.
         mic.isEnabled = !passwordField && state != DictationState.FINISHING
         mic.contentDescription = getString(if (listening) R.string.cd_stop else R.string.cd_start)
         mic.isActivated = listening
+        micSmall?.apply {
+            setIconResource(if (listening) R.drawable.ic_stop else R.drawable.ic_mic)
+            isEnabled = !passwordField && state != DictationState.FINISHING
+            contentDescription = getString(if (listening) R.string.cd_stop else R.string.cd_start)
+            isActivated = listening
+        }
 
         val es = engineState
         // Read from the controller, per session: never a stale flag from a dropped dictation.
