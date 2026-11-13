@@ -24,6 +24,8 @@ import io.github.remtav.dictee.stt.Acceleration
 import io.github.remtav.dictee.stt.ModelCatalog
 import io.github.remtav.dictee.stt.RemoteApi
 import io.github.remtav.dictee.stt.RemoteEngine
+import io.github.remtav.dictee.stt.ServerConsent
+import io.github.remtav.dictee.stt.ServerTimeout
 import io.github.remtav.dictee.stt.WhisperTuning
 import io.github.remtav.dictee.stt.asDownloadable
 import java.util.Locale
@@ -239,13 +241,17 @@ class SettingsActivity : AppCompatActivity() {
         refreshRemoteLanguage = { remoteLanguageGroup.checkSilently(remoteLanguageIndex(), onRemoteLanguage) }
         col.switch(getString(R.string.settings_remote_polish), s.remotePolish) { s.remotePolish = it }
         col.body(getString(R.string.settings_remote_polish_help), small = true)
-        col.body(getString(R.string.settings_remote_fallback), small = true)
-        val fallbacks = listOf("" to getString(R.string.settings_remote_no_fallback)) +
-            ModelCatalog.listed(s.languages).map { it.id to it.displayName }
-        col.radio(fallbacks.map { it.second }, fallbacks.indexOfFirst { it.first == s.remoteFallbackId }.coerceAtLeast(0)) {
-            s.remoteFallbackId = fallbacks[it].first
-            if (::remoteStatus.isInitialized) updateRemoteWarning()
-        }
+        // Issue #23: server first once an address is set and the user agreed; the phone model is the fallback.
+        col.heading(getString(R.string.settings_server_use))
+        col.switch(getString(R.string.settings_server_consent), s.serverConsent == ServerConsent.ACCEPTED) {
+            s.serverConsent = if (it) ServerConsent.ACCEPTED else ServerConsent.REFUSED
+        }.tag = SERVER_CONSENT_TAG
+        col.body(getString(R.string.settings_server_consent_help), small = true)
+        col.switch(getString(R.string.settings_always_local), s.alwaysLocal) { s.alwaysLocal = it }.tag = ALWAYS_LOCAL_TAG
+        col.body(getString(R.string.settings_always_local_help), small = true)
+        col.slider(getString(R.string.settings_server_timeout), ServerTimeout.MIN_SECONDS.toFloat(), 30f, 1f,
+            s.serverTimeoutSeconds.toFloat(), { "${it.toInt()} s" }) { s.serverTimeoutSeconds = it.toInt() }
+        col.body(getString(R.string.settings_server_timeout_help, s.activeModel.displayName), small = true)
         col.row().apply {
             button(getString(R.string.settings_remote_test), outlined = true) { testRemote() }.spaced()
             button(getString(R.string.settings_diagnostic), outlined = true) {
@@ -264,10 +270,6 @@ class SettingsActivity : AppCompatActivity() {
         s.remoteModel = remoteModel.text.toString()
         s.cfAccessClientId = cfClientId.text.toString()
         s.cfAccessClientSecret = cfClientSecret.text.toString()
-        // Using the server needs a valid address; never leave it selected without one.
-        if (s.activeModel.family == io.github.remtav.dictee.stt.ModelFamily.REMOTE && !s.remoteConfig().isConfigured) {
-            s.activeModelId = ModelCatalog.default.id
-        }
     }
 
     private fun updateRemoteWarning() {
@@ -279,7 +281,7 @@ class SettingsActivity : AppCompatActivity() {
                 else -> null
             },
             // Without an installed local model, a server failure loses the dictation.
-            if (c.isConfigured && ModelCatalog.byId(app.settings.remoteFallbackId)?.let { app.isInstalled(it) } != true) {
+            if (c.isConfigured && !app.isInstalled(app.settings.activeModel)) {
                 getString(R.string.settings_remote_no_fallback_warning)
             } else null,
         )
@@ -390,13 +392,12 @@ class SettingsActivity : AppCompatActivity() {
         llmBox.body(getString(R.string.settings_llm_note), small = true)
     }
 
-    private fun ViewGroup.switch(label: String, value: Boolean, onChange: (Boolean) -> Unit) {
-        addView(MaterialSwitch(context).apply {
+    private fun ViewGroup.switch(label: String, value: Boolean, onChange: (Boolean) -> Unit): MaterialSwitch =
+        MaterialSwitch(context).apply {
             text = label
             isChecked = value
             setOnCheckedChangeListener { _, v -> onChange(v) }
-        })
-    }
+        }.also { addView(it) }
 
     private fun ViewGroup.radio(labels: List<String>, selected: Int, onChange: (Int) -> Unit): RadioGroup {
         val group = RadioGroup(context)
@@ -438,6 +439,8 @@ class SettingsActivity : AppCompatActivity() {
         /** Intent extra: scroll to the personal vocabulary on opening. */
         const val EXTRA_SCROLL_TO_VOCABULARY = "scroll_to_vocabulary"
         const val VOCABULARY_TAG = "settings_vocabulary"
+        const val SERVER_CONSENT_TAG = "settings_server_consent"
+        const val ALWAYS_LOCAL_TAG = "settings_always_local"
         const val PARTICIPATION_YES_TAG = "settings_participation_yes"
         const val PARTICIPATION_NO_TAG = "settings_participation_no"
         const val PARTICIPATION_EXCLUDED_TAG = "settings_participation_excluded"

@@ -21,6 +21,8 @@ import io.github.remtav.dictee.DicteeApp
 import io.github.remtav.dictee.R
 import io.github.remtav.dictee.stt.DictationLanguage
 import io.github.remtav.dictee.stt.ModelCatalog
+import io.github.remtav.dictee.stt.ModelFamily
+import io.github.remtav.dictee.stt.ServerConsent
 import io.github.remtav.dictee.stt.ModelMigration
 import io.github.remtav.dictee.stt.ModelVisibility
 import io.github.remtav.dictee.stt.ModelRecommendation
@@ -226,17 +228,22 @@ class SetupActivity : AppCompatActivity() {
         }.tag = RETIRED_OK_TAG
     }
 
-    /** The user's server, shown as one more model once its address is set in the settings. */
+    /**
+     * The user's server (issue #23): the default as soon as its address is set in the settings (after the
+     * consent screen); picking a phone model above means « Toujours transcrire sur le téléphone ».
+     */
     private fun renderRemote() {
         val spec = ModelCatalog.remote
         val card = modelsBox.card()
         val config = app.settings.remoteConfig()
         card.addView(RadioButton(this).apply {
             text = spec.displayName
-            isChecked = app.settings.activeModelId == spec.id
+            isChecked = app.shownSpec().id == spec.id
             isEnabled = config.isConfigured
             setOnClickListener {
-                app.settings.activeModelId = spec.id
+                app.settings.alwaysLocal = false
+                // A refusal is asked again at the next dictation, never turned into consent here.
+                if (app.settings.serverConsent == ServerConsent.REFUSED) app.settings.serverConsent = ServerConsent.UNASKED
                 renderModels()
             }
         })
@@ -257,7 +264,7 @@ class SetupActivity : AppCompatActivity() {
         val card = modelsBox.card()
         card.tag = modelCardTag(spec)
         val installed = app.store.isInstalled(spec)
-        val active = app.settings.activeModelId == spec.id
+        val active = app.settings.activeModelId == spec.id && app.shownSpec().family != ModelFamily.REMOTE
         card.addView(RadioButton(this).apply {
             text = buildString {
                 append(spec.displayName)
@@ -267,6 +274,7 @@ class SetupActivity : AppCompatActivity() {
             isEnabled = installed
             setOnClickListener {
                 app.settings.activeModelId = spec.id
+                if (app.settings.remoteConfig().isConfigured) app.settings.alwaysLocal = true
                 renderModels()
             }
         })

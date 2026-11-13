@@ -3727,3 +3727,38 @@ Vérification locale : `./gradlew testDebugUnitTest assembleDebug assembleDebugA
 - Repli du serveur : un identifiant caché ou qui ne convient plus aux langues se lit comme Whisper turbo.
 - `switchModel` (clavier) accepte encore tout identifiant du catalogue : seul le menu filtre (les tests
   instrumentés s'en servent).
+
+## Issue #23 : serveur distant par défaut, consentement, repli local
+
+Décisions de l'utilisateur (2026-11-13) : code seulement, adresse par défaut vide, consentement + suppression.
+Choix faits pendant l'implémentation (le plus prudent pour la vie privée en cas de doute) :
+
+- **Choix du moteur** (`EngineChoice.route`) : sans adresse ou avec « Toujours transcrire sur le téléphone » →
+  téléphone ; adresse + refus → téléphone ; adresse sans réponse → écran de consentement d'abord (aucune dictée
+  n'utilise le serveur sur cette route) ; adresse + accord + réseau → serveur ; sans réseau → téléphone.
+- **Le serveur n'est plus un « modèle » actif.** `activeModelId` désigne toujours le modèle du téléphone, qui sert
+  aussi de repli au serveur ; l'ancien réglage « Si le serveur ne répond pas » disparaît des Réglages.
+  `remoteFallbackId` reste pour la migration seulement : un utilisateur dont le modèle actif était le serveur garde
+  le serveur, son ancien repli devient le modèle du téléphone (Whisper turbo si « aucun »), et **le consentement lui
+  est demandé** à la prochaine dictée (l'ancien choix ne disait pas ce qui arrive à l'audio).
+- Choisir un modèle du téléphone (clavier, écran principal) alors que le serveur est actif active « Toujours
+  transcrire sur le téléphone » ; choisir « Serveur distant » le désactive et, après un refus, repose la question
+  (un clic sur le serveur n'est jamais pris pour un accord).
+- **Écran de consentement** : un panneau dans le clavier (pas une activité séparée : le clavier ne perd pas le
+  champ), avec l'hôte du serveur dans le texte. Un panneau fermé sans réponse (clavier masqué) ne vaut rien : la
+  question revient. Le réglage « J'accepte d'envoyer l'audio… » passe à « accepté » ou « refusé ».
+- **Délai de repli** : 8 s par défaut (2 à 30 s dans les Réglages), compté depuis la fin de la dictée, plus un quart
+  de la durée de l'audio (envoi du WAV et transcription d'une longue dictée), 3 min au plus ; le délai de connexion
+  est plafonné au même délai. L'ancien budget (60 s + la durée de la dictée) attendait trop longtemps.
+- **Réseau** : `ConnectivityManager`, capacité INTERNET (pas VALIDATED : un serveur du réseau local n'a pas besoin
+  d'Internet). En cas de doute, la requête est tentée : le repli couvre l'échec.
+- **Adresse de compilation** : `BuildConfig.DEFAULT_SERVER_URL` (propriété Gradle `defaultServerUrl`, vide par
+  défaut, refusée si ce n'est pas une adresse http(s)). Jamais de jeton dans l'APK. Une adresse saisie (même vide)
+  remplace celle de la compilation.
+- **Serveur** : `DICTEE_TOKENS` défini protège toutes les routes sauf `/`, `/healthz` et `/static/` (la page web
+  ne peut alors plus appeler l'API : usage local seulement) ; défini mais sans jeton utilisable, tout est refusé.
+  Chaque jeton ne voit que ses tâches (404 pour les autres, `/progress` muet). La limite de débit ne compte que les
+  requêtes qui font travailler le serveur (transcription, changement de modèle, éjection), pas le suivi d'une tâche
+  (l'application interroge toutes les 0,4 s). L'audio est supprimé dès que Whisper l'a lu, avant le polissage.
+  `POLISH_LOG` (qui contient des transcriptions) est ignoré quand `DICTEE_TOKENS` est défini.
+- Politique de confidentialité : `docs/CONFIDENTIALITE.md` (il n'y en avait pas).

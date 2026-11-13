@@ -8,6 +8,8 @@ import io.github.remtav.dictee.reading.Participation
 import io.github.remtav.dictee.stt.Acceleration
 import io.github.remtav.dictee.stt.DictationLanguage
 import io.github.remtav.dictee.stt.DictationLanguages
+import io.github.remtav.dictee.stt.EngineChoice
+import io.github.remtav.dictee.stt.EngineRoute
 import io.github.remtav.dictee.stt.EngineOptions
 import io.github.remtav.dictee.stt.ModelCatalog
 import io.github.remtav.dictee.stt.ModelFamily
@@ -15,6 +17,8 @@ import io.github.remtav.dictee.stt.ModelMigration
 import io.github.remtav.dictee.stt.RemoteApi
 import io.github.remtav.dictee.stt.RemoteConfig
 import io.github.remtav.dictee.stt.ModelSpec
+import io.github.remtav.dictee.stt.ServerConsent
+import io.github.remtav.dictee.stt.ServerTimeout
 import io.github.remtav.dictee.stt.WhisperTuning
 import io.github.remtav.dictee.text.Vocabulary
 
@@ -36,10 +40,17 @@ enum class ThemeMode(val label: String) {
     }
 }
 
-/** User preferences. Everything has a safe default: the CPU path, no optional feature. */
-class AppSettings(context: Context) {
+/**
+ * User preferences. Everything has a safe default: the CPU path, no optional feature.
+ * [defaultServerUrl] is the build's server address (issue #23, `-PdefaultServerUrl`), empty by default.
+ */
+class AppSettings(context: Context, private val defaultServerUrl: String = io.github.remtav.dictee.BuildConfig.DEFAULT_SERVER_URL) {
     val prefs: SharedPreferences = context.getSharedPreferences("dictee", Context.MODE_PRIVATE)
 
+    /**
+     * The on-device model (#22): used when the server is not (see [route]), and as the server's fallback.
+     * Never the server itself since issue #23 (an old "remote-server" value is migrated by [DicteeApp]).
+     */
     var activeModelId: String
         get() = prefs.getString("active_model", ModelCatalog.default.id) ?: ModelCatalog.default.id
         set(v) = prefs.edit().putString("active_model", v).apply()
@@ -66,7 +77,7 @@ class AppSettings(context: Context) {
     val participation: Participation
         get() = Participation(languages, quebecDeclaration, participationCardDismissed)
 
-    val activeModel: ModelSpec get() = ModelCatalog.byId(activeModelId) ?: ModelCatalog.default
+    val activeModel: ModelSpec get() = ModelCatalog.byId(activeModelId)?.takeIf { it.family != ModelFamily.REMOTE } ?: ModelCatalog.default
 
     /**
      * Id of a model the app moved the user off (issue #22, see [io.github.remtav.dictee.stt.ModelMigration]),
@@ -144,10 +155,30 @@ class AppSettings(context: Context) {
         get() = prefs.getInt("keep_loaded_minutes", 5)
         set(v) = prefs.edit().putInt("keep_loaded_minutes", v.coerceIn(0, 60)).apply()
 
-    // ---- Remote server (opt-in) ----
+    // ---- Remote server (issue #23: the default once an address is set and the user agreed) ----
+    /** The user's address, or the build's default one until the user sets theirs (even to ""). */
     var remoteUrl: String
-        get() = prefs.getString("remote_url", "") ?: ""
+        get() = prefs.getString("remote_url", null) ?: defaultServerUrl
         set(v) = prefs.edit().putString("remote_url", v.trim()).apply()
+
+    /** The answer to the consent screen (issue #23); asked at the first dictation that would use the server. */
+    var serverConsent: ServerConsent
+        get() = ServerConsent.fromName(prefs.getString("server_consent", null))
+        set(v) = prefs.edit().putString("server_consent", v.name).apply()
+
+    /** « Toujours transcrire sur le téléphone »: the server is never used, even with an address and consent. */
+    var alwaysLocal: Boolean
+        get() = prefs.getBoolean("always_local", false)
+        set(v) = prefs.edit().putBoolean("always_local", v).apply()
+
+    /** Seconds the keyboard waits for the server before transcribing on the phone (advanced setting, 8 by default). */
+    var serverTimeoutSeconds: Int
+        get() = ServerTimeout.sanitize(prefs.getInt("server_timeout", ServerTimeout.DEFAULT_SECONDS))
+        set(v) = prefs.edit().putInt("server_timeout", ServerTimeout.sanitize(v)).apply()
+
+    /** Where the next dictation goes: server, phone, or the consent screen first (see [EngineChoice]). */
+    fun route(networkAvailable: Boolean = true): EngineRoute =
+        EngineChoice.route(remoteConfig().isConfigured, serverConsent, alwaysLocal, networkAvailable)
 
     var remoteApi: RemoteApi
         get() = RemoteApi.fromName(prefs.getString("remote_api", null))
@@ -183,8 +214,10 @@ class AppSettings(context: Context) {
         set(v) = prefs.edit().putString("cf_access_secret", RemoteConfig.cleanHeaderValue(v)).apply()
 
     /**
-     * Local model id used when the server cannot be reached; "" for none. Never a hidden model nor
-     * one that no longer suits the languages (issue #22): such a value reads as Whisper turbo.
+     * Before issue #23, the local model used when the server could not be reached ("" for none); read
+     * once to migrate a user whose active model was the server. Since #23 the fallback is [activeModel].
+     * Never a hidden model nor one that no longer suits the languages (issue #22): such a value reads
+     * as Whisper turbo.
      */
     var remoteFallbackId: String
         get() = ModelMigration.fallbackId(prefs.getString("remote_fallback", ModelCatalog.default.id) ?: "", languages)
@@ -195,15 +228,18 @@ class AppSettings(context: Context) {
         get() = prefs.getBoolean("remote_polish", true)
         set(v) = prefs.edit().putBoolean("remote_polish", v).apply()
 
-    fun remoteConfig() = RemoteConfig(
-        baseUrl = remoteUrl,
-        api = remoteApi,
-        apiKey = remoteApiKey,
-        model = remoteModel,
-        language = remoteLanguage,
-        cfAccessClientId = cfAccessClientId,
-        cfAccessClientSecret = cfAccessClientSecret,
-        polish = remotePolish,
+    fun remoteConfig() = ServerTimeout.apply(
+        RemoteConfig(
+            baseUrl = remoteUrl,
+            api = remoteApi,
+            apiKey = remoteApiKey,
+            model = remoteModel,
+            language = remoteLanguage,
+            cfAccessClientId = cfAccessClientId,
+            cfAccessClientSecret = cfAccessClientSecret,
+            polish = remotePolish,
+        ),
+        serverTimeoutSeconds,
     )
 
     /**
@@ -227,7 +263,8 @@ class AppSettings(context: Context) {
             // vocabulary edit does not reload an on-device model that ignores them.
             hotwords = if (spec.family == ModelFamily.QWEN3_ASR || remote) vocabulary.favoured else emptyList(),
             remote = if (remote) remoteConfig() else null,
-            remoteFallback = if (remote) ModelCatalog.byId(remoteFallbackId)?.takeIf(fallbackInstalled) else null,
+            // The server's fallback is the on-device model (issue #23), when it is installed.
+            remoteFallback = if (remote) activeModel.takeIf { it.family != ModelFamily.REMOTE }?.takeIf(fallbackInstalled) else null,
         )
     }
 }
