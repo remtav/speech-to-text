@@ -33,6 +33,7 @@
         <activity android:name=".ui.HowToActivity" android:exported="false"
             android:windowSoftInputMode="adjustResize" />
         <activity android:name=".ui.ReadingTestActivity" android:exported="false" />
+        <activity android:name=".ui.QuickTestActivity" android:exported="false" />
         <activity android:name=".ui.CompareActivity" android:exported="false" />
         <activity android:name=".ui.DiagnosticActivity" android:exported="false" />
 

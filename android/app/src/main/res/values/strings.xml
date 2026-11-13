@@ -33,9 +33,9 @@
     <string name="cd_decimal">Séparateur décimal</string>
 
     <string name="status_idle">Appuyez sur le micro pour dicter</string>
-    <string name="status_loading">Chargement de %1$s…</string>
+    <string name="status_loading">Chargement : %1$s…</string>
     <string name="status_listening">À l\'écoute…</string>
-    <string name="status_listening_loading">À l\'écoute (chargement de %1$s)…</string>
+    <string name="status_listening_loading">À l\'écoute (chargement : %1$s)…</string>
     <string name="status_speaking">Parole détectée…</string>
     <string name="status_finishing">Transcription…</string>
     <string name="status_server_polish">Transcription et polissage…</string>
@@ -67,11 +67,11 @@
     <string name="download_running">Téléchargement des modèles…</string>
     <string name="download_channel">Téléchargements</string>
 
-    <string name="setup_intro">Un clavier vocal conçu au Québec, pour le français d\'ici.\nVotre voix est transcrite sur votre téléphone : elle n\'est envoyée à personne. Le réseau sert à télécharger les modèles.\nPas de compte, pas de publicité, pas de télémétrie.\nLe code source est public : chacun peut le lire et le vérifier. Les modèles de transcription, eux, viennent d\'éditeurs étrangers, nommés plus bas.</string>
+    <string name="setup_intro">Un clavier vocal développé au Québec, pour le français d\'ici.\nVotre voix est transcrite sur votre téléphone : elle n\'est envoyée à personne. Le réseau sert à télécharger le modèle de transcription.\nPas de compte, pas de publicité, pas de télémétrie.\nCode ouvert : tout le monde peut vérifier ce que l\'application fait de votre voix. Le code est public ; vos dictées, elles, restent privées.\nLes modèles de transcription viennent d\'éditeurs étrangers, nommés plus bas.</string>
     <string name="setup_open_ime_settings">Activer le clavier</string>
     <string name="setup_pick_ime">Choisir Kalmia Blabla</string>
     <!-- Issue #55: the two keyboard steps, then the microphone. -->
-    <string name="setup_intro_server">Un clavier vocal conçu au Québec, pour le français d\'ici.\nVous avez configuré un serveur distant dans les réglages avancés : vos dictées y sont envoyées pour être transcrites (voir ci-dessous).\nPas de compte, pas de publicité, pas de télémétrie.\nLe code source est public : chacun peut le lire et le vérifier. Les modèles de transcription, eux, viennent d\'éditeurs étrangers, nommés plus bas.</string>
+    <string name="setup_intro_server">Un clavier vocal développé au Québec, pour le français d\'ici.\nVous avez configuré un serveur distant dans les réglages avancés : vos dictées y sont envoyées pour être transcrites (voir ci-dessous).\nPas de compte, pas de publicité, pas de télémétrie.\nCode ouvert : tout le monde peut vérifier ce que l\'application fait de votre voix. Le code est public.\nLes modèles de transcription viennent d\'éditeurs étrangers, nommés plus bas.</string>
     <string name="setup_step_enable_title">1. Activer Kalmia Blabla</string>
     <string name="setup_step_enable_text">Android ouvre la liste des claviers. Cochez « Kalmia Blabla (voix) », puis revenez ici.</string>
     <string name="setup_step_enable_warning">Android affiche alors un avertissement, le même pour tous les claviers : votre voix, elle, reste sur votre téléphone.</string>
@@ -94,23 +94,25 @@
     <string name="setup_step_languages">4. Vos langues</string>
     <string name="setup_languages_help">Cochez les langues que vous dictez. Elles servent à recommander un modèle et à régler la langue de la transcription : avec une seule langue, elle est imposée ; avec plusieurs, elle est détectée automatiquement. Au moins une langue reste cochée.</string>
     <string name="languages_keep_one">Au moins une langue doit rester cochée.</string>
-    <string name="setup_models">5. Modèles</string>
+    <string name="setup_models">5. Modèle</string>
+    <string name="model_publisher">Éditeur : %1$s</string>
     <string name="model_recommended_badge">Recommandé pour vos langues</string>
     <string name="model_license_runs_local">Licence %1$s · s\'exécute sur votre téléphone</string>
     <string name="model_warning_uncovered">Attention : ce modèle ne couvre pas %1$s. Il reste téléchargeable.</string>
-    <string name="setup_models_note">Téléchargés depuis Hugging Face, vérifiés par somme de contrôle SHA-256. Un seul est chargé à la fois. Wi-Fi conseillé.</string>
+    <string name="setup_models_note">Kalmia Blabla choisit le modèle pour vos langues. Il se télécharge une fois (Wi-Fi conseillé), puis tout se passe sur votre téléphone, même hors ligne.</string>
     <string name="setup_default_suffix"> (par défaut)</string>
     <string name="model_notice_title">Modèle remplacé</string>
-    <string name="model_notice_replaced">%1$s n\'est plus proposé pour vos langues : la dictée utilise maintenant %2$s.</string>
-    <string name="model_notice_download">%1$s n\'est pas encore téléchargé : téléchargez-le pour dicter.</string>
-    <string name="model_notice_download_button">Télécharger %1$s</string>
-    <string name="model_notice_delete_button">Supprimer les fichiers de %1$s (%2$s)</string>
-    <string name="model_notice_deleted">Fichiers de %1$s supprimés.</string>
+    <string name="model_notice_replaced">Le modèle que vous utilisiez n\'est plus proposé pour vos langues : la dictée utilise maintenant %1$s.</string>
+    <string name="model_notice_download">Il n\'est pas encore téléchargé : téléchargez-le pour dicter.</string>
+    <string name="model_notice_download_button">Télécharger (%1$s)</string>
+    <string name="model_notice_delete_button">Supprimer les fichiers de l\'ancien modèle (%1$s)</string>
+    <string name="model_notice_deleted">Fichiers de l\'ancien modèle supprimés.</string>
     <string name="model_notice_ok">J\'ai compris</string>
     <string name="settings_experimental">Modèles expérimentaux</string>
-    <string name="settings_experimental_help">Jamais recommandés : à essayer et à comparer sur votre téléphone (« Comparer les modèles » sur l\'écran principal).</string>
+    <string name="settings_experimental_help">Jamais recommandés : à essayer et à comparer sur votre téléphone (« Comparer les modèles », ci-dessus).</string>
     <string name="setup_downloading">Téléchargement : %1$d %% (%2$s / %3$s)</string>
-    <string name="setup_downloading_label">Téléchargement de %1$s</string>
+    <string name="setup_downloading_label">Téléchargement : %1$s</string>
+    <string name="setup_download_failed">Échec du téléchargement. Vérifiez la connexion et l\'espace libre, puis réessayez.</string>
     <string name="setup_download_error">Échec : %1$s</string>
     <string name="setup_installed">Installé (%1$s)</string>
     <string name="setup_not_installed">Non installé (%1$s à télécharger)</string>
@@ -124,7 +126,7 @@
     <string name="settings_languages">Vos langues</string>
     <string name="settings_dictation">Dictée</string>
     <string name="settings_partials">Texte provisoire pendant qu\'on parle</string>
-    <string name="settings_partials_help">Affiché souligné, remplacé par le texte final à chaque pause. Consomme plus de calcul. Sans effet avec Whisper, qui ne montre pas de texte provisoire (le texte final arrive plus vite ainsi).</string>
+    <string name="settings_partials_help">Affiché souligné, remplacé par le texte final à chaque pause. Consomme plus de calcul. Sans effet avec le modèle plus précis, qui ne montre pas de texte provisoire (le texte final arrive plus vite ainsi).</string>
     <string name="settings_commands">Commandes vocales</string>
     <string name="settings_commands_help">Ponctuation : « deux-points », « point-virgule », « point d\'interrogation », « point d\'exclamation », « ouvrir / fermer les guillemets », « ouvrir / fermer la parenthèse ». Mise en forme : « nouvelle ligne », « nouveau paragraphe ». Effacement, dit seul : « efface la dernière phrase », « efface le dernier mot ». Les commandes suivent vos langues de dictée (français, anglais) ; dans une phrase ordinaire (« j\'ai marqué deux points »), les mots restent du texte.</string>
     <string name="settings_pause">Pause qui termine un segment</string>
@@ -136,7 +138,7 @@
     <string name="settings_keep_loaded">Garder le modèle en mémoire après fermeture du clavier</string>
     <string name="settings_threads">Threads de calcul</string>
     <string name="settings_acceleration">Accélération matérielle</string>
-    <string name="settings_acceleration_help">Le CPU est le choix sûr. NNAPI peut utiliser le NPU/GPU du Snapdragon ; s\'il n\'est pas pris en charge, le moteur revient automatiquement au CPU. Comparez avec l\'écran de comparaison.</string>
+    <string name="settings_acceleration_help">Le CPU est le choix sûr. NNAPI peut utiliser le NPU/GPU du Snapdragon ; s\'il n\'est pas pris en charge, le moteur revient automatiquement au CPU. Comparez avec « Comparer les modèles », ci-dessus.</string>
     <!-- Section « Avancé » des réglages (issue #49, réutilisée par #37) et réglages Whisper qu'elle regroupe. -->
     <string name="settings_advanced">Avancé</string>
     <string name="settings_advanced_help">Réglages pour essais et cas particuliers. Les valeurs par défaut conviennent à la plupart des usages.</string>
@@ -156,6 +158,9 @@
     <string name="settings_llm_note">Le LLM tourne sur l\'appareil (MediaPipe, arm64 uniquement). S\'il est indisponible, le nettoyage par règles est utilisé.</string>
 
     <!-- Issue #57: the server is a developer setting, folded inside « Avancé ». -->
+    <!-- Issue #37: technical model choices, folded inside « Avancé ». -->
+    <string name="settings_models_section">Modèles et performances</string>
+    <string name="settings_models_names">Sur l\'écran principal, « Plus précis » est %1$s (%2$s) et « Plus léger et plus rapide » est %3$s (%4$s), quantifiés en int8 pour le téléphone.</string>
     <string name="settings_server_section">Serveur distant, pour essais (développeurs)</string>
     <string name="settings_server_section_help">Pour développer et déboguer. Kalmia Blabla transcrit votre voix sur votre téléphone ; ces réglages ne servent qu\'à qui héberge son propre serveur de transcription.</string>
     <string name="collapsible_open">déplié</string>
@@ -375,4 +380,52 @@
     <string name="reading_better_chosen">%1$s est maintenant votre modèle pour la dictée.</string>
     <string name="reading_result_kept">Votre lecture n\'est conservée nulle part : l\'enregistrement est effacé dès que vous fermez cet écran.</string>
     <string name="reading_close">Fermer</string>
+    <!-- Issue #36, recentred on the phone: the quick test compares two phone models (issue #37: named by their effect). -->
+    <string name="quick_title">Test rapide</string>
+    <string name="quick_open">Faire le test (1 minute)</string>
+    <string name="quick_open_help">Facultatif : lisez une quarantaine de mots à voix haute, et l\'application vous dit quel modèle vous comprend le mieux.</string>
+    <string name="quick_no_language">Le test rapide existe en français (Québec et France), en anglais, en espagnol et en portugais.</string>
+    <string name="quick_intro">Lisez ce texte à voix haute, en %1$s, comme vous dicteriez. Touchez « Enregistrer », lisez, puis « Arrêter ».</string>
+    <string name="quick_private">Tout se passe sur votre téléphone. L\'enregistrement reste en mémoire le temps du calcul, puis il est effacé : rien n\'est gardé, rien n\'est envoyé.</string>
+    <string name="quick_ready">Prêt.</string>
+    <string name="quick_recording">Enregistrement : %1$d s (au plus %2$d s)</string>
+    <string name="quick_record">Enregistrer</string>
+    <string name="quick_stop">Arrêter</string>
+    <string name="quick_scoring">Calcul du score…</string>
+    <string name="quick_scoring_model">Transcription avec %1$s…</string>
+    <string name="quick_current_suffix">(votre modèle actuel)</string>
+    <string name="quick_score">Ressemblance : %1$d %% · délai : %2$s s</string>
+    <string name="quick_too_slow">Trop lent : pas de réponse dans les %1$d s du test.</string>
+    <string name="quick_not_installed">Pas encore téléchargé.</string>
+    <string name="quick_installed_redo">Téléchargé : refaites le test pour le comparer.</string>
+    <string name="quick_download">Télécharger (%1$s) pour comparer</string>
+    <string name="quick_single_scored">Le modèle choisi pour vos langues vous a compris à %1$d %%.</string>
+    <string name="quick_single_too_slow">Le modèle choisi pour vos langues n\'a pas répondu à temps sur ce téléphone.</string>
+    <string name="quick_single_unavailable">Le modèle choisi pour vos langues n\'est pas encore téléchargé.</string>
+    <string name="quick_no_verdict">Aucun des deux modèles n\'est encore téléchargé. Téléchargez-en un sur l\'écran principal, puis refaites le test.</string>
+    <string name="quick_verdict_best_quick">Gardez le modèle plus précis : il vous a bien compris, et assez vite.</string>
+    <string name="quick_verdict_light_enough">Prenez le modèle plus léger : il vous comprend presque aussi bien, et plus vite.</string>
+    <string name="quick_verdict_light_inaccurate">Prenez le modèle plus précis : le plus léger a raté trop de mots.</string>
+    <string name="quick_verdict_light_behind">Prenez le modèle plus précis : il vous a nettement mieux compris.</string>
+    <string name="quick_verdict_light_not_installed">Gardez le modèle plus précis. Le plus léger n\'est pas encore téléchargé : téléchargez-le, puis refaites le test pour comparer.</string>
+    <string name="quick_verdict_best_too_slow">Prenez le modèle plus léger : il vous a bien compris. Le plus précis n\'a pas répondu à temps sur ce téléphone.</string>
+    <!-- Review of #65: one text per real case. -->
+    <string name="quick_verdict_light_too_slow">Gardez le modèle plus précis : le plus léger n\'a pas répondu à temps sur ce téléphone.</string>
+    <string name="quick_verdict_light_failed">Gardez le modèle plus précis : le plus léger n\'a pas pu être essayé.</string>
+    <string name="quick_verdict_best_not_installed">Prenez le modèle plus léger : il vous a bien compris. Pour le comparer au plus précis, téléchargez celui-ci, puis refaites le test.</string>
+    <string name="quick_verdict_best_failed">Prenez le modèle plus léger : il vous a bien compris. Le plus précis n\'a pas pu être essayé.</string>
+    <string name="quick_keep_best_unmeasured">Gardez le modèle plus précis : le plus léger a raté trop de mots, et le plus précis n\'a pas pu être mesuré.</string>
+    <string name="quick_no_verdict_slow">Aucun des deux modèles n\'a répondu à temps sur ce téléphone : pas de recommandation. Le modèle plus précis reste votre modèle.</string>
+    <string name="quick_single_failed">Le modèle choisi pour vos langues n\'a pas pu être essayé.</string>
+    <string name="quick_skipped">Pas essayé : le modèle précédent calculait encore.</string>
+    <string name="quick_failed">L\'essai a échoué.</string>
+    <string name="quick_interrupted">Lecture interrompue (l\'application est passée en arrière-plan) : elle n\'est pas notée. Recommencez quand vous voulez.</string>
+    <string name="quick_previous_running">Le calcul d\'un test précédent se termine. Réessayez dans un instant.</string>
+    <string name="quick_server_note">Vos dictées passent par le serveur distant configuré dans les réglages avancés : le modèle du téléphone ne sert qu\'en repli tant que ce réglage est actif.</string>
+    <string name="quick_adopt">Utiliser %1$s</string>
+    <string name="quick_already">C\'est déjà votre modèle.</string>
+    <string name="quick_light_note">Vous pourrez toujours revenir au modèle plus précis sur l\'écran principal.</string>
+    <string name="quick_hint">Une idée, pas un verdict : sur une quarantaine de mots, un mot raté vaut 2,5 points, et un texte lu n\'est pas une dictée spontanée.</string>
+    <string name="quick_redo">Refaire le test</string>
+    <string name="quick_close">Terminer</string>
 </resources>

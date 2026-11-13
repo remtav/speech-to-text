@@ -1,9 +1,10 @@
 # Kalmia Blabla — clavier vocal Android
 
-> **Kalmia Blabla** — un clavier vocal conçu au Québec, pour le français d'ici.
+> **Kalmia Blabla** — un clavier vocal développé au Québec, pour le français d'ici.
 > Votre voix est transcrite sur votre téléphone : elle n'est envoyée à personne.
-> Pas de compte, pas de publicité, pas de télémétrie, et un code source public
-> que chacun peut lire et vérifier.
+> Pas de compte, pas de publicité, pas de télémétrie.
+> Code ouvert : tout le monde peut vérifier ce que l'application fait de votre voix.
+> Le code est public ; vos dictées, elles, restent privées.
 
 Kalmia Blabla est un clavier Android (IME) dont la seule fonction est la
 dictée vocale. Il est développé au Québec. La transcription tourne
@@ -122,7 +123,7 @@ encore écouté ces six extraits** ; les phrases viennent de Wikipédia et de
 romans, donc la mesure porte sur l'accent et non sur le vocabulaire d'ici ; et
 elle n'a pas été faite sur un téléphone. La recommandation le dit : « mesuré
 sur six courts extraits (59 mots) : un indice, pas une preuve ». Vous pouvez refaire la mesure avec votre propre voix
-dans **Comparer les modèles**.
+avec le **test rapide** ou, plus en détail, dans **Comparer les modèles** (Réglages → Avancé).
 
 ## Test de lecture en français québécois
 
@@ -229,6 +230,13 @@ Configuration (accueil et étapes ; « Vos langues » ; modèle recommandé avec
 | ![Avancé, clair](docs/screenshots/settings-advanced-light.png) | ![Serveur distant, clair](docs/screenshots/settings-server-light.png) |
 | ![Avancé, sombre](docs/screenshots/settings-advanced-dark.png) | ![Serveur distant, sombre](docs/screenshots/settings-server-dark.png) |
 
+Test rapide (issue #36 recentrée sur le téléphone) et « Modèles et performances » (issue #37) :
+
+| Lecture | Résultat | Modèles et performances |
+|---|---|---|
+| ![Test rapide, lecture, clair](docs/screenshots/quick-test-reading-light.png) | ![Test rapide, résultat, clair](docs/screenshots/quick-test-result-light.png) | ![Modèles et performances, clair](docs/screenshots/settings-models-light.png) |
+| ![Test rapide, lecture, sombre](docs/screenshots/quick-test-reading-dark.png) | ![Test rapide, résultat, sombre](docs/screenshots/quick-test-result-dark.png) | ![Modèles et performances, sombre](docs/screenshots/settings-models-dark.png) |
+
 | Réglages | Comparaison des modèles | Diagnostic serveur |
 |---|---|---|
 | ![Réglages, clair](docs/screenshots/settings-light.png) | ![Comparaison, clair](docs/screenshots/compare-light.png) | ![Diagnostic, clair](docs/screenshots/diagnostic-light.png) |
@@ -253,17 +261,49 @@ Configuration (accueil et étapes ; « Vos langues » ; modèle recommandé avec
      moment »). Si l'une des deux étapes manque quand on rouvre l'application, l'écran
      s'ouvre sur elle ;
    - **3. Autoriser le micro** (un clavier ne peut pas demander la permission lui-même) ;
-   - cocher vos langues (étape « Vos langues ») : le modèle recommandé est mis en avant ;
-   - télécharger au moins un modèle (Wi-Fi conseillé, 0,7 à 1 Go chacun).
+   - cocher vos langues (étape « 4. Vos langues ») ;
+   - **5. Modèle** : l'application choisit le modèle pour vos langues, décrit par son effet
+     et jamais par son nom (issue #37) : « Plus précis » (1,04 Go), le choix par défaut et
+     le seul proposé avec le français québécois ou une langue autre que les cinq du test ;
+     et, pour le français de France, l'anglais, l'espagnol ou le portugais seuls, aussi
+     « Plus léger et plus rapide » (671 Mo). Le télécharger (Wi-Fi conseillé) ;
+   - facultatif : **« Faire le test (1 minute) »** (voir « Test rapide » plus bas).
 3. Dans n'importe quelle application, basculer vers le clavier Kalmia Blabla
    (icône clavier de la barre de navigation, ou touche micro de votre clavier
    habituel) et appuyer sur le micro. Appuyer de nouveau pour arrêter.
+
+## Test rapide (1 minute)
+
+Issue #36, recentrée sur le téléphone le 2026-11-13 (le serveur n'est plus une option du
+produit, issue #57). Facultatif, depuis l'étape « Modèle » de l'installation (une fois un
+modèle téléchargé) ou depuis les Réglages (« Vos langues »), pour le français (Québec ou
+France), l'anglais, l'espagnol et le portugais :
+
+1. Lire à voix haute un texte d'une quarantaine de mots dans la première de vos langues
+   parmi ces cinq (25 s au plus).
+2. L'application transcrit la lecture avec le modèle plus léger, puis le plus précis (ceux
+   qui sont téléchargés), et affiche pour chacun la **ressemblance** (1 − taux d'erreur de
+   mots) et le **délai** de transcription.
+3. Une phrase recommande l'un des deux, avec un bouton « Utiliser … ». Le plus léger n'est
+   recommandé que s'il fait au moins 90 %, à 5 points ou moins du plus précis, **et** si le
+   plus précis a mis plus de 5 s ; sinon le plus précis reste. Ces seuils sont des
+   estimations, pas des mesures sur un téléphone.
+4. Avec le français québécois (un seul modèle a du sens), le test donne simplement le score.
+
+Règles : la transcription des deux modèles tient en 30 s ; un modèle qui dépasse ce qui
+reste est noté « trop lent » et le test se termine sans l'attendre. Ni un téléchargement
+ni le chargement d'un modèle ne comptent dans la minute ; un modèle pas encore téléchargé
+peut l'être depuis le résultat, puis le test se refait. **Rien n'est gardé ni envoyé** :
+l'enregistrement reste en mémoire le temps du calcul, puis il est effacé ; le serveur n'est
+jamais utilisé, même configuré. Sur 40 mots, un mot raté vaut 2,5 points : « une idée, pas
+un verdict ».
 
 ## Le clavier
 
 - Gros bouton micro : appui pour démarrer, appui pour arrêter. Le texte
   s'insère à chaque pause.
-- Bouton du modèle (en haut à gauche) : changer de modèle sans quitter le champ.
+- Bouton du modèle (en haut à gauche) : changer de modèle sans quitter le champ. Les
+  modèles y sont nommés par leur effet (« Précis », « Léger » ; issue #37).
 - Touches : clavier précédent, `,` `.` espace `?` `!`, effacer (maintenir pour
   répéter), entrée.
 - **Clavier à touches** : le bouton « Clavier à touches », à côté du micro, ouvre
@@ -387,8 +427,14 @@ un indice, pas une preuve (ces extraits viennent de Common Voice, une des source
 lent sur le téléphone (observation de l'utilisateur sur Whisper turbo, pas une mesure sur appareil). Parakeet reste
 recommandé pour le français québécois ; ce modèle est seulement proposé.
 
+Ces noms techniques ne figurent pas dans le parcours normal (issue #37) : l'écran principal,
+le clavier et le test rapide disent « Plus précis » (Whisper large-v3-turbo) et « Plus léger
+et plus rapide » (Parakeet). Les noms, la comparaison, les modèles expérimentaux et les
+réglages de performance (modèle gardé en mémoire, threads, accélération) sont dans
+**Réglages → Avancé → « Modèles et performances »**, section repliée.
+
 Chaque fichier est vérifié par SHA-256 ; les modèles se suppriment depuis
-l'écran principal. **Comparer les modèles** transcrit les extraits de
+l'écran principal. **Comparer les modèles** (dans « Avancé ») transcrit les extraits de
 référence (ou votre enregistrement) avec chaque modèle installé et affiche
 texte, temps de chargement, facteur temps réel, mémoire en pointe et WER ;
 « Partager » exporte les résultats.
