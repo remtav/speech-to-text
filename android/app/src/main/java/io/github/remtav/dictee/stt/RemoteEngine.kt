@@ -104,6 +104,9 @@ data class RemoteConfig(
 
     fun jobsUrl(): String = normalizedBase()!! + "/jobs"
 
+    /** `POST /polish` (issue #35, PR #46): polish of a text without audio, through the job queue. */
+    fun polishUrl(): String = normalizedBase()!! + "/polish"
+
     fun healthUrl(): String = normalizedBase()!! + when (api) {
         RemoteApi.DICTEE_SERVER -> "/health"
         RemoteApi.OPENAI -> if (normalizedBase()!!.endsWith("/v1")) "/models" else "/v1/models"
@@ -163,6 +166,8 @@ open class RemoteException(
     cause: Throwable? = null,
     val failure: RemoteFailure = RemoteFailure.HTTP_ERROR,
     val httpCode: Int = 0,
+    /** Seconds from a 429's `Retry-After` header (rate limit, issue #35), 0 when absent. */
+    val retryAfterSeconds: Int = 0,
 ) : IOException(message, cause)
 
 /** Lets the keyboard stop a whole-dictation request: "Annuler" (go local) or the dictation was dropped. */
@@ -202,6 +207,22 @@ class WaitControl {
         hooks += hook
         if (cancelled) runCatching { hook() }
     }
+
+    @Volatile private var closed = false
+
+    /**
+     * A control for one request of a longer task (a block of a dictation, issue #35): cancelled with this one,
+     * in the same mode, until it is [close]d. A finished request is closed so that a later "Annuler" does not
+     * cancel its (already done) server job again.
+     */
+    fun child(): WaitControl {
+        val c = WaitControl()
+        onCancel { if (!c.closed) c.cancel(mode) }
+        return c
+    }
+
+    /** The request this control was made for is over: cancelling the parent no longer reaches it. */
+    fun close() { closed = true }
 }
 
 /** Outcome of a whole dictation. */
@@ -224,10 +245,15 @@ data class DictationResult(
     /** Time from the start of the request to the result. */
     val totalMillis: Long = 0,
     val audioSeconds: Float = 0f,
-    /** "jobs", "sync" or "local". */
+    /** "jobs", "sync", "blocks" or "local". */
     val transport: String = "",
-    /** Why the server was not used, for the local fallback. */
+    /** Why the server was not used, for the local fallback (whole or some blocks). */
     val fallbackReason: String? = null,
+    /** Block dictation (issue #35): number of blocks, and how many of them the phone transcribed. */
+    val blocks: Int = 0,
+    val localBlocks: Int = 0,
+    /** Time from the end of the dictation (stop, or the end of the audio) to the result, set by the controller. */
+    val waitMillis: Long = 0,
 ) {
     enum class Source { SERVER_POLISHED, SERVER_RAW, LOCAL_FALLBACK }
 }
@@ -256,7 +282,7 @@ class RemoteEngine(
     /** Words to favour: sent as the `prompt` of OpenAI-compatible requests. */
     private val hotwords: List<String> = emptyList(),
     private val log: RemoteLog = defaultLog,
-) : SttEngine, WholeDictationEngine {
+) : SttEngine, WholeDictationEngine, BlockBackend, BlockServer {
     override val provider: String = "remote"
 
     init {
@@ -335,38 +361,162 @@ class RemoteEngine(
                     put("polish", if (config.polish) "true" else "false")
                     if (config.language.isNotBlank()) put("language", config.language)
                 }
-                // If we give up while the upload is still going (Annuler, deadline), the job may be
-                // created anyway: cancel it as soon as its id arrives.
-                val orphan: (String) -> Unit = { body ->
-                    runCatching { JSONObject(body).optString("id", "") }.getOrNull()?.takeIf { it.isNotEmpty() }?.let { cancelJobAsync(it) }
-                }
-                val created = try {
-                    postCancellable(config.jobsUrl(), fields, wav, deadline, control, orphan)
-                } catch (e: RemoteException) {
-                    if (e.httpCode != 404 && e.httpCode != 405) throw e
-                    // A server without the job API: the synchronous route, same options.
-                    log("job API unavailable (HTTP ${e.httpCode}): synchronous request")
-                    val body = postCancellable(config.transcriptionUrl(), syncFields(polish = config.polish, explicitOff = true), wav, deadline, control)
-                    val upload = elapsed(start)
-                    return serverResult(parse(body), upload, elapsed(start), seconds, "sync", config.polish)
-                }
-                val upload = elapsed(start)
-                val id = parse(created).optString("id", "")
-                if (id.isEmpty()) throw RemoteException("Réponse du serveur sans identifiant de tâche", failure = RemoteFailure.BAD_RESPONSE)
-                log("job $id created in $upload ms")
-                val cancelHook = { cancelJobAsync(id) }
-                control.onCancel(cancelHook)
-                val result = try {
-                    pollJob(id, deadline, control)
-                } catch (e: RemoteException) {
-                    // A poll failure or a timeout leaves the job running for nothing: cancel it.
-                    // (A cancel already did through the hook; a failed job has nothing to cancel.)
-                    if (e.failure != RemoteFailure.CANCELLED && e.failure != RemoteFailure.JOB_FAILED) cancelJobAsync(id)
-                    throw e
-                }
-                serverResult(result, upload, elapsed(start), seconds, "jobs", config.polish)
+                val job = runJob(fields, wav, deadline, control, syncFields(polish = config.polish, explicitOff = true))
+                serverResult(job.result, job.uploadMillis, elapsed(start), seconds, job.transport, config.polish)
             }
         }
+    }
+
+    private class JobOutcome(val result: JSONObject, val uploadMillis: Long, val transport: String)
+
+    /**
+     * `POST /jobs` with [fields] and [wav], then `GET /jobs/{id}` until the result. A server without the job API
+     * (404/405) gets the synchronous route with [syncFields]. Every way out (failure, timeout, cancel) leaves no
+     * job running on the server.
+     */
+    private fun runJob(
+        fields: Map<String, String>, wav: ByteArray, deadline: Long, control: WaitControl, syncFields: Map<String, String>,
+    ): JobOutcome {
+        val start = System.nanoTime()
+        // If we give up while the upload is still going (Annuler, deadline), the job may be
+        // created anyway: cancel it as soon as its id arrives.
+        val created = try {
+            postCancellable(config.jobsUrl(), fields, wav, deadline, control, orphanJob)
+        } catch (e: RemoteException) {
+            if (e.httpCode != 404 && e.httpCode != 405) throw e
+            // A server without the job API: the synchronous route, same options.
+            log("job API unavailable (HTTP ${e.httpCode}): synchronous request")
+            val body = postCancellable(config.transcriptionUrl(), syncFields, wav, deadline, control)
+            return JobOutcome(parse(body), elapsed(start), "sync")
+        }
+        val upload = elapsed(start)
+        val id = parse(created).optString("id", "")
+        if (id.isEmpty()) throw RemoteException("Réponse du serveur sans identifiant de tâche", failure = RemoteFailure.BAD_RESPONSE)
+        log("job $id created in $upload ms")
+        return JobOutcome(followJob(id, deadline, control), upload, "jobs")
+    }
+
+    /** Polls job [id]; cancels it on the server on any failure other than its own. */
+    private fun followJob(id: String, deadline: Long, control: WaitControl): JSONObject {
+        control.onCancel { cancelJobAsync(id) }
+        return try {
+            pollJob(id, deadline, control)
+        } catch (e: RemoteException) {
+            // A poll failure or a timeout leaves the job running for nothing: cancel it.
+            // (A cancel already did through the hook; a failed job has nothing to cancel.)
+            if (e.failure != RemoteFailure.CANCELLED && e.failure != RemoteFailure.JOB_FAILED) cancelJobAsync(id)
+            throw e
+        }
+    }
+
+    private val orphanJob: (String) -> Unit = { body ->
+        runCatching { JSONObject(body).optString("id", "") }.getOrNull()?.takeIf { it.isNotEmpty() }?.let { cancelJobAsync(it) }
+    }
+
+    // ------------------------------------------------- block dictation (issue #35)
+
+    override val blockServer: BlockServer get() = this
+    override fun serverAvailable(): Boolean = true
+    override fun serverFailed(e: Exception) {}
+    override val canFallBack: Boolean get() = false
+    override fun transcribeLocally(samples: FloatArray): String = throw IllegalStateException("pas de modèle local")
+
+    override val polishWanted: Boolean get() = config.polish && config.api == RemoteApi.DICTEE_SERVER
+
+    override fun budgetMillis(audioSeconds: Float): Long = config.waitBudgetMillis(audioSeconds)
+
+    /** Set once `POST /polish` answered as a route that exists: no need to ask again. */
+    @Volatile private var polishRouteSeen = false
+
+    /**
+     * `POST /polish` with an empty text: a server that has the route refuses it (400, see the contract of
+     * PR #46) without creating a job; an older server answers 404 or 405. Anything else (401, 5xx, network)
+     * says nothing about the route and is thrown.
+     */
+    override fun supportsBlocks(control: WaitControl): Boolean {
+        if (config.api != RemoteApi.DICTEE_SERVER || polishRouteSeen) return true
+        val deadline = now() + config.waitBaseMillis
+        val probe = "{\"text\": \"\"}".toByteArray()
+        return try {
+            val body = cancellable(deadline, control, orphanJob) {
+                request("POST", config.polishUrl(), "application/json", listOf(probe), it)
+            }
+            // A 2xx would mean a job was created for nothing (not in the contract): cancel it.
+            orphanJob(body)
+            polishRouteSeen = true
+            true
+        } catch (e: RemoteException) {
+            when (e.httpCode) {
+                400, 413, 422 -> { polishRouteSeen = true; true }
+                404, 405 -> { log("POST /polish: HTTP ${e.httpCode}, server without blocks: whole dictation"); false }
+                else -> throw e
+            }
+        }
+    }
+
+    override fun transcribeBlock(
+        audio: FloatArray, language: String, prompt: String, polish: Boolean, notAfter: Long, control: WaitControl,
+    ): BlockText {
+        val seconds = audio.size / SttEngine.SAMPLE_RATE.toFloat()
+        if (audio.isEmpty()) return BlockText("", "")
+        val deadline = minOf(notAfter, now() + config.waitBudgetMillis(seconds))
+        val wav = WavReader.encode(PcmAudio(audio, SttEngine.SAMPLE_RATE))
+        val lang = config.language.ifBlank { language }
+        val askPolish = polish && polishWanted
+        log("block: %.1f s, %d bytes, api %s, polish %s".format(java.util.Locale.ROOT, seconds, wav.size, config.api, askPolish))
+        return when (config.api) {
+            RemoteApi.OPENAI -> {
+                val fields = syncFields(polish = false)
+                if (lang.isNotBlank()) fields["language"] = lang
+                val json = parse(postCancellable(config.transcriptionUrl(), fields, wav, deadline, control))
+                BlockText(json.optString("text", "").trim(), json.optString("language", "").ifBlank { lang })
+            }
+            RemoteApi.DICTEE_SERVER -> {
+                val fields = LinkedHashMap<String, String>().apply {
+                    put("quick", "true")
+                    put("polish", if (askPolish) "true" else "false")
+                    if (lang.isNotBlank()) put("language", lang)
+                    promptTail(prompt).takeIf { it.isNotEmpty() }?.let { put("prompt", it) }
+                }
+                val sync = syncFields(polish = askPolish, explicitOff = true).apply { if (lang.isNotBlank()) put("language", lang) }
+                val job = runJob(fields, wav, deadline, control, sync)
+                val raw = job.result.optString("text", "").trim()
+                val detected = job.result.optString("language", "").takeIf { it != "null" }.orEmpty()
+                if (!askPolish) return BlockText(raw, detected)
+                val (polished, status) = polishOf(job.result)
+                BlockText(raw, detected, polished, status)
+            }
+        }
+    }
+
+    override fun polish(text: String, language: String, audioSeconds: Float, control: WaitControl): PolishOutcome {
+        val deadline = now() + config.waitBudgetMillis(audioSeconds)
+        val lang = config.language.ifBlank { language }
+        val body = JSONObject().put("text", text).apply { if (lang.isNotBlank()) put("language", lang) }
+            .toString().toByteArray(Charsets.UTF_8)
+        log("polish: ${text.length} chars")
+        val created = cancellable(deadline, control, orphanJob) {
+            request("POST", config.polishUrl(), "application/json", listOf(body), it)
+        }
+        val id = parse(created).optString("id", "")
+        if (id.isEmpty()) throw RemoteException("Réponse du serveur sans identifiant de tâche", failure = RemoteFailure.BAD_RESPONSE)
+        val (polished, status) = polishOf(followJob(id, deadline, control))
+        log("polish job $id: $status")
+        return PolishOutcome(polished, status)
+    }
+
+    /** The polished text when the server applied it, and the polish status ("applied" or the reason it was not). */
+    private fun polishOf(json: JSONObject): Pair<String?, String> {
+        val polishedRaw = if (json.isNull("polished_text")) "" else json.optString("polished_text", "").trim()
+        val polish = json.optJSONObject("polish")
+        val applied = polish?.optBoolean("applied", false) == true
+        val polished = polishedRaw.takeIf { (applied || polish == null) && it.isNotEmpty() }
+        val status = when {
+            polished != null -> "applied"
+            polish == null -> "not returned"
+            else -> polish.optString("fallback_reason", "").takeIf { it.isNotEmpty() && it != "null" } ?: "failed"
+        }
+        return polished to status
     }
 
     private fun serverResult(json: JSONObject, upload: Long, total: Long, seconds: Float, transport: String, polishRequested: Boolean = true): DictationResult {
@@ -380,15 +530,7 @@ class RemoteEngine(
                 uploadMillis = upload, totalMillis = total, audioSeconds = seconds, transport = transport,
             )
         }
-        val polishedRaw = if (json.isNull("polished_text")) "" else json.optString("polished_text", "").trim()
-        val polish = json.optJSONObject("polish")
-        val applied = polish?.optBoolean("applied", false) == true
-        val polished = polishedRaw.takeIf { (applied || polish == null) && it.isNotEmpty() }
-        val status = when {
-            polished != null -> "applied"
-            polish == null -> "not returned"
-            else -> polish.optString("fallback_reason", "").takeIf { it.isNotEmpty() && it != "null" } ?: "failed"
-        }
+        val (polished, status) = polishOf(json)
         log("result: polish $status, ${raw.length} chars raw, ${polished?.length ?: 0} chars polished, $total ms")
         return DictationResult(
             texts = listOf(polished ?: raw),
@@ -555,6 +697,18 @@ class RemoteEngine(
     override fun release() {}
 
     companion object {
+        /** Longest `prompt` sent with a block: the end of the previous block's text (the server accepts 1000). */
+        const val PROMPT_CHARS = 200
+
+        /** The end of [text], at most [PROMPT_CHARS], starting on a word. */
+        fun promptTail(text: String): String {
+            val t = text.trim().replace(Regex("\\s+"), " ")
+            if (t.length <= PROMPT_CHARS) return t
+            val cut = t.substring(t.length - PROMPT_CHARS)
+            val space = cut.indexOf(' ')
+            return if (space in 0 until cut.length - 1) cut.substring(space + 1) else cut
+        }
+
         /** Set by the app to Android's log; tests pass their own. */
         @Volatile var defaultLog: RemoteLog = RemoteLog.NONE
 
@@ -592,9 +746,11 @@ class RemoteEngine(
                 val detail = try {
                     conn.errorStream?.bufferedReader()?.use { it.readText() }?.take(200).orEmpty()
                 } catch (_: IOException) { "" }
+                // Rate limit (issue #35): the server says when to come back.
+                val retryAfter = if (code == 429) conn.getHeaderField("Retry-After")?.trim()?.toIntOrNull()?.coerceIn(0, 3600) ?: 0 else 0
                 RemoteException(
                     config.redact("Serveur : HTTP $code ${detail.replace('\n', ' ')}").trim(),
-                    failure = RemoteFailure.HTTP_ERROR, httpCode = code,
+                    failure = RemoteFailure.HTTP_ERROR, httpCode = code, retryAfterSeconds = retryAfter,
                 )
             }
         }
@@ -653,7 +809,7 @@ class FallbackEngine(
     private val localFactory: () -> SttEngine,
     private val retryAfterMillis: Long = 60_000,
     private val clock: () -> Long = System::currentTimeMillis,
-) : SttEngine, WholeDictationEngine {
+) : SttEngine, WholeDictationEngine, BlockBackend {
     override val spec: ModelSpec get() = remote.spec
     @Volatile private var local: SttEngine? = null
     @Volatile private var skipUntil = 0L
@@ -730,6 +886,23 @@ class FallbackEngine(
             fallbackReason = reason,
         )
     }
+
+    // ------------------------------------------------- block dictation (issue #35)
+
+    override val blockServer: BlockServer? get() = remote as? BlockServer
+
+    /** False while the server is skipped after a failure (or until a 429's `Retry-After`). */
+    override fun serverAvailable(): Boolean = clock() >= skipUntil
+
+    override fun serverFailed(e: Exception) {
+        val retry = (e as? RemoteException)?.retryAfterSeconds?.takeIf { it > 0 }?.let { it * 1000L } ?: retryAfterMillis
+        skipUntil = clock() + retry
+    }
+
+    override val canFallBack: Boolean get() = true
+
+    @Synchronized
+    override fun transcribeLocally(samples: FloatArray): String = localEngine().transcribe(samples, SttEngine.SAMPLE_RATE).text
 
     @Synchronized
     override fun release() {

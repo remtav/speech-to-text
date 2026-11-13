@@ -4,15 +4,19 @@ import io.github.remtav.dictee.audio.AudioSource
 import io.github.remtav.dictee.audio.AudioSourceException
 import io.github.remtav.dictee.audio.SpeechChunk
 import io.github.remtav.dictee.audio.VoiceActivityDetector
+import io.github.remtav.dictee.stt.AudioBlock
+import io.github.remtav.dictee.stt.BlockDictation
 import io.github.remtav.dictee.stt.DictationResult
 import io.github.remtav.dictee.stt.ModelSpec
 import io.github.remtav.dictee.stt.Transcription
 import io.github.remtav.dictee.stt.WaitControl
+import io.github.remtav.dictee.stt.monotonicMillis
 import io.github.remtav.dictee.text.Piece
 import java.util.concurrent.Executor
 import java.util.concurrent.LinkedBlockingDeque
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
+import java.util.concurrent.atomic.AtomicLong
 import kotlin.math.log10
 import kotlin.math.sqrt
 
@@ -33,7 +37,16 @@ class DictationSession(
      * kept for a local fallback) goes to this function once the dictation ends.
      */
     val whole: ((audio: FloatArray, segments: List<FloatArray>, control: WaitControl) -> DictationResult)? = null,
-    /** Longest whole dictation; recording stops there and what was said is sent. */
+    /**
+     * Block mode (remote server, issue #35): when set, the audio is cut into blocks at pauses while the user
+     * speaks, and each block goes to the server at once (see [BlockDictation]); at the end only the last block
+     * and the polish remain. [whole] stays the way for a server that cannot do blocks (no `POST /polish`).
+     */
+    val blocks: ((control: WaitControl) -> BlockDictation)? = null,
+    /** Block size: closed at the first pause past [minBlockSeconds], at [maxBlockSeconds] at the latest. */
+    val minBlockSeconds: Float = 15f,
+    val maxBlockSeconds: Float = 30f,
+    /** Longest whole (or block) dictation; recording stops there and what was said is sent. */
     val maxWholeSeconds: Int = 300,
     /** False when no local model can take over: "Annuler" would only drop the dictation, so it is hidden. */
     val canFallBack: Boolean = true,
@@ -52,6 +65,8 @@ interface DictationListener {
     fun onInfo(message: String) {}
     /** Whole-dictation mode: the result was inserted ([inserted] is what was typed). */
     fun onDictationResult(result: DictationResult, inserted: String) {}
+    /** Block mode: [done] of the [total] blocks known so far are transcribed. */
+    fun onBlocks(done: Int, total: Int) {}
 }
 
 /**
@@ -104,7 +119,20 @@ class DictationController(
         class Partial(override val session: Int, val samples: FloatArray) : Job
         class End(override val session: Int, val error: String?) : Job
         class Whole(override val session: Int, val audio: FloatArray, val segments: List<FloatArray>, val error: String?) : Job
+        /** Block mode: one block, complete while the user still speaks. */
+        class Block(override val session: Int, val block: AudioBlock) : Job
+        /**
+         * Block mode, end of the dictation: the [last] block, and the whole audio with every VAD segment while
+         * the server's support for blocks was not known yet (to go whole for an older server).
+         */
+        class Finish(
+            override val session: Int, val last: AudioBlock?, val whole: FloatArray?, val segments: List<FloatArray>,
+            val error: String?,
+        ) : Job
     }
+
+    /** Block mode: whether this dictation goes by blocks or whole (older server), decided on the decode thread. */
+    private enum class Decision { UNKNOWN, BLOCKS, WHOLE }
 
     val isActive: Boolean get() = state == DictationState.LISTENING || state == DictationState.FINISHING
 
@@ -176,7 +204,20 @@ class DictationController(
         @Volatile var partialInFlight = false
         @Volatile var stopRequested = false
         val control = WaitControl()
-        private val wholeMode = s.whole != null
+        private val blockMode = s.blocks != null
+        /** No transcription while the user speaks (the server gets the whole dictation, or blocks). */
+        private val wholeMode = s.whole != null || blockMode
+        @Volatile private var decision = if (blockMode) Decision.UNKNOWN else Decision.WHOLE
+        /** Keep the whole audio and every segment: whole mode, or blocks not confirmed yet. */
+        private fun keepWhole() = s.whole != null && decision != Decision.BLOCKS
+        private fun cutBlocks() = blockMode && decision != Decision.WHOLE
+        private val blocksQueued = AtomicInteger()
+        private val blocksDone = AtomicInteger()
+        /** Audio of the blocks queued and not transcribed yet. */
+        private val pendingSamples = AtomicLong()
+        /** End of the capture (monotonic ms, 0 while capturing), and the audio still to transcribe then. */
+        @Volatile private var stoppedAt = 0L
+        @Volatile private var pendingAtStop = 0L
         private val capture = Thread({ captureLoop() }, "dictation-capture").apply { priority = Thread.MAX_PRIORITY }
         private val decode = Thread({ decodeLoop() }, "dictation-decode")
 
@@ -206,7 +247,12 @@ class DictationController(
             var error: String? = null
             // Whole-dictation mode: all the audio, and the VAD segments for a local fallback.
             val maxWhole = s.maxWholeSeconds.toLong() * RATE
-            var whole = if (wholeMode) FloatArray(RATE * 30) else FloatArray(0)
+            var whole = if (keepWhole()) FloatArray(RATE * 30) else FloatArray(0)
+            val cutter = if (!blockMode) null else BlockCutter(
+                (s.minBlockSeconds * RATE).toInt(),
+                (s.maxBlockSeconds * RATE).toInt() - CHUNK,
+                { n -> ring.last(n) },
+            ) { block -> enqueueBlock(block) }
             var wholeLen = 0
             var firstSpeech = -1L
             val segments = ArrayList<FloatArray>()
@@ -217,10 +263,15 @@ class DictationController(
                     if (n == 0) { Thread.sleep(5); continue }
                     if (s.audio.silenced) { error = "Micro coupé par le système (appel ?)"; break }
                     val samples = if (n == chunk.size) chunk else chunk.copyOf(n)
-                    if (wholeMode) {
+                    if (keepWhole()) {
                         if (wholeLen + n > whole.size) whole = whole.copyOf(minOf(maxOf(whole.size * 2, wholeLen + n), maxWhole.toInt()))
                         System.arraycopy(samples, 0, whole, wholeLen, n)
                         wholeLen += n
+                    } else if (whole.isNotEmpty()) {
+                        // The server takes blocks: the whole-dictation buffer is not needed any more.
+                        whole = FloatArray(0)
+                        wholeLen = 0
+                        segments.clear()
                     }
                     ring.write(samples)
                     totalSamples += n
@@ -234,21 +285,25 @@ class DictationController(
                     }
 
                     val speech = s.vad.isSpeech()
+                    var onset = -1L
                     if (speech && !wasSpeech) {
                         speechStart = (totalSamples - LOOKBACK).coerceAtLeast(0)
+                        onset = speechStart
                         if (firstSpeech < 0) firstSpeech = speechStart
                         post { listener.onSpeech(true) }
                     } else if (!speech && wasSpeech) {
                         post { listener.onSpeech(false) }
                     }
                     wasSpeech = speech
+                    if (cutBlocks()) cutter?.onAudio(samples, n, totalSamples, onset)
 
                     var popped = false
                     while (true) {
                         val seg = s.vad.poll() ?: break
-                        if (wholeMode) segments += seg.samples else enqueueFinal(seg)
+                        acceptSegment(seg, segments, cutter)
                         popped = true
                     }
+                    if (cutBlocks()) cutter?.afterChunk(totalSamples, speech, popped)
                     if (wholeMode && totalSamples + CHUNK > maxWhole) {
                         val info = MAX_DURATION_MESSAGE.format(s.maxWholeSeconds / 60)
                         post { listener.onInfo(info) }
@@ -285,12 +340,30 @@ class DictationController(
                     s.vad.flush()
                     while (true) {
                         val seg = s.vad.poll() ?: break
-                        if (wholeMode) segments += seg.samples else enqueueFinal(seg)
+                        acceptSegment(seg, segments, cutter)
                     }
                 } catch (_: Exception) {}
                 if (error != null) setState(DictationState.FINISHING, error)
                 else if (wholeMode && state == DictationState.LISTENING) setState(DictationState.FINISHING) // source ended by itself
-                if (wholeMode) {
+                if (blockMode) {
+                    val last = if (cutBlocks()) cutter?.finish() else null
+                    val keep = keepWhole()
+                    val said = segments.isNotEmpty() || firstSpeech >= 0
+                    val from = firstSpeech.coerceIn(0, wholeLen.toLong()).toInt()
+                    val audio = if (!keep || !said) null else try {
+                        whole.copyOfRange(from, wholeLen)
+                    } catch (_: OutOfMemoryError) {
+                        FloatArray(0) // the local fallback still has the segments
+                    }
+                    whole = FloatArray(0)
+                    last?.let { pendingSamples.addAndGet(it.audio.size.toLong()) }
+                    pendingAtStop = pendingSamples.get()
+                    stoppedAt = monotonicMillis()
+                    // The user waits from now on: "Transcription et polissage…" and "Annuler".
+                    if (last != null || blocksQueued.get() > 0 || audio != null) setWaiting(id, true)
+                    jobs.offer(Job.Finish(id, last, audio, if (keep) ArrayList(segments) else emptyList(), error))
+                } else if (wholeMode) {
+                    stoppedAt = monotonicMillis()
                     // Nothing was said: nothing to send. Otherwise drop the leading silence only.
                     val said = segments.isNotEmpty() || firstSpeech >= 0
                     val from = firstSpeech.coerceIn(0, wholeLen.toLong()).toInt()
@@ -310,6 +383,19 @@ class DictationController(
             post { listener.onSpeech(false); listener.onLevel(0f) }
         }
 
+        /** A VAD segment: kept for a whole dictation, given to the block cutter, or transcribed (local models). */
+        private fun acceptSegment(seg: SpeechChunk, segments: MutableList<FloatArray>, cutter: BlockCutter?) {
+            if (!wholeMode) return enqueueFinal(seg)
+            if (keepWhole()) segments += seg.samples
+            if (cutBlocks()) cutter?.onSegment(seg)
+        }
+
+        private fun enqueueBlock(block: AudioBlock) {
+            blocksQueued.incrementAndGet()
+            pendingSamples.addAndGet(block.audio.size.toLong())
+            jobs.offer(Job.Block(id, block))
+        }
+
         private fun enqueueFinal(seg: SpeechChunk) {
             synchronized(jobs) { finalsPending++ }
             // Finals jump ahead of a queued provisional decode, which they make obsolete.
@@ -322,6 +408,7 @@ class DictationController(
         private fun decodeLoop() {
             var error: String? = null
             try {
+                val blocks = s.blocks?.let { startBlocks(it) }
                 while (sessionId.get() == id) {
                     val job = jobs.poll(200, TimeUnit.MILLISECONDS) ?: continue
                     if (job.session != id) continue
@@ -366,6 +453,21 @@ class DictationController(
                             if (job.audio.isNotEmpty() || job.segments.isNotEmpty()) transcribeWhole(job)
                             break
                         }
+                        is Job.Block -> {
+                            // Queued before the server turned out to take no blocks: the whole audio covers it.
+                            if (blocks != null && decision == Decision.BLOCKS) transcribeBlock(blocks, job.block, last = false)
+                        }
+                        is Job.Finish -> {
+                            error = job.error
+                            if (blocks == null || decision == Decision.WHOLE) {
+                                val audio = job.whole ?: FloatArray(0)
+                                if (audio.isNotEmpty() || job.segments.isNotEmpty()) transcribeWhole(Job.Whole(id, audio, job.segments, job.error))
+                            } else {
+                                job.last?.let { transcribeBlock(blocks, it, last = true) }
+                                if (blocks.blocks > 0) finishBlocks(blocks)
+                            }
+                            break
+                        }
                     }
                 }
             } catch (_: InterruptedException) {
@@ -389,6 +491,55 @@ class DictationController(
             }
         }
 
+        /**
+         * Block mode: the dictation's [BlockDictation], and whether the server takes blocks (asked once, before
+         * the first block; the capture keeps the whole audio until then).
+         */
+        private fun startBlocks(factory: (WaitControl) -> BlockDictation): BlockDictation? {
+            // The phone taking over after the end of the dictation ends the wait ("Annuler" disappears).
+            control.onLocalStart { if (stoppedAt > 0) setWaiting(id, false) }
+            val blocks = try {
+                factory(control)
+            } catch (e: InterruptedException) {
+                throw e
+            } catch (e: Exception) {
+                null
+            }
+            val ok = try {
+                blocks?.prepare() ?: false
+            } catch (e: InterruptedException) {
+                throw e
+            } catch (e: Exception) {
+                true
+            }
+            decision = if (blocks != null && (ok || s.whole == null)) Decision.BLOCKS else Decision.WHOLE
+            return blocks
+        }
+
+        private fun transcribeBlock(blocks: BlockDictation, block: AudioBlock, last: Boolean) {
+            if (stoppedAt > 0) blocks.endPhase(pendingAtStop / RATE.toFloat())
+            try {
+                blocks.add(block, last)
+            } finally {
+                pendingSamples.addAndGet(-block.audio.size.toLong())
+            }
+            val done = blocksDone.incrementAndGet()
+            val total = blocksQueued.get() + if (last) 1 else 0
+            post(id) { listener.onBlocks(done, maxOf(done, total)) }
+        }
+
+        /** Block mode, after the last block: polish, then one insertion. */
+        private fun finishBlocks(blocks: BlockDictation) {
+            blocks.endPhase(pendingAtStop / RATE.toFloat())
+            val result = try {
+                blocks.finish()
+            } finally {
+                setWaiting(id, false)
+            }
+            if (control.mode == WaitControl.Mode.ABANDON || sessionId.get() != id) return
+            deliver(result.copy(waitMillis = monotonicMillis() - stoppedAt))
+        }
+
         /** One request for the whole dictation; the result is inserted in one go. */
         private fun transcribeWhole(job: Job.Whole) {
             setWaiting(id, true)
@@ -401,6 +552,11 @@ class DictationController(
                 setWaiting(id, false)
             }
             if (control.mode == WaitControl.Mode.ABANDON || sessionId.get() != id) return
+            deliver(if (stoppedAt > 0) result.copy(waitMillis = monotonicMillis() - stoppedAt) else result)
+        }
+
+        /** Inserts a whole result in one go (or keeps it until the field is back). */
+        private fun deliver(result: DictationResult) {
             val pieces = result.texts.flatMap { s.pipeline.prepare(it, s.spec.family) }
             post(id) {
                 val sink = sinkProvider()

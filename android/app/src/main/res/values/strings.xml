@@ -37,6 +37,10 @@
     <string name="msg_server_fallback">Serveur non utilisé (%1$s) : transcrit sur le téléphone</string>
     <string name="msg_server_cancelled">Attente annulée : transcrit sur le téléphone</string>
     <string name="msg_polish_failed">Texte non poli (%1$s) : texte brut du serveur inséré</string>
+    <!-- Issue #35: dictation sent block by block while the user speaks. -->
+    <string name="status_server_blocks">%1$s (%2$d blocs sur %3$d)</string>
+    <string name="msg_blocks_local">%1$d bloc(s) sur %2$d transcrit(s) sur le téléphone (%3$s)</string>
+    <string name="polish_too_long">texte trop long pour le polissage</string>
 
     <string name="msg_password">Dictée désactivée dans les champs de mot de passe</string>
     <string name="msg_no_permission">Autorisez le micro dans l\'application Kalmia Blabla</string>
@@ -147,7 +151,8 @@
     <string name="settings_cf_id_hint">Cloudflare Access Client ID</string>
     <string name="settings_cf_secret_hint">Cloudflare Access Client Secret</string>
     <string name="diag_title">Diagnostic serveur</string>
-    <string name="diag_help">Envoie les enregistrements de référence de l\'application (et leur enchaînement, environ 30 s) comme de vraies dictées : une requête par essai, avec polissage. Aucune donnée personnelle, aucun secret dans le rapport.</string>
+    <string name="diag_help">Envoie les enregistrements de référence de l\'application (et leur enchaînement, environ 30 s) comme de vraies dictées, deux fois chacun : par blocs, joués en temps réel comme au clavier, puis en une seule requête (dictée entière). Pour chaque essai : l\'attente après l\'arrêt, le nombre de blocs, le texte brut et le texte poli. Les essais longs durent environ 2 et 5 minutes chacun (une quinzaine de minutes en tout). Aucune donnée personnelle, aucun secret dans le rapport.</string>
+    <string name="diag_run_long">Essais longs (2 et 5 min)</string>
     <string name="diag_run">Lancer</string>
     <string name="diag_export">Exporter le rapport</string>
     <string name="diag_running">Essai %1$d sur %2$d…</string>

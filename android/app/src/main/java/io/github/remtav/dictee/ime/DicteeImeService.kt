@@ -400,7 +400,7 @@ class DicteeImeService : InputMethodService(), DictationListener, EngineManager.
         app.dictationActive = state == DictationState.LISTENING || state == DictationState.FINISHING
         Log.i(TAG, "dictation $state ${message ?: ""}")
         when (state) {
-            DictationState.LISTENING -> lastMessage = null
+            DictationState.LISTENING -> { lastMessage = null; blocksDone = 0; blocksTotal = 0 }
             DictationState.IDLE, DictationState.ERROR -> {
                 abandonAudioFocus()
                 speaking = false
@@ -439,13 +439,39 @@ class DicteeImeService : InputMethodService(), DictationListener, EngineManager.
         render()
     }
 
+    /** Block mode (issue #35): progress shown while the user waits. */
+    private var blocksDone = 0
+    private var blocksTotal = 0
+
+    override fun onBlocks(done: Int, total: Int) {
+        blocksDone = done
+        blocksTotal = total
+        render()
+    }
+
     override fun onInfo(message: String) {
         showMessage(message, error = false)
     }
 
     override fun onDictationResult(result: DictationResult, inserted: String) {
         lastDictation = result
-        Log.i(TAG, "dictation result: ${result.source} via ${result.transport}, polish ${result.polishStatus}, ${result.totalMillis} ms")
+        Log.i(
+            TAG,
+            "dictation result: ${result.source} via ${result.transport}, polish ${result.polishStatus}, ${result.totalMillis} ms, " +
+                "wait after stop ${result.waitMillis} ms, blocks ${result.blocks} (${result.localBlocks} local)",
+        )
+        blocksDone = 0
+        blocksTotal = 0
+        val polishReason = if (result.polishStatus == "unsupported") getString(R.string.polish_too_long) else result.polishStatus
+        if (result.localBlocks > 0 && result.source != DictationResult.Source.LOCAL_FALLBACK) {
+            // Some blocks went to the phone: say so, whether or not the whole text was polished afterwards.
+            showMessage(
+                getString(R.string.msg_blocks_local, result.localBlocks, result.blocks, (result.fallbackReason ?: "?").take(120)),
+                error = false, rerender = false,
+            )
+            cancelledWait = false
+            return
+        }
         when (result.source) {
             DictationResult.Source.LOCAL_FALLBACK -> showMessage(
                 if (cancelledWait) getString(R.string.msg_server_cancelled)
@@ -453,7 +479,7 @@ class DicteeImeService : InputMethodService(), DictationListener, EngineManager.
                 error = false, rerender = false,
             )
             DictationResult.Source.SERVER_RAW -> if (result.polishStatus != "not requested" && result.transport != "segments") {
-                showMessage(getString(R.string.msg_polish_failed, result.polishStatus), error = false, rerender = false)
+                showMessage(getString(R.string.msg_polish_failed, polishReason), error = false, rerender = false)
             }
             DictationResult.Source.SERVER_POLISHED -> {}
         }
@@ -665,7 +691,7 @@ class DicteeImeService : InputMethodService(), DictationListener, EngineManager.
             waiting -> getString(
                 if (spec.family == ModelFamily.REMOTE && app.settings.remoteApi == RemoteApi.OPENAI) R.string.status_server
                 else R.string.status_server_polish,
-            ) to false
+            ).let { if (blocksTotal > 1) getString(R.string.status_server_blocks, it.trimEnd('…'), blocksDone, blocksTotal) else it } to false
             lastMessage != null && !listening -> lastMessage!! to lastMessageIsError
             state == DictationState.FINISHING -> getString(R.string.status_finishing) to false
             listening && es is EngineManager.State.Loading -> getString(R.string.status_listening_loading, es.spec.shortName) to false

@@ -318,10 +318,13 @@ class OptionalFeaturesInstrumentedTest : ImeTestBase() {
     fun dictationOnARemoteServer() {
         // A server on the device's loopback stands in for the home server behind Cloudflare
         // Access: the real RemoteEngine (job API, polling, multipart WAV, cleartext to a
-        // LAN-style address) is used. Two utterances: still one request, one insertion.
+        // LAN-style address) is used. Two utterances (~13 s, under one block of issue #35): one
+        // transcription request, polished in the same job, one insertion.
         val polls = java.util.concurrent.atomic.AtomicInteger()
         RecordingServer { req ->
             when {
+                // The server has POST /polish (issue #35): it refuses the keyboard's empty probe.
+                req.method == "POST" && req.path == "/polish" -> 400 to """{"detail": "text must be a non-empty string"}"""
                 req.method == "POST" && req.path == "/jobs" -> 202 to """{"id": "j1", "status": "queued"}"""
                 req.path == "/jobs/j1" && polls.incrementAndGet() < 3 -> 200 to """{"id": "j1", "status": "running"}"""
                 req.path == "/jobs/j1" -> 200 to """{"id": "j1", "status": "done", "result": {"text": "alice et moi euh after early nightfall", "language": "fr", "polished_text": "Alice et moi, after early nightfall.", "polish": {"applied": true}}}"""
@@ -341,9 +344,10 @@ class OptionalFeaturesInstrumentedTest : ImeTestBase() {
             // The keyboard shows the waiting state (with "Annuler") while the server works.
             waitFor("waiting for the server", 30_000) { service.controller.waitingServer }
             waitFor("text from the server", 30_000) { field1() == "Alice et moi, after early nightfall." }
-            val posts = server.requests.filter { it.method == "POST" }
+            val posts = server.requests.filter { it.method == "POST" && it.path == "/jobs" }
             assertEquals(1, posts.size)
-            assertEquals("/jobs", posts.single().path)
+            // Besides it, only the empty probe of POST /polish: no separate polish for a single block.
+            assertEquals(1, server.requests.count { it.method == "POST" && it.path == "/polish" })
             val body = String(posts.single().body, Charsets.ISO_8859_1)
             assertTrue(body.contains("name=\"polish\"\r\n\r\ntrue"))
             assertTrue(posts.single().body.size > 300_000) // both clips: ~13 s of 16 kHz 16-bit audio

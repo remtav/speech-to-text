@@ -305,7 +305,7 @@ Limites connues :
 - Le texte provisoire (pendant la parole) montre les mots dits ; la commande
   s'applique au texte final.
 - **Mode serveur.** Les commandes s'appliquent au texte reçu du serveur, comme
-  à celui d'un modèle local. Avec le polissage du serveur (dictée entière), son
+  à celui d'un modèle local. Avec le polissage du serveur (sur toute la dictée), son
   modèle de langage peut remplacer lui-même une commande par le signe, avec ses
   propres espaces (une espace ordinaire avant `: ? ! ;`, sans la typographie du
   Québec), ou la laisser telle quelle ; dans les deux cas il n'y a pas de
@@ -387,30 +387,44 @@ HTTPS ou un VPN (WireGuard, Tailscale).
   -PdefaultServerUrl=https://dictee.example.ca` (vide par défaut ; jamais de jeton dans
   l'APK). Une adresse saisie dans les Réglages la remplace.
 
-**Dictée entière, polie par le serveur** (issue #13). Avec le serveur,
-rien ne s'affiche pendant la dictée : à la fin (appui sur stop), toute la
-dictée part au serveur en une seule requête. Le serveur de ce dépôt la
-transcrit (chemin rapide) puis la polit avec son LLM, et le texte poli est
-inséré d'un bloc. Pendant l'attente, le clavier affiche « Transcription et
-polissage… » avec un bouton **Annuler**.
+**Dictée transcrite au fil de l'eau, polie à la fin** (issues #13 et #35). Avec
+le serveur, rien ne s'affiche pendant la dictée, mais le clavier n'attend plus la
+fin pour envoyer l'audio : il le découpe en blocs de 15 à 30 s, coupés aux pauses,
+et envoie chaque bloc au serveur dès qu'il est complet (`POST /jobs`, chemin
+rapide, sans polissage, avec la fin du bloc précédent comme contexte). À l'arrêt,
+il ne reste que le dernier bloc à transcrire, puis le polissage du texte complet
+(`POST /polish`) : l'attente ne dépend plus de la durée de la dictée. Le texte est
+inséré d'un bloc, comme avant. Pendant l'attente, le clavier affiche
+« Transcription et polissage… » (avec l'avancement, par exemple « 3 blocs sur 4 »)
+et un bouton **Annuler**.
+
+- Une dictée plus courte qu'un bloc part en une seule requête, transcrite et polie
+  dans la même tâche.
+- Un serveur qui n'a pas `POST /polish` (version antérieure à #35) reçoit la dictée
+  entière en une seule requête à la fin, comme avant.
+- Le polissage du serveur ne traite pas plus de 400 mots (environ 3 min de
+  dictée) : au-delà, le texte brut est inséré, avec le message « texte trop long
+  pour le polissage ».
 
 - Le polissage se coupe dans les Réglages (« Polissage par le serveur », activé
   par défaut) : un LLM peut parfois remplacer un mot bien transcrit. Coupé, le
   clavier demande `polish=false` et insère le texte brut de la transcription.
 - Si le polissage échoue, le texte brut du serveur est inséré (message
   discret, pas d'erreur).
-- Si le serveur est injoignable, en erreur, refuse l'accès ou ne répond pas à
-  temps (délai réglable, 8 s par défaut + un quart de la durée de la dictée, 3 min
-  au plus), ou si vous appuyez sur Annuler, l'audio gardé sur le téléphone est
-  transcrit par le modèle du téléphone : aucune dictée n'est perdue. Après une
-  panne, le serveur est réessayé au bout de 60 s.
+- Si le serveur est injoignable, en erreur, refuse l'accès, limite le débit
+  (429) ou ne répond pas à temps (délai réglable, 8 s par défaut + un quart de la
+  durée de l'audio, 3 min au plus), ou si vous appuyez sur Annuler, l'audio des
+  blocs qui manquent, gardé sur le téléphone jusqu'à réception de leur texte, est
+  transcrit par le modèle du téléphone ; les textes déjà reçus du serveur sont
+  gardés : aucune dictée n'est perdue. Après une panne, le serveur est réessayé
+  au bout de 60 s (ou du délai `Retry-After` d'un 429).
 - Une dictée dure au plus 5 minutes : au-delà, l'enregistrement s'arrête et
   ce qui a été dit est envoyé.
 - Les commandes vocales et le vocabulaire s'appliquent au texte final reçu
   (limite du polissage : voir « Dicter la ponctuation »). Les
   mots favoris ne sont pas envoyés au serveur de ce dépôt.
-- Avec une API compatible OpenAI, la dictée part aussi en une fois, sans
-  polissage (ces serveurs n'en ont pas).
+- Avec une API compatible OpenAI, la dictée part aussi par blocs (un appel à
+  `/v1/audio/transcriptions` par bloc), sans polissage (ces serveurs n'en ont pas).
 
 **Derrière Cloudflare Access (tunnel Cloudflare).** L'application s'authentifie
 avec un *service token* :
@@ -437,9 +451,13 @@ masqué, et n'apparaît ni dans les journaux ni dans les rapports.
 
 **Diagnostic serveur** (Réglages → Serveur distant) : envoie les enregistrements
 de référence de l'application, puis leur enchaînement (environ 30 s), comme de
-vraies dictées. Pour chaque essai, l'écran affiche le temps d'envoi, le temps
-total jusqu'au résultat, le statut du polissage, et le texte brut et le texte
-poli côte à côte. « Exporter le rapport » le partage en texte, sans aucun secret.
+vraies dictées, deux fois chacun : par blocs, joués en temps réel avec la
+détection de la voix du clavier, puis en une seule requête (dictée entière).
+« Essais longs » fait de même avec l'enchaînement répété sur environ 2 et
+5 minutes. Pour chaque essai, l'écran affiche l'attente entre la fin de la dictée
+et le résultat, le nombre de blocs, le statut du polissage, et le texte brut et le
+texte poli côte à côte. « Exporter le rapport » le partage en texte, sans aucun
+secret.
 
 Réglages : texte provisoire, commandes vocales, pause de fin de segment,
 vocabulaire personnalisé, thème, vibrations, durée de maintien du modèle en

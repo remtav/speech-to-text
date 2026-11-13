@@ -30,7 +30,9 @@ import io.github.remtav.dictee.stt.ModelSpec
 import io.github.remtav.dictee.stt.SttEngineFactory
 import io.github.remtav.dictee.stt.RemoteEngine
 import io.github.remtav.dictee.stt.RemoteLog
+import io.github.remtav.dictee.stt.BlockDictation
 import io.github.remtav.dictee.stt.DictationResult
+import io.github.remtav.dictee.stt.LentBlockBackend
 import io.github.remtav.dictee.stt.WholeDictationEngine
 import io.github.remtav.dictee.stt.WhisperTuning
 import io.github.remtav.dictee.text.RuleCleaner
@@ -220,6 +222,10 @@ class DicteeApp : Application() {
                     (engine as? WholeDictationEngine)?.transcribeDictation(audio, segments, control)
                         ?: DictationResult(segments.map { engine.transcribe(it).text }, DictationResult.Source.SERVER_RAW, transport = "segments")
                 }
+            },
+            // Issue #35: blocks sent while the user speaks; whole dictation above for a server without POST /polish.
+            blocks = if (spec.family != ModelFamily.REMOTE) null else { control ->
+                BlockDictation(LentBlockBackend { op -> engines.use(spec, options) { op(it) } }, control)
             },
             canFallBack = options.remoteFallback != null,
         ) to null
