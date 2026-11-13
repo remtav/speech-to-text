@@ -221,5 +221,7 @@ object WhisperRepetition {
             .replace(NOT_WORD, " ").replace('-', ' ')
             .split(' ').filter { it.isNotEmpty() }
 
-    private val NOT_WORD = Regex("(?U)[^\\w'\\- ]+")
+    // Explicit Unicode classes, not `(?U)\w`: Android's regex engine rejects the `(?U)` flag (the JVM accepts it,
+    // so host tests pass), and the pattern failed to compile on the phone at the first Whisper decode.
+    private val NOT_WORD = Regex("[^\\p{L}\\p{M}\\p{N}_'\\- ]+")
 }
