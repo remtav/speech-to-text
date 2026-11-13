@@ -58,6 +58,7 @@ et évaluée en anglais ; l'utilisateur fait son propre banc d'essai sur des ext
 `openai-whisper` les couches factorisées par un module équivalent (mêmes calculs que `modeling_lite_whisper.py`, lu mais
 non exécuté) avant de lancer le script d'export de sherpa-onnx. Les noms de fichiers produits sont ceux de turbo.
 
-Publication prévue par l'utilisateur : `https://huggingface.co/remiavelo/sherpa-onnx-lite-whisper-large-v3-turbo-acc-int8`
-(les trois fichiers de `sortie/`). Reporter ensuite les tailles et SHA-256 de `SHA256SUMS` dans le catalogue de l'app.
-État au 2026-11-13 : `hf_vers_openai.py` vérifié sur ce modèle (758 tenseurs) ; l'export ONNX n'a pas été mené à terme.
+**Attention : en l'état, `convertir_lite.sh` produit un encodeur int8 cassé** (sortie « ... »). L'export fp32 et le
+décodeur int8 sont corrects ; c'est la quantification int8 de l'encodeur (multiplications qui partent de la
+représentation réduite) qui casse le modèle. La seule variante correcte trouvée (ces multiplications laissées en fp32)
+est plus grosse et plus lente que turbo. Essais, mesures et pistes : issue #25. Rien n'est publié.
