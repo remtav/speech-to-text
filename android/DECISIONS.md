@@ -3418,3 +3418,11 @@ consentement. `ReadingPrivacyTest` interdit dans le code du test les écritures 
 3. **Wording** des nouvelles chaînes (`reading_*`, `settings_participation_*`), notamment « Non merci » (ferme la carte)
    par rapport à la réponse « Non » (exclut).
 4. Que la carte n'apparaisse **qu'à la fin de la configuration** (et pas dès le premier lancement) convient.
+
+## Issue #15, lot 4 — étape 4.3 : consentement, archive locale, envoi par courriel
+
+État au 2026-11-13 (en cours). **Fait** : description unique de l'archive (`reading/ContributionArchive.kt`),
+proposition de partage dans l'écran du test, `FileProvider` limité au dossier des archives, intention de courriel,
+réécoute, tests JVM (`ContributionArchiveTest`, `ReadingPrivacyTest` adapté, `ContributionConsistencyTest`).
+**Reste à faire** : test instrumenté de l'export, captures `reading-share-*.png`, README, `CONTRIBUTION.md`, détail des
+décisions ci-dessous.

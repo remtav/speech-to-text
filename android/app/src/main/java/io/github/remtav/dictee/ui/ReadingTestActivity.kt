@@ -1,8 +1,15 @@
 package io.github.remtav.dictee.ui
 
+import android.content.ActivityNotFoundException
 import android.os.Bundle
+import android.text.Editable
+import android.text.InputFilter
+import android.text.InputType
+import android.text.TextWatcher
 import android.view.ViewGroup
 import android.view.WindowManager
+import android.widget.CheckBox
+import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.ProgressBar
 import android.widget.RadioButton
@@ -12,6 +19,10 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import io.github.remtav.dictee.DicteeApp
 import io.github.remtav.dictee.R
+import io.github.remtav.dictee.reading.ArchiveAudio
+import io.github.remtav.dictee.reading.ArchiveField
+import io.github.remtav.dictee.reading.ContributionContent
+import io.github.remtav.dictee.reading.Contribution
 import io.github.remtav.dictee.reading.ParagraphRecorder
 import io.github.remtav.dictee.reading.ReadingMaterial
 import io.github.remtav.dictee.reading.ReadingModel
@@ -27,9 +38,16 @@ import io.github.remtav.dictee.stt.ModelRecommendations
  * paragraph, then the resemblance score of every installed on-device model with the misheard words
  * highlighted. Opened by the participation card (main screen and settings).
  *
- * Nothing leaves the phone and nothing is written: the recordings live in [ReadingTestModel] (memory)
- * and are dropped when this screen is finished. No network request, no new permission. The decisions
- * are in [ReadingSession]; this class only draws its state.
+ * Nothing leaves the phone and nothing is written during the test: the recordings live in
+ * [ReadingTestModel] (memory) and are dropped when this screen is finished. No network request, no new
+ * permission. The decisions are in [ReadingSession]; this class only draws its state.
+ *
+ * Step 4.3, the one voluntary exception: when the recommended model misheard more than 20 % of the text,
+ * the result proposes to share the reading ([renderShareSlot]). The screen lists exactly what would leave
+ * (built from the same [ContributionContent] as the archive), lets the person listen again, redo or
+ * refuse; only the ticked consent box AND the button create the archive, in private storage; the person
+ * then hands it to their own mail (or another app) and presses « Envoyer » there. The app itself sends
+ * nothing.
  */
 class ReadingTestActivity : AppCompatActivity() {
     private lateinit var app: DicteeApp
@@ -285,7 +303,7 @@ class ReadingTestActivity : AppCompatActivity() {
     private fun renderResultFooter(result: ReadingResult) {
         // Step 4.3 plugs the sharing offer here, when `result.offerSharing` is true. Nothing in step 4.2.
         renderShareSlot(column, result)
-        column.body(getString(R.string.reading_result_kept), small = true)
+        if (model.archive == null) column.body(getString(R.string.reading_result_kept), small = true)
         column.row().apply {
             button(getString(R.string.contrib_share_redo), outlined = true) { model.restart() }.apply { tag = TAG_REDO }.spaced()
             button(getString(R.string.reading_close)) { finish() }.tag = TAG_CLOSE
@@ -293,16 +311,138 @@ class ReadingTestActivity : AppCompatActivity() {
     }
 
     /**
-     * The extension point of step 4.3: an empty container, present only when [ReadingResult.offerSharing]
-     * is true (the WER of the recommended model, on the complete text, is above the threshold). 4.3 fills it
-     * with the consent screen entry; here it stays empty, and nothing is created, recorded or sent.
+     * The sharing offer (step 4.3), present only when [ReadingResult.offerSharing] is true (the WER of the
+     * recommended model, on the complete text, is above the threshold). Below it, nothing at all.
      */
     private fun renderShareSlot(parent: ViewGroup, result: ReadingResult) {
         if (!result.offerSharing) return
-        parent.addView(LinearLayout(this).apply {
+        val slot = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             tag = TAG_SHARE_SLOT
-        })
+        }
+        parent.addView(slot)
+        val offer = model.shareOffer() ?: return
+        val modelLabel = model.labelOf(result.recommendedModelId)
+        val card = slot.card()
+        card.heading(getString(R.string.contrib_share_title)).setPadding(0, 0, 0, dp(6))
+        if (model.shareDeclined) {
+            card.body(getString(R.string.contrib_share_declined), small = true).tag = TAG_SHARE_DECLINED
+            return
+        }
+        val archive = model.archive
+        val global = result.globalScores.getValue(result.recommendedModelId)
+        card.body(getString(R.string.contrib_share_reason, "${global.similarityPercent} %", modelLabel), small = true)
+
+        // Exactly what would leave: the same content the archive is written from (one source).
+        val facts = ContributionShare.deviceFacts()
+        val content = checkNotNull(offer.preview(facts))
+        card.heading(getString(R.string.contrib_share_sent_title)).tag = TAG_SHARE_LIST
+        var regionValue: android.widget.TextView? = null
+        for (item in content.fields) {
+            card.label(ContributionShare.fieldLabel(this, item.field, modelLabel)).tag = fieldTag(item.field)
+            val v = card.body(describe(item.field, content), small = true)
+            if (item.field == ArchiveField.REGION) regionValue = v
+        }
+        if (result.globalScores.size > 1) card.body(getString(R.string.contrib_share_only_recommended), small = true)
+        card.button(getString(if (model.playing) R.string.contrib_share_listen_stop else R.string.contrib_share_listen), outlined = true) {
+            model.togglePlayback()
+        }.tag = TAG_SHARE_LISTEN
+        for (text in listOf(
+            getString(R.string.contrib_share_not_sent),
+            getString(R.string.contrib_share_recipient, Contribution.RECEIVING_ADDRESS),
+            getString(R.string.contrib_share_purpose),
+            getString(R.string.contrib_share_email_reveals),
+            getString(R.string.contrib_share_retention, Contribution.RETENTION_MAX_YEARS),
+            getString(R.string.contrib_share_voice),
+            getString(R.string.contrib_share_withdraw, Contribution.RECEIVING_ADDRESS),
+            getString(R.string.contrib_share_you_send),
+            getString(R.string.contrib_share_policy, Contribution.POLICY_URL),
+        )) card.body(text, small = true)
+        model.shareNotice?.let { card.warning(it, TAG_SHARE_NOTICE) }
+
+        if (archive == null) {
+            if (model.archiveDeleted) card.body(getString(R.string.contrib_share_deleted), small = true).tag = TAG_SHARE_DELETED
+            // The optional region (a region, not an address: short, one line).
+            card.label(getString(R.string.contrib_share_region_label))
+            card.addView(EditText(this).apply {
+                tag = TAG_SHARE_REGION
+                hint = getString(R.string.contrib_share_region_hint)
+                inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_CAP_WORDS
+                isSingleLine = true
+                filters = arrayOf(InputFilter.LengthFilter(ContributionContent.REGION_MAX_CHARS))
+                setText(offer.region)
+                addTextChangedListener(object : TextWatcher {
+                    override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) = Unit
+                    override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) = Unit
+                    override fun afterTextChanged(s: Editable?) {
+                        model.setRegion(s?.toString().orEmpty())
+                        regionValue?.text = describe(ArchiveField.REGION, offer.preview(facts) ?: return)
+                    }
+                })
+            })
+            // The third consent gesture: a box, unticked by default, then a separate button.
+            lateinit var prepare: android.view.View
+            card.addView(CheckBox(this).apply {
+                tag = TAG_SHARE_CONSENT
+                text = getString(R.string.contrib_share_consent)
+                isChecked = offer.consent
+                setOnCheckedChangeListener { _, checked ->
+                    model.setConsent(checked)
+                    prepare.isEnabled = checked
+                }
+            })
+            prepare = card.button(getString(R.string.contrib_share_prepare)) { model.prepareArchive() }.apply {
+                tag = TAG_SHARE_PREPARE
+                isEnabled = offer.consent
+            }
+        } else {
+            card.value(getString(R.string.contrib_share_ready, archive.name, size(archive.length()))).tag = TAG_SHARE_READY
+            card.body(getString(R.string.contrib_share_ready_where), small = true)
+            if (model.mailOpened) card.body(getString(R.string.contrib_share_mail_opened), small = true).tag = TAG_SHARE_MAIL_OPENED
+            card.button(getString(R.string.contrib_share_email)) { sendByEmail(result.textVersion, modelLabel) }.tag = TAG_SHARE_EMAIL
+            card.button(getString(R.string.contrib_share_other), outlined = true) {
+                val file = model.archive ?: return@button
+                startActivity(ContributionShare.otherIntent(this, file, result.textVersion, modelLabel))
+            }.tag = TAG_SHARE_OTHER
+            card.button(getString(R.string.contrib_share_delete), outlined = true) { model.deleteArchive() }.tag = TAG_SHARE_DELETE
+        }
+        card.button(getString(R.string.contrib_share_decline), outlined = true) { model.declineSharing() }.tag = TAG_SHARE_DECLINE
+    }
+
+    private fun sendByEmail(textVersion: String, modelLabel: String) {
+        val file = model.archive ?: return
+        try {
+            startActivity(ContributionShare.emailIntent(this, file, textVersion, modelLabel))
+            model.mailOpened = true
+            model.shareNotice = null
+        } catch (e: ActivityNotFoundException) {
+            model.shareNotice = getString(R.string.contrib_share_no_email_app)
+        }
+        render()
+    }
+
+    /** The value of one element of the archive, as shown before consent (from the content the archive is written from). */
+    private fun describe(field: ArchiveField, content: ContributionContent): String {
+        val value = content[field]
+        return when (field) {
+            ArchiveField.AUDIO -> {
+                val tenths = content.audio.sumOf(ArchiveAudio::tenths)
+                getString(R.string.contrib_value_audio, content.audio.size, tenths / 10) + "\n" +
+                    content.audio.joinToString(", ") { it.name }
+            }
+            ArchiveField.TEXT, ArchiveField.TRANSCRIPTION -> (value as List<*>).joinToString("\n") { p ->
+                val m = p as Map<*, *>
+                getString(R.string.contrib_value_paragraph, m["paragraphe"] as Int, m["texte"] as String)
+            }
+            ArchiveField.SCORE -> {
+                val m = value as Map<*, *>
+                getString(R.string.contrib_value_score, m["ressemblance_pourcent"] as Int, m["erreurs"] as Int, m["mots"] as Int)
+            }
+            ArchiveField.MODEL -> (value as Map<*, *>)["nom"] as String
+            ArchiveField.REGION -> (value as String?) ?: getString(R.string.contrib_value_region_none)
+            ArchiveField.TEXT_VERSION, ArchiveField.APP_VERSION, ArchiveField.PHONE_MODEL,
+            ArchiveField.DECLARATION, ArchiveField.DATE -> value as String
+        }
     }
 
     companion object {
@@ -326,6 +466,20 @@ class ReadingTestActivity : AppCompatActivity() {
         const val TAG_BETTER_CHOOSE = "reading_better_choose"
         const val TAG_BETTER_CHOSEN = "reading_better_chosen"
         const val TAG_SHARE_SLOT = "reading_share_slot"
+        const val TAG_SHARE_LIST = "reading_share_list"
+        const val TAG_SHARE_LISTEN = "reading_share_listen"
+        const val TAG_SHARE_REGION = "reading_share_region"
+        const val TAG_SHARE_CONSENT = "reading_share_consent"
+        const val TAG_SHARE_PREPARE = "reading_share_prepare"
+        const val TAG_SHARE_DECLINE = "reading_share_decline"
+        const val TAG_SHARE_DECLINED = "reading_share_declined"
+        const val TAG_SHARE_READY = "reading_share_ready"
+        const val TAG_SHARE_EMAIL = "reading_share_email"
+        const val TAG_SHARE_OTHER = "reading_share_other"
+        const val TAG_SHARE_DELETE = "reading_share_delete"
+        const val TAG_SHARE_DELETED = "reading_share_deleted"
+        const val TAG_SHARE_MAIL_OPENED = "reading_share_mail_opened"
+        const val TAG_SHARE_NOTICE = "reading_share_notice"
         const val TAG_REDO = "reading_redo_test"
         const val TAG_CLOSE = "reading_close"
 
@@ -335,5 +489,7 @@ class ReadingTestActivity : AppCompatActivity() {
         fun globalTag(modelId: String) = "reading_global_$modelId"
         /** Tag of the radio button that shows the detail of a model. */
         fun modelChoiceTag(modelId: String) = "reading_model_$modelId"
+        /** Tag of the label of one element of the archive in the « what would leave » list. */
+        fun fieldTag(field: ArchiveField) = "reading_share_field_${field.key}"
     }
 }

@@ -11,17 +11,25 @@ import io.github.remtav.dictee.R
 import io.github.remtav.dictee.TestHooks
 import io.github.remtav.dictee.audio.AudioSourceException
 import io.github.remtav.dictee.audio.PcmAudio
+import io.github.remtav.dictee.reading.ContributionArchive
 import io.github.remtav.dictee.reading.ParagraphRecorder
 import io.github.remtav.dictee.reading.ReadingProgress
 import io.github.remtav.dictee.reading.ReadingSession
 import io.github.remtav.dictee.reading.ReadingTranscriber
+import io.github.remtav.dictee.reading.ShareOffer
 import io.github.remtav.dictee.stt.ModelCatalog
+import java.io.File
 import kotlin.concurrent.thread
 
 /**
  * Holds the reading test while the screen is rotated or recreated, and ends it with the screen:
  * [onCleared] runs only when the activity is really finished, and drops every recording
  * (issue #15, step 4.2: the audio lives in memory, in the [session], and nowhere else).
+ *
+ * Step 4.3: it also holds the sharing offer and the contribution archive, which exists only after the
+ * person's explicit consent and never outlives the screen: deleted by « Supprimer le fichier », « Ne pas
+ * partager », « Refaire le test », when the screen is finished ([onCleared]) and, for a leftover of a killed
+ * process, when a new reading test opens ([init]) or the app starts with one older than a day (`DicteeApp`).
  *
  * The recording and the scoring run on worker threads; every change of what the screen shows is made on
  * the main thread, then [onChange] asks the screen to redraw (null while no screen is started).
@@ -42,6 +50,32 @@ class ReadingTestModel(private val app: DicteeApp, val session: ReadingSession) 
         private set
     var progress: ReadingProgress? = null
         private set
+
+    private val archiveDir: File = ContributionShare.archiveDir(app)
+    private val player = ReadingPlayer()
+
+    init {
+        // A new reading test: an archive left by an earlier one (process killed meanwhile) goes now.
+        ContributionArchive.deleteAll(archiveDir)
+    }
+
+    private var offer: ShareOffer? = null
+
+    /** The contribution archive, once created with consent; null otherwise. */
+    var archive: File? = null
+        private set
+    /** « Ne pas partager » was chosen for this result. */
+    var shareDeclined = false
+        private set
+    /** The archive of this result was deleted from the screen. */
+    var archiveDeleted = false
+        private set
+    /** The person's mail was opened with the archive (nothing is known of what they did there). */
+    var mailOpened = false
+    /** A message about the sharing (no mail app, archive not written), or null. */
+    var shareNotice: String? = null
+
+    val playing: Boolean get() = player.playing
 
     @Volatile private var stopRequested = false
     @Volatile private var cancelRequested = false
@@ -99,7 +133,10 @@ class ReadingTestModel(private val app: DicteeApp, val session: ReadingSession) 
     }
 
     /** The screen leaves the foreground: a recording in progress ends (the microphone is not kept in the background). */
-    fun stopRecording() { stopRequested = true }
+    fun stopRecording() {
+        stopRequested = true
+        player.stop()
+    }
 
     fun answer(yes: Boolean) {
         session.answer(yes)
@@ -114,7 +151,95 @@ class ReadingTestModel(private val app: DicteeApp, val session: ReadingSession) 
     fun next() { session.next(); notice = null; changed() }
     fun previous() { session.previous(); notice = null; changed() }
 
-    fun restart() { session.restart(); notice = null; changed() }
+    fun restart() {
+        player.stop()
+        dropArchive()
+        offer = null
+        resetShareState()
+        session.restart()
+        notice = null
+        changed()
+    }
+
+    // ---- sharing (step 4.3) ----
+
+    private fun resetShareState() {
+        shareDeclined = false
+        archiveDeleted = false
+        mailOpened = false
+        shareNotice = null
+    }
+
+    /** Display name of a model of the test. */
+    fun labelOf(modelId: String): String =
+        session.models.firstOrNull { it.id == modelId }?.label ?: ModelCatalog.byId(modelId)?.displayName ?: modelId
+
+    /** The sharing offer of the current result, or null when nothing is offered (below the threshold). */
+    fun shareOffer(): ShareOffer? {
+        val result = session.result ?: return null
+        if (offer?.result !== result) {
+            offer = ShareOffer(result, session.declaration, session.material.text.paragraphs, labelOf(result.recommendedModelId))
+            resetShareState()
+        }
+        return offer?.takeIf { it.offered }
+    }
+
+    /** The consent box (no redraw: the screen updates the button itself). */
+    fun setConsent(checked: Boolean) { offer?.consent = checked }
+
+    /** The optional region, as typed (no redraw: the field keeps its focus). */
+    fun setRegion(text: String) { offer?.region = text }
+
+    /** « Préparer le courriel »: writes the archive, only if the consent box is ticked (checked again by [ShareOffer]). */
+    fun prepareArchive() {
+        val o = shareOffer() ?: return
+        shareNotice = null
+        archive = try {
+            o.createArchive(archiveDir, ContributionShare.deviceFacts())
+        } catch (e: Exception) {
+            ContributionArchive.deleteAll(archiveDir)
+            shareNotice = app.getString(R.string.contrib_share_write_failed, e.message ?: e.javaClass.simpleName)
+            null
+        }
+        if (archive != null) archiveDeleted = false
+        changed()
+    }
+
+    private fun dropArchive() {
+        ContributionArchive.deleteAll(archiveDir)
+        archive = null
+        offer?.consent = false
+        mailOpened = false
+    }
+
+    /** « Supprimer le fichier »: the archive is gone; sharing again needs the consent box again. */
+    fun deleteArchive() {
+        val had = archive != null
+        dropArchive()
+        if (had) archiveDeleted = true
+        shareNotice = null
+        changed()
+    }
+
+    /** « Ne pas partager »: no archive (any existing one is deleted), and the offer is closed. */
+    fun declineSharing() {
+        player.stop()
+        dropArchive()
+        shareDeclined = true
+        shareNotice = null
+        changed()
+    }
+
+    /** « Réécouter » / stop: plays the recordings of the result back, from memory. */
+    fun togglePlayback() {
+        if (player.playing) {
+            player.stop()
+        } else {
+            val clips = session.result?.paragraphs?.map { it.audio }.orEmpty()
+            player.play(clips) { main.post { changed() } }
+        }
+        changed()
+    }
 
     /** Transcribes and scores what was read, with every installed on-device model, off the main thread. */
     fun startScoring() {
@@ -158,6 +283,9 @@ class ReadingTestModel(private val app: DicteeApp, val session: ReadingSession) 
         stopRequested = true
         cancelRequested = true
         onChange = null
+        player.stop()
+        // The screen is closed for good: the contribution archive goes with it (sent or not).
+        dropArchive()
         session.clear()
     }
 }

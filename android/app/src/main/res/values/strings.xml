@@ -209,7 +209,6 @@
     <string name="contrib_share_title">Partager votre lecture ?</string>
     <string name="contrib_share_reason">Votre lecture a été moins bien comprise que prévu : %1$s de ressemblance avec %2$s, le modèle recommandé pour vos langues. La partager aiderait à améliorer la dictée en français québécois. C\'est entièrement facultatif, et refuser ne change rien au fonctionnement de l\'application.</string>
     <string name="contrib_share_sent_title">Ce qui partirait, et seulement ça</string>
-    <string name="contrib_share_sent">• l\'enregistrement de votre lecture (audio WAV, 16 kHz) ;\n• le texte lu et son numéro de version ;\n• la transcription obtenue et le score ;\n• le nom du modèle, la version de l\'application et le modèle de votre téléphone ;\n• votre réponse « je parle un français québécois » ;\n• la date du test ;\n• votre région, seulement si vous l\'indiquez.</string>
     <string name="contrib_share_not_sent">Ce qui ne part pas : aucun nom, aucun numéro de téléphone, aucun identifiant de l\'appareil ou de compte, aucune autre dictée, aucun autre fichier.</string>
     <string name="contrib_share_recipient">Destinataire : %1$s, l\'adresse du projet Kalmia Blabla.</string>
     <string name="contrib_share_purpose">Pourquoi : repérer les mots et les accents d\'ici que la dictée comprend mal, pour mieux choisir et régler les modèles. Votre lecture ne sert à rien d\'autre sans un nouveau consentement de votre part.</string>
@@ -226,6 +225,41 @@
     <string name="contrib_share_listen">Réécouter</string>
     <string name="contrib_share_redo">Refaire le test</string>
     <string name="contrib_share_decline">Ne pas partager</string>
+
+    <!--
+      Étape 4.3 : la liste « ce qui partirait » est générée depuis reading/ArchiveField (une ligne par
+      élément de l'archive) ; chaque élément a son libellé contrib_field_<nom>. Même source que l'archive.
+    -->
+    <string name="contrib_field_audio">Enregistrement de votre lecture</string>
+    <string name="contrib_field_text_version">Numéro de version du texte lu</string>
+    <string name="contrib_field_text">Texte lu</string>
+    <string name="contrib_field_transcription">Transcription obtenue (par %1$s, le modèle recommandé)</string>
+    <string name="contrib_field_score">Score</string>
+    <string name="contrib_field_model">Modèle de transcription</string>
+    <string name="contrib_field_app_version">Version de l\'application</string>
+    <string name="contrib_field_phone_model">Modèle de votre téléphone</string>
+    <string name="contrib_field_declaration">Votre réponse à la question</string>
+    <string name="contrib_field_date">Date du test (le jour seulement, sans l\'heure)</string>
+    <string name="contrib_field_region">Votre région (facultative)</string>
+    <string name="contrib_value_audio">%1$d fichiers audio WAV, 16 kHz, mono (%2$d s en tout) :</string>
+    <string name="contrib_value_paragraph">%1$d. %2$s</string>
+    <string name="contrib_value_score">Ressemblance %1$d %% : %2$d erreurs sur %3$d mots (détail par paragraphe dans le fichier)</string>
+    <string name="contrib_value_region_none">Non indiquée : rien n\'est inclus.</string>
+    <string name="contrib_share_only_recommended">Seuls la transcription et le score du modèle recommandé sont inclus : les résultats des autres modèles installés restent sur votre téléphone.</string>
+    <string name="contrib_share_listen_stop">Arrêter l\'écoute</string>
+    <string name="contrib_share_ready">Fichier prêt : %1$s (%2$s)</string>
+    <string name="contrib_share_ready_where">Ce fichier est dans l\'espace privé de l\'application, sur votre téléphone. Rien n\'est envoyé tant que vous n\'appuyez pas sur « Envoyer » dans votre messagerie. Il est supprimé quand vous fermez cet écran, quand vous refaites le test, quand vous choisissez de ne pas partager ou avec le bouton « Supprimer le fichier ».</string>
+    <string name="contrib_share_mail_opened">Votre messagerie a été ouverte avec le fichier joint. Rien n\'est parti tant que vous n\'y avez pas appuyé sur « Envoyer ». Une fois le courriel envoyé, vous pouvez supprimer le fichier ici.</string>
+    <string name="contrib_share_email">Envoyer par courriel</string>
+    <string name="contrib_share_other">Partager le fichier autrement</string>
+    <string name="contrib_share_chooser_title">Partager votre lecture</string>
+    <string name="contrib_share_delete">Supprimer le fichier</string>
+    <string name="contrib_share_deleted">Fichier supprimé : il n\'existe plus sur votre téléphone.</string>
+    <string name="contrib_share_declined">Vous avez choisi de ne pas partager : aucun fichier n\'est conservé et rien n\'est envoyé. La dictée fonctionne comme avant.</string>
+    <string name="contrib_share_no_email_app">Aucune application de courriel n\'est installée sur ce téléphone. Vous pouvez partager le fichier autrement, ou le supprimer.</string>
+    <string name="contrib_share_write_failed">Le fichier n\'a pas pu être préparé : %1$s. Rien n\'a été conservé.</string>
+    <string name="contrib_email_subject">Kalmia Blabla : test de lecture %1$s</string>
+    <string name="contrib_email_body">Bonjour,\n\nVoici ma lecture du test de Kalmia Blabla, dans le fichier joint %1$s. Il contient seulement :\n%2$s\n\nPolitique de contribution : %3$s</string>
 
     <!--
       Écran du test de lecture et réglages de participation (issue #15, lot 4, étape 4.2).

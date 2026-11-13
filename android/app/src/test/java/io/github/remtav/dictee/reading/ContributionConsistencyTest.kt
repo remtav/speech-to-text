@@ -62,24 +62,40 @@ class ContributionConsistencyTest {
 
     @Test
     fun theConsentSaysEverythingTheIssueRequires() {
-        val consent = listOf(
-            shown("contrib_share_sent"), shown("contrib_share_not_sent"),
+        // Step 4.3: the « what would leave » list is generated from ArchiveField, one `contrib_field_*` label
+        // (and `contrib_value_*` for the values) per element of the archive.
+        val list = strings.filterKeys { it.startsWith("contrib_field_") || it.startsWith("contrib_value_") }.values +
+            ContributionContent.DECLARATION_TEXT
+        val consent = (list + listOf(
+            shown("contrib_share_not_sent"),
             shown("contrib_share_recipient", Contribution.RECEIVING_ADDRESS), shown("contrib_share_purpose"),
             shown("contrib_share_email_reveals"), shown("contrib_share_retention", Contribution.RETENTION_MAX_YEARS),
             shown("contrib_share_voice"), shown("contrib_share_withdraw", Contribution.RECEIVING_ADDRESS),
             shown("contrib_share_you_send"),
-        ).joinToString("\n")
+        )).joinToString("\n").lowercase()
         for (item in listOf(
             "WAV", "16 kHz", "texte lu", "version", "transcription", "score", "modèle", "version de l'application",
             "modèle de votre téléphone", "je parle un français québécois", "date", "région",
             "aucun identifiant", "aucune autre dictée", "adresse de courriel", "Plus tôt si vous le demandez",
             "n'est plus utile", "à la main", "pas anonyme", "retirer votre consentement", "supprimer",
             "C'est vous qui envoyez", "aucun serveur",
-        )) assertTrue("consentement : « $item » absent", consent.contains(item))
+        )) assertTrue("consentement : « $item » absent", consent.contains(item.lowercase()))
         for (item in listOf("WAV", "16 kHz", "aucun identifiant", "aucune autre dictée", "à la main",
             "Ceci n'est pas un avis juridique", "à préciser", "Loi 25", "art. 23")) {
             assertTrue("politique : « $item » absent", policy.contains(item))
         }
+    }
+
+    @Test
+    fun everyElementOfTheArchiveHasItsLabelOnScreen() {
+        // The list shown before consent and the archive come from ArchiveField: each element needs its label.
+        for (field in ArchiveField.entries) {
+            val name = "contrib_field_${field.name.lowercase()}"
+            assertTrue("libellé $name absent", strings[name].orEmpty().isNotBlank())
+        }
+        assertEquals(ArchiveField.entries.size, strings.keys.count { it.startsWith("contrib_field_") })
+        // The bullet list of step 4.1 is gone: a second, hand-written list could diverge from the archive.
+        assertFalse(strings.containsKey("contrib_share_sent"))
     }
 
     @Test

@@ -31,6 +31,7 @@ import io.github.remtav.dictee.stt.WholeDictationEngine
 import io.github.remtav.dictee.stt.WhisperTuning
 import io.github.remtav.dictee.text.RuleCleaner
 import java.io.File
+import kotlin.concurrent.thread
 
 /**
  * Seams for instrumented tests: the test runs in the app process and swaps the
@@ -68,6 +69,14 @@ class DicteeApp : Application() {
         // Messages are redacted by RemoteEngine: no token or Cloudflare secret reaches logcat.
         RemoteEngine.defaultLog = RemoteLog { android.util.Log.i("DicteeRemote", it) }
         applyTheme()
+        // Reading-test contribution (issue #15, step 4.3): an archive is deleted with its screen; one that
+        // survived a killed process for more than a day goes now (not younger: the person's mail may still
+        // be reading it, and this process also starts for the keyboard).
+        thread(name = "contribution-sweep") {
+            io.github.remtav.dictee.reading.ContributionArchive.deleteOlderThan(
+                io.github.remtav.dictee.ui.ContributionShare.archiveDir(this),
+            )
+        }
     }
 
     fun applyTheme() {
