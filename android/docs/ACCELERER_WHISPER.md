@@ -449,7 +449,7 @@ Remarque (demande de l'utilisateur) : turbo garde **la même architecture d'enco
 1 280 ; poids réajustés par l'affinage : les tenseurs d'encodeur des deux dépôts `openai/whisper-large-v3*` diffèrent
 [vérifié par requêtes partielles sur les `model.safetensors`]) ; c'est le décodeur réduit de 32 à 4 couches qui le rend
 rapide. Ce qui distingue large-v3 de turbo, et ce qu'on peut encore en tirer pour la vitesse, est une piste séparée
-(issue à part), non traitée ici.
+(issue #33), non traitée ici.
 
 ## 8. Autres moteurs
 
