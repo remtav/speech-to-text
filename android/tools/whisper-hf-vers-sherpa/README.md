@@ -44,3 +44,25 @@ sont tels quels ; `WHISPER_QC` de `ModelCatalog.kt` pointe sur `…/resolve/main
 Si la conversion est refaite et republiée, reporter les nouvelles sommes dans le catalogue.
 
 Vérifier : `./gradlew testDebugUnitTest` puis, hôte, `-PmodelsDir=… --tests '*ModelAccuracyHostTest*'`.
+
+## Lite-Whisper large-v3-turbo-acc (2026-11-13, à l'essai)
+
+Demande de l'utilisateur : un Whisper « juste un peu plus petit » que large-v3-turbo.
+[`efficient-speech/lite-whisper-large-v3-turbo-acc`](https://huggingface.co/efficient-speech/lite-whisper-large-v3-turbo-acc)
+(Apache-2.0, article arXiv 2502.20583) est large-v3-turbo dont les couches linéaires de l'**encodeur** sont factorisées
+en deux matrices de rang réduit : encodeur de 635 M à 421 M paramètres, décodeur inchangé (172 M). WER annoncé en
+anglais (ESB) : 10,2 % contre 10,1 % pour turbo. **Aucune mesure en français** à ce jour : la compression a été calibrée
+et évaluée en anglais ; l'utilisateur fait son propre banc d'essai sur des extraits québécois (voir aussi l'issue #24).
+
+`bash convertir_lite.sh /chemin/de/travail` : comme `convertir.sh`, avec `exporter_lite.py`, qui remplace dans le modèle
+`openai-whisper` les couches factorisées par un module équivalent (mêmes calculs que `modeling_lite_whisper.py`, lu mais
+non exécuté) avant de lancer le script d'export de sherpa-onnx. Les noms de fichiers produits sont ceux de turbo.
+
+**Attention : en l'état, `convertir_lite.sh` produit un encodeur int8 cassé** (sortie « ... »). L'export fp32 et le
+décodeur int8 sont corrects ; c'est la quantification int8 de l'encodeur (multiplications qui partent de la
+représentation réduite) qui casse le modèle. La seule variante correcte trouvée (ces multiplications laissées en fp32)
+est plus grosse et plus lente que turbo. Essais, mesures et pistes : issue #25.
+
+Cette variante est publiée à titre expérimental (2026-11-13, à la demande de l'utilisateur) :
+`https://huggingface.co/remiavelo/sherpa-onnx-lite-whisper-large-v3-turbo-acc-int8` (encodeur 799 004 644 octets,
+`ccefad7d…`). Elle n'est pas encore reproduite par `convertir_lite.sh` (voir #25) ; intégration dans l'app : #22.
