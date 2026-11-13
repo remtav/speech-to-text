@@ -120,12 +120,11 @@ dans **Comparer les modèles**.
 
 ## Apparence
 
-L'interface reprend l'image de marque de Kalmia : fond « papier », texte
-« encre », vert et accent « fleur », polices Newsreader et IBM Plex Mono
-embarquées dans l'application (licence SIL OFL, aucun service de polices en
-ligne), angles droits et boutons à ombre décalée. Le thème suit le réglage
-Système, Clair ou Sombre. L'erreur reste en rouge et s'accompagne toujours d'un
-texte ou d'une icône.
+L'interface est un thème Material 3 générique : bleu, polices du système,
+coins arrondis et ombres ordinaires de Material. Le thème suit le réglage
+Système, Clair ou Sombre, sur les écrans comme sur le clavier. L'erreur reste en
+rouge et s'accompagne toujours d'un texte ou d'une icône ; le micro devient
+rouge à l'écoute.
 
 ## Aperçu
 
@@ -272,7 +271,7 @@ conversion int8 (`android/tools/whisper-hf-vers-sherpa/`) est hébergée par l'a
 `huggingface.co/remiavelo/sherpa-onnx-whisper-large-v3-turbo-fr-quebecois-int8` ; l'application la télécharge de là,
 fichier par fichier, vérifiée par SHA-256. WER annoncé par son auteur : 6,65 % sur son jeu de validation. Mesuré ici :
 5 erreurs sur 59 mots (8,5 %) sur six courts extraits québécois, contre 4 pour Parakeet et 6 pour Whisper turbo :
-un indice, pas une preuve. Il a la même taille et le même coût de calcul que Whisper large-v3-turbo, donc il est plus
+un indice, pas une preuve (ces extraits viennent de Common Voice, une des sources de son affinage : il a pu les entendre). Il a la même taille et le même coût de calcul que Whisper large-v3-turbo, donc il est plus
 lent sur le téléphone (observation de l'utilisateur sur Whisper turbo, pas une mesure sur appareil). Parakeet reste
 recommandé pour le français québécois ; ce modèle est seulement proposé.
 

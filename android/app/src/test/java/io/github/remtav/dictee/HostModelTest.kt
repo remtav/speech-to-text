@@ -151,6 +151,41 @@ class ModelAccuracyHostTest {
     @Test fun whisperTurbo() = check(ModelCatalog.whisperTurbo)
 
     @Test fun whisperQuebec() = check(ModelCatalog.whisperQuebec)
+
+    /**
+     * Independent review of lot 3: forcing the language on Qwen3-ASR ("language French" in its
+     * prompt, sherpa-onnx 2.0.1 `OfflineStream.setOption`) became the default when one language
+     * is chosen. Measured on the French references, with and without the forced language: the
+     * forced language must not make the transcription markedly worse (DECISIONS.md, lot 3 review).
+     */
+    @Test fun qwen3ForcedFrenchDoesNotDegradeTheFrenchReferences() {
+        val spec = ModelCatalog.qwen3
+        val store = Host.ensureModel(spec)
+        val french = Host.references.filter { it.language == "fr" }
+        assertTrue(french.size >= 2)
+        val totals = HashMap<String, Int>()
+        var words = 0
+        for (language in listOf("", "French")) {
+            val engine = SherpaEngine(spec, store.dirFor(spec.id), EngineOptions(numThreads = 4, language = language))
+            try {
+                var errors = 0
+                words = 0
+                for (s in french) {
+                    val text = engine.transcribe(s.audio.samples).text
+                    val w = Wer.compute(s.reference!!, text)
+                    errors += w.errors
+                    words += w.referenceWords
+                    println("Qwen3 language=${language.ifEmpty { "auto" }} ${s.name}: ${w.errors}/${w.referenceWords} «$text»")
+                }
+                totals[language] = errors
+                println("WER Qwen3 French refs, language=${language.ifEmpty { "auto" }} = ${"%.1f".format(Locale.ROOT, errors * 100.0 / words)} % ($errors errors / $words words, ${french.size} clips)")
+            } finally {
+                engine.release()
+            }
+        }
+        // "Markedly worse": more than 2 extra errors over these short clips.
+        assertTrue("forced French: ${totals["French"]} errors vs ${totals[""]} automatic", totals.getValue("French") <= totals.getValue("") + 2)
+    }
 }
 
 /** The whole dictation path with the default model: audio stream → Silero VAD → Parakeet → text. */

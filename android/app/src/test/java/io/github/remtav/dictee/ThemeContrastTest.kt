@@ -9,7 +9,7 @@ import javax.xml.parsers.DocumentBuilderFactory
 import org.w3c.dom.Element
 
 /**
- * Kalmia theme (issue #15, step 1.5). Reads the colours and the theme from the resource files
+ * Generic Material 3 theme. Reads the colours and the theme from the resource files
  * (`res/values/colors.xml`, `res/values-night/colors.xml`, `res/values/themes.xml`), never from a copy
  * kept here, and requires a contrast of at least 4.5:1 (WCAG AA) for every text/background pair the
  * app really uses, in the light and the dark theme.
@@ -64,19 +64,19 @@ class ThemeContrastTest {
     /** (text attribute, background attribute, where the pair is used) */
     private val pairs = listOf(
         Triple("colorOnSurface", "colorSurface", "texte courant sur les écrans et le clavier"),
-        Triple("colorOnSurface", "colorSurfaceContainer", "texte des cartes, des touches, des zones de saisie"),
-        Triple("colorOnSurfaceVariant", "colorSurface", "texte secondaire, étiquettes, état du clavier"),
-        Triple("colorOnSurfaceVariant", "colorSurfaceContainer", "texte secondaire dans les cartes"),
+        Triple("colorOnSurface", "colorSurfaceContainer", "texte des cartes et fond du clavier"),
+        Triple("colorOnSurfaceVariant", "colorSurface", "texte secondaire, étiquettes"),
+        Triple("colorOnSurfaceVariant", "colorSurfaceContainer", "état du clavier, texte secondaire dans les cartes"),
         Triple("colorPrimary", "colorSurface", "titres de section, badge « Recommandé », liens"),
         Triple("colorPrimary", "colorSurfaceContainer", "badge « Recommandé » dans les cartes"),
-        Triple("colorOnPrimary", "colorPrimary", "coche, interrupteur et sélection activés"),
-        Triple("colorOnPrimaryContainer", "colorPrimaryContainer", "boutons d'action, micro au repos"),
-        Triple("colorOnTertiaryContainer", "colorTertiaryContainer", "micro à l'écoute (fleur)"),
-        Triple("colorTertiary", "colorSurface", "mots surlignés du test de lecture (lot 4), fleur sur papier"),
-        Triple("colorTertiary", "colorSurfaceContainer", "mots surlignés dans une carte (lot 4), fleur sur papier 2"),
+        Triple("colorOnPrimary", "colorPrimary", "boutons d'action, micro au repos, coche et interrupteur activés"),
+        Triple("colorOnPrimaryContainer", "colorPrimaryContainer", "éléments sélectionnés, interrupteur"),
+        Triple("colorOnSecondaryContainer", "colorSecondaryContainer", "touches du clavier, boutons tonals"),
+        Triple("colorOnError", "colorError", "micro à l'écoute (rouge)"),
         Triple("colorError", "colorSurface", "erreur du clavier et des écrans (avec texte et icône)"),
-        Triple("colorError", "colorSurfaceContainer", "avertissement dans une carte (avec texte et icône)"),
-        Triple("colorOnSecondaryContainer", "colorSecondaryContainer", "éléments sélectionnés des composants Material"),
+        Triple("colorError", "colorSurfaceContainer", "erreur dans une carte et sur le clavier (avec texte et icône)"),
+        Triple("colorOnErrorContainer", "colorErrorContainer", "conteneurs d'erreur des composants Material"),
+        Triple("colorOnTertiaryContainer", "colorTertiaryContainer", "conteneurs tertiaires des composants Material"),
         Triple("colorOnSurfaceInverse", "colorSurfaceInverse", "messages et info-bulles"),
     )
 
@@ -96,8 +96,8 @@ class ThemeContrastTest {
     }
 
     @Test
-    fun controlOutlineHasAtLeast3ToOneOnPaperAndOnPaper2() {
-        // Borders of keys and inputs are functional graphics: WCAG 1.4.11 asks 3:1.
+    fun controlOutlineHasAtLeast3ToOneOnSurfaceAndSurfaceContainer() {
+        // Borders of outlined buttons and inputs are functional graphics: WCAG 1.4.11 asks 3:1.
         for ((name, palette) in listOf("clair" to light, "sombre" to dark)) {
             for (bg in listOf("colorSurface", "colorSurfaceContainer")) {
                 val r = ratio(resolve(palette, "colorOutline"), resolve(palette, bg))
@@ -107,32 +107,15 @@ class ThemeContrastTest {
     }
 
     @Test
-    fun errorIsTheMaterialRedAndNeverTheFlowerPink() {
+    fun errorIsTheMaterialRed() {
         assertEquals("#BA1A1A", resolve(light, "colorError").uppercase())
         assertEquals("#FFB4AB", resolve(dark, "colorError").uppercase())
-        for (palette in listOf(light, dark)) {
-            assertNotEquals(resolve(palette, "colorTertiary"), resolve(palette, "colorError"))
-            assertNotEquals(resolve(palette, "colorOnErrorContainer"), resolve(palette, "colorTertiary"))
-        }
     }
 
     @Test
-    fun paletteIsTheKalmiaOneFromTheSource() {
-        // Values read on 2026-11-12 in kalmia.ca (index.html) and design/marque/tokens.css of the Kalmia.ca repository.
-        val expectedLight = mapOf(
-            "kalmia_paper" to "#F5F1E8", "kalmia_paper_2" to "#EDE7DA", "kalmia_ink" to "#23261F",
-            "kalmia_muted" to "#5B5E54", "kalmia_rule" to "#CFC8B8", "kalmia_green" to "#3F5E45",
-            "kalmia_button" to "#8FAE93", "kalmia_on_button" to "#23261F",
-            "kalmia_flower" to "#A9446A", "kalmia_on_flower" to "#FFFFFF",
-        )
-        val expectedDark = mapOf(
-            "kalmia_paper" to "#13160F", "kalmia_paper_2" to "#1B1F17", "kalmia_ink" to "#ECE7DA",
-            "kalmia_muted" to "#A9AB9B", "kalmia_rule" to "#3A3E33", "kalmia_green" to "#8DB596",
-            "kalmia_button" to "#8DB596", "kalmia_on_button" to "#13160F",
-            "kalmia_flower" to "#DE85A7", "kalmia_on_flower" to "#13160F",
-        )
-        for ((k, v) in expectedLight) assertEquals("clair $k", v, light[k]!!.uppercase())
-        for ((k, v) in expectedDark) assertEquals("sombre $k", v, dark[k]!!.uppercase())
+    fun primaryIsTheOriginalBlue() {
+        assertEquals("#2E5E8C", resolve(light, "colorPrimary").uppercase())
+        assertEquals("#9FCAFF", resolve(dark, "colorPrimary").uppercase())
     }
 
     @Test
@@ -147,14 +130,11 @@ class ThemeContrastTest {
             "colorSurfaceDim", "colorSurfaceBright", "colorSurfaceContainerLowest", "colorSurfaceContainerLow",
             "colorSurfaceContainer", "colorSurfaceContainerHigh", "colorSurfaceContainerHighest",
             "colorOutline", "colorOutlineVariant",
-            "colorPrimaryFixed", "colorPrimaryFixedDim", "colorOnPrimaryFixed", "colorOnPrimaryFixedVariant",
-            "colorSecondaryFixed", "colorSecondaryFixedDim", "colorOnSecondaryFixed", "colorOnSecondaryFixedVariant",
-            "colorTertiaryFixed", "colorTertiaryFixedDim", "colorOnTertiaryFixed", "colorOnTertiaryFixedVariant",
         )
         for (role in roles) {
             val ref = theme[role]
             assertTrue("rôle $role absent du thème", ref != null)
-            assertTrue("$role doit renvoyer à la palette, pas à une valeur écrite ici : $ref", ref!!.startsWith("@color/kalmia_"))
+            assertTrue("$role doit renvoyer à la palette, pas à une valeur écrite ici : $ref", ref!!.startsWith("@color/md_"))
             assertTrue("$role : couleur absente en clair", light.containsKey(ref.removePrefix("@color/")))
         }
     }
@@ -166,9 +146,9 @@ class ThemeContrastTest {
     }
 
     @Test
-    fun frameworkTextColoursAreKalmiaOnesNotTheMaterialDefaults() {
+    fun frameworkTextColoursFollowTheThemeNotTheMaterialDefaults() {
         // Without these, a TextView, CheckBox or RadioButton with no explicit colour takes the
-        // default Material ink (m3_default_color_primary_text), not the Kalmia one.
+        // default Material text colour (m3_default_color_primary_text), not one of the theme.
         val expected = mapOf(
             "android:textColorPrimary" to "?attr/colorOnSurface",
             "android:textColorSecondary" to "?attr/colorOnSurfaceVariant",
@@ -178,11 +158,11 @@ class ThemeContrastTest {
         )
         for ((item, attr) in expected) {
             val ref = theme[item] ?: error("$item absent du thème")
-            assertTrue("$item doit renvoyer à res/color : $ref", ref.startsWith("@color/kalmia_text_"))
+            assertTrue("$item doit renvoyer à res/color : $ref", ref.startsWith("@color/text_"))
             assertEquals(item, attr, selectorDefault(ref.removePrefix("@color/")))
         }
         for (item in listOf("android:textColorHighlight", "android:textColorPrimaryInverse", "android:textColorHintInverse")) {
-            assertTrue("$item absent du thème", theme[item]?.startsWith("@color/kalmia_") == true)
+            assertTrue("$item absent du thème", (theme[item]?.startsWith("@color/text_") == true || theme[item]?.startsWith("@color/md_") == true))
         }
     }
 
@@ -192,35 +172,28 @@ class ThemeContrastTest {
             val items = parse(f).getElementsByTagName("item")
             for (i in 0 until items.length) {
                 val c = (items.item(i) as Element).getAttribute("android:color")
-                assertTrue("${f.name} : $c", c.startsWith("?attr/color") || c.startsWith("@color/kalmia_"))
+                assertTrue("${f.name} : $c", c.startsWith("?attr/color") || c.startsWith("@color/md_"))
             }
         }
     }
 
     @Test
-    fun selectorsOfButtonsKeysAndMicMatchTheTestedPairs() {
-        // The foreground/background of each component, as drawn, is one of the pairs measured above.
+    fun micSelectorsMatchTheTestedPairs() {
+        // The foreground/background of the mic, as drawn, is one of the pairs measured above.
         val tested = pairs.map { it.first to it.second }.toSet()
-        val components = listOf(
-            "kalmia_button_text" to "kalmia_button_bg", // action buttons
-            "kalmia_mic_icon" to "kalmia_mic_bg",       // mic at rest
-        )
-        for ((fg, bg) in components) {
-            val pair = selectorDefault(fg).removePrefix("?attr/") to selectorDefault(bg).removePrefix("?attr/")
-            assertTrue("$fg sur $bg = $pair, paire non mesurée", pair in tested)
-        }
-        // Mic while listening (activated state: first non-disabled item).
+        // Mic at rest: default item of each selector.
+        val rest = selectorDefault("mic_icon").removePrefix("?attr/") to selectorDefault("mic_bg").removePrefix("?attr/")
+        assertTrue("micro au repos $rest, paire non mesurée", rest in tested)
+        // Mic while listening (activated state).
         fun activated(name: String): String {
             val items = parse(res.resolve("color/$name.xml")).getElementsByTagName("item")
             return (0 until items.length).map { items.item(it) as Element }
                 .first { it.getAttribute("android:state_activated") == "true" }
                 .getAttribute("android:color").removePrefix("?attr/")
         }
-        assertTrue(activated("kalmia_mic_icon") to activated("kalmia_mic_bg") in tested)
-        // Keys and outlined buttons: ink text on paper 2 (keys) or paper (outlined buttons).
-        val key = selectorDefault("kalmia_key_text").removePrefix("?attr/")
-        assertTrue(key to "colorSurfaceContainer" in tested)
-        assertTrue(key to "colorSurface" in tested)
+        val listening = activated("mic_icon") to activated("mic_bg")
+        assertTrue("micro à l'écoute $listening, paire non mesurée", listening in tested)
+        assertNotEquals("le micro à l'écoute doit se distinguer du micro au repos", rest, listening)
     }
 
     /** Items of the style [name] in themes.xml. */
@@ -237,14 +210,22 @@ class ThemeContrastTest {
         assertTrue(key["android:layout_height"]!!.removeSuffix("dp").toFloat() >= 48f)
         // The gap between keys is an inset (inside the touch area), never an outer margin.
         assertTrue("marge externe sur les touches", key.keys.none { it.startsWith("android:layout_margin") })
-        assertEquals("@style/TextAppearance.Kalmia.Key", key["android:textAppearance"])
-        assertTrue(style("TextAppearance.Kalmia.Key")["android:textSize"]!!.removeSuffix("sp").toFloat() >= 20f)
-        assertTrue(style("Widget.Kalmia.Button")["android:minHeight"]!!.removeSuffix("dp").toFloat() >= 48f)
-        assertTrue(style("Widget.Kalmia.OutlinedButton")["android:minHeight"]!!.removeSuffix("dp").toFloat() >= 48f)
+        assertEquals("@style/TextAppearance.Dictee.Key", key["android:textAppearance"])
+        assertTrue(style("TextAppearance.Dictee.Key")["android:textSize"]!!.removeSuffix("sp").toFloat() >= 20f)
+    }
+
+    @Test
+    fun keyboardButtonsAreAtLeast48dpHigh() {
+        val layout = res.resolve("layout/keyboard_view.xml").readText()
+        for (id in listOf("model", "cancel_wait", "help", "settings")) {
+            val tag = Regex("<[A-Za-z.]+\\s[^>]*android:id=\"@\\+id/$id\"[^>]*>").find(layout)?.value ?: error("$id absent du clavier")
+            val h = Regex("android:layout_height=\"(\\d+)dp\"").find(tag)?.groupValues?.get(1)?.toInt() ?: error("$id sans hauteur en dp")
+            assertTrue("$id : $h dp < 48 dp", h >= 48)
+        }
     }
 
     @Test
     fun everyPaletteColourHasADarkValue() {
-        for (name in light.keys) assertTrue("values-night/colors.xml doit définir $name", colors("values-night").containsKey(name))
+        for (name in light.keys.filter { it.startsWith("md_") }) assertTrue("values-night/colors.xml doit définir $name", colors("values-night").containsKey(name))
     }
 }

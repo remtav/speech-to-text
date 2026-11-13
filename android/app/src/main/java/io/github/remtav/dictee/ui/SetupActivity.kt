@@ -45,7 +45,6 @@ class SetupActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         app = DicteeApp.from(this)
         val col = scrollingColumn()
-        col.logo()
         col.title(getString(R.string.app_name))
         col.body(getString(R.string.setup_intro))
         col.button(getString(R.string.setup_howto), outlined = true) {

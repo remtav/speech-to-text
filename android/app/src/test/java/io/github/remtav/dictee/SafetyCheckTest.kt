@@ -147,7 +147,10 @@ class SafetyCheckTest {
     @Test fun caseAndPunctuationOnlyAreAccepted() {
         assertAccepted("on se voit au cégep demain", "On se voit au cégep demain.")
         assertAccepted("je passe à la friperie demain est-ce que tu viens", "Je passe à la friperie demain. Est-ce que tu viens ?")
-        assertAccepted("Je passe à la Friperie demain.", "Je passe à la friperie demain.")
+        // Lowering a capital mid-sentence is refused (independent review): "j'ai vu Pierre" -> "pierre"
+        // is a changed word; at a sentence start it is a case fix.
+        assertRejected("Je passe à la Friperie demain.", "Je passe à la friperie demain.")
+        assertAccepted("Friperie demain.", "friperie demain.")
         assertAccepted("c’est la friperie", "C'est la friperie.")
     }
 

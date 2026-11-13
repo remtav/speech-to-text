@@ -5,11 +5,11 @@ import org.junit.Test
 import java.io.File
 
 /**
- * CI guard of issue #15, step 1.5: no colour and no font written by hand outside the palette and the
- * theme. Colours live in `res/values/colors.xml` and `res/values-night/colors.xml` (and are used through
- * theme attributes or `@color/...`), fonts live in `res/font` and are used through the named text styles
- * of the theme. The guard walks the sources, so it runs in the existing unit-test job.
- * It also checks that no downloadable font is declared (the app must not depend on an online service to display).
+ * CI guard of issue #15: no colour and no font written by hand outside the palette and the theme.
+ * Colours live in `res/values/colors.xml` and `res/values-night/colors.xml` (and are used through
+ * theme attributes or `@color/...`); text uses the named text styles of the theme, which point at the
+ * Material defaults (system fonts). The guard walks the sources, so it runs in the existing unit-test job.
+ * It also checks that no font is embedded or downloadable (the app must not depend on an online service to display).
  */
 class NoHardcodedStyleTest {
     private val main = File(System.getProperty("dictee.assetsDir")!!).parentFile
@@ -78,22 +78,16 @@ class NoHardcodedStyleTest {
     }
 
     @Test
-    fun fontsAreAlwaysReferencedAsEmbeddedFontResources() {
+    fun noFontIsEmbeddedOrNamedInResources() {
+        assertTrue("res/font ne doit pas exister : polices du système seulement", !res.resolve("font").exists())
         val problems = ArrayList<String>()
         for (f in files(res, "xml")) {
             val text = stripXmlComments(f.readText())
-            Regex("name=\"(android:)?fontFamily\">([^<]*)<").findAll(text).forEach { m ->
-                if (!m.groupValues[2].trim().startsWith("@font/") && !m.groupValues[2].trim().startsWith("?")) {
-                    problems += "${relative(f)} : fontFamily « ${m.groupValues[2]} » ne vient pas de res/font"
-                }
-            }
-            Regex("android:fontFamily=\"([^\"]*)\"").findAll(text).forEach { m ->
-                if (!m.groupValues[1].startsWith("@font/") && !m.groupValues[1].startsWith("?")) {
-                    problems += "${relative(f)} : fontFamily « ${m.groupValues[1]} » ne vient pas de res/font"
-                }
-            }
+            Regex("(android:)?fontFamily\"?[=>]").findAll(text).forEach { problems += "${relative(f)} : fontFamily" }
+            if (text.contains("@font/")) problems += "${relative(f)} : @font/"
         }
-        assertTrue("police hors de res/font :\n" + problems.joinToString("\n"), problems.isEmpty())
+        for (f in files(main, "ttf") + files(main, "otf")) problems += "${relative(f)} : fichier de police embarqué"
+        assertTrue("police embarquée ou nommée :\n" + problems.joinToString("\n"), problems.isEmpty())
     }
 
     @Test
@@ -110,24 +104,5 @@ class NoHardcodedStyleTest {
             for (t in tokens) if (text.contains(t)) problems += "${f.name} : $t"
         }
         assertTrue("police téléchargeable déclarée :\n" + problems.joinToString("\n"), problems.isEmpty())
-    }
-
-    @Test
-    fun embeddedFontFamiliesPointAtFilesShippedWithTheirLicence() {
-        val fontDir = res.resolve("font")
-        val ttf = fontDir.listFiles()!!.filter { it.extension == "ttf" }.map { it.nameWithoutExtension }.toSet()
-        assertTrue("polices attendues dans res/font : $ttf", ttf.containsAll(
-            listOf("newsreader_vf", "newsreader_italic_vf", "ibm_plex_mono_regular", "ibm_plex_mono_medium"),
-        ))
-        for (family in fontDir.listFiles()!!.filter { it.extension == "xml" }) {
-            Regex("android:font=\"@font/([a-z0-9_]+)\"").findAll(family.readText()).forEach {
-                assertTrue("${family.name} renvoie à @font/${it.groupValues[1]}, absent de res/font", it.groupValues[1] in ttf)
-            }
-        }
-        for (licence in listOf("OFL-Newsreader.txt", "OFL-IBMPlexMono.txt")) {
-            val f = main.resolve("assets/licences/$licence")
-            assertTrue("licence manquante : $licence", f.isFile)
-            assertTrue("$licence n'est pas la licence OFL", f.readText().contains("SIL OPEN FONT LICENSE"))
-        }
     }
 }
