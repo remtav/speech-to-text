@@ -10,7 +10,6 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import io.github.remtav.dictee.stt.DictationLanguage
 import io.github.remtav.dictee.stt.ModelCatalog
-import io.github.remtav.dictee.stt.ModelRecommendations
 import io.github.remtav.dictee.ui.SettingsActivity
 import io.github.remtav.dictee.ui.SetupActivity
 import io.github.remtav.dictee.ui.languageTag
@@ -23,9 +22,9 @@ import org.junit.Test
 import org.junit.runner.RunWith
 
 /**
- * Issue #15, step 1.3: first launch -> welcome -> language choice -> the
- * recommended model is marked; changing the languages in the settings changes
- * the recommendation. Reads the view tree (stable tags and ids), needs neither
+ * Issue #15, step 1.3, and issue #22: first launch -> welcome -> language choice ->
+ * only the models offered for the languages are shown (Whisper turbo recommended,
+ * Parakeet for English alone); changing the languages in the settings changes the offer. Reads the view tree (stable tags and ids), needs neither
  * network nor an installed model.
  */
 @RunWith(AndroidJUnit4::class)
@@ -57,17 +56,33 @@ class SetupLanguageTest {
         return out
     }
 
-    /** Ids of the models whose card carries the "recommended" badge. */
+    /** Ids of the models that have a card on the setup screen, in screen order. */
+    private fun ActivityScenario<*>.shownModels(): List<String> {
+        val ids = mutableListOf<String>()
+        onActivity { a ->
+            for (spec in ModelCatalog.all) {
+                if (a.window.decorView.findViewWithTag<View>(SetupActivity.modelCardTag(spec)) != null) ids += spec.id
+            }
+        }
+        return ids
+    }
+
+    /** Ids of the shown models whose card carries the "recommended" badge. */
     private fun ActivityScenario<*>.recommendedModels(): List<String> {
         val ids = mutableListOf<String>()
         onActivity { a ->
             for (spec in ModelCatalog.all) {
-                val card = a.window.decorView.findViewWithTag<View>(SetupActivity.modelCardTag(spec))
-                assertNotNull("card of ${spec.id}", card)
+                val card = a.window.decorView.findViewWithTag<View>(SetupActivity.modelCardTag(spec)) ?: continue
                 if (card.findViewById<View>(R.id.recommended_badge) != null) ids += spec.id
             }
         }
         return ids
+    }
+
+    private fun ActivityScenario<*>.hasTag(tag: String): Boolean {
+        var found = false
+        onActivity { a -> found = a.window.decorView.findViewWithTag<View>(tag) != null }
+        return found
     }
 
     private fun ActivityScenario<*>.box(language: DictationLanguage): CheckBox {
@@ -81,8 +96,11 @@ class SetupLanguageTest {
         instrumentation.waitForIdleSync()
     }
 
+    private val whisper = ModelCatalog.whisperTurbo.id
+    private val parakeet = ModelCatalog.parakeet.id
+
     @Test
-    fun firstLaunchShowsWelcomeAndMarksParakeetForQuebecFrench() {
+    fun firstLaunchShowsWelcomeAndOffersOnlyWhisperTurboForQuebecFrench() {
         ActivityScenario.launch(SetupActivity::class.java).use { s ->
             val text = s.text()
             assertTrue("welcome text", text.contains("conçu au Québec"))
@@ -97,57 +115,74 @@ class SetupLanguageTest {
                 }
             }
             assertEquals(listOf(DictationLanguage.FRENCH_QUEBEC), checked)
-            assertEquals(listOf(ModelCatalog.parakeet.id), s.recommendedModels())
+            // Issue #22: only Whisper turbo is offered (and recommended) with Quebec French.
+            assertEquals(listOf(whisper), s.shownModels())
+            assertEquals(listOf(whisper), s.recommendedModels())
             assertTrue(text.contains("Recommandé pour vos langues"))
-            // Publisher and licence on the cards, and the "runs on the phone" reminder.
-            assertTrue(text.contains(ModelCatalog.parakeet.publisher))
-            assertTrue(text.contains(ModelCatalog.parakeet.license))
+            // Publisher and licence on the card, and the "runs on the phone" reminder.
+            assertTrue(text.contains(ModelCatalog.whisperTurbo.publisher))
+            assertTrue(text.contains(ModelCatalog.whisperTurbo.license))
             assertTrue(text.contains("s'exécute sur votre téléphone"))
+            assertTrue(!text.contains(ModelCatalog.WHISPER_QC_NOTE))
         }
     }
 
     @Test
-    fun choosingALanguageParakeetLacksMovesTheBadgeAndWarns() {
+    fun parakeetIsOfferedForEnglishAloneOnly() {
         ActivityScenario.launch(SetupActivity::class.java).use { s ->
-            s.click(DictationLanguage.MANDARIN)
-            assertEquals(ModelRecommendations.recommend(app.settings.languages).model.id, s.recommendedModels().single())
-            assertEquals(ModelCatalog.qwen3.id, s.recommendedModels().single())
-            // Parakeet is not blocked, but carries a written warning.
-            var warned = false
-            var parakeetEnabledToDownload = false
-            s.onActivity { a ->
-                val card = a.window.decorView.findViewWithTag<View>(SetupActivity.modelCardTag(ModelCatalog.parakeet))
-                warned = card.findViewWithTag<android.widget.TextView>(SetupActivity.WARNING_TAG)?.text?.contains("mandarin") == true
-                parakeetEnabledToDownload = card.allViews().filterIsInstance<android.widget.Button>().any { it.isEnabled }
-            }
-            assertTrue("warning text on Parakeet", warned)
-            assertTrue("nothing is blocked", parakeetEnabledToDownload)
-            // Add Bengali: only Whisper covers everything.
-            s.click(DictationLanguage.BENGALI)
-            assertEquals(listOf(ModelCatalog.whisperTurbo.id), s.recommendedModels())
-        }
-    }
-
-    @Test
-    fun quebecWhisperIsListedAndWarnsOnlyWhenEnglishIsAdded() {
-        ActivityScenario.launch(SetupActivity::class.java).use { s ->
-            fun warning(): String? {
-                var text: String? = null
-                s.onActivity { a ->
-                    val card = a.window.decorView.findViewWithTag<View>(SetupActivity.modelCardTag(ModelCatalog.whisperQuebec))
-                    assertNotNull("card of the Quebec Whisper", card)
-                    text = card.findViewWithTag<android.widget.TextView>(SetupActivity.WARNING_TAG)?.text?.toString()
-                }
-                return text
-            }
-            assertEquals(null, warning())
-            assertTrue(s.text().contains(ModelCatalog.WHISPER_QC_NOTE))
             s.click(DictationLanguage.ENGLISH)
-            val w = warning()
-            assertTrue(w, w != null && w.contains("ne couvre pas") && w.contains("anglais"))
-            // Never the recommended one.
-            assertEquals(listOf(ModelCatalog.parakeet.id), s.recommendedModels())
+            assertEquals(listOf(whisper), s.shownModels())
+            s.click(DictationLanguage.FRENCH_QUEBEC) // unchecked: English alone
+            assertEquals(setOf(DictationLanguage.ENGLISH), app.settings.languages)
+            assertEquals(listOf(whisper, parakeet), s.shownModels())
+            assertEquals(listOf(whisper), s.recommendedModels())
+            s.click(DictationLanguage.MANDARIN)
+            assertEquals(listOf(whisper), s.shownModels())
         }
+    }
+
+    @Test
+    fun hiddenAndExperimentalModelsAreNotOnTheSetupScreen() {
+        ActivityScenario.launch(SetupActivity::class.java).use { s ->
+            for (language in listOf(DictationLanguage.ENGLISH, DictationLanguage.MANDARIN, DictationLanguage.BENGALI)) {
+                s.click(language)
+                val shown = s.shownModels()
+                assertTrue(shown.toString(), ModelCatalog.qwen3.id !in shown)
+                assertTrue(shown.toString(), ModelCatalog.whisperQuebec.id !in shown)
+                assertTrue(shown.toString(), ModelCatalog.liteWhisperTurbo.id !in shown)
+            }
+        }
+    }
+
+    /** Issue #22, step 5: Parakeet active, then Quebec French chosen: Whisper turbo takes over, with a notice. */
+    @Test
+    fun parakeetGivesWayToWhisperTurboWhenQuebecFrenchIsChosen() {
+        app.settings.languages = setOf(DictationLanguage.ENGLISH)
+        app.settings.activeModelId = parakeet
+        ActivityScenario.launch(SetupActivity::class.java).use { s ->
+            assertTrue(!s.hasTag(SetupActivity.RETIRED_NOTICE_TAG))
+            s.click(DictationLanguage.FRENCH_QUEBEC)
+            assertEquals(whisper, app.settings.activeModelId)
+            assertTrue(s.hasTag(SetupActivity.RETIRED_NOTICE_TAG))
+            // Whisper turbo is not installed here: the notice invites to download it. Parakeet is not hidden: no delete.
+            assertTrue(s.hasTag(SetupActivity.RETIRED_DOWNLOAD_TAG))
+            assertTrue(!s.hasTag(SetupActivity.RETIRED_DELETE_TAG))
+            s.onActivity { a -> a.window.decorView.findViewWithTag<View>(SetupActivity.RETIRED_OK_TAG).performClick() }
+            instrumentation.waitForIdleSync()
+            assertTrue(!s.hasTag(SetupActivity.RETIRED_NOTICE_TAG))
+            assertEquals("", app.settings.retiredModelNotice)
+        }
+    }
+
+    @Test
+    fun hiddenActiveModelIsReplacedAtStartUp() {
+        app.settings.activeModelId = ModelCatalog.whisperQuebec.id
+        app.migrateModels()
+        assertEquals(whisper, app.settings.activeModelId)
+        assertEquals(ModelCatalog.whisperQuebec.id, app.settings.retiredModelNotice)
+        // The server's local fallback is never a hidden model either.
+        app.settings.remoteFallbackId = ModelCatalog.qwen3.id
+        assertEquals(whisper, app.settings.remoteFallbackId)
     }
 
     @Test
@@ -165,23 +200,23 @@ class SetupLanguageTest {
      * activity (its scenario then failed with a NullPointerException in CI).
      */
     @Test
-    fun changingTheLanguagesInTheSettingsChangesTheRecommendation() {
+    fun changingTheLanguagesInTheSettingsChangesTheOffer() {
         ActivityScenario.launch(SetupActivity::class.java).use { setup ->
-            assertEquals(listOf(ModelCatalog.parakeet.id), setup.recommendedModels())
+            assertEquals(listOf(whisper), setup.shownModels())
         }
         ActivityScenario.launch<SettingsActivity>(Intent(context, SettingsActivity::class.java)).use { settings ->
             // Same list, same default as on the setup screen.
             assertTrue(settings.box(DictationLanguage.FRENCH_QUEBEC).isChecked)
-            settings.click(DictationLanguage.ARABIC)
-            settings.click(DictationLanguage.HINDI)
+            // Issue #22: the experimental Lite-Whisper is listed in the settings.
+            assertTrue(settings.hasTag(SettingsActivity.experimentalCardTag(ModelCatalog.liteWhisperTurbo)))
+            settings.click(DictationLanguage.ENGLISH)
+            settings.click(DictationLanguage.FRENCH_QUEBEC)
         }
-        assertEquals(
-            setOf(DictationLanguage.FRENCH_QUEBEC, DictationLanguage.HINDI, DictationLanguage.ARABIC),
-            app.settings.languages,
-        )
+        assertEquals(setOf(DictationLanguage.ENGLISH), app.settings.languages)
         ActivityScenario.launch(SetupActivity::class.java).use { setup ->
-            assertEquals(listOf(ModelCatalog.qwen3.id), setup.recommendedModels())
-            assertTrue(setup.box(DictationLanguage.ARABIC).isChecked)
+            assertEquals(listOf(whisper, parakeet), setup.shownModels())
+            assertEquals(listOf(whisper), setup.recommendedModels())
+            assertTrue(setup.box(DictationLanguage.ENGLISH).isChecked)
         }
     }
 
@@ -189,13 +224,13 @@ class SetupLanguageTest {
     @Test
     fun setupRedrawsOnResumeAfterTheLanguagesChanged() {
         ActivityScenario.launch(SetupActivity::class.java).use { setup ->
-            assertEquals(listOf(ModelCatalog.parakeet.id), setup.recommendedModels())
+            assertEquals(listOf(whisper), setup.shownModels())
             setup.moveToState(Lifecycle.State.CREATED) // covered, as by the settings screen
-            app.settings.languages = setOf(DictationLanguage.FRENCH_QUEBEC, DictationLanguage.BENGALI)
+            app.settings.languages = setOf(DictationLanguage.ENGLISH)
             setup.moveToState(Lifecycle.State.RESUMED)
             instrumentation.waitForIdleSync()
-            assertEquals(listOf(ModelCatalog.whisperTurbo.id), setup.recommendedModels())
-            assertTrue(setup.box(DictationLanguage.BENGALI).isChecked)
+            assertEquals(listOf(whisper, parakeet), setup.shownModels())
+            assertTrue(setup.box(DictationLanguage.ENGLISH).isChecked)
         }
     }
 

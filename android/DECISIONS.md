@@ -3711,3 +3711,19 @@ ni police en dur ».
 | Texte, consentement, vrai courriel | Humain (A_VERIFIER, points 16 à 20). |
 
 Vérification locale : `./gradlew testDebugUnitTest assembleDebug assembleDebugAndroidTest lintDebug --console=plain -q`.
+
+## Issue #22 : Whisper turbo par défaut, modèles cachés, Lite-Whisper expérimental
+
+- `ModelSpec.visibility` (`VISIBLE`, `EXPERIMENTAL`, `HIDDEN`) : on cache sans supprimer. `ModelCatalog.all` garde
+  tout (cinq modèles) ; `offered(langues)` = visibles, couvrant les langues, Parakeet seulement pour l'anglais seul ;
+  `experimental` = Lite-Whisper ; `listed(langues)` = les deux.
+- Écrans : installation = `offered` ; clavier, comparaison = `listed` (+ serveur) ; Réglages = section « Modèles
+  expérimentaux » (télécharger, choisir, supprimer) et repli du serveur dans `listed` ; test de lecture = `offered`.
+- Recommandation : toujours Whisper turbo ; la note de Whisper ne dit plus « dernier recours ».
+- Migration (`ModelMigration`, `DicteeApp.migrateModels`) : au démarrage et à chaque changement de langues. Le
+  modèle actif passe à Whisper turbo même s'il n'est pas installé (l'avis invite alors à le télécharger : choix le
+  plus simple, la dictée affiche déjà « non installé » sinon). L'avis reste sur l'écran principal jusqu'au clic
+  « J'ai compris » ; la suppression des fichiers n'est proposée que pour un modèle caché.
+- Repli du serveur : un identifiant caché ou qui ne convient plus aux langues se lit comme Whisper turbo.
+- `switchModel` (clavier) accepte encore tout identifiant du catalogue : seul le menu filtre (les tests
+  instrumentés s'en servent).

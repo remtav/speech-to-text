@@ -12,6 +12,7 @@ import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.RadioButton
 import android.widget.TextView
+import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
@@ -20,6 +21,8 @@ import io.github.remtav.dictee.DicteeApp
 import io.github.remtav.dictee.R
 import io.github.remtav.dictee.stt.DictationLanguage
 import io.github.remtav.dictee.stt.ModelCatalog
+import io.github.remtav.dictee.stt.ModelMigration
+import io.github.remtav.dictee.stt.ModelVisibility
 import io.github.remtav.dictee.stt.ModelRecommendation
 import io.github.remtav.dictee.stt.ModelRecommendations
 import io.github.remtav.dictee.stt.ModelSpec
@@ -153,7 +156,8 @@ class SetupActivity : AppCompatActivity() {
     }
 
     private fun setupComplete(): Boolean {
-        val modelReady = (ModelCatalog.all + ModelCatalog.remote).any { app.isInstalled(it) }
+        // Only a model the keyboard can use counts (a hidden model's files may still be on the phone).
+        val modelReady = (ModelCatalog.listed(app.settings.languages) + ModelCatalog.remote).any { app.isInstalled(it) }
         return SetupProgress.isComplete(isKeyboardEnabled(), isMicGranted(), modelReady)
     }
 
@@ -179,8 +183,47 @@ class SetupActivity : AppCompatActivity() {
         modelsBox.removeAllViews()
         val chosen = app.settings.languages
         val recommendation = ModelRecommendations.recommend(chosen)
-        for (spec in ModelCatalog.all) renderModel(spec, chosen, recommendation)
+        renderRetiredNotice()
+        // Issue #22: only the models offered for the chosen languages (experimental ones are in the settings).
+        for (spec in ModelCatalog.offered(chosen)) renderModel(spec, chosen, recommendation)
         renderRemote()
+    }
+
+    /**
+     * The one-time notice after the active model was replaced ([DicteeApp.migrateModels]): an invitation to
+     * download Whisper turbo when it is missing, and a button to delete a hidden model's files. Nothing is
+     * deleted without that click; closing the notice keeps the files.
+     */
+    private fun renderRetiredNotice() {
+        val retired = ModelCatalog.byId(app.settings.retiredModelNotice) ?: return
+        val replacement = ModelMigration.replacement
+        val card = modelsBox.card()
+        card.tag = RETIRED_NOTICE_TAG
+        card.heading(getString(R.string.model_notice_title))
+        card.body(getString(R.string.model_notice_replaced, retired.displayName, replacement.displayName))
+        val missing = !app.store.isInstalled(replacement) && !Downloads.isBusy(replacement.id)
+        if (missing) card.body(getString(R.string.model_notice_download, replacement.displayName), small = true)
+        val deletable = retired.visibility == ModelVisibility.HIDDEN && app.store.isInstalled(retired)
+        if (missing) {
+            card.button(getString(R.string.model_notice_download_button, replacement.displayName)) {
+                startDownload(replacement)
+            }.tag = RETIRED_DOWNLOAD_TAG
+        }
+        if (deletable) {
+            card.button(
+                getString(R.string.model_notice_delete_button, retired.displayName, size(app.store.installedBytes(retired.asDownloadable()))),
+                outlined = true,
+            ) {
+                if (app.engines.current()?.spec?.id == retired.id) app.engines.release()
+                app.store.delete(retired)
+                Toast.makeText(this, getString(R.string.model_notice_deleted, retired.displayName), Toast.LENGTH_SHORT).show()
+                renderModels()
+            }.tag = RETIRED_DELETE_TAG
+        }
+        card.button(getString(R.string.model_notice_ok), outlined = true) {
+            app.settings.retiredModelNotice = ""
+            renderModels()
+        }.tag = RETIRED_OK_TAG
     }
 
     /** The user's server, shown as one more model once its address is set in the settings. */
@@ -291,5 +334,9 @@ class SetupActivity : AppCompatActivity() {
         fun modelNoteTag(spec: ModelSpec) = "model_note_${spec.id}"
         const val WARNING_TAG = "model_warning"
         const val HOWTO_BUTTON_TAG = "setup_howto_button"
+        const val RETIRED_NOTICE_TAG = "retired_model_notice"
+        const val RETIRED_DOWNLOAD_TAG = "retired_model_download"
+        const val RETIRED_DELETE_TAG = "retired_model_delete"
+        const val RETIRED_OK_TAG = "retired_model_ok"
     }
 }

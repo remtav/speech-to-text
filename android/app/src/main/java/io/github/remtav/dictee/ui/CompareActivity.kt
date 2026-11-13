@@ -132,7 +132,8 @@ class CompareActivity : AppCompatActivity() {
         if (busy) return
         val samples = references.filter { it.first.isChecked }.map { it.second }.toMutableList()
         recording?.let { samples += BenchSample("enregistrement", "?", it, null) }
-        val models = ModelCatalog.selectable.filter { app.isInstalled(it) }
+        // Issue #22: the models offered for the languages, the experimental ones, and the user's server.
+        val models = (ModelCatalog.listed(app.settings.languages) + ModelCatalog.remote).filter { app.isInstalled(it) }
         if (models.isEmpty() || samples.isEmpty()) {
             Toast.makeText(this, R.string.compare_nothing, Toast.LENGTH_LONG).show()
             return

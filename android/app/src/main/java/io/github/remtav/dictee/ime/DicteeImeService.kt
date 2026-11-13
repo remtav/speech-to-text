@@ -561,7 +561,8 @@ class DicteeImeService : InputMethodService(), DictationListener, EngineManager.
 
     private fun showModelMenu(anchor: View) {
         val menu = PopupMenu(anchor.context, anchor)
-        val installed = ModelCatalog.selectable.filter { app.isInstalled(it) }
+        // Issue #22: offered for the languages, then the experimental ones, then the user's server.
+        val installed = (ModelCatalog.listed(app.settings.languages) + ModelCatalog.remote).filter { app.isInstalled(it) }
         if (installed.isEmpty()) {
             showMessage(getString(R.string.msg_no_model), error = true)
             return

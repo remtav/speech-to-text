@@ -22,6 +22,7 @@ import io.github.remtav.dictee.stt.ModelStore
 import io.github.remtav.dictee.stt.DefaultEngineFactory
 import io.github.remtav.dictee.stt.EngineOptions
 import io.github.remtav.dictee.stt.ModelFamily
+import io.github.remtav.dictee.stt.ModelMigration
 import io.github.remtav.dictee.stt.ModelSpec
 import io.github.remtav.dictee.stt.SttEngineFactory
 import io.github.remtav.dictee.stt.RemoteEngine
@@ -69,6 +70,7 @@ class DicteeApp : Application() {
         // Messages are redacted by RemoteEngine: no token or Cloudflare secret reaches logcat.
         RemoteEngine.defaultLog = RemoteLog { android.util.Log.i("DicteeRemote", it) }
         applyTheme()
+        migrateModels()
         // Reading-test contribution (issue #15, step 4.3): an archive is deleted with its screen; one that
         // survived a killed process for more than a day goes now (not younger: the person's mail may still
         // be reading it, and this process also starts for the keyboard).
@@ -87,6 +89,19 @@ class DicteeApp : Application() {
                 ThemeMode.DARK -> AppCompatDelegate.MODE_NIGHT_YES
             },
         )
+    }
+
+    /**
+     * Issue #22: an active model that is hidden or no longer suits the chosen languages (Parakeet
+     * with Quebec French, say) is replaced by Whisper turbo, and the main screen tells the user once
+     * (inviting to download Whisper turbo if it is missing, offering to delete the hidden model's
+     * files: nothing is deleted without a click). Run at start-up and when the languages change.
+     */
+    fun migrateModels() {
+        val notice = ModelMigration.plan(settings.activeModelId, settings.languages) { isInstalled(it) } ?: return
+        settings.activeModelId = notice.replacement.id
+        settings.retiredModelNotice = notice.retired.id
+        if (engines.current()?.spec?.id == notice.retired.id) engines.release()
     }
 
     fun isInstalled(spec: ModelSpec): Boolean = when {

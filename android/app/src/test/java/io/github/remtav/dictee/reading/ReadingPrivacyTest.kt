@@ -110,9 +110,13 @@ class ReadingPrivacyTest {
     fun theTestNeverRunsTheUsersOwnServer() {
         // Only the on-device catalogue is offered to the test: the server would take the voice over the network.
         val screen = code(java.resolve("ui/ReadingTestActivity.kt"))
-        assertTrue(screen.contains("ModelCatalog.all.filter"))
+        assertTrue(screen.contains("ModelCatalog.offered(settings.languages).filter"))
         // Review 4.R: and that list really holds no server (the server is `ModelCatalog.remote`, outside it).
         assertTrue(io.github.remtav.dictee.stt.ModelCatalog.all.none { it.family == io.github.remtav.dictee.stt.ModelFamily.REMOTE })
+        for (l in io.github.remtav.dictee.stt.DictationLanguage.entries) {
+            val offered = io.github.remtav.dictee.stt.ModelCatalog.offered(setOf(l))
+            assertTrue(offered.none { it.family == io.github.remtav.dictee.stt.ModelFamily.REMOTE })
+        }
         assertTrue(io.github.remtav.dictee.stt.ModelCatalog.remote !in io.github.remtav.dictee.stt.ModelCatalog.all)
         // The transcriber of the screen model looks the id up in that list too, never with byId.
         val model = code(java.resolve("ui/ReadingTestModel.kt"))

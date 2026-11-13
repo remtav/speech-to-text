@@ -74,7 +74,8 @@ class ReadingTestActivity : AppCompatActivity() {
         val settings = app.settings
         val material = ReadingMaterial.load { path -> assets.open(path).bufferedReader().use { it.readText() } }
         // On-device models only: the user's own server would take the voice over the network.
-        val models = ModelCatalog.all.filter { app.isInstalled(it) }.map { ReadingModel(it.id, it.displayName) }
+        // Issue #22: the models offered for the languages, never a hidden nor an experimental one.
+        val models = ModelCatalog.offered(settings.languages).filter { app.isInstalled(it) }.map { ReadingModel(it.id, it.displayName) }
         return ReadingSession(
             material = material,
             models = models,
