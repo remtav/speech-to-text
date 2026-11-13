@@ -3114,3 +3114,54 @@ délai de grâce de rotation n'est pas allongé : ce serait changer le produit s
   `RobustnessInstrumentedTest`.
 - Reste : confirmer dans la CI que `ImeTestBase` modifié passe ; corrections à reporter dans `docs/A_VERIFIER.md`
   (listées dans le rapport de revue à l'orchestrateur, ce fichier-là n'est pas modifié par la revue).
+
+`--tests '*ModelAccuracyHostTest.qwen3Forced*' -PmodelsDir=…`.
+
+## Issue #15 — demande de l'utilisateur : retour au style générique
+
+Date : 2026-11-13. Demande : « Retire tout le style lié à Kalmia. Reviens au style générique. » Elle remplace la
+section « Identité visuelle Kalmia » de l'issue et l'étape 1.5 : **la section 1.5 de ce fichier et « Identité
+visuelle Kalmia » de l'issue sont désormais caduques** (elles restent plus haut comme historique).
+
+Référence du « style générique » : l'apparence d'avant l'étape 1.5 (commit `800d08e`) : thème Material 3 DayNight
+bleu (`#2E5E8C`), polices du système, coins arrondis (touches à 12 dp), ombres Material ordinaires, icône de
+lancement bleue d'origine.
+
+Portée tranchée par l'orchestrateur (prudente) :
+
+**Retiré**
+- La palette Kalmia (papier, encre, vert sauge, fleur…) et les rôles qui la faisaient correspondre à Material 3.
+- Les polices embarquées Newsreader et IBM Plex Mono (`res/font/*`, 1,2 Mo) et leurs licences
+  (`assets/licences/OFL-*.txt`) : plus aucune police dans l'application.
+- Les angles droits imposés, l'ombre pleine décalée (`kalmia_ombre_bouton`), les majuscules espacées « façon
+  étiquette », les styles `Widget.Kalmia.*`, `ShapeAppearance.Kalmia.*`, `TextAppearance.Kalmia.*`.
+- Le logo Kalmia (`kalmia_logo`, le logo de l'écran d'accueil, `cd_kalmia_logo`), l'icône de lancement dérivée du logo
+  et sa couche monochrome ; retour à l'icône d'origine (micro blanc sur fond bleu).
+- Les sélecteurs `res/color/kalmia_button_*` et `kalmia_key_text` (les boutons reprennent les couleurs Material).
+
+**Gardé**
+- Le **nom** « Kalmia Blabla » et tous les textes (la demande porte sur le style, pas sur le nom ni le
+  positionnement) ; toutes les fonctionnalités des lots 1 à 3.
+- Les acquis d'accessibilité et de robustesse, qui ne sont pas du « style Kalmia » : erreurs en rouge avec icône
+  (`markError`, `ic_error`) ; zones tactiles d'au moins 48 dp (boutons du clavier, bouton d'aide) ; symboles des
+  touches d'au moins 20 sp (24 sp) ; écart entre touches en marge interne (zone tactile continue) ; clavier qui
+  suit le réglage Système / Clair / Sombre ; texte lisible dans les deux thèmes ; styles de texte nommés
+  (`TextAppearance.Dictee.*`, utilisés par `ui/Ui.kt`) qui pointent maintenant vers les apparences Material par
+  défaut ; aucun rôle de couleur laissé au thème Material par défaut (tous les rôles utilisés sont définis, clair
+  et sombre, y compris les couleurs de texte du cadre Android).
+- Le micro garde un état visuel distinct à l'écoute : rouge (couleur d'erreur du thème) au lieu de bleu au repos,
+  icône « stop » (jamais la couleur seule).
+
+**Faits**
+- `values/colors.xml` et `values-night/colors.xml` : palette Material 3 bleue (noms `md_*`), seul endroit où un
+  hexadécimal s'écrit, plus `launcher_bg` et `launcher_fg` pour l'icône. `values/themes.xml` : un seul thème
+  `Theme.Dictee` (parent `Theme.Material3.DayNight.NoActionBar`), `KeyButton` (tonal, 12 dp, 52 dp de haut) et le
+  style du micro `Widget.Dictee.Button.Mic`. Les barres système suivent un booléen `light_system_bars` (clair/sombre).
+- `LevelMeterView` : retour à la version d'avant 1.5 (piste `colorSurfaceVariant`, barre `colorPrimary`).
+- Tests : `ThemeContrastTest` garde le principe (ressources lues, 4,5:1 pour chaque paire texte/fond utilisée, clair
+  et sombre, contour 3:1, tous les rôles définis, micro, touches, boutons du clavier à 48 dp) ; il perd « palette =
+  source Kalmia » et ajoute « bleu d'origine ». `NoHardcodedStyleTest` garde « aucune couleur ni police en dur » et
+  « aucune police téléchargeable », et exige maintenant qu'aucune police ne soit embarquée ni nommée. Les tests
+  instrumentés n'utilisaient aucune ressource supprimée.
+- Les captures de `docs/screenshots/` montrent encore le thème Kalmia : elles sont régénérées par la CI
+  (`ScreenshotTest`, mêmes noms de fichiers).

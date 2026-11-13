@@ -4,7 +4,6 @@
     <string name="ime_name">Kalmia Blabla (voix)</string>
     <string name="subtype_label">Dictée FR / EN</string>
 
-    <string name="cd_kalmia_logo">Kalmia</string>
     <string name="cd_start">Commencer la dictée</string>
     <string name="cd_stop">Arrêter la dictée</string>
     <string name="cd_model">Changer de modèle</string>

@@ -1,19 +1,38 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Palette Kalmia, thème sombre (voir values/colors.xml). -->
+<!-- Palette Material 3 bleue, thème sombre (voir values/colors.xml). -->
 <resources>
-    <color name="kalmia_paper">#13160F</color>
-    <color name="kalmia_paper_2">#1B1F17</color>
-    <color name="kalmia_ink">#ECE7DA</color>
-    <color name="kalmia_muted">#A9AB9B</color>
-    <color name="kalmia_rule">#3A3E33</color>
-    <color name="kalmia_green">#8DB596</color>
-    <color name="kalmia_button">#8DB596</color>
-    <color name="kalmia_on_button">#13160F</color>
-    <color name="kalmia_flower">#DE85A7</color>
-    <color name="kalmia_on_flower">#13160F</color>
-    <color name="kalmia_error">#FFB4AB</color>
-    <color name="kalmia_on_error">#690005</color>
-    <color name="kalmia_inverse_surface">#ECE7DA</color>
-    <color name="kalmia_on_inverse_surface">#13160F</color>
-    <color name="kalmia_inverse_primary">#3F5E45</color>
+    <color name="md_primary">#9FCAFF</color>
+    <color name="md_on_primary">#003258</color>
+    <color name="md_primary_container">#00497D</color>
+    <color name="md_on_primary_container">#D1E4FF</color>
+    <color name="md_secondary">#BBC7DB</color>
+    <color name="md_on_secondary">#253140</color>
+    <color name="md_secondary_container">#3B4858</color>
+    <color name="md_on_secondary_container">#D7E3F8</color>
+    <color name="md_tertiary">#D6BEE4</color>
+    <color name="md_on_tertiary">#3B2948</color>
+    <color name="md_tertiary_container">#523F5F</color>
+    <color name="md_on_tertiary_container">#F2DAFF</color>
+    <color name="md_error">#FFB4AB</color>
+    <color name="md_on_error">#690005</color>
+    <color name="md_error_container">#93000A</color>
+    <color name="md_on_error_container">#FFDAD6</color>
+    <color name="md_background">#101418</color>
+    <color name="md_on_background">#E0E2E8</color>
+    <color name="md_surface">#101418</color>
+    <color name="md_on_surface">#E0E2E8</color>
+    <color name="md_surface_variant">#43474E</color>
+    <color name="md_on_surface_variant">#C3C7CF</color>
+    <color name="md_surface_dim">#101418</color>
+    <color name="md_surface_bright">#36393E</color>
+    <color name="md_surface_container_lowest">#0B0F13</color>
+    <color name="md_surface_container_low">#191C20</color>
+    <color name="md_surface_container">#1D2024</color>
+    <color name="md_surface_container_high">#272A2F</color>
+    <color name="md_surface_container_highest">#32353A</color>
+    <color name="md_outline">#8D9199</color>
+    <color name="md_outline_variant">#43474E</color>
+    <color name="md_inverse_surface">#E0E2E8</color>
+    <color name="md_inverse_on_surface">#2E3135</color>
+    <color name="md_inverse_primary">#2E5E8C</color>
 </resources>

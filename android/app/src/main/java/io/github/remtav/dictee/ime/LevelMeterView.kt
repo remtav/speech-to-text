@@ -8,7 +8,7 @@ import android.util.AttributeSet
 import android.util.TypedValue
 import android.view.View
 
-/** Thin input-level bar under the status line (Kalmia: square track in the rule colour, green bar). */
+/** Thin input-level bar under the status line. */
 class LevelMeterView @JvmOverloads constructor(
     context: Context,
     attrs: AttributeSet? = null,
@@ -20,7 +20,7 @@ class LevelMeterView @JvmOverloads constructor(
     private var target = 0f
 
     init {
-        track.color = themeColor(com.google.android.material.R.attr.colorOutlineVariant)
+        track.color = themeColor(com.google.android.material.R.attr.colorSurfaceVariant)
         bar.color = themeColor(androidx.appcompat.R.attr.colorPrimary)
     }
 
@@ -40,11 +40,11 @@ class LevelMeterView @JvmOverloads constructor(
     override fun onDraw(canvas: Canvas) {
         // Fast attack, slow release.
         shown = if (target > shown) target else shown * 0.85f + target * 0.15f
-        // Square ends, like every Kalmia shape.
+        val r = height / 2f
         rect.set(0f, 0f, width.toFloat(), height.toFloat())
-        canvas.drawRect(rect, track)
+        canvas.drawRoundRect(rect, r, r, track)
         rect.right = width * shown
-        if (rect.right > 0.5f) canvas.drawRect(rect, bar)
+        if (rect.right > 0.5f) canvas.drawRoundRect(rect, r, r, bar)
         if (kotlin.math.abs(shown - target) > 0.01f) postInvalidateOnAnimation()
     }
 }

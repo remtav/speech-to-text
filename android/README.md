@@ -120,12 +120,11 @@ dans **Comparer les modèles**.
 
 ## Apparence
 
-L'interface reprend l'image de marque de Kalmia : fond « papier », texte
-« encre », vert et accent « fleur », polices Newsreader et IBM Plex Mono
-embarquées dans l'application (licence SIL OFL, aucun service de polices en
-ligne), angles droits et boutons à ombre décalée. Le thème suit le réglage
-Système, Clair ou Sombre. L'erreur reste en rouge et s'accompagne toujours d'un
-texte ou d'une icône.
+L'interface est un thème Material 3 générique : bleu, polices du système,
+coins arrondis et ombres ordinaires de Material. Le thème suit le réglage
+Système, Clair ou Sombre, sur les écrans comme sur le clavier. L'erreur reste en
+rouge et s'accompagne toujours d'un texte ou d'une icône ; le micro devient
+rouge à l'écoute.
 
 ## Aperçu
 
