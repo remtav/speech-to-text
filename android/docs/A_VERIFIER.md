@@ -284,6 +284,8 @@ aucune collecte réelle n'a lieu.
   « Y'a rien là ». Quatre formes (« chu », « tsé », « à matin », « pogner »)
   n'ont été vérifiées que dans des sources secondaires ; les autres mots l'ont
   été dans Usito.
+- **Équivalence à confirmer** : « je suis » et « chu » comptent comme le même
+  mot dans le calcul, y compris dans « je suis allé » (premier paragraphe).
 - **Où corriger** : le fichier ci-dessus. Tout changement du texte demande un
   nouveau numéro de version (`lecture-qc-2`), pour ne pas mélanger les
   résultats ; les variantes d'écriture acceptées sont dans
@@ -303,7 +305,7 @@ aucune collecte réelle n'a lieu.
 - **Réponse « non »** : vérifier qu'aucun test n'est proposé ensuite, et que la
   réponse se corrige dans les Réglages.
 - **Choix à confirmer** : le serveur distant est exclu du test (il enverrait
-  la voix sur le réseau) ; « nettement mieux » veut dire au moins 5 points et
+  la voix sur le réseau), même s'il est le modèle actif ; « nettement mieux » veut dire au moins 5 points et
   30 % d'erreurs en moins.
 - **Où corriger** : écran dans
   `android/app/src/main/java/io/github/remtav/dictee/ui/ReadingTestActivity.kt` ;
@@ -332,6 +334,12 @@ aucune collecte réelle n'a lieu.
   jointe qu'après la fermeture de l'écran du test la trouverait supprimée
   (l'archive est effacée à la fermeture de l'écran, par « Ne pas partager »,
   par « Refaire le test », et au démarrage si elle a plus de 24 heures).
+  Essayer en fermant l'écran du test juste après avoir appuyé sur « Envoyer ».
+- **Corrigé par la revue** : l'archive n'est jamais incluse dans une
+  sauvegarde ni dans un transfert vers un nouveau téléphone ; la date écrite
+  dans l'archive est celle affichée avant le consentement ; le champ région
+  demande au clavier de ne pas retenir ce qui est tapé (à vérifier : la région
+  ne doit pas réapparaître dans les suggestions du clavier).
 - **Choix à confirmer** : seule la transcription du modèle recommandé part ;
   la région est un champ libre de 60 caractères au plus.
 - **Où corriger** : contenu de l'archive dans `reading/ContributionArchive.kt`
@@ -355,3 +363,12 @@ aucune collecte réelle n'a lieu.
   refusé l'accès à l'agent. Il a lu le texte officiel de la Loi 25 et quatre
   pages de la Commission d'accès à l'information. Ce n'est pas un avis
   juridique.
+
+### 21. Transfert des réglages vers un nouveau téléphone (hors du lot, à décider)
+
+- **Constat de la revue** : sous Android 12 ou plus, les réglages de
+  l'application, dont la réponse à « Parlez-vous un français québécois ? »,
+  peuvent être copiés lors d'un transfert d'appareil à appareil. Seul le
+  dossier des contributions en est exclu.
+- **À décider** : exclure aussi les réglages.
+- **Où corriger** : `android/app/src/main/res/xml/data_extraction_rules.xml`.
