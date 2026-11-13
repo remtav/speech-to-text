@@ -17,6 +17,8 @@ data class SampleResult(
     val wer: Double?,
     /** What the Whisper repetition filter did (issue #49). */
     val repetition: RepetitionOutcome = RepetitionOutcome.NONE,
+    /** Pieces decoded when the sample was cut as a grouped dictation (issue #53), null when decoded whole. */
+    val groups: Int? = null,
 ) {
     val rtf: Float get() = if (audioSeconds > 0) decodeMillis / 1000f / audioSeconds else 0f
 }
@@ -55,6 +57,11 @@ class Benchmark(
     private val options: EngineOptions = EngineOptions(),
     /** Options per model; the comparison screen passes the dictation's own (forced language, Whisper padding). */
     private val optionsFor: (ModelSpec) -> EngineOptions = { options },
+    /**
+     * Issue #53: when it returns a cut for a model (« Regrouper les énoncés (Whisper) » on), each sample is cut as the
+     * dictation would cut it (VAD, then groups) and every piece is decoded; null (default): the sample is decoded whole.
+     */
+    private val cutFor: (ModelSpec) -> ((FloatArray) -> List<FloatArray>)? = { null },
 ) {
     fun interface Progress {
         fun onProgress(message: String)
@@ -73,19 +80,35 @@ class Benchmark(
             val t0 = System.nanoTime()
             engine = factory.create(spec, dirFor(spec), optionsFor(spec))
             val loadMillis = (System.nanoTime() - t0) / 1_000_000
+            val cut = cutFor(spec)
             val results = samples.map { s ->
                 progress.onProgress("${spec.shortName} : ${s.name}")
                 val audio = s.audio.resampled(SttEngine.SAMPLE_RATE)
-                val t = engine.transcribe(audio.samples, SttEngine.SAMPLE_RATE)
-                SampleResult(
-                    sample = s.name,
-                    language = s.language,
-                    text = t.text,
-                    decodeMillis = t.decodeMillis,
-                    audioSeconds = audio.seconds,
-                    wer = s.reference?.let { Wer.compute(it, t.text).rate },
-                    repetition = t.repetition,
-                )
+                if (cut == null) {
+                    val t = engine.transcribe(audio.samples, SttEngine.SAMPLE_RATE)
+                    SampleResult(
+                        sample = s.name,
+                        language = s.language,
+                        text = t.text,
+                        decodeMillis = t.decodeMillis,
+                        audioSeconds = audio.seconds,
+                        wer = s.reference?.let { Wer.compute(it, t.text).rate },
+                        repetition = t.repetition,
+                    )
+                } else {
+                    val parts = cut(audio.samples).map { engine.transcribe(it, SttEngine.SAMPLE_RATE) }
+                    val text = parts.map { it.text }.filter { it.isNotEmpty() }.joinToString(" ")
+                    SampleResult(
+                        sample = s.name,
+                        language = s.language,
+                        text = text,
+                        decodeMillis = parts.sumOf { it.decodeMillis },
+                        audioSeconds = audio.seconds,
+                        wer = s.reference?.let { Wer.compute(it, text).rate },
+                        repetition = parts.map { it.repetition }.firstOrNull { it != RepetitionOutcome.NONE } ?: RepetitionOutcome.NONE,
+                        groups = parts.size,
+                    )
+                }
             }
             return ModelResult(spec, engine.provider, loadMillis, sampler.stop(), baseline, results)
         } catch (e: Throwable) {
@@ -142,7 +165,8 @@ class Benchmark(
                             Locale.ROOT, "   [%s %s] %.1f s audio · %.2f s · RTF %.3f%s",
                             s.sample, s.language, s.audioSeconds, s.decodeMillis / 1000f, s.rtf,
                             s.wer?.let { String.format(Locale.ROOT, " · WER %.1f %%", it * 100) } ?: "",
-                        ) + repetitionLabel(s.repetition).let { if (it.isEmpty()) "" else " · $it" },
+                        ) + repetitionLabel(s.repetition).let { if (it.isEmpty()) "" else " · $it" } +
+                            (s.groups?.let { " · $it groupe(s) décodé(s)" } ?: ""),
                     )
                     appendLine("      « ${s.text} »")
                 }

@@ -329,6 +329,14 @@ class SettingsActivity : AppCompatActivity() {
         fixNote = box.body(getString(R.string.settings_whisper_repetition_inactive), small = true)
         box.body(getString(R.string.settings_whisper_repetition_help), small = true)
         renderFix()
+        // Issue #53: off by default, then the two group lengths to try.
+        box.body(getString(R.string.settings_whisper_group), small = false)
+        val groupLabels = listOf(R.string.settings_whisper_group_off, R.string.settings_whisper_group_5, R.string.settings_whisper_group_10)
+            .map { getString(it) }
+        box.radio(groupLabels, WhisperTuning.GROUP_CHOICES.indexOf(s.whisperGroupSeconds).coerceAtLeast(0)) {
+            s.whisperGroupSeconds = WhisperTuning.GROUP_CHOICES[it]
+        }.tag = WHISPER_GROUP_TAG
+        box.body(getString(R.string.settings_whisper_group_help), small = true)
     }
 
     private fun saveRemote() {
@@ -533,6 +541,8 @@ class SettingsActivity : AppCompatActivity() {
         const val ADVANCED_TAG = "settings_advanced"
         const val WHISPER_TAIL_TAG = "settings_whisper_tail"
         const val WHISPER_REPETITION_TAG = "settings_whisper_repetition"
+        /** « Regrouper les énoncés (Whisper) », issue #53. */
+        const val WHISPER_GROUP_TAG = "settings_whisper_group"
         /** Tag of an experimental model's card, for tests. */
         fun experimentalCardTag(spec: io.github.remtav.dictee.stt.ModelSpec) = "experimental_card_${spec.id}"
     }

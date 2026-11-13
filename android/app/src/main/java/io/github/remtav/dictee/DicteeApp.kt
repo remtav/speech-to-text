@@ -228,6 +228,8 @@ class DicteeApp : Application() {
                 BlockDictation(LentBlockBackend { op -> engines.use(spec, options) { op(it) } }, control)
             },
             canFallBack = options.remoteFallback != null,
+            // Issue #53: off by default (null), Whisper only.
+            localGrouping = WhisperTuning.groupingFor(spec, settings.whisperGroupSeconds),
         ) to null
     }
 

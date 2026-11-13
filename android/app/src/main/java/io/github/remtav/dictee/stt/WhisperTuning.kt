@@ -44,6 +44,24 @@ object WhisperTuning {
         else "silence ajouté Whisper automatique ($tailPaddings + correction des répétitions : ${fix.reportLabel})"
 
     /**
+     * « Regrouper les énoncés (Whisper) » (issue #53): 0 (off, the default) or the minimum length of a group, in
+     * seconds. Two values to try on the phone; see [io.github.remtav.dictee.dictation.LocalGrouping].
+     */
+    val GROUP_CHOICES = listOf(0, 5, 10)
+
+    /** A stored value outside [GROUP_CHOICES] reads as off. */
+    fun sanitizeGroupSeconds(value: Int): Int = if (value in GROUP_CHOICES) value else 0
+
+    /**
+     * The grouping of a local dictation with [spec]: only for Whisper (the issue's scope; Parakeet and Qwen3-ASR are
+     * left as they are), null when the setting is off.
+     */
+    fun groupingFor(spec: ModelSpec, seconds: Int): io.github.remtav.dictee.dictation.LocalGrouping? {
+        val v = sanitizeGroupSeconds(seconds)
+        return if (spec.family == ModelFamily.WHISPER && v > 0) io.github.remtav.dictee.dictation.LocalGrouping(v.toFloat()) else null
+    }
+
+    /**
      * Whether provisional (underlined) decodes may run. Never with the server (one HTTP request
      * per 0.7 s), never with Whisper: they cost 2.8 times the final decode and delay it by
      * 1.5 s on average (measured on the host); the "provisional text" setting applies to the others.

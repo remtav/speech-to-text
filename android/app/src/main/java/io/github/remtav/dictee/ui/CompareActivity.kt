@@ -23,6 +23,8 @@ import io.github.remtav.dictee.R
 import io.github.remtav.dictee.audio.MicAudioSource
 import io.github.remtav.dictee.audio.PcmAudio
 import io.github.remtav.dictee.audio.WavReader
+import io.github.remtav.dictee.dictation.LocalCut
+import io.github.remtav.dictee.dictation.LocalGrouping
 import io.github.remtav.dictee.stt.BenchSample
 import io.github.remtav.dictee.stt.Benchmark
 import io.github.remtav.dictee.stt.ModelCatalog
@@ -149,6 +151,14 @@ class CompareActivity : AppCompatActivity() {
         // padding), so the screen measures what the keyboard does; the server never falls back here.
         val bench = Benchmark(app.engineFactory(), { app.store.dirFor(it.id) }, optionsFor = { spec ->
             app.engineOptions(spec).copy(remote = app.settings.remoteConfig().takeIf { it.isConfigured }, remoteFallback = null)
+        }, cutFor = { spec ->
+            // Issue #53: with « Regrouper les énoncés » on, each sample is cut as the dictation cuts it (VAD + groups).
+            WhisperTuning.groupingFor(spec, app.settings.whisperGroupSeconds)?.let { grouping ->
+                { samples: FloatArray ->
+                    val vad = app.newVad()
+                    try { LocalCut.cut(samples, vad, grouping).map { it.audio } } finally { vad.release() }
+                }
+            }
         })
         thread(name = "compare-run") {
             val results = ArrayList<ModelResult>()
@@ -163,7 +173,10 @@ class CompareActivity : AppCompatActivity() {
                     // The options the engine actually got (issue #49: automatic mode and its correction).
                     val o = app.engineOptions(whisper)
                     " · ${WhisperTuning.describe(o.whisperTailPaddings, o.whisperRepetitionFix)} · langue Whisper " +
-                        o.language.ifEmpty { "automatique" }
+                        o.language.ifEmpty { "automatique" } +
+                        // Issue #53: the grouping setting, and that the samples are then cut as a dictation.
+                        " · " + (WhisperTuning.groupingFor(whisper, app.settings.whisperGroupSeconds)
+                            ?.let { "${it.describe()}, extraits découpés comme une dictée" } ?: LocalGrouping.OFF_DESCRIPTION)
                 } ?: "")
             report = Benchmark.report(results, header) { spec -> app.engineOptions(spec).whisperRepetitionFix != null }
             main.post {
@@ -191,7 +204,8 @@ class CompareActivity : AppCompatActivity() {
         for (s in r.samples) {
             card.value(
                 "${s.sample} · RTF %.3f%s".format(Locale.ROOT, s.rtf, s.wer?.let { " · WER %.1f %%".format(Locale.ROOT, it * 100) } ?: "") +
-                    Benchmark.repetitionLabel(s.repetition).let { if (it.isEmpty()) "" else " · $it" },
+                    Benchmark.repetitionLabel(s.repetition).let { if (it.isEmpty()) "" else " · $it" } +
+                    (s.groups?.let { " · $it groupe(s)" } ?: ""),
             )
             card.body("« ${s.text} »")
         }

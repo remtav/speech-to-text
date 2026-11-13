@@ -3995,3 +3995,112 @@ pendant la dictée ». Le contrat du serveur est celui de la PR #46 (`POST /poli
   - si le serveur est en échec récent au début de la dictée, la sonde n'est pas faite. Un ancien serveur
     reçoit alors des blocs (sans polissage), et le texte brut est inséré au lieu du texte poli. Rien n'est
     perdu.
+
+## Issue #53 : Whisper local, contexte entre segments et regroupement des énoncés
+
+Décisions de l'utilisateur (2026-11-13), appliquées telles quelles : deux mécanismes essayables par un réglage chacun, dans
+« Avancé », **désactivés par défaut** ; un résultat de banc défavorable ne retire pas un réglage. Choix faits pendant la
+mise en œuvre :
+
+### Contexte entre segments : impossible avec sherpa-onnx 2.0.1 sans modifier le modèle (point d'arrêt)
+
+- **Code source de la v2.0.1** (tag `v2.0.1`, commit `af2d8d81dbfa61c4cea4c568da78f3982edca005`) :
+  - `sherpa-onnx/csrc/offline-whisper-model-config.h` : `encoder`, `decoder`, `language`, `task`, `tail_paddings`,
+    `enable_token_timestamps`, `enable_segment_timestamps`. Rien d'autre ; la classe Kotlin
+    (`OfflineWhisperModelConfig`) et la lecture JNI (`jni/offline-recognizer.cc`, lignes 146 à 172) ont les mêmes champs.
+    Les seuls `prompt` de la JNI sont ceux de FunASR-nano (`systemPrompt`, `userPrompt`).
+  - `offline-whisper-greedy-search-decoder.cc` : le décodage part de `model_->GetInitialTokens()`, c'est-à-dire la
+    métadonnée `sot_sequence` lue dans le fichier ONNX au chargement (`offline-whisper-model.cc`, ligne 371) ; seuls la
+    langue et la tâche y sont remplacées, puis `no_timestamps` est ajouté. Aucun jeton `<|startofprev|>`, aucune entrée
+    pour des jetons de texte avant `<|startoftranscript|>`.
+  - `OfflineStream::SetOption` existe, mais `offline-recognizer-whisper-impl.h` ne lit aucune option du flux
+    (`GetOption` n'est appelé que par Qwen3-ASR, FunASR-nano, Canary, SenseVoice, FireRedASR et des modèles en ligne).
+- **Essai sur le JAR Linux x86-64 de la 2.0.1** (`WhisperPromptHostTest`) : la classe de configuration n'a pas de champ
+  d'amorce (vérifié aussi sans modèle, donc sur la CI : le test échouera si une version future en ajoute un) ; avec le vrai
+  turbo, une amorce (fin du texte précédent, 200 caractères) passée par les options de flux `prompt`, `initial_prompt`,
+  `context`, `hotwords`, `prefix` et `text` est bien enregistrée par le flux (relue par `getOption`), mais le texte décodé
+  est identique octet pour octet à celui sans amorce, sur les 7 extraits français.
+- **`setConfig` ne peut pas servir** : il ne remplace que le bloc Whisper de la configuration (les champs ci-dessus).
+- **Donc ni réglage ni code pour le contexte dans cette PR** : un réglage sans effet tromperait l'utilisateur. Ce qu'il
+  faudrait : (1) une version de sherpa-onnx qui ajoute une amorce au décodeur Whisper hors ligne (un champ de
+  configuration ou une option de flux lue par `OfflineWhisperGreedySearchDecoder`, qui préfixe `<|startofprev|>` + les
+  jetons du texte à `sot_sequence` et décale `offset`), à proposer en amont ; ou (2) une JNI maison, compilée avec l'app,
+  qui fait ce préfixe : le décodeur ONNX exporté reçoit déjà des séquences initiales de longueurs différentes (3 ou 4
+  jetons selon les horodatages, `offset` = `initial_tokens.size()`), à vérifier pour une centaine de jetons ; mais il faut encoder le texte en jetons (le `tokens.txt` de sherpa-onnx n'a que
+  la table jeton → texte) ; ou (3) réécrire `sot_sequence` dans le modèle, ce qui figerait une seule amorce par fichier :
+  inutilisable pour un contexte qui change à chaque segment. Aucune des trois n'est dans le périmètre de l'issue.
+
+### Regroupement des énoncés (`LocalGrouping`, `BlockCutter`)
+
+- **`BlockCutter` réutilisé** (le découpeur des blocs du serveur, #35), avec un paramètre de plus, `idleSamples`
+  (0 pour le serveur : comportement inchangé, `BlockCutterTest` intact). Un groupe se ferme : à la première pause confirmée
+  par le VAD une fois le seuil atteint ; après **1 s de silence** qui suit son dernier énoncé, même s'il est plus court
+  (coupé à la fin de cet énoncé : le silence n'est pas décodé, et un énoncé que le VAD rendrait plus tard n'est pas
+  perdu) ; à 30 s au plus (fenêtre de Whisper, même au milieu d'une phrase, comme le serveur) ; à l'arrêt.
+- **Pourquoi la fermeture sur silence** : sans elle, une phrase isolée suivie d'un silence n'apparaîtrait qu'à la phrase
+  suivante ou à l'arrêt, ce qui contredit l'insertion à chaque pause du mode local. Avec elle, le retard d'une phrase
+  isolée est borné (pause du VAD, 0,5 s par défaut, + 1 s). Une pause tolérée dans un groupe vaut donc la pause du VAD + 1 s
+  (1,5 s avec le réglage par défaut) : les phrases enchaînées sont groupées, une vraie pause rend le texte.
+- **Seuils proposés : 5 s et 10 s** (réglage « Non / 5 s / 10 s »), plutôt que 15 s : en local le texte arrive groupe par
+  groupe, et le seuil borne le retard d'un énoncé dans une dictée continue. Les deux sont offerts parce que le banc ne les
+  départage pas nettement (10 s : un peu meilleur, plus lent à venir), et l'utilisateur juge sur le téléphone.
+- **Whisper seulement** (`WhisperTuning.groupingFor`), en dictée locale : sans effet sur Parakeet, Qwen3-ASR et le mode
+  serveur. Signalé sans l'activer : le mécanisme ne dépend pas du modèle, mais il n'est pas mesuré pour Parakeet (qui se
+  dégrade au-delà de 20 s environ et dont les textes provisoires suivent les énoncés).
+- **Pas dans `EngineOptions`** : le réglage ne change que la découpe, pas le modèle ; le changer ne recharge rien.
+  Préférence `whisper_group_seconds` (0 par défaut ; valeur inconnue → 0).
+- **Contrôleur** : `DictationSession.localGrouping` (nul par défaut). Le groupe vit dans le fil de capture et passe en
+  `Job.Final` comme un énoncé aujourd'hui (insertion, textes gardés pendant l'absence du champ, numéro de session) : une
+  annulation (champ changé, clavier fermé) jette le groupe en cours sans le décoder, un arrêt le décode.
+- **Écran « Comparer les modèles »** : avec le réglage actif, chaque extrait est découpé comme une dictée (VAD Silero de
+  l'app + groupes, `LocalCut`, le rejeu exact des appels du contrôleur) et chaque groupe est décodé ; le rapport « Copier »
+  écrit le réglage dans l'en-tête et le nombre de groupes par extrait. Réglage inactif : extrait décodé entier, comme avant
+  (ce n'est pas la découpe de la dictée par énoncé, mais c'est le comportement d'avant, gardé tel quel).
+
+### Banc hôte (`LocalGroupingHostTest`, 172 extraits québécois, 1 673 mots, x86-64 4 cœurs, 4 threads, `fr` forcé)
+
+Les extraits de Common Voice sont des phrases isolées : pris trois par trois dans l'ordre du fichier (58 dictées,
+945,7 s d'audio), silence de début et de fin retiré au VAD (0,3 s gardées), 0,7 s de silence entre eux (pause d'environ
+1,3 s entre deux phrases). Chaque dictée passe par `LocalCut` avec le vrai VAD Silero (pause 0,5 s) et le vrai turbo
+(marge 1 000, défaut) de `SherpaEngine` ; variantes en alternance dans la même exécution ; WER avec la normalisation de
+`wer.py`, comme #49.
+
+| Variante | Temps de décodage (mesuré) | Décodages | WER (mesuré) | Délai fin d'énoncé → insertion (estimé, hôte) |
+| --- | --- | --- | --- | --- |
+| Turbo, extrait entier (repère du banc de #49) | 258,8 s | 172 | 14,5 % | — |
+| **Actuel** : un décodage par énoncé (défaut) | 229,2 s | 186 | **17,5 %** | moyenne 1,73 s, médiane 1,74, 90e centile 2,14, max 2,54 |
+| Groupes de 5 s | 239,9 s (+4,7 %) | 171 | **14,0 %** | moyenne 2,72 s, médiane 2,47, 90e centile 3,06, max 9,66 |
+| Groupes de 10 s | 239,2 s (+4,4 %) | 165 | **13,7 %** | moyenne 3,40 s, médiane 2,89, 90e centile 4,16, max 13,37 |
+
+- Le repère redonne le 14,5 % de #49 : la mesure est comparable. La dictée locale actuelle fait **3 points de plus** que
+  l'extrait entier : le VAD coupe 14 phrases en deux (186 énoncés pour 172 extraits) et ses segments sont serrés.
+- **D'où vient le gain** (analyse du TSV) : sur les 44 dictées où les trois variantes font le même nombre de décodages,
+  les erreurs passent de 179 à 148 (5 s) ; sur les 14 où le regroupement réunit des morceaux, de 114 à 86. Plus de la
+  moitié du gain vient donc des marges du découpage par groupes (0,6 s avant le début de la parole, et la pause jusqu'à ce
+  que le VAD la confirme), pas du regroupement lui-même. Piste signalée, hors portée : ajouter ces marges aux énoncés du
+  mode actuel améliorerait peut-être aussi le défaut. Avec des pauses de 1,3 s, les groupes réunissent rarement deux
+  phrases ; des pauses plus courtes en réuniraient davantage.
+- **Délai** : estimé, pas mesuré. L'audio est supposé arriver en temps réel, chaque morceau décodé dès qu'il est prêt et
+  que le décodage précédent est fini, avec les temps mesurés sur l'hôte. Le regroupement ajoute environ 1 s (5 s) à 1,7 s
+  (10 s) en moyenne ; le maximum vient d'un énoncé au début d'un long groupe. Sur le téléphone, où Whisper est plus lent
+  (#23), le délai sera plus long dans les trois variantes ; non mesuré.
+- Contexte : aucun chiffre (impossible, voir plus haut), donc ni « contexte seul » ni « les deux ensemble ».
+
+### Tests
+
+- `LocalGroupingTest` (rejeu `LocalCut`, VAD à énergie) : hors réglage, exactement les énoncés du VAD ; énoncés courts
+  groupés avec leurs pauses ; fermeture à la première pause passé le seuil ; fermeture sur silence sans décoder le silence ;
+  pause tolérée = pause du VAD + 1 s ; plafond de 30 s avec 50 s de parole continue ; fin de dictée ; aucun échantillon
+  perdu ni décodé deux fois ; valeurs du réglage et familles ; libellé du rapport.
+- `LocalGroupingControllerTest` (vrai `DictationController`) : réglage nul par défaut ; **hors réglage, le contrôleur décode
+  exactement les énoncés du VAD, un par un (critère « identique à aujourd'hui »)** ; avec réglage, il décode exactement
+  les groupes de `LocalCut` (le rejeu de l'écran de comparaison et du banc est donc fidèle) ; plafond ; arrêt avec un
+  groupe ouvert (décodé) ; annulation avec un groupe ouvert (rien décodé, rien inséré) ; changement de champ (le groupe du
+  champ 1 n'arrive jamais au champ 2) ; phrase isolée insérée après le silence, avant la suivante ; écran de comparaison.
+- `WhisperPromptHostTest` : la preuve du point d'arrêt (ci-dessus).
+- `LocalGroupingInstrumentedTest` (appareil, leçon de la PR #52) : `LocalCut` avec le VAD Silero de l'APK sur les extraits
+  inclus, libellé du rapport, réglage dans « Avancé », désactivé par défaut, enregistré.
+- Aucune expression régulière nouvelle ; `AndroidRegexGuardTest` inchangé.
+- **Écueil trouvé en écrivant le banc** : un seul `acceptWaveform` de tout un extrait au VAD Silero de sherpa-onnx 2.0.1
+  rend un segment faux (début à 4,5 s pour une parole qui commence à 1,3 s) ; par morceaux de 512, comme le contrôleur, le
+  segment est juste. Le contrôleur et `LocalCut` passent toujours par morceaux de 512.

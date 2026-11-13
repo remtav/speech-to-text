@@ -119,6 +119,14 @@ class AppSettings(context: Context, private val defaultServerUrl: String = io.gi
         get() = RepetitionFix.fromName(prefs.getString("whisper_repetition_fix", null))
         set(v) = prefs.edit().putString("whisper_repetition_fix", v.name).apply()
 
+    /**
+     * « Regrouper les énoncés (Whisper) » (issue #53): 0 = off (default), else the minimum group length in seconds
+     * ([WhisperTuning.GROUP_CHOICES]). Not part of [EngineOptions]: changing it never reloads a model.
+     */
+    var whisperGroupSeconds: Int
+        get() = WhisperTuning.sanitizeGroupSeconds(prefs.getInt("whisper_group_seconds", 0))
+        set(v) = prefs.edit().putInt("whisper_group_seconds", WhisperTuning.sanitizeGroupSeconds(v)).apply()
+
     /** The "Comment dicter" screen has been opened (by itself at the end of the first setup, or by the user): it opens by itself only once. */
     var howToShown: Boolean
         get() = prefs.getBoolean("howto_shown", false)

@@ -259,7 +259,13 @@ class BlockDictation(
 }
 
 /** One block of a dictation: its audio, and the VAD segments inside it, for a local fallback. */
-class AudioBlock(val index: Int, val audio: FloatArray, val segments: List<FloatArray>) {
+class AudioBlock(
+    val index: Int,
+    val audio: FloatArray,
+    val segments: List<FloatArray>,
+    /** Position of the first sample in the dictation (local grouping, issue #53: its latency bench); -1 unknown. */
+    val startSample: Long = -1,
+) {
     val seconds: Float get() = audio.size / SttEngine.SAMPLE_RATE.toFloat()
 }
 
