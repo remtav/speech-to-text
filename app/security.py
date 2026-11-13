@@ -6,7 +6,7 @@ needs ``Authorization: Bearer <token>``, else 401. Unset, the server behaves
 as before (local use, no authentication).
 
 ``DICTEE_RATE_LIMIT`` (default 30, 0 = off) caps, per token, the requests
-that start work on the server (transcriptions, model switch / eject) per
+that start work on the server (transcriptions, text polishing, model switch / eject) per
 minute; beyond it the server answers 429. Polling a job (``GET /jobs/{id}``)
 is not counted: the Android app polls every 0.4 s while it waits.
 
@@ -33,6 +33,7 @@ RATE_LIMITED = {
     ("POST", "/transcribe"),
     ("POST", "/transcribe/streaming"),
     ("POST", "/jobs"),
+    ("POST", "/polish"),
     ("POST", "/switch-model"),
     ("POST", "/eject"),
 }

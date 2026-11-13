@@ -81,7 +81,7 @@ class TestConfig:
 
 class TestToken:
     @pytest.mark.parametrize("method,path", [
-        ("post", "/jobs"), ("post", "/transcribe"), ("post", "/transcribe/streaming"),
+        ("post", "/jobs"), ("post", "/polish"), ("post", "/transcribe"), ("post", "/transcribe/streaming"),
         ("get", "/jobs"), ("get", "/jobs/abc"), ("post", "/jobs/abc/cancel"), ("get", "/health"),
         ("get", "/progress"), ("post", "/eject"), ("post", "/switch-model"), ("get", "/settings/hf-token"),
     ])

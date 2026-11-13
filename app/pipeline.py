@@ -6,6 +6,8 @@ reported through a ``progress(fraction, message, stage)`` callback, which may
 raise ``Cancelled`` to stop the work. In production it runs inside the worker
 process (see ``app.worker``).
 """
+import contextlib
+import dataclasses
 import fnmatch
 import gc
 import logging
@@ -279,9 +281,30 @@ class Engine:
         audio = load_audio(audio_path, self.ffmpeg_path, self.ffmpeg_timeout)
         duration = len(audio) / 16000
 
-        if options.get("quick"):
-            return self._quick(audio, options, progress)
-        return self._full(audio, duration, options, progress)
+        with self._initial_prompt(options.get("prompt")):
+            if options.get("quick"):
+                return self._quick(audio, options, progress)
+            return self._full(audio, duration, options, progress)
+
+    @contextlib.contextmanager
+    def _initial_prompt(self, prompt):
+        """Give Whisper ``prompt`` as context (``initial_prompt``) for the duration of one call.
+
+        WhisperX reads its decoding options (``self.model.options``) from what was given to
+        ``load_model``, shared by every call, so the prompt of one request is set here and the loaded
+        options are restored afterwards, even on error or cancellation: it never leaks into the next
+        request. Without a prompt nothing is touched. The prompt is user text and is never logged.
+        """
+        prompt = (prompt or "").strip()
+        previous = getattr(self.model, "options", None)
+        if not prompt or previous is None:
+            yield
+            return
+        self.model.options = dataclasses.replace(previous, initial_prompt=prompt)
+        try:
+            yield
+        finally:
+            self.model.options = previous
 
     def _quick(self, audio, options, progress):
         """Transcription only (no alignment / diarization), for low-latency use."""
