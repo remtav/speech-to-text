@@ -69,6 +69,7 @@ abstract class ImeTestBase {
         TestHooks.engineFactory = null
         TestHooks.vadParams = null
         TestHooks.assumeInstalled = false
+        TestHooks.networkAvailable = null
         if (::scenario.isInitialized) scenario.close()
         app.engines.release()
         device.setOrientationNatural()

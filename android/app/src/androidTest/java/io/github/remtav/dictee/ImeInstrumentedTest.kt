@@ -331,8 +331,9 @@ class OptionalFeaturesInstrumentedTest : ImeTestBase() {
             app.settings.remoteUrl = "http://127.0.0.1:${server.port}"
             app.settings.cfAccessClientId = "test-id.access"
             app.settings.cfAccessClientSecret = "test-secret-value"
-            app.settings.remoteFallbackId = ""
-            app.settings.activeModelId = ModelCatalog.remote.id
+            // Issue #23: an address and the "server" mode send dictations to the server.
+            app.settings.transcriptionMode = io.github.remtav.dictee.stt.TranscriptionMode.SERVER
+            TestHooks.networkAvailable = true
             TestHooks.engineFactory = null
             useAudio("fr1", "en1")
             launchFields()
