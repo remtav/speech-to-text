@@ -3995,3 +3995,128 @@ pendant la dictée ». Le contrat du serveur est celui de la PR #46 (`POST /poli
   - si le serveur est en échec récent au début de la dictée, la sonde n'est pas faite. Un ancien serveur
     reçoit alors des blocs (sans polissage), et le texte brut est inséré au lieu du texte poli. Rien n'est
     perdu.
+
+## Issues #55 et #57 : les deux étapes du clavier, le serveur hors du parcours (PR 1 du retour de #54)
+
+Fait d'un seul tenant, sans intervention humaine, dans l'ordre demandé par #54 (#55 puis #57, même écran).
+Les « décisions proposées, à confirmer » des deux issues sont appliquées telles quelles. Changement
+d'orientation du 2026-11-13 au soir (décision de l'utilisateur) : le serveur distant n'est plus une piste
+de produit ; il ne sert qu'au débogage. Cela annule ce que #36 et #37 disent du serveur.
+
+### #55 : écran d'installation
+
+- **Une seule page**, comme proposé : les étapes en tête, une carte par étape (numéro et titre, ce que
+  fait l'étape et ce qu'Android va montrer, état, bouton). L'avertissement d'Android est annoncé avant
+  que la personne le voie.
+- **Numérotation** : 1. Activer Kalmia Blabla, 2. Choisir Kalmia Blabla, 3. Autoriser le micro,
+  4. Vos langues, 5. Modèles. Le micro passe de 2 à 3 pour garder les deux gestes du clavier côte à côte.
+- **Un bouton plein au plus** : celui de `SetupProgress.nextStep` (activer → choisir → micro → modèle).
+  Tous les autres boutons de l'écran sont en contour, y compris « Comparer les modèles », le bouton de
+  la carte du test de lecture (`participationCard(filled = false)`) et ceux de l'avis de remplacement de
+  modèle. Quand l'étape suivante est le modèle, c'est le « Télécharger » du modèle recommandé qui est
+  plein ; tout fait, aucun bouton plein. Le style est noté sur chaque bouton (`R.id.button_outlined`)
+  pour que le test le lise sans dépendre des attributs Material.
+- **Étape inactive** : « Choisir Kalmia Blabla » est désactivé tant que le clavier n'est pas activé, et
+  sa carte est atténuée (opacité 0,5, `DIMMED_ALPHA`) avec l'état « À faire après l'étape précédente ».
+  Une étape faite garde son bouton, en contour, pour la refaire.
+- **Micro** : son bouton reste actif à tout moment (il ne dépend pas du clavier), mais il n'est plein
+  que quand il est l'étape suivante.
+- **« Complète » veut dire activé et choisi** (`SetupProgress.isComplete` prend quatre arguments). « Choisi »
+  sans « activé » (lecture incohérente des réglages système) ne compte pas. Conséquence voulue : le
+  tutoriel ne s'ouvre plus tout seul tant que le clavier n'est pas le clavier courant ; et une personne
+  qui revient à un autre clavier voit l'étape 2 redevenir « À faire ».
+- **Rappel au retour** (point 6) : si la personne a déjà quitté l'écran une fois (`setupSeen`, posé dans
+  `onStop`) et qu'une des deux étapes du clavier manque, l'écran défile jusqu'aux étapes à chaque
+  `onResume`. Jamais à la toute première ouverture : l'accueil est lu d'abord. Le retour de la liste des
+  claviers d'Android passe par `onStop`, donc après l'étape 1 l'écran revient directement sur l'étape 2.
+- **« Comment dicter »** descend sous les étapes ; ni son contenu ni son ouverture automatique ne
+  changent (#56).
+- **Modèle prêt** : un serveur configuré ne compte que s'il est réellement utilisé (adresse **et** mode
+  « serveur ») ; avant, une simple adresse suffisait.
+- **Tests** : l'état du système (clavier activé, choisi, micro) se force par `TestHooks` pour dessiner
+  les trois états sans toucher aux claviers de l'émulateur ni retirer une permission (ce qui tue le
+  processus).
+
+### #57 : le serveur hors du parcours
+
+- **Installation** : plus de carte « Serveur distant », plus aucun mot sur un serveur sans adresse ni
+  mode « serveur » (test instrumenté qui lit tout le texte de l'écran). L'aide « Vos langues » ne dit plus
+  « Whisper et le serveur la reçoivent ».
+- **Réglages** : les sections « Serveur distant » et « Envoi au serveur » (« Où transcrire ») passent dans
+  « Avancé », dans une sous-section repliée à l'ouverture, titrée « Serveur distant, pour essais
+  (développeurs) ». Pas de geste secret (décision de l'utilisateur). « Avancé » lui-même reste déplié :
+  les réglages Whisper de #49 ne bougent pas, et la session de #53 y ajoute les siens. La sous-section
+  est placée après les réglages Whisper, en un seul bloc, pour limiter les conflits.
+- **Repli** : un en-tête de la taille d'un titre, avec un chevron (▸/▾), d'au moins 48 dp, dont l'état
+  (« replié » / « déplié ») est annoncé aux lecteurs d'écran (`Ui.collapsible`). Ouvert depuis la ligne
+  du serveur de l'écran principal, ou depuis le menu du clavier, l'écran déplie la section et défile
+  jusqu'au choix « Envoi au serveur ».
+- **Textes vrais dans les deux cas** : l'accueil (`setup_intro`) et « Comment dicter » (`howto_privacy`)
+  disent simplement que la voix est transcrite sur le téléphone et n'est envoyée à personne. Quand un
+  serveur est réellement utilisé (`AppSettings.serverInUse` : adresse et mode « serveur »), ils sont
+  remplacés par `setup_intro_server` et `howto_privacy_server`, et l'avertissement d'Android de l'étape 1
+  perd sa fin « votre voix, elle, reste sur votre téléphone ». Aucune phrase n'est donc fausse pour
+  quelqu'un qui a configuré un serveur. L'exception du serveur est expliquée dans sa section.
+- **Mise à jour sans perte** : une adresse et le mode « serveur » déjà enregistrés restent actifs (aucune
+  migration ne touche au mode). Dans ce cas seulement, l'écran principal affiche « Transcription :
+  serveur distant » avec l'adresse et un bouton « Voir le réglage ».
+- **Code du serveur gardé** : `RemoteEngine`, le mode blocs de #35, le diagnostic, le repli et leurs
+  tests ne changent pas. Le serveur reste dans le menu de modèles du clavier, mais seulement une fois
+  son adresse saisie (comportement inchangé).
+- **`-PdefaultServerUrl`** reste pour les builds d'essai ; la release publique est compilée sans adresse.
+  Même avec une adresse compilée, rien ne part sans le mode « serveur ».
+
+### La règle sans compromis, et sa preuve
+
+« Aucune dictée ne part vers un serveur sans que la personne l'ait configuré elle-même dans les réglages
+avancés. » Elle tient à deux conditions, chacune testée :
+
+1. **Le routage** : une dictée va au serveur seulement avec une adresse **et** le mode « serveur »
+   (`EngineChoice.route`, toutes les combinaisons dans `ServerOnlyByChoiceTest`, sur l'appareil dans
+   `ServerModeInstrumentedTest`, qui vérifie aussi qu'aucune requête n'arrive au faux serveur sans ce
+   choix).
+2. **Le consentement** : le mode « serveur » n'est écrit qu'à un seul endroit de l'application, le choix
+   de `SettingsActivity`, dans la section repliée d'« Avancé ». `ServerOnlyByChoiceTest` parcourt les
+   sources et échoue si un autre fichier affecte `SERVER` au mode ou écrit la préférence directement.
+   L'installation ne peut plus l'enregistrer (la carte qui y menait a disparu), et la PR suivante (test
+   rapide) ne l'enregistre pas non plus.
+
+### Revue indépendante de la PR (corrections)
+
+Revue par un autre agent, relayée par l'orchestrateur ; chaque constat vérifié dans le code avant correction.
+
+- **Saut vers les étapes** : il se faisait à chaque `onResume`, et `setupSeen` était posé même pendant une
+  rotation. Une rotation à la première visite sautait l'accueil, et un retour (Réglages, dialogue de
+  notification d'Android 13+ ouvert par « Télécharger ») ramenait en haut une personne qui avait fait
+  défiler. Désormais : seulement à une **nouvelle ouverture** de l'écran (`savedInstanceState == null`), et
+  `setupSeen` n'est pas posé pendant un changement de configuration. Limite connue : rouvrir
+  l'application depuis le lanceur alors que l'écran est encore en mémoire ne relance pas le saut.
+- **Étape 2, « choisi »** (décision de l'orchestrateur pour lever l'ambiguïté de #55) : faite si Kalmia est
+  le clavier actif **ou** l'a déjà été une fois (`keyboardChosenOnce`, mémorisé dès que c'est constaté). Une
+  personne qui garde son clavier habituel et ne bascule que pour dicter a fait l'étape ; l'état dit alors
+  « ✓ Fait (un autre clavier est actif en ce moment) », sans bouton plein. « Complète » suit la même règle.
+- **Ligne du serveur** : « Le modèle du téléphone sert de repli » n'est dite que si un modèle est installé ;
+  sinon, la ligne dit qu'une dictée est perdue si le serveur ne répond pas.
+- **Textes** : la politique de confidentialité redit, en tête de « Sur le téléphone », l'exception du serveur
+  configuré dans les réglages avancés ; le README et le commentaire du clavier disent que le serveur figure
+  dans le menu des modèles dès qu'une adresse est configurée, compilée avec `-PdefaultServerUrl` comprise.
+- **Comparaison des modèles** (code déjà dans `main`) : elle incluait le serveur dès qu'une adresse était
+  configurée, quel que soit le mode, et lui aurait envoyé l'audio de la comparaison. Elle ne l'inclut plus
+  que s'il est utilisé (adresse **et** mode « serveur », `EngineChoice.comparedModels`), testé.
+- **`ServerOnlyByChoiceTest`** : le test par recherche de texte est renommé
+  `noSourceFileButTheSettingsAssignsTheServerMode` et son commentaire dit sa limite (il manquerait une
+  écriture par `valueOf` ou par un `.name` stocké).
+
+### À vérifier par un humain (rien n'a tourné sur un vrai téléphone)
+
+- Refaire l'installation sur un téléphone remis à zéro, idéalement avec une personne qui n'a jamais vu
+  l'application, sans l'aider : l'ordre des deux gestes est-il évident ? L'avertissement d'Android
+  fait-il reculer ?
+- Au retour de la liste des claviers d'Android, l'étape 1 a-t-elle sa coche ? Au retour du sélecteur de
+  clavier, l'étape 2 passe-t-elle tout de suite à « Fait », ou faut-il quitter et revenir
+  (`onWindowFocusChanged`) ?
+- Revenir à son clavier habituel : l'étape 2 affiche-t-elle « Fait (un autre clavier est actif en ce
+  moment) » ?
+- Avec un serveur déjà configuré avant la mise à jour : les dictées vont-elles toujours au serveur, et la
+  ligne « Transcription : serveur distant » est-elle visible ?
+- Lecteur d'écran (TalkBack) : l'en-tête replié annonce-t-il son état ?

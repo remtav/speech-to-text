@@ -37,6 +37,13 @@ object EngineChoice {
         else -> EngineRoute.SERVER
     }
 
+    /**
+     * The models the comparison screen runs: the on-device ones, plus the server only when dictations go to it
+     * ([serverInUse]: an address **and** the "server" mode). An address alone never sends the comparison's audio.
+     */
+    fun comparedModels(onDevice: List<ModelSpec>, serverInUse: Boolean): List<ModelSpec> =
+        if (serverInUse) onDevice + ModelCatalog.remote else onDevice
+
     /** The model a dictation on [route] uses: the server, or the local model. */
     fun spec(route: EngineRoute, local: ModelSpec): ModelSpec =
         if (route == EngineRoute.SERVER) ModelCatalog.remote else local
