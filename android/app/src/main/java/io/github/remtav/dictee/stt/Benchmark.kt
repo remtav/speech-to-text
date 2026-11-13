@@ -15,6 +15,8 @@ data class SampleResult(
     val decodeMillis: Long,
     val audioSeconds: Float,
     val wer: Double?,
+    /** What the Whisper repetition filter did (issue #49). */
+    val repetition: RepetitionOutcome = RepetitionOutcome.NONE,
 ) {
     val rtf: Float get() = if (audioSeconds > 0) decodeMillis / 1000f / audioSeconds else 0f
 }
@@ -36,6 +38,10 @@ data class ModelResult(
         if (scored.isEmpty()) return null
         return scored.sumOf { it.wer!! } / scored.size
     }
+
+    /** Samples per repetition-filter outcome other than [RepetitionOutcome.NONE] (issue #49). */
+    val repetitionCounts: Map<RepetitionOutcome, Int>
+        get() = samples.groupingBy { it.repetition }.eachCount() - RepetitionOutcome.NONE
 }
 
 /**
@@ -78,6 +84,7 @@ class Benchmark(
                     decodeMillis = t.decodeMillis,
                     audioSeconds = audio.seconds,
                     wer = s.reference?.let { Wer.compute(it, t.text).rate },
+                    repetition = t.repetition,
                 )
             }
             return ModelResult(spec, engine.provider, loadMillis, sampler.stop(), baseline, results)
@@ -90,7 +97,30 @@ class Benchmark(
     }
 
     companion object {
-        fun report(results: List<ModelResult>, header: String = ""): String = buildString {
+        /** Report wording of a repetition-filter outcome, "" for none. */
+        fun repetitionLabel(o: RepetitionOutcome): String = when (o) {
+            RepetitionOutcome.NONE -> ""
+            RepetitionOutcome.REDECODED -> "répétition redécodée"
+            RepetitionOutcome.CUT -> "répétition coupée"
+            RepetitionOutcome.DETECTED -> "répétition détectée, texte gardé"
+        }
+
+        /**
+         * « répétitions : 1 redécodée sur 9 segments » for a Whisper model in automatic mode
+         * ([automatic]: the filter was on), "" otherwise.
+         */
+        fun repetitionSummary(r: ModelResult, automatic: Boolean): String {
+            if (!automatic) return ""
+            val c = r.repetitionCounts
+            val parts = listOfNotNull(
+                c[RepetitionOutcome.REDECODED]?.let { "$it redécodé(s)" },
+                c[RepetitionOutcome.CUT]?.let { "$it coupé(s)" },
+                c[RepetitionOutcome.DETECTED]?.let { "$it détecté(s) sans coupure" },
+            ).ifEmpty { listOf("aucune") }
+            return "   répétitions corrigées : ${parts.joinToString(", ")} sur ${r.samples.size} segment(s)"
+        }
+
+        fun report(results: List<ModelResult>, header: String = "", automatic: (ModelSpec) -> Boolean = { false }): String = buildString {
             if (header.isNotEmpty()) appendLine(header)
             for (r in results) {
                 appendLine("== ${r.spec.displayName} (${r.spec.publisher}) · provider ${r.provider}")
@@ -105,13 +135,14 @@ class Benchmark(
                         r.totalWer?.let { String.format(Locale.ROOT, " · WER moyen %.1f %%", it * 100) } ?: "",
                     ),
                 )
+                repetitionSummary(r, automatic(r.spec)).takeIf { it.isNotEmpty() }?.let { appendLine(it) }
                 for (s in r.samples) {
                     appendLine(
                         String.format(
                             Locale.ROOT, "   [%s %s] %.1f s audio · %.2f s · RTF %.3f%s",
                             s.sample, s.language, s.audioSeconds, s.decodeMillis / 1000f, s.rtf,
                             s.wer?.let { String.format(Locale.ROOT, " · WER %.1f %%", it * 100) } ?: "",
-                        ),
+                        ) + repetitionLabel(s.repetition).let { if (it.isEmpty()) "" else " · $it" },
                     )
                     appendLine("      « ${s.text} »")
                 }

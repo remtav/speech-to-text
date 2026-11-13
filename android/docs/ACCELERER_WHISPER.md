@@ -488,7 +488,7 @@ rapide. Ce qui distingue large-v3 de turbo, et ce qu'on peut encore en tirer pou
 ## 10. Procédure de mesure sur le téléphone
 
 À suivre avec l'écran « Comparer les modèles » (Réglages > Comparer les modèles). Rien à compiler pour les étapes 1 à 4 ;
-l'étape 5 utilise le réglage « Silence ajouté pour Whisper » (Réglages, section Performance, sous l'accélération matérielle).
+l'étape 5 utilise le réglage « Silence ajouté pour Whisper » (Réglages, section Avancé, en bas de l'écran, depuis l'issue #49).
 
 **Préparation** : téléphone branché, économiseur de batterie éteint, autres applications fermées, écran allumé,
 température ordinaire ; installer Whisper turbo et, pour comparer, Parakeet. Cocher tous les extraits de référence.
