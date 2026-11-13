@@ -41,10 +41,13 @@ class SetupActivity : AppCompatActivity() {
     private lateinit var modelsBox: LinearLayout
     private lateinit var languagesBox: LinearLayout
     private lateinit var participationBox: LinearLayout
+    private lateinit var readyBox: LinearLayout
+    /** Whether the « C'est prêt » card is drawn now; null before the first draw. */
+    private var readyShown: Boolean? = null
     /** Whether the participation card is drawn now; null before the first draw. It is redrawn only when this changes. */
     private var participationShown: Boolean? = null
-    // A download that ends can complete the setup: `maybeOpenHowTo` checks it.
-    private val refresh: () -> Unit = { renderModels(); maybeOpenHowTo(); renderParticipation() }
+    // A download that ends can complete the setup: `renderReady` checks it.
+    private val refresh: () -> Unit = { renderModels(); renderReady(); renderParticipation() }
 
     private val askMic = registerForActivityResult(ActivityResultContracts.RequestPermission()) { renderSteps() }
     private val askNotifications = registerForActivityResult(ActivityResultContracts.RequestPermission()) { }
@@ -96,6 +99,10 @@ class SetupActivity : AppCompatActivity() {
             }
         }
 
+        // « C'est prêt » (issue #56): drawn here, just above the try field, once the setup is complete.
+        readyBox = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        col.addView(readyBox)
+
         col.heading(getString(R.string.setup_try))
         col.addView(EditText(this).apply {
             hint = getString(R.string.setup_try_hint)
@@ -125,7 +132,7 @@ class SetupActivity : AppCompatActivity() {
     }
 
     private fun renderSteps() {
-        // Called again on resume, on focus and when a download ends: `maybeOpenHowTo` opens once.
+        // Called again on resume, on focus and when a download ends.
         val imm = getSystemService(InputMethodManager::class.java)
         val enabled = imm.enabledInputMethodList.any { it.packageName == packageName }
         val current = Settings.Secure.getString(contentResolver, Settings.Secure.DEFAULT_INPUT_METHOD) ?: ""
@@ -136,8 +143,20 @@ class SetupActivity : AppCompatActivity() {
         }
         val mic = ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
         micStatus.text = getString(if (mic) R.string.setup_mic_ok else R.string.setup_mic_missing)
-        maybeOpenHowTo()
+        renderReady()
         renderParticipation()
+    }
+
+    /**
+     * Draws or removes the « C'est prêt » card (issue #56): once the setup is complete, with an invitation to
+     * "Comment dicter", which no longer opens by itself. Touches nothing when it is already as it should be.
+     */
+    private fun renderReady() {
+        val show = setupComplete()
+        if (show == readyShown) return
+        readyShown = show
+        readyBox.removeAllViews()
+        if (show) readyBox.readyCard { startActivity(Intent(this, HowToActivity::class.java)) }
     }
 
     /** Draws or removes the participation card; touching nothing when it is already as it should be (downloads call this often). */
@@ -161,18 +180,6 @@ class SetupActivity : AppCompatActivity() {
         // Only a model the keyboard can use counts (a hidden model's files may still be on the phone).
         val modelReady = (ModelCatalog.listed(app.settings.languages) + ModelCatalog.remote).any { app.isInstalled(it) }
         return SetupProgress.isComplete(isKeyboardEnabled(), isMicGranted(), modelReady)
-    }
-
-    /**
-     * Opens "Comment dicter" once, when the setup is complete (keyboard enabled, microphone
-     * allowed, a model ready: see [SetupProgress]). The screen marks itself as seen, but the flag
-     * is also set here before starting it, so a second call before it appears cannot open it twice.
-     */
-    private fun maybeOpenHowTo() {
-        if (SetupProgress.shouldOpenHowTo(setupComplete(), app.settings.howToShown)) {
-            app.settings.howToShown = true
-            startActivity(Intent(this, HowToActivity::class.java))
-        }
     }
 
     private fun isKeyboardEnabled() =

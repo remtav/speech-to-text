@@ -196,30 +196,28 @@
     <!-- Écran « Comment dicter » (issue #15, étape 2.3) -->
     <string name="setup_howto">Comment dicter</string>
     <string name="howto_title">Comment dicter</string>
-    <string name="howto_privacy">Tout se passe sur votre téléphone : votre voix y est transcrite et n\'est envoyée à personne, sauf si vous choisissez vous-même un serveur distant.</string>
-    <string name="howto_examples">Dites ceci, vous obtenez cela</string>
-    <string name="howto_examples_help">Dites la commande au milieu de votre phrase. Ces exemples sont tirés de la liste des commandes de l\'application.</string>
-    <string name="howto_say">Dites</string>
-    <string name="howto_get">Vous obtenez</string>
-    <string name="howto_said">« %1$s »</string>
+    <string name="howto_rule">Dites le nom du signe au milieu de votre phrase : il s\'écrit tout seul.</string>
+    <string name="howto_privacy">Par défaut, tout se passe sur votre téléphone : votre voix y est transcrite et n\'est envoyée à personne. Un réglage avancé peut changer cela.</string>
+    <string name="howto_say">Dites :</string>
+    <string name="howto_say_in">Dites (%1$s) :</string>
+    <string name="howto_get">Vous obtenez :</string>
     <string name="howto_before">Si le champ contient : %1$s</string>
-    <string name="howto_covers">Commandes : %1$s</string>
+    <string name="howto_example_line">Exemple : « %1$s » donne « %2$s »</string>
     <string name="howto_commands_off">Les commandes vocales sont désactivées dans les Réglages : ce que vous dites est écrit tel quel. Activez-les pour que les exemples ci-dessous fonctionnent.</string>
     <string name="howto_open_settings">Ouvrir les Réglages</string>
-    <string name="howto_all">Toutes les commandes</string>
+    <string name="howto_all_show">Toutes les commandes</string>
+    <string name="howto_all_hide">Masquer les commandes</string>
     <string name="howto_all_help">Chaque commande, avec les autres façons de la dire.</string>
     <string name="howto_produces">Donne : %1$s</string>
     <string name="howto_also">Aussi : %1$s</string>
     <string name="howto_try">Zone d\'essai</string>
     <string name="howto_try_hint">Touchez ici pour faire apparaître le clavier, puis basculez vers Kalmia Blabla et dictez</string>
-    <string name="howto_model">Votre modèle</string>
-    <string name="howto_model_recommended">Recommandé pour vos langues : %1$s</string>
-    <string name="howto_model_installed">Installé : prêt à dicter.</string>
-    <string name="howto_model_missing">Pas encore installé : téléchargez-le sur l\'écran de configuration.</string>
-    <string name="howto_model_choose">Choisir un modèle</string>
     <string name="howto_vocabulary">Noms propres et mots techniques</string>
     <string name="howto_vocabulary_help">Un nom propre ou un mot technique mal écrit (« GitHub », le nom d\'une rue) se corrige une fois pour toutes dans le vocabulaire personnalisé.</string>
     <string name="howto_vocabulary_open">Ouvrir le vocabulaire</string>
+    <string name="setup_ready_title">C\'est prêt</string>
+    <string name="setup_ready_body">Dictez dans n\'importe quelle zone de texte : touchez le micro du clavier et parlez. Vous pouvez aussi essayer ci-dessous.</string>
+    <string name="setup_ready_more">Aller plus loin : dicter la ponctuation</string>
 
     <!--
       Test de lecture en français québécois (issue #15, lot 4, étape 4.1). Textes seulement : les

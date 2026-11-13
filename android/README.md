@@ -272,8 +272,12 @@ diverger du comportement.
 ![Comment dicter, clair](docs/screenshots/howto-light.png)
 ![Comment dicter, sombre](docs/screenshots/howto-dark.png)
 
-L'écran « Comment dicter » s'ouvre à la fin de la configuration ; on le rouvre
-depuis l'écran principal et depuis le bouton d'aide du clavier.
+L'écran « Comment dicter » ne s'ouvre jamais tout seul : à la fin de la configuration,
+l'écran d'installation dit « C'est prêt » et propose « Aller plus loin : dicter la
+ponctuation ». On l'ouvre aussi depuis le bouton « Comment dicter » de l'écran principal
+et depuis le bouton d'aide du clavier. Le premier écran donne la règle en une phrase,
+trois exemples (la commande et le signe obtenu sont mis en évidence) et la zone d'essai ;
+les autres commandes et leurs variantes sont sous « Toutes les commandes », fermé au départ.
 
 - **Peu de faux positifs.** Une formulation n'est une commande que si les mots
   autour n'en font pas du texte ordinaire : « j'ai marqué deux points » ou

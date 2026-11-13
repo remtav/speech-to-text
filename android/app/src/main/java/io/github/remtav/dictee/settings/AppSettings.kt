@@ -119,11 +119,6 @@ class AppSettings(context: Context, private val defaultServerUrl: String = io.gi
         get() = RepetitionFix.fromName(prefs.getString("whisper_repetition_fix", null))
         set(v) = prefs.edit().putString("whisper_repetition_fix", v.name).apply()
 
-    /** The "Comment dicter" screen has been opened (by itself at the end of the first setup, or by the user): it opens by itself only once. */
-    var howToShown: Boolean
-        get() = prefs.getBoolean("howto_shown", false)
-        set(v) = prefs.edit().putBoolean("howto_shown", v).apply()
-
     var voiceCommands: Boolean
         get() = prefs.getBoolean("voice_commands", true)
         set(v) = prefs.edit().putBoolean("voice_commands", v).apply()

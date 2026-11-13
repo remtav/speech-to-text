@@ -3995,3 +3995,105 @@ pendant la dictée ». Le contrat du serveur est celui de la PR #46 (`POST /poli
   - si le serveur est en échec récent au début de la dictée, la sonde n'est pas faite. Un ancien serveur
     reçoit alors des blocs (sans polissage), et le texte brut est inséré au lieu du texte poli. Rien n'est
     perdu.
+
+## Issue #56 — « Comment dicter » : un choix, et l'essentiel d'abord
+
+Suite du retour d'une testeuse (#54, 2026-11-13) : le tutoriel s'ouvrait sans qu'on le demande et
+empilait trop d'information. Les « décisions proposées » de l'issue sont prises telles quelles,
+sauf deux ajustements indiqués (mise en évidence, anglais).
+
+### Changement par rapport au lot 2 de #15
+
+Le lot 2 de l'issue #15 demandait l'**ouverture automatique**, une fois, à la fin de la première
+configuration. Elle est **retirée** : `SetupActivity.maybeOpenHowTo`, `SetupProgress.shouldOpenHowTo`
+et le réglage `AppSettings.howToShown` n'existent plus (l'ancienne clé `howto_shown` reste
+inutilisée dans les préférences des téléphones qui l'ont écrite : sans effet). À la place, l'écran
+d'installation, une fois la configuration complète (`SetupProgress.isComplete`, inchangé ici),
+montre une carte « C'est prêt » au-dessus de la zone d'essai, avec le bouton discret « Aller plus
+loin : dicter la ponctuation » (`ui/SetupReady.kt`, appelée par `SetupActivity.renderReady`).
+Rien ne s'ouvre seul. Le tutoriel reste ouvert par le bouton de l'écran principal et par le
+bouton d'aide du clavier (`ime/` non touché).
+
+Pour limiter le conflit avec la refonte de l'écran d'installation (#55, #57, #36, #37), le
+changement dans `SetupActivity` est petit : trois lignes d'appel et une fonction `renderReady`,
+le dessin de la carte étant dans un fichier à part. Rien d'autre n'y est réordonné. La carte suit
+`SetupProgress.isComplete` : si cette définition change (clavier activé **et** choisi), « C'est
+prêt » la suit sans autre modification.
+
+### Premier écran
+
+Titre ; la règle « Dites le nom du signe au milieu de votre phrase : il s'écrit tout seul. » ;
+**trois exemples au plus**, de deux lignes chacun (« Dites : … », « Vous obtenez : … ») ; la zone
+d'essai, tout de suite après ; puis le bouton « Toutes les commandes » (liste **fermée** par
+défaut, état gardé à la rotation) ; enfin la phrase de confidentialité, en petit.
+
+- **Les trois exemples** : deux-points, point d'interrogation, nouvelle ligne (français). Ils sont
+  choisis par `HowToExamples.firstScreen`, dans `CommandTable.active`, et le résultat est celui du
+  pipeline du clavier (typographie de l'utilisateur) : rien n'est écrit à la main dans l'écran.
+  Avec plusieurs langues, les places sont partagées comme avant (français d'abord, avec l'impair).
+- **Phrase courte pour le deux-points** : l'exemple de la table (« il a dit deux-points ouvrir les
+  guillemets bonjour fermer les guillemets ») enseigne trois commandes à la fois. Pour que la
+  commande et le signe se repèrent, `CommandEntry.firstScreen` donne, pour le deux-points français
+  seulement, « il a dit deux-points bonjour » → « Il a dit : bonjour ». C'est une donnée d'aide dans
+  la table, pas une commande : aucune formulation n'est ajoutée ni changée. Un test vérifie que le
+  pipeline donne bien le résultat écrit à côté.
+- **Anglais** : « colon » est un homographe (le côlon) que l'analyseur n'accepte qu'entre deux
+  ponctuations ou en bord de segment, donc jamais « au milieu de la phrase ». L'anglais montre
+  donc point d'interrogation, nouvelle ligne, point d'exclamation ; le deux-points anglais reste
+  dans la liste complète.
+- **Nouvelle ligne** : le saut de ligne est dessiné « ↵ » dans le résultat, pour pouvoir être mis en
+  évidence et pour que l'exemple reste sur deux lignes ; c'est le seul écart avec le texte produit.
+- **Ce qui sort du premier écran** : « Si le champ contient », « Commandes : … », les variantes
+  (« Aussi : »), les effacements, guillemets, parenthèses, point-virgule (tous dans la liste), la
+  section « Votre modèle » (elle appartient à l'installation) ; le lien du vocabulaire passe au bas
+  de la partie repliée.
+- **Liste complète** : toutes les commandes de `CommandTable.active`, chacune avec « Donne : », « Aussi : »
+  et, une fois par phrase partagée, son exemple (avec « Si le champ contient » pour les effacements).
+
+### Mise en évidence (écart par rapport à la proposition)
+
+La proposition parlait d'IBM Plex Mono et du fond « papier 2 ». L'application n'a ni l'un ni l'autre :
+polices du système et palette Material 3 (`NoHardcodedStyleTest` interdit toute police et couleur en
+dur). Le principe est gardé, avec ce qui existe :
+
+| Élément | Style | Paire de couleurs (`ThemeContrastTest`, ≥ 4,5 : 1 en clair et en sombre) |
+| --- | --- | --- |
+| Commande dite | gras + soulignement + fond `colorSecondaryContainer` | `colorOnSecondaryContainer` sur `colorSecondaryContainer` |
+| Signe obtenu | gras + `colorPrimary` | `colorPrimary` sur `colorSurface` / `colorSurfaceContainer` |
+
+Jamais la couleur seule : le gras (et le soulignement pour la commande) la double. Le style est posé
+par des plages (`ui/HowToStyle.kt`, `emphasised`), vérifiées par un test instrumenté plage par plage.
+
+### Phrase sur la confidentialité
+
+« Par défaut, tout se passe sur votre téléphone : votre voix y est transcrite et n'est envoyée à
+personne. Un réglage avancé peut changer cela. » Aucune mention du serveur (décision du 2026-11-13,
+#57), et vraie aussi pour qui a configuré un serveur dans les réglages avancés. La branche
+`claude/installation-local-d-abord` n'existait pas encore sur `origin` au moment du travail : si #57
+écrit un autre texte pour `howto_privacy`, prendre le sien à la fusion.
+
+### Tests
+
+- JVM (`HowToTest.kt`, `ThemeContrastTest.kt`) : trois exemples au plus pour tous les jeux de langues,
+  partage des places, exemples tirés de la table et résultat égal au pipeline, plage de la commande
+  (une formulation de la table) et du signe (le signe produit, ou « ↵ ») dans chaque exemple, y compris
+  en typographie de France (espace insécable avant le signe), aucun exemple recopié dans l'écran ni les
+  chaînes, paires de couleurs de la mise en évidence.
+- Instrumentés (`HowToInstrumentedTest.kt`) : rien ne s'ouvre seul, « C'est prêt » absent sans modèle
+  et présent avec, l'invitation ouvre le tutoriel (remplace l'assertion d'ouverture automatique) ;
+  réouverture depuis l'écran principal et depuis le clavier (inchangés) ; premier écran : règle, au plus
+  trois cartes de deux lignes, ordre règle → exemples → essai → liste, pas de section modèle ; styles
+  distincts de la commande et du signe, plages exactes, gras jamais absent ; liste fermée au départ,
+  ouverte d'un geste, une ligne par commande de la table, « Aussi » visible seulement ouverte ;
+  vocabulaire dans la partie repliée ; phrase de confidentialité sans « serveur ».
+  `ScreenshotTest` : `howto-{light,dark}.png` (premier écran) et `howto-all-{light,dark}.png` (liste ouverte).
+- Pas de nouveau traitement de texte sur le téléphone : les plages sont calculées par `indexOf` sur
+  des chaînes, sans expression régulière ; le piège `(?U)` de la PR #52 ne s'applique pas.
+
+### À vérifier sur un vrai téléphone (rien n'y a tourné)
+
+- Les deux premiers écrans (clair et sombre) : lisibilité du gras/souligné de la commande et du signe en
+  couleur, longueur réelle des exemples sur un petit écran.
+- Fin de configuration : « C'est prêt » apparaît, rien ne s'ouvre, le bouton ouvre bien le tutoriel.
+- **Essai « dicter un deux-points » avec une personne qui ne connaît pas l'application** (critère
+  d'acceptation de #56 **non coché** : à faire par un humain).

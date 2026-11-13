@@ -51,9 +51,6 @@ abstract class ImeTestBase {
         app.settings.haptics = false
         app.settings.cleanupMode = CleanupMode.OFF
         app.settings.activeModelId = ModelCatalog.parakeet.id
-        // Keyboard enabled, microphone granted (HowToInstrumentedTest) and a scripted model "installed":
-        // the setup screen would open "Comment dicter" over itself. Only HowToInstrumentedTest tests that.
-        app.settings.howToShown = true
         TestHooks.assumeInstalled = true
         app.engines.release()
         waitUntilImeIsKnown()
