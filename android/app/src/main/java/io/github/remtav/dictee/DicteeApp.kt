@@ -42,6 +42,11 @@ object TestHooks {
     @Volatile var vadParams: VadParams? = null
     /** Treat every catalog model as installed (scripted engines need no files). */
     @Volatile var assumeInstalled: Boolean = false
+    /**
+     * When set, exactly these on-device catalogue models are "installed" (scripted engines need no
+     * files): lets a test run the reading test with one model, then with several. Wins over [assumeInstalled].
+     */
+    @Volatile var installedModelIds: Set<String>? = null
 }
 
 class DicteeApp : Application() {
@@ -77,7 +82,7 @@ class DicteeApp : Application() {
 
     fun isInstalled(spec: ModelSpec): Boolean = when {
         spec.family == ModelFamily.REMOTE -> settings.remoteConfig().isConfigured
-        else -> TestHooks.assumeInstalled || store.isInstalled(spec)
+        else -> TestHooks.installedModelIds?.contains(spec.id) ?: (TestHooks.assumeInstalled || store.isInstalled(spec))
     }
 
     /** Engine factory in effect (scripted in tests). */

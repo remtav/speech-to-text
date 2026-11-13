@@ -13,6 +13,7 @@ import io.github.remtav.dictee.stt.ModelCatalog
 import io.github.remtav.dictee.ui.CompareActivity
 import io.github.remtav.dictee.ui.DiagnosticActivity
 import io.github.remtav.dictee.ui.HowToActivity
+import io.github.remtav.dictee.ui.ReadingTestActivity
 import io.github.remtav.dictee.ui.SettingsActivity
 import io.github.remtav.dictee.ui.SetupActivity
 import io.github.remtav.dictee.ui.languageTag
@@ -132,6 +133,51 @@ class ScreenshotTest : ImeTestBase() {
             awaitIdle()
             shot("keyboard-text-$suffix", scenario)
             scenario.close()
+        }
+    }
+
+    /**
+     * The reading test with a result (issue #15, step 4.2): two scripted models, the active one (Qwen3-ASR)
+     * loses every fourth word and the other (Parakeet) hears everything, so the capture shows the model
+     * chooser, the "another model understands you better" card and the misheard words highlighted
+     * (colour and underline). The clip is the test's, never the microphone; nothing is downloaded or sent.
+     */
+    @Test
+    fun readingTest() {
+        val material = io.github.remtav.dictee.reading.ReadingMaterial.load { path ->
+            context.assets.open(path).bufferedReader().use { it.readText() }
+        }
+        val qwen = ModelCatalog.qwen3.id
+        try {
+            for (mode in listOf(ThemeMode.LIGHT, ThemeMode.DARK)) {
+                val suffix = mode.name.lowercase()
+                setTheme(mode)
+                app.settings.quebecDeclaration = io.github.remtav.dictee.reading.Declaration.YES
+                app.settings.activeModelId = qwen
+                TestHooks.installedModelIds = setOf(ModelCatalog.parakeet.id, qwen)
+                TestHooks.engineFactory = ScriptedReadingModels(material) { model, _, text ->
+                    if (model == qwen) ScriptedReadingModels.dropEveryFourthWord(text) else text
+                }
+                TestHooks.audioSourceFactory = io.github.remtav.dictee.audio.AudioSourceFactory {
+                    io.github.remtav.dictee.audio.PcmAudioSource(
+                        listOf(io.github.remtav.dictee.audio.PcmAudio(FloatArray(3 * 16000) { 0.05f }, 16000)),
+                        realTime = false, leadSeconds = 0f, tailSeconds = 0f,
+                    )
+                }
+                ActivityScenario.launch(ReadingTestActivity::class.java).use { s ->
+                    val d = ReadingDriver(instrumentation, s, material)
+                    d.awaitTag(ReadingTestActivity.TAG_ACCEPT_START)
+                    d.click(ReadingTestActivity.TAG_ACCEPT_START)
+                    d.awaitTag(ReadingTestActivity.TAG_PARAGRAPH)
+                    d.readAllParagraphs(context.getString(R.string.reading_redo))
+                    d.click(ReadingTestActivity.TAG_SCORE)
+                    d.awaitTag(ReadingTestActivity.TAG_BETTER, 90_000)
+                    s.scrollToTag(ReadingTestActivity.TAG_BETTER, above = 160)
+                    shot("reading-$suffix", s)
+                }
+            }
+        } finally {
+            TestHooks.installedModelIds = null
         }
     }
 
