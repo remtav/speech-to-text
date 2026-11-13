@@ -226,4 +226,55 @@
     <string name="contrib_share_listen">Réécouter</string>
     <string name="contrib_share_redo">Refaire le test</string>
     <string name="contrib_share_decline">Ne pas partager</string>
+
+    <!--
+      Écran du test de lecture et réglages de participation (issue #15, lot 4, étape 4.2).
+      Les textes de la carte, de la déclaration et de l'acceptation sont plus haut (contrib_*).
+    -->
+    <string name="settings_participation">Test de lecture en français québécois</string>
+    <string name="settings_participation_answer">Votre réponse à « Parlez-vous un français québécois ? »</string>
+    <string name="settings_participation_yes">Oui</string>
+    <string name="settings_participation_no">Non</string>
+    <string name="settings_participation_unanswered">Pas encore répondu : la question vous sera posée avant le test.</string>
+    <string name="settings_participation_excluded">Vous avez répondu non : le test de lecture n\'est pas proposé, et rien n\'est enregistré. Changez votre réponse pour le retrouver.</string>
+
+    <string name="reading_title">Test de lecture</string>
+    <string name="reading_models_used">Modèles utilisés : %1$s.</string>
+    <string name="reading_no_model">Aucun modèle n\'est installé sur ce téléphone. Téléchargez-en un depuis l\'écran principal, puis revenez faire le test.</string>
+    <string name="reading_progress">Paragraphe %1$d sur %2$d</string>
+    <string name="reading_hint">Lisez à voix haute, à votre rythme. L\'enregistrement s\'arrête tout seul après %1$d secondes.</string>
+    <string name="reading_record">Enregistrer</string>
+    <string name="reading_stop">Arrêter</string>
+    <string name="reading_redo">Refaire ce paragraphe</string>
+    <string name="reading_recording">Enregistrement : %1$d s sur %2$d s</string>
+    <string name="reading_recorded">Paragraphe enregistré (%1$d s).</string>
+    <string name="reading_previous">Précédent</string>
+    <string name="reading_next">Suivant</string>
+    <string name="reading_score">Voir le score</string>
+    <string name="reading_mic_missing">Le microphone n\'est pas autorisé : autorisez-le depuis l\'écran principal, puis revenez.</string>
+    <string name="reading_too_short">Rien n\'a été entendu : recommencez, un peu plus près du micro.</string>
+    <string name="reading_mic_error">Microphone indisponible : %1$s</string>
+    <string name="reading_scoring_title">Calcul du score</string>
+    <string name="reading_scoring_progress">%1$s (%2$d sur %3$d) : paragraphe %4$d sur %5$d</string>
+    <string name="reading_scoring_note">Chaque modèle est chargé à tour de rôle sur votre téléphone : cela peut prendre une ou deux minutes.</string>
+    <string name="reading_scoring_failed">Le calcul du score a échoué : %1$s</string>
+    <string name="reading_scoring_cancel">Annuler</string>
+    <string name="reading_result_title">Votre score</string>
+    <string name="reading_result_global">Ressemblance globale : %1$d %%</string>
+    <string name="reading_result_partial">Paragraphes lus : %1$d sur %2$d. Le score porte sur ces paragraphes seulement.</string>
+    <string name="reading_result_model_line">%1$s : %2$d %%</string>
+    <string name="reading_result_detail_for">Détail pour le modèle</string>
+    <string name="reading_result_paragraph">Paragraphe %1$d · ressemblance %2$d %%</string>
+    <string name="reading_result_heard">Entendu : « %1$s »</string>
+    <string name="reading_result_misheard">Mots mal compris : %1$s</string>
+    <string name="reading_result_all_good">Tous les mots ont été reconnus.</string>
+    <string name="reading_result_legend">Les mots surlignés et soulignés n\'ont pas été reconnus par le modèle.</string>
+    <string name="reading_result_unread">Paragraphe non lu</string>
+    <string name="reading_result_error">%1$s n\'a pas pu transcrire votre lecture : %2$s</string>
+    <string name="reading_better_title">Un autre modèle vous comprend mieux</string>
+    <string name="reading_better_body">%1$s a compris %2$d %% de votre lecture, contre %3$d %% pour %4$s, le modèle que vous utilisez.</string>
+    <string name="reading_better_choose">Choisir %1$s</string>
+    <string name="reading_better_chosen">%1$s est maintenant votre modèle pour la dictée.</string>
+    <string name="reading_result_kept">Votre lecture n\'est conservée nulle part : l\'enregistrement est effacé dès que vous fermez cet écran.</string>
+    <string name="reading_close">Fermer</string>
 </resources>
