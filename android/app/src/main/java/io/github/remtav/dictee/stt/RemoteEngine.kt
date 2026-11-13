@@ -54,9 +54,13 @@ data class RemoteConfig(
     val cfAccessClientSecret: String = "",
     val connectTimeoutMillis: Int = 4_000,
     val readTimeoutMillis: Int = 30_000,
-    /** Whole dictation: total wait = base + 1 × audio length, capped (issue #13). */
+    /**
+     * Whole dictation: total wait = base + [waitPerAudioSecondMillis] per second of audio, capped (issue #13).
+     * The keyboard sets them from the "délai avant repli" setting (issue #23, see [ServerTimeout]).
+     */
     val waitBaseMillis: Long = 60_000,
     val waitCapMillis: Long = 360_000,
+    val waitPerAudioSecondMillis: Long = 1_000,
     val pollIntervalMillis: Long = 400,
     /**
      * Ask the server to polish the whole dictation with its LLM (issue #15). When false the
@@ -107,7 +111,7 @@ data class RemoteConfig(
 
     /** Total time allowed for the result of a dictation of [audioSeconds]. */
     fun waitBudgetMillis(audioSeconds: Float): Long =
-        (waitBaseMillis + (audioSeconds * 1000).toLong()).coerceAtMost(waitCapMillis)
+        (waitBaseMillis + (audioSeconds * waitPerAudioSecondMillis).toLong()).coerceAtMost(waitCapMillis)
 
     companion object {
         /**

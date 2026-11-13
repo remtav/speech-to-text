@@ -32,11 +32,13 @@ FINISHED = ("done", "error", "cancelled")
 
 @dataclass
 class Job:
-    kind: str  # transcribe | load | eject
+    kind: str  # transcribe | polish | load | eject
     params: dict = field(default_factory=dict)
     filename: str | None = None
     file_size: int | None = None
     audio_path: str | None = None
+    text: str | None = field(default=None, repr=False)  # input of a polish job; dropped when it ends
+    owner: str | None = None  # hash of the caller's token when DICTEE_TOKENS is set (app/security.py)
     id: str = field(default_factory=lambda: uuid.uuid4().hex)
     status: str = "queued"
     progress: float = 0.0
@@ -61,7 +63,7 @@ class Job:
             "progress": round(self.progress, 4),
             "message": self.message,
             "stage": self.stage,
-            "params": self.params,
+            "params": {k: v for k, v in self.params.items() if k != "prompt"},  # prompt = user text
             "filename": self.filename,
             "file_size": self.file_size,
             "created_at": self.created_at,
@@ -115,8 +117,9 @@ class JobManager:
 
     # ---------------------------------------------------------------- public
 
-    def submit(self, kind, params=None, filename=None, file_size=None, audio_path=None):
-        job = Job(kind=kind, params=params or {}, filename=filename, file_size=file_size, audio_path=audio_path)
+    def submit(self, kind, params=None, filename=None, file_size=None, audio_path=None, owner=None, text=None):
+        job = Job(kind=kind, params=params or {}, filename=filename, file_size=file_size, audio_path=audio_path,
+                  owner=owner, text=text)
         with self._lock:
             ahead = sum(1 for j in self._jobs.values() if not j.finished)
             if ahead:
@@ -201,6 +204,7 @@ class JobManager:
                 job.progress = 1.0
             self._publish(job, done=True)
             self._remove_audio(job)
+            job.text = None
             self._trim()
 
     @staticmethod
@@ -247,8 +251,14 @@ class JobManager:
                 if polishing:  # leave the end of the bar to the polish stage
                     def whisper_progress(fraction, message, stage):
                         progress(fraction * POLISH_PROGRESS_START, message, stage)
-                result = self.backend.call("transcribe", {"audio_path": job.audio_path, "options": options},
-                                           whisper_progress)
+                try:
+                    result = self.backend.call("transcribe", {"audio_path": job.audio_path, "options": options},
+                                               whisper_progress)
+                finally:
+                    # The audio is deleted as soon as Whisper is done with it (issue #23), before the
+                    # polish step; _finish removes it too on every other path (error, cancel, shutdown).
+                    with self._lock:
+                        self._remove_audio(job)
                 if polishing:
                     try:
                         self._polish(job, result, progress)
@@ -258,6 +268,12 @@ class JobManager:
                         log.warning("Polish step failed: %s", type(e).__name__)
                         self._polish_failed(result)
                 message = "Transcription complete!"
+            elif job.kind == "polish":
+                # Text only: no audio, no Whisper. The input text is kept on the job (not in its
+                # params, so never in GET /jobs) until the job ends, then dropped; never logged.
+                result = {"text": job.text or "", "language": job.params.get("language")}
+                self._polish(job, result, progress)
+                message = "Text polished"
             elif job.kind == "load":
                 model, device = job.params["model"], job.params["device"]
                 self.backend.call("load", {"model": model, "device": device}, progress)

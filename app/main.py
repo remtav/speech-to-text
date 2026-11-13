@@ -17,7 +17,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 
-from app import hf, system
+from app import hf, security, system
 from app.config import VALID_DEVICES, VALID_MODELS, load_settings
 from app.errors import http_status_for
 from app.formats import EXPORT_FORMATS, export
@@ -32,6 +32,8 @@ ROOT = Path(__file__).resolve().parent.parent
 TEMPLATES_DIR = ROOT / "templates"
 STATIC_DIR = ROOT / "static"
 UPLOAD_CHUNK = 1024 * 1024
+MAX_PROMPT_CHARS = 1000  # Whisper reads at most the last 224 tokens of it
+MAX_POLISH_CHARS = 100_000  # far above what the polish step accepts; only bounds memory
 
 log = logging.getLogger("app")
 
@@ -116,9 +118,19 @@ def _raise_for_job(job):
         raise HTTPException(status_code=http_status_for(job.error["code"]), detail=job.error["message"])
 
 
+def _owner(request):
+    """Hash of the caller's token when DICTEE_TOKENS is set, else None (app/security.py)."""
+    return getattr(request.state, "owner", None)
+
+
+def _visible(request, job):
+    """With tokens, a job is only visible to the token that created it."""
+    return not request.app.state.auth_required or job.owner == _owner(request)
+
+
 def _get_job(request, job_id):
     job = request.app.state.jobs.get(job_id)
-    if job is None:
+    if job is None or not _visible(request, job):
         raise HTTPException(status_code=404, detail="Job not found (it may have expired)")
     return job
 
@@ -172,6 +184,12 @@ def create_app(settings=None, backend=None, polish_client=None):
         log.info("Speech-to-Text %s (commit %s, %s) on http://%s:%s", __version__, build["commit_short"] or "unknown",
                  build["date"] or "date unknown", settings.host, settings.port)
         log.info("Model: %s on %s (worker mode: %s)", settings.model, device, settings.worker_mode)
+        if settings.auth_required:
+            log.info("Access: token required (%d token(s), %s)", len(settings.tokens),
+                     f"{settings.rate_limit} transcription requests per minute per token" if settings.rate_limit
+                     else "no rate limit")
+        else:
+            log.info("Access: open, no token (set DICTEE_TOKENS before exposing the server to the internet)")
         log.info("Model cache dir: %s", model_cache_dir())
         log.info("ffmpeg: %s", ffmpeg_path or "NOT FOUND (install it or set FFMPEG_PATH)")
         source = hf.token_source()
@@ -195,6 +213,8 @@ def create_app(settings=None, backend=None, polish_client=None):
         lifespan=lifespan,
     )
     app.state.settings = settings
+    # Before CORS, so CORS stays the outer layer (401 / 429 answers keep their CORS headers)
+    security.install(app, settings)
     app.add_middleware(
         CORSMiddleware,
         allow_origins=list(settings.cors_origins),
@@ -270,7 +290,12 @@ def create_app(settings=None, backend=None, polish_client=None):
     @app.get("/progress")
     def progress(request: Request):
         """Latest progress event (model download / load / transcription), for any job."""
-        return request.app.state.jobs.latest_progress()
+        latest = request.app.state.jobs.latest_progress()
+        job = request.app.state.jobs.get(latest.get("job_id")) if latest.get("job_id") else None
+        if job is not None and not _visible(request, job):  # another token's job: say nothing about it
+            return {"progress": 0.0, "message": "Waiting...", "stage": "idle", "done": False,
+                    "status": "idle", "job_id": None}
+        return latest
 
     # ---------------------------------------------------------- models
 
@@ -280,7 +305,7 @@ def create_app(settings=None, backend=None, polish_client=None):
 
         Also asks the Ollama polish endpoint to unload its model, so the whole GPU is given back.
         """
-        job = request.app.state.jobs.submit("eject")
+        job = request.app.state.jobs.submit("eject", owner=_owner(request))
         if not wait:
             return JSONResponse(status_code=202, content={"status": "queued", "job": job.to_dict()})
         await _wait(job)
@@ -304,7 +329,7 @@ def create_app(settings=None, backend=None, polish_client=None):
         if new_device == "cuda" and not await run_in_threadpool(system.cuda_available):
             raise HTTPException(status_code=400, detail="CUDA not available on this system.")
 
-        job = jobs.submit("load", {"model": new_model, "device": new_device})
+        job = jobs.submit("load", {"model": new_model, "device": new_device}, owner=_owner(request))
         if body.get("wait") is False:
             return JSONResponse(status_code=202, content={"status": "queued", "job": job.to_dict()})
         await _wait(job)
@@ -319,9 +344,14 @@ def create_app(settings=None, backend=None, polish_client=None):
     # --------------------------------------------------- transcription
 
     async def submit_transcription(request, file, diarize, num_speakers, min_speakers, max_speakers,
-                                   language, quick=False, polish=None):
+                                   language, quick=False, polish=None, prompt=None):
         params = {"quick": quick, "language": _validate_language(language),
                   "polish": settings.polish_default if polish is None else bool(polish)}
+        prompt = (prompt or "").strip()
+        if prompt:
+            if len(prompt) > MAX_PROMPT_CHARS:
+                raise HTTPException(status_code=400, detail=f"prompt too long (limit {MAX_PROMPT_CHARS} characters)")
+            params["prompt"] = prompt
         if not quick:
             diarize = settings.diarize_default if diarize is None else diarize
             _validate_speaker_hints(num_speakers, min_speakers, max_speakers)
@@ -331,7 +361,7 @@ def create_app(settings=None, backend=None, polish_client=None):
                           max_speakers=max_speakers)
         path, size = await _save_upload(file, max_upload_bytes)
         return request.app.state.jobs.submit("transcribe", params, filename=file.filename, file_size=size,
-                                             audio_path=path)
+                                             audio_path=path, owner=_owner(request))
 
     @app.post("/transcribe")
     async def transcribe(
@@ -365,6 +395,28 @@ def create_app(settings=None, backend=None, polish_client=None):
         _raise_for_job(job)
         return job.result
 
+    # ---------------------------------------------------------- polish
+
+    @app.post("/polish", status_code=202)
+    async def create_polish_job(request: Request, body: dict = Body(...)):
+        """Queue the LLM polish of a text (no audio) and return immediately; poll GET /jobs/{id}.
+
+        Body: ``{"text": "...", "language": "fr"}`` (``language`` optional, "auto" = unknown). The job's
+        result has the raw ``text``, ``polished_text`` when the polish was applied, and the ``polish``
+        status, as for a transcription. The text is never logged and is dropped when the job ends.
+        """
+        text = body.get("text")
+        if not isinstance(text, str) or not text.strip():
+            raise HTTPException(status_code=400, detail="text must be a non-empty string")
+        language = body.get("language")
+        if language is not None and not isinstance(language, str):
+            raise HTTPException(status_code=400, detail="language must be a string")
+        if len(text) > MAX_POLISH_CHARS:
+            raise HTTPException(status_code=413, detail=f"Text too long (limit {MAX_POLISH_CHARS} characters)")
+        job = request.app.state.jobs.submit("polish", {"language": _validate_language(language)},
+                                            owner=_owner(request), text=text)
+        return job.to_dict()
+
     # ------------------------------------------------------------ jobs
 
     @app.post("/jobs", status_code=202)
@@ -378,15 +430,21 @@ def create_app(settings=None, backend=None, polish_client=None):
         language: Optional[str] = Form(None),
         quick: bool = Form(False),
         polish: Optional[bool] = Form(None),
+        prompt: Optional[str] = Form(None),
     ):
-        """Queue a transcription and return immediately; poll GET /jobs/{id} for progress and result."""
+        """Queue a transcription and return immediately; poll GET /jobs/{id} for progress and result.
+
+        ``prompt`` (optional): text given to Whisper as context (``initial_prompt``), e.g. the end of the
+        previous block of a long dictation. It is never logged.
+        """
         job = await submit_transcription(request, file, diarize, num_speakers, min_speakers, max_speakers,
-                                         language, quick, polish)
+                                         language, quick, polish, prompt)
         return job.to_dict()
 
     @app.get("/jobs")
     def list_jobs(request: Request):
-        return {"jobs": [job.to_dict(include_result=False) for job in request.app.state.jobs.list()]}
+        return {"jobs": [job.to_dict(include_result=False) for job in request.app.state.jobs.list()
+                         if _visible(request, job)]}
 
     @app.get("/jobs/{job_id}")
     def get_job(request: Request, job_id: str):

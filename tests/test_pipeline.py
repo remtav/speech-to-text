@@ -150,6 +150,54 @@ class TestTranscription:
         assert load.call_args.args[:2] == ("small", "cpu")
 
 
+class TestInitialPrompt:
+    """Issue #35: the request's ``prompt`` is Whisper's ``initial_prompt`` for that call only."""
+
+    @staticmethod
+    def _options():
+        import dataclasses
+
+        @dataclasses.dataclass(frozen=True)
+        class Options:  # stands in for whisperx.asr's TranscriptionOptions, set once at load_model
+            initial_prompt: str | None = None
+            beam_size: int = 5
+
+        return Options()
+
+    @pytest.mark.parametrize("quick", [True, False])
+    def test_set_during_the_call_then_restored(self, engine, quick):
+        loaded = engine.model.options = self._options()
+        seen = []
+
+        def transcribe(*args, **kwargs):
+            seen.append(engine.model.options)
+            return {"segments": [{"start": 0.0, "end": 2.0, "text": " Hello.", "avg_logprob": -0.2}],
+                    "language": "en"}
+
+        engine.model.transcribe.side_effect = transcribe
+        engine.transcribe("a.wav", {"quick": quick, "prompt": "  Maëlle, Tuesday.  "})
+        assert seen[0].initial_prompt == "Maëlle, Tuesday."
+        assert seen[0].beam_size == 5  # the other loaded options are kept
+        assert engine.model.options is loaded and loaded.initial_prompt is None
+
+    def test_restored_after_an_error(self, engine):
+        loaded = engine.model.options = self._options()
+        engine.model.transcribe.side_effect = RuntimeError("boom")
+        with pytest.raises(RuntimeError):
+            engine.transcribe("a.wav", {"quick": True, "prompt": "context"})
+        assert engine.model.options is loaded
+
+    @pytest.mark.parametrize("options", [{"quick": True}, {"quick": True, "prompt": ""},
+                                         {"quick": True, "prompt": "  "}])
+    def test_without_prompt_options_are_untouched(self, engine, options):
+        loaded = engine.model.options = self._options()
+        seen = []
+        engine.model.transcribe.side_effect = lambda *a, **k: (seen.append(engine.model.options) or {
+            "segments": [], "language": "en"})
+        engine.transcribe("a.wav", options)
+        assert seen == [loaded]
+
+
 class TestLoading:
     def test_same_model_is_not_reloaded(self, engine):
         model = engine.model
