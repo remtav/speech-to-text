@@ -146,9 +146,13 @@ class AppSettings(context: Context, private val defaultServerUrl: String = io.gi
         get() = ThemeMode.fromName(prefs.getString("theme", null))
         set(v) = prefs.edit().putString("theme", v.name).apply()
 
-    /** Letter arrangement of the text keyboard (issue #21): QWERTY unless the user picked AZERTY. */
+    /**
+     * Letter arrangement of the text keyboard (issue #21): the user's pick, else deduced from the languages
+     * chosen at setup (issue #54): AZERTY with "Français (France)", QWERTY otherwise.
+     */
     var keyboardLayout: LayoutKind
-        get() = LayoutKind.fromName(prefs.getString("keyboard_layout", null))
+        get() = prefs.getString("keyboard_layout", null)?.let { LayoutKind.fromName(it) }
+            ?: LayoutKind.defaultFor(languages)
         set(v) = prefs.edit().putString("keyboard_layout", v.name).apply()
 
     /** The keyboard shows the text keys rather than the microphone (last view used, kept between fields). */

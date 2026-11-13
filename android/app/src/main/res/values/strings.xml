@@ -17,13 +17,20 @@
     <string name="cd_shift_locked">Majuscules verrouillées</string>
     <string name="cd_symbols">Chiffres et symboles</string>
     <string name="cd_letters">Lettres</string>
-    <string name="cd_to_keyboard">Clavier pour corriger le texte</string>
+    <string name="cd_to_keyboard">Clavier à touches</string>
     <string name="cd_to_dictation">Revenir à la dictée</string>
     <string name="cd_comma">Virgule</string>
     <string name="cd_period">Point</string>
-    <string name="settings_layout">Disposition du clavier de correction</string>
-    <string name="settings_layout_help">Lettres du clavier texte, ouvert par le bouton « A » : QWERTY par défaut. Appui long sur une lettre : accents.</string>
+    <string name="settings_layout">Disposition du clavier à touches</string>
+    <string name="settings_layout_help">Lettres du clavier à touches, ouvert par le bouton « Clavier à touches » à côté du micro. AZERTY si « Français (France) » a été choisi à l\'installation, QWERTY sinon. Appui long sur une touche : accents et ponctuation des langues choisies.</string>
     <string name="cd_enter">Entrée</string>
+    <!-- Issue #42 / #54: the text keys, the second symbols page and the number pad. -->
+    <string name="keys_open">Clavier à touches</string>
+    <string name="key_symbols_page_1">123</string>
+    <string name="key_symbols_page_2">#+=</string>
+    <string name="cd_symbols_page_1">Premiers symboles</string>
+    <string name="cd_symbols_page_2">Autres symboles</string>
+    <string name="cd_decimal">Séparateur décimal</string>
 
     <string name="status_idle">Appuyez sur le micro pour dicter</string>
     <string name="status_loading">Chargement de %1$s…</string>

@@ -164,6 +164,9 @@ abstract class ImeTestBase {
 
     protected fun field1(): String { var t = ""; scenario.onActivity { t = it.field1.text.toString() }; return t }
     protected fun field2(): String { var t = ""; scenario.onActivity { t = it.field2.text.toString() }; return t }
+    protected fun fieldText(pick: (TestFieldActivity) -> android.widget.EditText): String {
+        var t = ""; scenario.onActivity { t = pick(it).text.toString() }; return t
+    }
 
     protected fun focus(which: Int) {
         // The keyboard only hears of a focus change inside a window that has the window focus. A
@@ -174,7 +177,7 @@ abstract class ImeTestBase {
         awaitWindowFocus()
         val before = onMain { DicteeImeService.instance?.get()?.currentInputEditorInfo }
         scenario.onActivity {
-            val f = when (which) { 1 -> it.field1; 2 -> it.field2; 4 -> it.noId1; 5 -> it.noId2; else -> it.password }
+            val f = when (which) { 1 -> it.field1; 2 -> it.field2; 4 -> it.noId1; 5 -> it.noId2; 6 -> it.number; 7 -> it.decimal; 8 -> it.phone; else -> it.password }
             f.requestFocus()
         }
         instrumentation.waitForIdleSync()

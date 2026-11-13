@@ -3,4 +3,7 @@
     <item name="test_field1" type="id" />
     <item name="test_field2" type="id" />
     <item name="test_password" type="id" />
+    <item name="test_number" type="id" />
+    <item name="test_decimal" type="id" />
+    <item name="test_phone" type="id" />
 </resources>

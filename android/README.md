@@ -241,6 +241,16 @@ Configuration (accueil et étapes ; « Vos langues » ; modèle recommandé avec
 - Bouton du modèle (en haut à gauche) : changer de modèle sans quitter le champ.
 - Touches : clavier précédent, `,` `.` espace `?` `!`, effacer (maintenir pour
   répéter), entrée.
+- **Clavier à touches** : le bouton « Clavier à touches », à côté du micro, ouvre
+  de vraies touches (QWERTY, ou AZERTY si « Français (France) » est choisi à
+  l'installation ; modifiable dans les Réglages). Appui long sur une touche :
+  accents et ponctuation des langues choisies (français, anglais, espagnol,
+  portugais : `é ñ ã ç`, `¿ ¡`, `« » ’ …`), deuxième page de symboles
+  (`[ ] { } # + = _ \ | ~ € £`). Le clavier garde la dernière vue utilisée d'un
+  champ à l'autre.
+- **Champs de chiffres** (nombre, montant, téléphone, date, heure, code) : le
+  clavier ouvre directement un pavé numérique aux grandes touches, avec
+  seulement les signes que le champ accepte. Pas de micro sur ce pavé.
 - Commandes vocales : voir « Dicter la ponctuation » ci-dessous.
 - Désactivé dans les champs de mot de passe.
 

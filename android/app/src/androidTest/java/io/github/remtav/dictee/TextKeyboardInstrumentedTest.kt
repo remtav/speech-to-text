@@ -102,7 +102,11 @@ class TextKeyboardInstrumentedTest : ImeTestBase() {
         launchFields()
         assertNotNull("microphone first", device.wait(Until.findObject(res("mic")), 5_000))
         assertNull(device.findObject(res("letters")))
-        device.findObject(res("toggle_view")).click()
+        // One tap on the labelled button beside the microphone (issue #54).
+        val open = device.findObject(res("open_keys"))
+        assertNotNull("labelled button to the keys", open)
+        assertEquals("Clavier à touches", open.text)
+        open.click()
         assertNotNull("letters", device.wait(Until.findObject(res("letters")), 5_000))
         assertNotNull("microphone stays in the bottom row", device.findObject(res("mic_small")))
         assertTrue(app.settings.textKeyboardShown)
@@ -153,5 +157,119 @@ class TextKeyboardInstrumentedTest : ImeTestBase() {
         awaitIdle()
         assertTrue("typed letter present: ${field1()}", "x" in field1())
         assertEquals(1, field1().count { it == 'x' })
+    }
+
+    // ------------------------------------------------------------ issue #42
+
+    private fun setLanguages(vararg l: io.github.remtav.dictee.stt.DictationLanguage) {
+        app.settings.languages = l.toSet()
+    }
+
+    @Test
+    fun typesASpanishCharacter() {
+        setLanguages(io.github.remtav.dictee.stt.DictationLanguage.SPANISH)
+        launchFields()
+        showTextKeyboard()
+        accent("n", "ñ")
+        accent("a", "á")
+        waitFor("spanish typed", 5_000) { field1() == "ñá" }
+    }
+
+    @Test
+    fun typesASpanishInvertedQuestionMark() {
+        setLanguages(io.github.remtav.dictee.stt.DictationLanguage.SPANISH)
+        launchFields()
+        showTextKeyboard()
+        device.findObject(res("kb_symbols")).click()
+        accent("?", "¿")
+        waitFor("inverted question mark", 5_000) { field1() == "¿" }
+    }
+
+    @Test
+    fun typesAPortugueseCharacter() {
+        setLanguages(io.github.remtav.dictee.stt.DictationLanguage.PORTUGUESE)
+        launchFields()
+        showTextKeyboard()
+        accent("a", "ã")
+        accent("o", "õ")
+        waitFor("portuguese typed", 5_000) { field1() == "ãõ" }
+    }
+
+    @Test
+    fun longPressWindowOnlyHoldsTheChosenLanguages() {
+        setLanguages(io.github.remtav.dictee.stt.DictationLanguage.PORTUGUESE)
+        launchFields()
+        showTextKeyboard()
+        key("e").click(900L)
+        assertNotNull("é offered", device.wait(Until.findObject(By.text("é")), 5_000))
+        assertNull("è is French", device.findObject(By.text("è")))
+        assertNull("ë is French", device.findObject(By.text("ë")))
+    }
+
+    @Test
+    fun secondSymbolsPageTypesBracketsAndEuro() {
+        launchFields()
+        showTextKeyboard()
+        device.findObject(res("kb_symbols")).click()
+        device.findObject(By.desc("Autres symboles")).click()
+        tap("[", "€", "~")
+        waitFor("page 2 typed", 5_000) { field1() == "[€~" }
+    }
+
+    @Test
+    fun numberFieldOpensThePadWithOnlyDigits() {
+        launchFields()
+        focus(6)
+        assertNotNull("pad", device.wait(Until.findObject(res("pad")), 5_000))
+        assertNull("no letters", device.findObject(res("letters")))
+        assertNull("no microphone", device.findObject(res("mic")))
+        assertNull("no decimal key in a whole-number field", device.findObject(res("pad_decimal")))
+        tap("4", "5", "0")
+        waitFor("digits typed", 5_000) { fieldText { it.number } == "450" }
+        device.findObject(res("pad_backspace")).click()
+        waitFor("one deleted", 5_000) { fieldText { it.number } == "45" }
+        // Back to a text field: the usual view returns.
+        focus(1)
+        assertNotNull(device.wait(Until.findObject(res("mic")), 5_000))
+        assertNull(device.findObject(res("pad")))
+    }
+
+    @Test
+    fun amountFieldHasMinusAndADecimalKeyThatTypesWhatTheFieldTakes() {
+        launchFields()
+        focus(7)
+        assertNotNull("pad", device.wait(Until.findObject(res("pad")), 5_000))
+        assertNotNull("minus in a signed field", device.findObject(By.text("-").pkg(BuildConfig.APPLICATION_ID)))
+        tap("-", "1", "2")
+        device.findObject(res("pad_decimal")).click()
+        tap("5")
+        // Whichever separator the phone's language prefers, the field ends up with one it accepts.
+        waitFor("decimal typed", 5_000) { fieldText { it.decimal }.matches(Regex("-12[.,]5")) }
+    }
+
+    @Test
+    fun phoneFieldOpensThePadWithPhoneSigns() {
+        launchFields()
+        focus(8)
+        assertNotNull("pad", device.wait(Until.findObject(res("pad")), 5_000))
+        tap("+", "1", "(", "5", ")", "#", "*")
+        waitFor("phone typed", 5_000) { fieldText { it.phone } == "+1(5)#*" }
+        assertNull("no letters", device.findObject(res("letters")))
+    }
+
+    @Test
+    fun theChosenViewIsKeptWhenTheNextFieldOpens() {
+        launchFields()
+        showTextKeyboard()
+        focus(6)
+        assertNotNull("pad in a number field", device.wait(Until.findObject(res("pad")), 5_000))
+        focus(2)
+        assertNotNull("text keys come back, as left", device.wait(Until.findObject(res("letters")), 5_000))
+        onMain { service.setTextKeyboardShown(false) }
+        focus(7)
+        assertNotNull(device.wait(Until.findObject(res("pad")), 5_000))
+        focus(1)
+        assertNotNull("microphone, as left", device.wait(Until.findObject(res("mic")), 5_000))
+        assertNull(device.findObject(res("letters")))
     }
 }

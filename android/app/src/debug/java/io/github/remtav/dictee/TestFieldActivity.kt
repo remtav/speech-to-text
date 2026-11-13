@@ -14,6 +14,10 @@ class TestFieldActivity : AppCompatActivity() {
     /** Two fields with no id: same EditorInfo key, like inputs of one web page. */
     lateinit var noId1: EditText
     lateinit var noId2: EditText
+    /** Digit fields (issue #42): whole number, signed decimal, phone. */
+    lateinit var number: EditText
+    lateinit var decimal: EditText
+    lateinit var phone: EditText
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -35,11 +39,21 @@ class TestFieldActivity : AppCompatActivity() {
         }
         noId1 = EditText(this).apply { hint = "sans id 1"; inputType = InputType.TYPE_CLASS_TEXT; isSaveEnabled = false }
         noId2 = EditText(this).apply { hint = "sans id 1"; inputType = InputType.TYPE_CLASS_TEXT; isSaveEnabled = false }
+        number = EditText(this).apply { id = R.id.test_number; hint = "nombre"; inputType = InputType.TYPE_CLASS_NUMBER }
+        decimal = EditText(this).apply {
+            id = R.id.test_decimal
+            hint = "montant"
+            inputType = InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_FLAG_DECIMAL or InputType.TYPE_NUMBER_FLAG_SIGNED
+        }
+        phone = EditText(this).apply { id = R.id.test_phone; hint = "téléphone"; inputType = InputType.TYPE_CLASS_PHONE }
         col.addView(field1)
         col.addView(field2)
         col.addView(password)
         col.addView(noId1)
         col.addView(noId2)
+        col.addView(number)
+        col.addView(decimal)
+        col.addView(phone)
         setContentView(col)
         field1.requestFocus()
     }

@@ -47,6 +47,13 @@ class LetterKeyboardView @JvmOverloads constructor(
     var symbols: Boolean = false
         set(v) { if (field != v) { field = v; rebuild() } }
 
+    /** Second symbols page (brackets, operators, currencies); only shown while [symbols] is. */
+    var moreSymbols: Boolean = false
+        set(v) { if (field != v) { field = v; rebuild() } }
+
+    /** Languages whose accents and punctuation the long-press windows offer (the ones chosen at setup). */
+    var languages: Set<KeyLanguage> = KeyLanguage.entries.toSet()
+
     var shift: ShiftState = ShiftState.OFF
         private set
 
@@ -77,6 +84,7 @@ class LetterKeyboardView @JvmOverloads constructor(
     /** Back to lowercase and the letters page (new field). */
     fun reset() {
         shift = ShiftState.OFF
+        moreSymbols = false
         symbols = false
         refreshLabels()
     }
@@ -116,11 +124,12 @@ class LetterKeyboardView @JvmOverloads constructor(
         removeAllViews()
         letterKeys.clear()
         shiftKey = null
-        val rows = if (symbols) KeyboardLayout.symbolRows() else KeyboardLayout.letterRows(kind)
+        val rows = if (symbols) KeyboardLayout.symbolRows(if (moreSymbols) 2 else 1) else KeyboardLayout.letterRows(kind)
         rows.forEachIndexed { i, keys ->
             val row = rowContainer()
             val last = i == rows.lastIndex
             if (last && !symbols) row.addView(shiftKey().also { shiftKey = it }, keyParams(1.5f))
+            else if (last) row.addView(pageKey(), keyParams(1.5f))
             // The shorter rows are centred, with a half key of margin: AZERTY's middle row is full width.
             else if (!last && keys.size < rows[0].size) row.addView(spacer(), keyParams((rows[0].size - keys.size) / 2f))
             for (k in keys) row.addView(letterKey(k), keyParams(1f))
@@ -143,18 +152,30 @@ class LetterKeyboardView @JvmOverloads constructor(
         isFocusable = false
     }
 
-    @SuppressLint("ClickableViewAccessibility")
     private fun letterKey(base: String): TextView {
         val key = baseKey()
         key.text = base
         letterKeys += base to key
-        val isLetter = base[0].isLetter()
+        installKeyTouch(key, base, styled = true) {
+            listener?.onText(KeyboardLayout.label(base, shift))
+            if (base[0].isLetter()) afterLetter()
+        }
+        return key
+    }
+
+    /**
+     * Gives [key] a tap (what [onTap] does) and a long press that opens the window of the alternates of
+     * [base] (accents, language punctuation). Also used by keys the service lays out itself (the period).
+     * [styled]: the key is drawn by this view and shows its pressed state.
+     */
+    @SuppressLint("ClickableViewAccessibility")
+    fun installKeyTouch(key: View, base: String, styled: Boolean = false, onTap: () -> Unit) {
         var longPressed = false
         val longPress = Runnable {
-            val accents = KeyboardLayout.accentsFor(base, shift.upper)
-            if (accents.isNotEmpty()) {
+            val alternates = KeyboardLayout.alternatesFor(base, shift.upper, languages)
+            if (alternates.isNotEmpty()) {
                 longPressed = true
-                showAccents(key, accents)
+                showAccents(key, alternates)
             }
         }
         key.setOnTouchListener { v, e ->
@@ -162,31 +183,38 @@ class LetterKeyboardView @JvmOverloads constructor(
                 MotionEvent.ACTION_DOWN -> {
                     dismissPopup()
                     longPressed = false
-                    v.background = keyBackground(pressed = true)
+                    if (styled) v.background = keyBackground(pressed = true)
                     onKeyPressed?.invoke(v)
-                    if (isLetter) handler.postDelayed(longPress, LONG_PRESS_MS)
+                    handler.postDelayed(longPress, LONG_PRESS_MS)
                 }
                 MotionEvent.ACTION_MOVE -> popup?.let { highlightAt(e.rawX, e.rawY) }
                 MotionEvent.ACTION_UP -> {
                     handler.removeCallbacks(longPress)
-                    v.background = keyBackground()
+                    if (styled) v.background = keyBackground()
                     if (longPressed) {
-                        // The finger slid onto an accent: type it. Released on the key: the window stays, tap an accent.
+                        // The finger slid onto an alternate: type it. Released on the key: the window stays, tap one.
                         chosenAt(e.rawX, e.rawY)?.let { typeAccent(it) }
                     } else {
-                        listener?.onText(KeyboardLayout.label(base, shift))
-                        if (isLetter) afterLetter()
+                        onTap()
                     }
                 }
                 MotionEvent.ACTION_CANCEL -> {
                     handler.removeCallbacks(longPress)
-                    v.background = keyBackground()
+                    if (styled) v.background = keyBackground()
                     dismissPopup()
                 }
             }
             true
         }
-        return key
+    }
+
+    /** Switches between the two symbols pages (replaces Shift there). */
+    private fun pageKey(): TextView = baseKey().apply {
+        setTextSize(TypedValue.COMPLEX_UNIT_SP, 16f)
+        background = keyBackground(special = true)
+        text = context.getString(if (moreSymbols) R.string.key_symbols_page_1 else R.string.key_symbols_page_2)
+        contentDescription = context.getString(if (moreSymbols) R.string.cd_symbols_page_1 else R.string.cd_symbols_page_2)
+        setOnClickListener { v -> onKeyPressed?.invoke(v); moreSymbols = !moreSymbols }
     }
 
     private fun afterLetter() {
