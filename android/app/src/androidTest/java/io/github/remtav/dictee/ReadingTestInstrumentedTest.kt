@@ -387,7 +387,7 @@ class ReadingTestInstrumentedTest : ImeTestBase() {
 
     @Test
     fun stopButtonStopsTheRecordingAtEveryTapAndTheSecondCounterStillShows() {
-        useModels(ModelCatalog.parakeet.id)
+        useModels(ModelCatalog.whisperTurbo.id) // Parakeet is not offered with Québec French (#22, #36)
         app.settings.quebecDeclaration = Declaration.YES
         // A clip paced in real time, longer than the test waits: only « Arrêter » can end the recording.
         TestHooks.audioSourceFactory = AudioSourceFactory {
