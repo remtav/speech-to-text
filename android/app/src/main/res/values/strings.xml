@@ -99,7 +99,7 @@
     <string name="model_notice_deleted">Fichiers de l\'ancien modèle supprimés.</string>
     <string name="model_notice_ok">J\'ai compris</string>
     <string name="settings_experimental">Modèles expérimentaux</string>
-    <string name="settings_experimental_help">Jamais recommandés : à essayer et à comparer sur votre téléphone (« Comparer les modèles » sur l\'écran principal).</string>
+    <string name="settings_experimental_help">Jamais recommandés : à essayer et à comparer sur votre téléphone (« Comparer les modèles », ci-dessus).</string>
     <string name="setup_downloading">Téléchargement : %1$d %% (%2$s / %3$s)</string>
     <string name="setup_downloading_label">Téléchargement : %1$s</string>
     <string name="setup_download_error">Échec : %1$s</string>
@@ -127,7 +127,7 @@
     <string name="settings_keep_loaded">Garder le modèle en mémoire après fermeture du clavier</string>
     <string name="settings_threads">Threads de calcul</string>
     <string name="settings_acceleration">Accélération matérielle</string>
-    <string name="settings_acceleration_help">Le CPU est le choix sûr. NNAPI peut utiliser le NPU/GPU du Snapdragon ; s\'il n\'est pas pris en charge, le moteur revient automatiquement au CPU. Comparez avec l\'écran de comparaison.</string>
+    <string name="settings_acceleration_help">Le CPU est le choix sûr. NNAPI peut utiliser le NPU/GPU du Snapdragon ; s\'il n\'est pas pris en charge, le moteur revient automatiquement au CPU. Comparez avec « Comparer les modèles », ci-dessus.</string>
     <!-- Section « Avancé » des réglages (issue #49, réutilisée par #37) et réglages Whisper qu'elle regroupe. -->
     <string name="settings_advanced">Avancé</string>
     <string name="settings_advanced_help">Réglages pour essais et cas particuliers. Les valeurs par défaut conviennent à la plupart des usages.</string>
