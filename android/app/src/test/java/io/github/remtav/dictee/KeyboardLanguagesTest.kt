@@ -20,7 +20,7 @@ class KeyboardLanguagesTest {
         KeyLanguage.FRENCH to ("àâæçéèêëîïôœùûüÿ" to "«»’…€"),
         KeyLanguage.ENGLISH to ("" to "’“”…"),
         KeyLanguage.SPANISH to ("áéíóúüñ" to "¿¡«»“”…"),
-        KeyLanguage.PORTUGUESE to ("áàâãéêíóôõúç" to "“”…€"),
+        KeyLanguage.PORTUGUESE to ("áàâãéêíóôõúç" to "“”«»…€"),
     )
 
     @Test
