@@ -192,7 +192,9 @@ Reconnaît-on Kalmia au premier coup d'œil ? À regarder en particulier :
   aux autres dans « Comparer les modèles » avec ta voix.
 - **Mesuré ici** : 5 erreurs sur 59 mots sur les six extraits québécois
   (Parakeet 4, Whisper turbo 6, Qwen3-ASR 8). Trop peu pour conclure ; les
-  mots isolés n'ont pas été mesurés. Le WER de 6,65 % est celui annoncé par
+  mots isolés n'ont pas été mesurés. Ce score est peut-être flatté : le modèle
+  a été entraîné en partie sur Common Voice « Français du Canada », d'où
+  viennent ces six extraits ; il a pu les entendre. Le WER de 6,65 % est celui annoncé par
   l'auteur sur son propre jeu.
 - **À savoir** : même taille et même coût que Whisper turbo, donc aussi lent ;
   français seulement. Parakeet reste le modèle recommandé.
@@ -219,15 +221,23 @@ Reconnaît-on Kalmia au premier coup d'œil ? À regarder en particulier :
 - **Mesuré sur ordinateur seulement** (x86-64, machine partagée) : ce sont des
   tendances, pas la latence du téléphone. Procédure complète, threads compris :
   `android/docs/ACCELERER_WHISPER.md`.
+- **Si une dictée s'arrête toute seule après une rotation de l'écran** : la
+  dictée s'arrête quand le clavier reste caché plus de 4 secondes. Sur un
+  émulateur chargé, un test de la CI a échoué une fois ainsi ; à juger sur le
+  téléphone (`ime/DicteeImeService.kt`).
 - **Où corriger** : `stt/WhisperTuning.kt` (texte provisoire),
   `settings/AppSettings.kt` (`whisperTailPaddings`, défaut).
 
-### 13. Langue transmise à Qwen3-ASR (changement de défaut non mesuré)
+### 13. Langue transmise à Qwen3-ASR (changement de défaut)
 
 - **Ce qui a changé** : quand une seule langue est cochée — c'est le cas du
   choix initial, « Français (Québec) » —, Qwen3-ASR reçoit maintenant cette
   langue, comme Whisper. Parakeet n'accepte aucune langue : il devine toujours,
   ce qui explique qu'un mot dit seul parte vers l'anglais.
+- **Mesuré par la revue** (ordinateur, 7 extraits français, 75 mots) :
+  6 erreurs avec « French » forcé contre 8 en détection automatique. Pas de
+  dégradation ; trop peu pour parler de gain, et les mots dits seuls n'ont pas
+  été mesurés.
 - **Quoi faire** : avec Qwen3-ASR, dicter des mots d'ici dits seuls, puis une
   phrase française contenant quelques mots anglais ; vérifier que rien n'est
   francisé à tort.
@@ -242,7 +252,11 @@ Reconnaît-on Kalmia au premier coup d'œil ? À regarder en particulier :
   À décider : le laisser activé ou le couper par défaut (une ligne,
   `AppSettings.remotePolish`).
 - **Petit LLM local** : toujours désactivé par défaut. Son garde-fou refuse
-  maintenant tout mot changé, même d'une lettre. Pour le confirmer : l'activer,
+  maintenant tout mot changé, même d'une lettre, ainsi qu'une majuscule
+  abaissée en cours de phrase, un nombre ou une lettre épelée retirés comme
+  « répétition », et un point d'interrogation supprimé. Il rejettera donc plus
+  souvent la sortie du LLM ; le texte nettoyé par règles est alors gardé.
+  Limites connues : une virgule qui change le sens, « un un ». Pour le confirmer : l'activer,
   dicter des phrases longues contenant des mots d'ici, vérifier qu'aucun mot
   ne change, puis le remettre sur « Désactivé ».
 - **Enquête « friperie »** : arrêtée à ta demande, sans cause trouvée. Le cas
