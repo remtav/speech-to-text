@@ -4109,3 +4109,47 @@ Les extraits de Common Voice sont des phrases isolées : pris trois par trois da
 - **Écueil trouvé en écrivant le banc** : un seul `acceptWaveform` de tout un extrait au VAD Silero de sherpa-onnx 2.0.1
   rend un segment faux (début à 4,5 s pour une parole qui commence à 1,3 s) ; par morceaux de 512, comme le contrôleur, le
   segment est juste. Le contrôleur et `LocalCut` passent toujours par morceaux de 512.
+
+### Revue indépendante (session distincte) et corrections
+
+1. **Plafond des groupes trop haut (bloquant, corrigé)**. Vérifié dans `offline-recognizer-whisper-impl.h` (v2.0.1,
+   `DecodeStream`) : `if (num_frames >= max_num_frames - 50)` avec `max_num_frames = 3000`, donc toute entrée Whisper
+   de 29,5 s ou plus est tronquée à 2 950 trames, avec un simple message dans le journal. Le plafond de 30 s moins
+   512 échantillons laissait jeter environ 0,45 s à chaque fermeture au plafond, échantillons que le groupe suivant ne
+   reprenait pas. `LocalGrouping.MAX_SECONDS` passe à **29 s**. Le plafond de jetons de `WhisperRepetition` (calculé
+   sur les échantillons) reste donc juste. Tests resserrés : plafond atteint (plus de 28 s) et jamais dépassé
+   (29 s), dans `LocalCut` et dans le contrôleur. Les chiffres du premier banc ne changent pas : aucune de ses dictées ne
+   dépasse 25,9 s. Les blocs du mode serveur (#35, 30 s) partent au serveur, pas à sherpa-onnx : non touchés.
+2. **Marge de fin rognée sur les groupes longs (mesuré, plafond gardé à 29 s)**. `LocalGroupingHostTest.continuousSpeechBench` :
+   23 dictées de parole continue de 25 à 30 s (extraits rognés à 0,1 s de leur parole, mis bout à bout sans écart),
+   1 490 mots, même VAD et même turbo ; groupes de 10 s plafonnés à 29 s puis à 20 s ; marge 1 000 puis « Automatique ».
+
+   | Marge | Découpe | Décodages (le plus long) | WER | Fins « manquées » | Répétitions restées | Redécodés |
+   | --- | --- | --- | --- | --- | --- | --- |
+   | 1 000 | actuel (énoncés du VAD) | 53 (24,0 s) | 15,4 % | 8/23 | 0 | — |
+   | 1 000 | groupes, plafond 29 s | 45 (27,7 s) | **13,2 %** | 6/23 | 0 | — |
+   | 1 000 | groupes, plafond 20 s | 46 (20,0 s) | 13,5 % | 3/23 | 0 | — |
+   | Automatique | actuel | 53 (24,0 s) | 15,2 % | 6/23 | 0 | 5 |
+   | Automatique | groupes, plafond 29 s | 45 (27,7 s) | **14,5 %** | 6/23 | 0 | 1 |
+   | Automatique | groupes, plafond 20 s | 46 (20,0 s) | 15,6 % | 4/23 | 0 | 1 |
+
+   « Fin manquée » : un des 3 derniers mots de la référence absent des 6 derniers mots du texte. À la lecture des cas
+   où les variantes diffèrent, l'indicateur compte surtout des mots mal reconnus en fin de dictée (« prostitution » →
+   « pression », « Maikal » → « Mekhav ») : aucun texte ne disparaît en fin de groupe avec le plafond de 29 s. Aucune
+   répétition ne reste, quelle que soit la variante. Le plafond de 20 s n'améliore pas le WER (+0,3 point à 1 000,
+   +1,1 en « Automatique ») : **29 s est gardé**. Constat au passage : le VAD Silero rend déjà, aujourd'hui, des énoncés
+   de 24 s (au-delà de ses 20 s nominales), qui ont la même marge rognée ; rien de nouveau dû au regroupement.
+3. **Touche tapée pendant la dictée (limite connue, documentée)**. `DicteeImeService.stopDictationForTyping` appelle
+   `controller.stop()`, qui est asynchrone : le caractère s'insère tout de suite, le groupe ouvert est décodé ensuite et
+   son texte arrive après le caractère. Sans regroupement, seule la phrase en cours avait ce défaut. Non corrigé :
+   retenir les touches jusqu'à la fin du décodage ferait paraître le clavier figé pendant plusieurs secondes, et
+   toucherait le chemin du clavier par défaut. Écrit dans l'aide du réglage.
+4. **Changement de champ** : `cancel()` jette le groupe ouvert (voulu : rien dans le mauvais champ), ce qui peut faire
+   perdre un groupe entier de phrases finies, qui auraient été insérées sans regroupement. Écrit dans l'aide du réglage.
+5. **Formulation** : « pas possible avec l'AAR 2.0.1 standard » au lieu d'« impossible », avec ce qui est démontré par
+   l'exécution et ce qui repose sur la lecture du code ; titre de la PR corrigé.
+6. **Tests** : `LocalGroupingInstrumentedTest` vérifie sur l'appareil, avec le vrai VAD Silero, qu'aucun échantillon
+   n'est dans deux groupes et que l'audio de chaque énoncé est entièrement dans les groupes ; même contrôle sur l'hôte
+   (`withTheRealVadNothingIsLostOrDecodedTwice`, extraits à 0,3 s d'écart, groupes jusqu'au plafond).
+   `aLoneSentenceIsInsertedAfterTheIdleTime` attend le texte au lieu d'un `sleep` fixe, puis vérifie que seul le
+   premier groupe a été décodé.
