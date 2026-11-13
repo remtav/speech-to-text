@@ -57,14 +57,23 @@ class LocalGroupingInstrumentedTest {
         assertTrue("utterances: ${each.size}", each.size >= clips.size)
         // These clips have their own long silences: on the host, each one stays its own group (4 for 4); never more.
         assertTrue("groups: ${grouped.size} for ${each.size} utterances", grouped.isNotEmpty() && grouped.size <= each.size)
-        grouped.forEach { assertTrue(it.audio.size <= 30 * 16000) }
+        grouped.forEach { assertTrue(it.audio.size <= 29 * 16000) }
         // Every utterance is in a group.
         assertEquals(each.size, grouped.sumOf { it.utteranceEnds.size })
+        // With the real VAD: no sample in two groups, and every utterance's audio inside the groups.
+        val ranges = grouped.map { it.startSample until it.startSample + it.audio.size }
+        ranges.zipWithNext().forEach { (a, b) -> assertTrue("groups overlap: $a $b", a.last < b.first) }
+        each.forEach { u ->
+            val r = u.startSample until u.startSample + u.audio.size
+            // Covered by the groups (an utterance cut at the cap is in two consecutive groups).
+            val covered = ranges.sumOf { maxOf(0L, minOf(it.last, r.last) - maxOf(it.first, r.first) + 1) }
+            assertEquals("utterance $r not entirely in the groups $ranges", r.last - r.first + 1, covered)
+        }
     }
 
     @Test fun reportWordingOnTheDevice() {
         assertEquals(
-            "regroupement des énoncés Whisper 10 s (groupe fermé à la 1re pause passé ce seuil, après 1 s de silence, 30 s au plus)",
+            "regroupement des énoncés Whisper 10 s (groupe fermé à la 1re pause passé ce seuil, après 1 s de silence, 29 s au plus)",
             LocalGrouping(10f).describe(),
         )
     }

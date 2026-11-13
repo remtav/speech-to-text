@@ -92,11 +92,13 @@ class LocalGroupingTest {
         assertEquals(1, cut(stream(-0.5f, 1f, -1.8f, 1f, -0.5f), LocalGrouping(5f, idleSeconds = 2f)).size)
     }
 
-    @Test fun groupsNeverExceedWhispersWindow() {
-        // 50 s without a pause (the VAD cuts at 20 s), then short utterances: 30 s at most, nothing lost.
+    @Test fun groupsStayUnderWhatSherpaKeepsOfAWhisperInput() {
+        // 50 s without a pause (the VAD cuts at 20 s), then short utterances: 29 s at most (sherpa-onnx 2.0.1 drops
+        // what is past 29,5 s), nothing lost.
         val audio = stream(-0.5f, 50f, -0.8f, 1f, -0.8f, 1f, -1f)
         val pieces = cut(audio, LocalGrouping(10f))
-        pieces.forEach { assertTrue("group of ${it.audio.size / rate.toFloat()} s", it.audio.size <= 30 * rate) }
+        pieces.forEach { assertTrue("group of ${it.audio.size / rate.toFloat()} s", it.audio.size <= 29 * rate) }
+        assertTrue("the cap is reached", pieces.any { it.audio.size > 28 * rate })
         assertTrue(pieces.size >= 2)
         assertEverySpeechSampleOnce(audio, pieces)
     }
@@ -126,7 +128,7 @@ class LocalGroupingTest {
 
     @Test fun reportWording() {
         assertEquals(
-            "regroupement des énoncés Whisper 5 s (groupe fermé à la 1re pause passé ce seuil, après 1 s de silence, 30 s au plus)",
+            "regroupement des énoncés Whisper 5 s (groupe fermé à la 1re pause passé ce seuil, après 1 s de silence, 29 s au plus)",
             LocalGrouping(5f).describe(),
         )
         assertEquals("regroupement des énoncés Whisper : non", LocalGrouping.OFF_DESCRIPTION)

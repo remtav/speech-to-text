@@ -9,7 +9,7 @@ import io.github.remtav.dictee.stt.AudioBlock
  *  - at the first pause the VAD confirms once it holds [minSeconds] (as the server's blocks of #35, shorter);
  *  - after [idleSeconds] of silence following its last utterance, even if shorter: the text of a lone sentence
  *    still comes, [idleSeconds] later than without grouping (the silence itself is not decoded);
- *  - at [maxSeconds] (Whisper's 30 s window) at the latest, even mid-speech;
+ *  - at [maxSeconds] (29 s, under the 29,5 s sherpa-onnx keeps of a Whisper input) at the latest, even mid-speech;
  *  - at the end of the dictation.
  * Cut by [BlockCutter], the class of the server's blocks; off (null) by default, see DECISIONS.md « Issue #53 ».
  */
@@ -36,8 +36,12 @@ data class LocalGrouping(
     companion object {
         /** Silence after the last utterance that closes a short group (on top of the VAD's own pause, 0.5 s by default). */
         const val IDLE_SECONDS = 1f
-        /** Hard cap: Whisper's window. */
-        const val MAX_SECONDS = 30f
+        /**
+         * Hard cap, under Whisper's window: sherpa-onnx 2.0.1 drops, without error, everything past 2 950 frames (29,5 s)
+         * of a Whisper input (`OfflineRecognizerWhisperImpl::DecodeStream`), and the next group starts after the cut.
+         * 29 s keeps half a second of margin (review of #53).
+         */
+        const val MAX_SECONDS = 29f
 
         /** Report wording when the setting is off. */
         const val OFF_DESCRIPTION = "regroupement des énoncés Whisper : non"

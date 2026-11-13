@@ -103,13 +103,15 @@ class LocalGroupingControllerTest {
         assertEquals(DictationState.IDLE, l.states.last().first)
     }
 
-    @Test fun groupsInTheControllerNeverExceedThirtySeconds() {
+    /** sherpa-onnx 2.0.1 drops what is past 29,5 s of a Whisper input: the controller's groups stay at 29 s at most. */
+    @Test fun groupsInTheControllerStayUnderTwentyNineSeconds() {
         val data = audio(-0.5f, 50f, -0.8f, 1f, -1f)
         val l = RecordingListener()
         val engine = ScriptedEngine(spec, List(10) { "x." }, 0)
         controller({ StringSink() }, l).start(session(data, engine, LocalGrouping(10f)))
         l.awaitEnd()
-        assertTrue(engine.durations.toString(), engine.durations.all { it <= 30.001f })
+        assertTrue(engine.durations.toString(), engine.durations.all { it <= 29.001f })
+        assertTrue("the cap is reached", engine.durations.any { it > 28f })
         assertTrue(engine.calls.get() >= 2)
     }
 
@@ -172,11 +174,38 @@ class LocalGroupingControllerTest {
         val engine = ScriptedEngine(spec, listOf("seule.", "suite."), 0)
         val c = controller({ sink }, l)
         c.start(session(audio(-0.2f, 1f, -4f, 1f, -1f), engine, LocalGrouping(5f), realTime = true))
-        // Speech ends at 1.2 s, VAD pause 0.5 s, idle 1 s: inserted at about 2.7 s, long before the second sentence.
-        Thread.sleep(3500)
+        // Speech ends at 1.2 s, VAD pause 0.5 s, idle 1 s: inserted at about 2.7 s, long before the second sentence
+        // (5.2 to 6.2 s). Waits for the text rather than a fixed time; when it comes, only the first group was decoded.
+        val deadline = System.currentTimeMillis() + 15_000
+        while (sink.text.isEmpty() && System.currentTimeMillis() < deadline) Thread.sleep(20)
         assertEquals("Seule.", sink.text)
+        assertEquals("the second sentence was not decoded yet", 1, engine.calls.get())
         l.awaitEnd()
         assertEquals("Seule. Suite.", sink.text)
+    }
+
+    /**
+     * The real Silero VAD (host JAR): the bundled French clips 0.3 s apart (continuous speech for the VAD, so groups
+     * also close at the cap). No sample in two groups, every VAD utterance inside a group, 29 s at most.
+     */
+    @Test fun withTheRealVadNothingIsLostOrDecodedTwice() {
+        val clips = Host.references.filter { it.language != "en" }.map { it.audio.resampled(rate).samples }
+        val gap = FloatArray(rate * 3 / 10)
+        val data = (clips.flatMap { it.toList() + gap.toList() }).toFloatArray()
+        for (g in listOf(LocalGrouping(5f), LocalGrouping(10f))) {
+            val each = LocalCut.cut(data, Host.vad(), null)
+            val groups = LocalCut.cut(data, Host.vad(), g)
+            assertTrue(groups.isNotEmpty())
+            groups.forEach { assertTrue("group of ${it.audio.size / rate.toFloat()} s", it.audio.size <= 29 * rate) }
+            val ranges = groups.map { it.startSample until it.startSample + it.audio.size }
+            ranges.zipWithNext().forEach { (a, b) -> assertTrue("groups overlap: $a $b", a.last < b.first) }
+            each.forEach { u ->
+                val r = u.startSample until u.startSample + u.audio.size
+                // Covered by the groups (an utterance cut at the cap is in two consecutive groups).
+                val covered = ranges.sumOf { maxOf(0L, minOf(it.last, r.last) - maxOf(it.first, r.first) + 1) }
+                assertEquals("utterance $r not entirely in the groups $ranges", r.last - r.first + 1, covered)
+            }
+        }
     }
 
     /** « Comparer les modèles »: with a cut the samples are decoded in groups and the report says how many. */

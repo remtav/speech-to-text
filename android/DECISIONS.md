@@ -4002,7 +4002,7 @@ Décisions de l'utilisateur (2026-11-13), appliquées telles quelles : deux méc
 « Avancé », **désactivés par défaut** ; un résultat de banc défavorable ne retire pas un réglage. Choix faits pendant la
 mise en œuvre :
 
-### Contexte entre segments : impossible avec sherpa-onnx 2.0.1 sans modifier le modèle (point d'arrêt)
+### Contexte entre segments : pas possible avec l'AAR sherpa-onnx 2.0.1 standard (point d'arrêt)
 
 - **Code source de la v2.0.1** (tag `v2.0.1`, commit `af2d8d81dbfa61c4cea4c568da78f3982edca005`) :
   - `sherpa-onnx/csrc/offline-whisper-model-config.h` : `encoder`, `decoder`, `language`, `task`, `tail_paddings`,
@@ -4021,6 +4021,10 @@ mise en œuvre :
   `context`, `hotwords`, `prefix` et `text` est bien enregistrée par le flux (relue par `getOption`), mais le texte décodé
   est identique octet pour octet à celui sans amorce, sur les 7 extraits français.
 - **`setConfig` ne peut pas servir** : il ne remplace que le bloc Whisper de la configuration (les champs ci-dessus).
+- **Ce qui est démontré, et ce qui ne l'est pas** : démontré par l'exécution, l'absence de champ d'amorce dans la
+  configuration (réflexion, vérifiée en CI) et l'absence d'effet des six options de flux essayées ; le reste (aucun autre
+  chemin vers le décodeur) repose sur la lecture du code source. Une JNI compilée sur mesure reste une voie possible
+  (ci-dessous) : la conclusion vaut pour l'AAR 2.0.1 standard, pas pour sherpa-onnx en général.
 - **Donc ni réglage ni code pour le contexte dans cette PR** : un réglage sans effet tromperait l'utilisateur. Ce qu'il
   faudrait : (1) une version de sherpa-onnx qui ajoute une amorce au décodeur Whisper hors ligne (un champ de
   configuration ou une option de flux lue par `OfflineWhisperGreedySearchDecoder`, qui préfixe `<|startofprev|>` + les
@@ -4036,7 +4040,8 @@ mise en œuvre :
   (0 pour le serveur : comportement inchangé, `BlockCutterTest` intact). Un groupe se ferme : à la première pause confirmée
   par le VAD une fois le seuil atteint ; après **1 s de silence** qui suit son dernier énoncé, même s'il est plus court
   (coupé à la fin de cet énoncé : le silence n'est pas décodé, et un énoncé que le VAD rendrait plus tard n'est pas
-  perdu) ; à 30 s au plus (fenêtre de Whisper, même au milieu d'une phrase, comme le serveur) ; à l'arrêt.
+  perdu) ; à **29 s** au plus, même au milieu d'une phrase (voir « Revue indépendante » : sherpa-onnx jette tout ce qui
+  dépasse 29,5 s d'une entrée Whisper) ; à l'arrêt.
 - **Pourquoi la fermeture sur silence** : sans elle, une phrase isolée suivie d'un silence n'apparaîtrait qu'à la phrase
   suivante ou à l'arrêt, ce qui contredit l'insertion à chaque pause du mode local. Avec elle, le retard d'une phrase
   isolée est borné (pause du VAD, 0,5 s par défaut, + 1 s). Une pause tolérée dans un groupe vaut donc la pause du VAD + 1 s
@@ -4084,13 +4089,13 @@ Les extraits de Common Voice sont des phrases isolées : pris trois par trois da
   que le décodage précédent est fini, avec les temps mesurés sur l'hôte. Le regroupement ajoute environ 1 s (5 s) à 1,7 s
   (10 s) en moyenne ; le maximum vient d'un énoncé au début d'un long groupe. Sur le téléphone, où Whisper est plus lent
   (#23), le délai sera plus long dans les trois variantes ; non mesuré.
-- Contexte : aucun chiffre (impossible, voir plus haut), donc ni « contexte seul » ni « les deux ensemble ».
+- Contexte : aucun chiffre (pas possible avec l'AAR standard, voir plus haut), donc ni « contexte seul » ni « les deux ensemble ».
 
 ### Tests
 
 - `LocalGroupingTest` (rejeu `LocalCut`, VAD à énergie) : hors réglage, exactement les énoncés du VAD ; énoncés courts
   groupés avec leurs pauses ; fermeture à la première pause passé le seuil ; fermeture sur silence sans décoder le silence ;
-  pause tolérée = pause du VAD + 1 s ; plafond de 30 s avec 50 s de parole continue ; fin de dictée ; aucun échantillon
+  pause tolérée = pause du VAD + 1 s ; plafond de 29 s atteint et jamais dépassé avec 50 s de parole continue ; fin de dictée ; aucun échantillon
   perdu ni décodé deux fois ; valeurs du réglage et familles ; libellé du rapport.
 - `LocalGroupingControllerTest` (vrai `DictationController`) : réglage nul par défaut ; **hors réglage, le contrôleur décode
   exactement les énoncés du VAD, un par un (critère « identique à aujourd'hui »)** ; avec réglage, il décode exactement
