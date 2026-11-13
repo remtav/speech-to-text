@@ -35,8 +35,11 @@ class SetupActivity : AppCompatActivity() {
     private lateinit var micStatus: TextView
     private lateinit var modelsBox: LinearLayout
     private lateinit var languagesBox: LinearLayout
+    private lateinit var participationBox: LinearLayout
+    /** Whether the participation card is drawn now; null before the first draw. It is redrawn only when this changes. */
+    private var participationShown: Boolean? = null
     // A download that ends can complete the setup: `maybeOpenHowTo` checks it.
-    private val refresh: () -> Unit = { renderModels(); maybeOpenHowTo() }
+    private val refresh: () -> Unit = { renderModels(); maybeOpenHowTo(); renderParticipation() }
 
     private val askMic = registerForActivityResult(ActivityResultContracts.RequestPermission()) { renderSteps() }
     private val askNotifications = registerForActivityResult(ActivityResultContracts.RequestPermission()) { }
@@ -76,6 +79,10 @@ class SetupActivity : AppCompatActivity() {
         modelsBox = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         col.addView(modelsBox)
 
+        // The reading-test card: at the end of the setup, Québec French chosen, not answered no, not closed.
+        participationBox = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        col.addView(participationBox)
+
         col.heading(getString(R.string.setup_more))
         col.row().apply {
             button(getString(R.string.setup_compare)) { startActivity(Intent(this@SetupActivity, CompareActivity::class.java)) }.spaced()
@@ -97,8 +104,9 @@ class SetupActivity : AppCompatActivity() {
         Downloads.addListener(refresh)
         renderSteps()
         // Redrawn on each resume: the languages may have been changed in the settings.
-        languagesBox.renderLanguageChoices(app.settings) { renderModels() }
+        languagesBox.renderLanguageChoices(app.settings) { renderModels(); renderParticipation() }
         renderModels()
+        renderParticipation()
     }
 
     override fun onPause() {
@@ -124,6 +132,29 @@ class SetupActivity : AppCompatActivity() {
         val mic = ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
         micStatus.text = getString(if (mic) R.string.setup_mic_ok else R.string.setup_mic_missing)
         maybeOpenHowTo()
+        renderParticipation()
+    }
+
+    /** Draws or removes the participation card; touching nothing when it is already as it should be (downloads call this often). */
+    private fun renderParticipation() {
+        val show = app.settings.participation.cardOnSetup(setupComplete())
+        if (show == participationShown) return
+        participationShown = show
+        participationBox.removeAllViews()
+        if (show) {
+            participationBox.participationCard(
+                onStart = { startActivity(Intent(this, ReadingTestActivity::class.java)) },
+                onDismiss = {
+                    app.settings.participationCardDismissed = true
+                    renderParticipation()
+                },
+            )
+        }
+    }
+
+    private fun setupComplete(): Boolean {
+        val modelReady = (ModelCatalog.all + ModelCatalog.remote).any { app.isInstalled(it) }
+        return SetupProgress.isComplete(isKeyboardEnabled(), isMicGranted(), modelReady)
     }
 
     /**
@@ -132,9 +163,7 @@ class SetupActivity : AppCompatActivity() {
      * is also set here before starting it, so a second call before it appears cannot open it twice.
      */
     private fun maybeOpenHowTo() {
-        val modelReady = (ModelCatalog.all + ModelCatalog.remote).any { app.isInstalled(it) }
-        val complete = SetupProgress.isComplete(isKeyboardEnabled(), isMicGranted(), modelReady)
-        if (SetupProgress.shouldOpenHowTo(complete, app.settings.howToShown)) {
+        if (SetupProgress.shouldOpenHowTo(setupComplete(), app.settings.howToShown)) {
             app.settings.howToShown = true
             startActivity(Intent(this, HowToActivity::class.java))
         }

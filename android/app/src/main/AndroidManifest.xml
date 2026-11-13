@@ -31,6 +31,7 @@
             android:windowSoftInputMode="adjustResize" />
         <activity android:name=".ui.HowToActivity" android:exported="false"
             android:windowSoftInputMode="adjustResize" />
+        <activity android:name=".ui.ReadingTestActivity" android:exported="false" />
         <activity android:name=".ui.CompareActivity" android:exported="false" />
         <activity android:name=".ui.DiagnosticActivity" android:exported="false" />
 
@@ -44,6 +45,21 @@
             </intent-filter>
             <meta-data android:name="android.view.im" android:resource="@xml/method" />
         </service>
+
+        <!--
+          Reading-test contribution (issue #15, step 4.3): hands the archive the person consented to share
+          to the app they choose (their mail). Not exported; read access is granted per intent only; it
+          serves only files/contribution/. The app itself sends nothing.
+        -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.contribution"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/contribution_paths" />
+        </provider>
 
         <service
             android:name=".ui.DownloadService"

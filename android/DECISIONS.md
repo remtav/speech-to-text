@@ -2953,6 +2953,117 @@ Décisions 1 et 2 ci-dessus appliquées à la demande de l'utilisateur ; la 3 re
   « Comparer les modèles », une exécution par valeur) ; ne passer le défaut à 600 que sans répétition ni mot manquant sur
   5 essais par valeur (ce serait un changement de défaut, donc une nouvelle décision) ; puis les threads (3 à 5).
 
+## Issue #15, lot 4 — étape 4.1 : texte de lecture, normalisation, consentement
+
+État au 2026-11-13. **Fait** : texte `lecture-qc-1` et sa table d'équivalences (`app/src/main/assets/lecture/`),
+paquet pur `reading/` (`ReadingText`, `ReadingMaterial`, `ReadingNormalizer`, `Equivalences`, `FrenchNumbers`,
+`ReadingScoring`, `ReadingThresholds`, `Contribution`), `Levenshtein.align` dans `text/Normalize.kt`, chaînes
+`contrib_*`, `docs/CONTRIBUTION.md`, tests JVM (`app/src/test/.../reading/`, 36 tests). **Reste à faire (autres
+étapes)** : écrans (4.2), consentement au partage, archive et courriel (4.3), README (4.3), revue (4.R). Aucun écran ni
+export dans cette étape.
+
+### Texte de lecture (`lecture-qc-1`)
+
+Petit récit du quotidien, 9 paragraphes, **224 mots** affichés (16 à 34 mots par paragraphe, soit 7 à 14 s à
+2,5 mots/s : sous la limite de 20 s d'un segment ; plafond codé `ReadingText.MAX_PARAGRAPH_WORDS = 40`). Registre
+familier, sans sacre, nombres en lettres, espaces insécables avant le deux-points et dans les guillemets, aucune avant
+« ! » (typographie québécoise du lot 2).
+
+**Format** : un fichier texte par version dans les *assets* (`lecture/<version>.txt` : commentaires `#`, une ligne
+`version:`, paragraphes séparés par une ligne vide), lu par `ReadingMaterial.load(readAsset)`. Pas des chaînes :
+le texte est une donnée, pas une interface ; il ne doit pas être traduit ni réparti en clés, et sa version doit
+voyager avec lui (l'archive de 4.3 pourra le citer tel quel). Un texte publié n'est jamais modifié : une nouvelle
+version est un nouveau fichier (`lecture-qc-2.txt`), ce que `ReadingTextTest` encadre (version = nom de fichier,
+unique).
+
+Couverture de la liste de départ :
+
+| Élément | Présent / écarté | Forme dans le texte |
+| --- | --- | --- |
+| dépanneur, magasiner, tuque, mitaines, char, cellulaire, courriel, clavardage, poudrerie, cabane à sucre, blonde, chum | présent | tel quel |
+| fin de semaine | présent | « en fin de semaine » |
+| banc de neige | présent | au pluriel, « les bancs de neige » |
+| déjeuner / dîner / souper | présent | « pour le déjeuner », « Au dîner », « on soupe » (verbe) |
+| piastre | présent | « vingt piastres » (pluriel) |
+| friperie (ajout de l'utilisateur) | présent | « une petite friperie » |
+| avoir de la misère | présent | « j'ai toujours de la misère à me décider » |
+| il fait frette | présent | « il faisait frette » (imparfait du récit) |
+| à matin, pantoute, tiguidou, c'est correct, tantôt | présent | « Elle me l'avait dit tantôt » : sens québécois « plus tôt aujourd'hui » (Usito) |
+| jaser, niaiser, achaler, être tanné, pogner | présent | « a jasé », « aime niaiser et achaler », « était pas tannée », « on a pogné tous les feux rouges » |
+| Rimouski, Saguenay, Chicoutimi, Trois-Rivières, Abitibi, Gaspésie, Lac-Saint-Jean, Sherbrooke, Magog, Hochelaga | présent | tous |
+| tu, dire, petit, mardi (affrication) | présent | « Si tu veux », « à dire », « petite », « mardi » |
+| père, fête, neige, pâte (voyelles longues) | présent | « son père », « une fête », « bancs de neige », « des pâtes » |
+| chu, y'a, t'sais | présent, **deux phrases seulement** | « Moi, chu pas bon pour choisir… » et « Y'a rien là, t'sais, c'est correct. » |
+| Hors liste, ajoutés pour le naturel | — | « Y'a rien là » (« ce n'est pas grave »), « chemise à carreaux », la négation sans « ne » (« elle était pas ») |
+
+Rien n'a été écarté. Limite assumée : « je suis allé » (premier paragraphe) est normalisé comme « chu », voir plus bas.
+
+**Sources consultées** (Usito, Université de Sherbrooke, le 2026-11-12) : pantoute (Q/C fam.), tiguidou (var.
+tigidou), frette (adj. Q/C, « il fait frette »), piastre (var. piasse), friperie, tantôt (Q/C : plus tôt dans la
+journée), achaler, poudrerie (Q/C), tanné (« être tanné de », fam.), clavardage (Q/C), niaiser, magasiner, misère
+(« avoir de la misère à »), jaser (Q/C fam.). « pogner » : entrée Usito `pogner_ou_poigner` vue seulement par un
+résumé de recherche (« attraper, saisir », Q/C fam.). « à matin » : absent d'Usito ; attesté « fam., ce matin » par le
+Dictionnaire historique du français québécois (dhfq.org, vu par un résumé de recherche). « chu », « tsé » : Lexique du
+français québécois (Wikipédia) et je-parle-quebecois.com, vus par des résumés de recherche, sources secondaires.
+
+### Normalisation et équivalences
+
+`ReadingNormalizer` = jetons de `Normalize.werTokens` (même WER que `Benchmark`, vérifié par un test) avec leur
+position dans le texte ; nombres en chiffres écrits en lettres (`FrenchNumbers`, orthographe traditionnelle) ;
+puis la table `lecture/lecture-qc-1.equivalences.tsv` (forme, variantes, raison), appliquée des deux côtés,
+plus longue variante d'abord, chaque groupe devenant un seul jeton. Accents gardés (comme `Benchmark`).
+
+| Forme du texte | Variantes acceptées | Raison |
+| --- | --- | --- |
+| chu | chus, chui, chuis, j'suis, je suis | même mot dit, graphies des modèles |
+| y'a | y a, ya, il y a | idem ; « il n'y a » refusé (« ne » ajouté) |
+| t'sais | t'sé, tsé, tsais, tu sais | idem |
+| tiguidou | tigidou | variante d'Usito |
+| piastre(s) | piasse(s) | variante d'Usito |
+| saint / sainte | st / ste | abréviation des toponymes (« Lac-St-Jean ») |
+
+**Refusées volontairement** (testées comme erreurs) : courriel/email, char/auto, piastres/dollars ou « $ »,
+à matin/ce matin, fin de semaine/week-end, dépanneur/dep, pantoute/pas du tout, frette/froid, négation complétée
+(« n'était pas », « je ne suis pas »). Reconnaître le mot d'ici est ce que le test mesure. Aucune variante
+non attestée pour pantoute ou frette. Effet de bord accepté : « je suis » du premier paragraphe devient « chu » des
+deux côtés (symétrique, donc sans effet sur le score, mais le dénominateur perd un mot).
+
+### Score et seuils (`ReadingScoring`, `ReadingThresholds`)
+
+- Score de paragraphe : `Levenshtein.align` (nouveau, même distance que `Levenshtein.distance`, testé) ; ressemblance
+  = 1 − WER bornée à [0, 1] ; mots mal compris = jetons de référence substitués ou omis, avec leur position dans le
+  paragraphe (surlignage) et ce qui a été entendu ; mots en trop à part.
+- Score global : somme des erreurs sur somme des mots des paragraphes lus (pas une moyenne de taux) ; `complete`
+  quand tous les paragraphes sont lus.
+- **Partage proposé** : `SHARE_WER_THRESHOLD_PERCENT = 20`, WER **strictement** supérieur, calculé avec le **modèle
+  recommandé**, sur le texte **complet**. Repli prudent : si le modèle recommandé n'est pas installé ou n'a pas tourné,
+  rien n'est proposé (on ne propose pas de partager une voix sur la foi d'un autre modèle). Comparaison en entiers.
+- **« Nettement mieux »** : les deux à la fois, sur le texte complet et le même nombre de mots : au moins
+  `BETTER_MODEL_MIN_GAIN_POINTS = 5` points de WER de moins (10 mots sur 200, plus qu'une hésitation ou un bruit) **et**
+  au moins `BETTER_MODEL_MIN_RELATIVE_GAIN_PERCENT = 30` % d'erreurs en moins. `betterModel` donne le meilleur de ceux-là.
+
+### Consentement et politique
+
+- Constantes uniques : `Contribution.RECEIVING_ADDRESS` (`remi@kalmia.ca`), `RETENTION_MAX_YEARS` (2), `POLICY_URL`.
+  Les chaînes les reçoivent en argument (`%1$s`, `%1$d`) et n'en contiennent aucune copie ; `CONTRIBUTION.md` (texte
+  libre) les cite, et `ContributionConsistencyTest` vérifie que la politique et le consentement affiché annoncent la
+  même adresse et la même durée, et qu'aucune autre n'apparaît.
+- Chaînes : `contrib_card_*`, `contrib_declare_*`, `contrib_declined_*`, `contrib_accept_*`, `contrib_share_*`.
+  Le consentement promet aussi « ne sert à rien d'autre sans un nouveau consentement » (ni publication, ni vente, ni
+  entraînement) : engagement fort, conforme à la portée de l'issue, à valider.
+- Sources juridiques lues (texte officiel de la Loi 25 en PDF, pages de la CAI) : listées dans `docs/CONTRIBUTION.md`.
+  Légis Québec a refusé l'accès à l'outil : le texte consolidé en vigueur n'est **pas vérifié**.
+
+### À valider par un humain
+
+1. **Naturel du texte** : se lit-il comme du français d'ici, sans effet « liste » ? « on a pogné tous les feux
+   rouges », « d'Hochelaga », « Y'a rien là » sonnent-ils juste ?
+2. **Consentement** : clarté, ton, et l'engagement « rien d'autre sans nouveau consentement ».
+3. **Cadre juridique, avant toute diffusion** : durée de 2 ans, accès à la boîte `remi@kalmia.ca`, hébergement de
+   la messagerie (art. 17), statut de la voix (sensible ou biométrique), responsable de la protection des
+   renseignements personnels, mineurs. Liste dans `docs/CONTRIBUTION.md`, « Ce qui reste à valider ».
+4. Seuils (20 %, 5 points et 30 %) après les premiers essais réels.
+
 ## Issue #15, lot 3 — revue indépendante
 
 Revue du diff `origin/main...HEAD` (branche du lot 3, PR #18) contre les critères du lot 3, la section
@@ -3183,3 +3294,301 @@ Portée tranchée par l'orchestrateur (prudente) :
   instrumentés n'utilisaient aucune ressource supprimée.
 - Les captures de `docs/screenshots/` montrent encore le thème Kalmia : elles sont régénérées par la CI
   (`ScreenshotTest`, mêmes noms de fichiers).
+
+## Issue #15, lot 4 — étape 4.2 : carte, déclaration, écran du test de lecture
+
+État au 2026-11-13. **Fait** : carte de participation (écran principal et Réglages), déclaration et exclusion,
+acceptation, écran de lecture paragraphe par paragraphe, transcription par le ou les modèles installés, score global et
+par paragraphe avec mots surlignés, suggestion de modèle, point d'extension pour 4.3, logique pure et tests JVM,
+test instrumenté avec moteurs scriptés, capture `reading-*.png`, section du README. **Reste à faire (autres
+étapes)** : consentement au partage, archive locale, courriel (4.3) ; revue (4.R). **Non vérifié ici** : aucun
+émulateur dans ce conteneur, donc les tests instrumentés sont compilés (`assembleDebugAndroidTest`) et relus, pas
+exécutés (la CI de la PR les exécute) ; le rendu à l'écran est à juger par un humain (liste plus bas).
+
+Thème : le style Kalmia ayant été retiré à la demande de l'utilisateur, l'écran emploie les helpers de `ui/Ui.kt` et les
+attributs du thème Material générique ; aucune couleur ni police en dur.
+
+### Parcours
+
+1. **Carte** (`ui/Ui.kt`, `participationCard`) : « Aider à améliorer la dictée en français québécois », deux phrases,
+   « Faire le test » et, sur l'écran principal seulement, « Non merci ». Décision (`reading/Participation.kt`, valeur
+   pure construite par `AppSettings.participation`) :
+   - langues : seulement avec « Français (Québec) » parmi les langues choisies ;
+   - écran principal : **à la fin de la configuration**, c'est-à-dire quand `SetupProgress.isComplete` (clavier activé,
+     micro autorisé, un modèle prêt), la carte n'étant ni fermée ni exclue. Avant, rien : la carte ne doit pas
+     couvrir les étapes de configuration. Elle n'est redessinée que si cet état change (les téléchargements
+     rappellent l'écran à chaque progression : un redessin avalerait les appuis) ;
+   - « Non merci » : `participationCardDismissed` (préférence) ; masque la carte de l'écran principal, ne change rien
+     d'autre, la carte reste dans les Réglages ;
+   - réponse « non » : plus de carte nulle part, plus de test.
+2. **Déclaration** (`ReadingSession`, phase `DECLARE`) : « Parlez-vous un français québécois ? » avant tout, y compris
+   avant l'acceptation. *Non* : phase `DECLINED` (remerciement, « Fermer »), réponse mémorisée (`AppSettings.quebecDeclaration`,
+   valeurs `UNANSWERED/YES/NO`), **aucun enregistrement** : `ReadingSession.store` refuse tout hors de la phase
+   `READING`, `accept()` et `beginScoring()` lèvent une erreur après « non ». Le micro n'est pas ouvert (le compteur du
+   test instrumenté le vérifie), aucun moteur n'est chargé, aucun fichier n'est créé. *Oui* : acceptation puis test.
+   Une personne qui a déjà répondu *oui* va directement à l'acceptation ; l'acceptation est redemandée à chaque test.
+3. **Réglages** : section « Test de lecture en français québécois » (après les langues) : la réponse en deux cases
+   (Oui / Non, aucune cochée tant qu'on n'a pas répondu) et la carte. Corriger *non* en *oui* fait revenir la carte
+   (Réglages et écran principal, sauf si elle y avait été fermée). La réponse reste visible même si
+   « Français (Québec) » est décoché, pour pouvoir être corrigée.
+4. **Lecture** (`ui/ReadingTestActivity`) : un paragraphe à la fois en style `TextAppearance.Dictee.Reading` (TitleLarge
+   du thème, interligne 1,4), un seul bouton Enregistrer / Arrêter / Refaire ce paragraphe, Précédent / Suivant (Suivant
+   seulement quand le paragraphe courant est enregistré), « Voir le score » dès qu'un paragraphe est lu. L'enregistrement
+   (`ParagraphRecorder`, 16 kHz, via `app.newAudioSource()` donc `MicAudioSource` ou, en test, un clip) s'arrête tout seul
+   à 20 s (la limite d'un segment) ou quand la source se termine ; moins de 0,5 s = « rien entendu », rien n'est gardé.
+   Un enregistrement en cours s'arrête quand l'écran quitte le premier plan (pas de micro en arrière-plan).
+   Pas de VAD : le paragraphe est transcrit tel quel, silences compris (les trois moteurs s'en accommodent).
+5. **Transcription** : tous les paragraphes lus, **à la fin** (« Voir le score »), **un modèle à la fois** (le modèle
+   est chargé une fois, au lieu de recharger ~1 Go à chaque paragraphe) avec les mêmes moteurs et options que la dictée
+   (`app.engines.use`, langue forcée avec une seule langue choisie). `benchmarkRunning` est levé pendant le calcul
+   (comme « Comparer les modèles »), le modèle est libéré à la fin. Annulable. Un modèle qui échoue est signalé et les
+   autres continuent. **Modèles utilisés : les modèles locaux installés** (`ModelCatalog.all` filtré par `isInstalled`) ;
+   **le serveur distant est exclu** : il enverrait la voix sur le réseau, ce qui contredit « rien ne quitte le
+   téléphone » (`ReadingPrivacyTest` le garde). Un seul modèle marche comme plusieurs ; aucun modèle installé : l'écran
+   d'acceptation le dit et le bouton est grisé.
+6. **Score** : ressemblance (1 − WER, `ReadingScoring`) globale et par paragraphe. Pourcentage affiché **arrondi vers le
+   bas, en entiers** (`similarityPercent`) : « 79 % » est donc toujours sous la ligne des 80 % du seuil de partage, et
+   20 % d'erreurs s'affiche « 80 % ». Avec plusieurs modèles : une ligne par modèle (« Parakeet : 87 % ») et le détail
+   d'un modèle à la fois (le modèle actif par défaut), car un texte entier par modèle ne tiendrait pas. Détail : le
+   texte du paragraphe avec les mots mal compris surlignés, la ligne « Entendu : … » et la liste des mots mal compris.
+   Un test arrêté tôt note ce qui a été lu et le dit ; il n'y a alors ni suggestion ni offre (texte incomplet, règle de
+   4.1).
+7. **Suggestion de modèle** : `ReadingThresholds.betterModel(scores, modèle actif)`, comparé au modèle **actif** au moment
+   du test (c'est lui que la personne utilise). Carte « Un autre modèle vous comprend mieux » et bouton « Choisir X »
+   qui change `activeModelId` ; le texte devient « X est maintenant votre modèle pour la dictée ».
+
+### Surlignage (accessibilité)
+
+Les mots mal compris portent `colorTertiaryContainer` en fond et `colorOnTertiaryContainer` en texte (paire déjà mesurée
+par `ThemeContrastTest`, libellé complété) **et un soulignement** : la couleur n'est jamais le seul signal. Jamais la
+couleur d'erreur (un mot mal compris n'est pas une faute de la personne). Une ligne « Mots mal compris : … » et une
+légende doublent le surlignage pour un lecteur d'écran. `ThemeContrastTest.readingHighlightUsesAMeasuredPair…`
+vérifie que `ReadingHighlight.kt` n'emploie que cette paire, le soulignement et pas `colorError`.
+
+### Structure de résultat et point d'extension pour 4.3
+
+`reading/ReadingResult.kt` (en mémoire, tenue par `ReadingSession.result`) :
+
+- `ReadingResult(textVersion, paragraphs: List<ParagraphResult>, globalScores: Map<modelId, GlobalScore>,
+  modelErrors: Map<modelId, String>, recommendedModelId, activeModelId, betterModelId: String?, offerSharing: Boolean,
+  region: String? = null)` ;
+- `ParagraphResult(index, audio: PcmAudio /* PCM 16 kHz mono */, transcriptions: Map<modelId, String>,
+  scores: Map<modelId, ParagraphScore>)` ; seuls les paragraphes lus y figurent ;
+- `offerSharing` = `ReadingThresholds.offerSharing(globalScores, recommendedModelId)` (WER strictement > 20 % avec le
+  modèle recommandé, texte complet).
+
+**Où 4.3 se branche** : `ReadingTestActivity.renderShareSlot(parent, result)`, appelée dans `renderResultFooter` ; elle ne
+crée qu'un conteneur vide (tag `reading_share_slot`) quand `result.offerSharing` est vrai, et rien sinon. 4.3 y met son
+point d'entrée (bouton vers l'écran de consentement) ; l'archive se construit depuis `ReadingTestModel.session.result`.
+La région (facultative) n'est pas saisie ici. Les chaînes `contrib_share_*` restent inutilisées.
+
+### Où vit l'audio, quand il disparaît
+
+**En mémoire seulement**, aucun fichier, même temporaire : `ReadingSession` garde un `PcmAudio` par paragraphe (au plus
+20 s × 16 kHz × 4 octets, soit 1,3 Mo par paragraphe, 11,5 Mo pour les neuf), et `ReadingResult` en reprend les
+références. Le tout est tenu par `ReadingTestModel` (un `ViewModel`), qui survit à une rotation ou à un changement de
+thème (sans lui, tourner le téléphone perdrait la lecture) et dont `onCleared()` appelle `session.clear()` quand l'écran
+est vraiment fermé (« Fermer », retour arrière, tâche supprimée). « Refaire le test » efface aussi tout. Si le processus
+est tué, la mémoire l'est avec lui. Aucune archive n'est créée à cette étape ; 4.3 décidera de ce qui est conservé après
+consentement. `ReadingPrivacyTest` interdit dans le code du test les écritures de fichier, `ACTION_SEND`, `java.net`,
+`FileProvider`, le serveur distant, etc., et vérifie que l'ensemble des permissions du manifeste n'a pas bougé.
+
+### Choix de conception
+
+- **Logique séparée de l'écran** (`reading/`, sans classe Android) : `Participation` (carte, exclusion, correction),
+  `ReadingSession` (phases `DECLARE → ACCEPT → READING → SCORING → RESULT`, `DECLINED`, protection de la vie privée dans
+  `store`/`accept`), `ParagraphRecorder` (boucle d'enregistrement sur une `AudioSource`), `ReadingTranscriber` (interface :
+  les tests passent un moteur scripté, l'application l'adosse à `EngineManager`). L'activité ne fait que dessiner.
+- **Une seule activité** pour question, remerciement, acceptation, lecture, calcul et résultat (phases d'une même
+  session) plutôt que cinq écrans : l'état est un seul objet, la rotation ne casse rien.
+- **Graine de test** : `TestHooks.installedModelIds` (debug/tests) rend « installés » exactement ces modèles du
+  catalogue, pour tester un modèle puis plusieurs ; sans effet hors test (null).
+- **Captures** : `reading-light.png` et `reading-dark.png` (résultat à deux modèles, carte de meilleur modèle,
+  surlignage) sont produites par `ScreenshotTest.readingTest` dans la CI ; elles ne sont pas encore dans
+  `docs/screenshots/` ni liées dans le README (pas de lien mort : la CI les générera avec les autres).
+- Chaînes : `settings_participation_*` et `reading_*` dans `strings.xml` ; les textes de la carte, de la déclaration
+  et de l'acceptation sont ceux de 4.1 (`contrib_*`), inchangés.
+
+### Tests ajoutés
+
+- JVM : `ParticipationTest` (9 : carte selon les langues, fin de configuration, fermeture, exclusion après « non »,
+  correction dans les Réglages), `ReadingSessionTest` (21 : phases, aucun enregistrement après « non » ni avant
+  l'acceptation, lecture et refaire, score avec un modèle et avec plusieurs, mots mal compris, pourcentage arrondi vers le
+  bas, partage de part et d'autre de 20 %, pas d'offre sans le modèle recommandé ni sur texte incomplet, suggestion de
+  modèle, modèle en échec, annulation, erreur imprévue, effacement), `ParagraphRecorderTest` (6), `ReadingPrivacyTest`
+  (3), `ThemeContrastTest` (surlignage).
+- Instrumentés (`ReadingTestInstrumentedTest`, `ReadingDriver`, compilés non exécutés ici) : carte absente sans
+  « Français (Québec) » (et présente avec, en témoin) ; fermeture de la carte ; la carte ouvre le test par la question ;
+  **« non » → aucun test proposé, micro jamais ouvert, aucun moteur chargé, aucun fichier créé** (comparaison des
+  répertoires `filesDir`, `cacheDir`, `codeCacheDir`, `noBackupFilesDir`, stockage externe, bases), carte retirée,
+  correction dans les Réglages, retour de la carte ; aucun modèle installé ; **un modèle** : score affiché égal au calcul,
+  mot surlignée avec les couleurs du thème et soulignée, rien d'autre surligné, pas de choix de modèle, enregistrements
+  supprimés à la fermeture ; **trois modèles** : une ligne par modèle, détail du modèle actif, suggestion et changement
+  de modèle ; emplacement de partage vide quand le modèle recommandé est loin ; arrêt anticipé.
+
+### À valider par un humain
+
+1. **Rendu à l'écran** (clair et sombre, `reading-*.png` de la CI) : taille et aération du texte à lire, lisibilité du
+   surlignage (fond tertiaire + soulignement) sur un vrai écran, longueur du détail.
+2. **Parcours sur un vrai téléphone** : micro réel, arrêt à 20 s, temps de calcul avec trois ou quatre modèles (chacun est
+   rechargé à tour de rôle : plusieurs dizaines de secondes par modèle sont probables), mémoire (un seul modèle chargé à la
+   fois, libéré à la fin).
+3. **Wording** des nouvelles chaînes (`reading_*`, `settings_participation_*`), notamment « Non merci » (ferme la carte)
+   par rapport à la réponse « Non » (exclut).
+4. Que la carte n'apparaisse **qu'à la fin de la configuration** (et pas dès le premier lancement) convient.
+
+## Issue #15, lot 4 — étape 4.3 : consentement, archive locale, envoi par courriel
+
+État au 2026-11-13. **Fait** : proposition de partage dans l'écran du score, liste « ce qui partirait » générée depuis
+la description unique de l'archive, réécoute, région facultative, consentement (case + bouton), archive zip dans le
+stockage privé, `FileProvider` limité au dossier des archives, intention de courriel et sélecteur du système,
+suppression (bouton, refus, « Refaire le test », fermeture, balayages), tests JVM et instrumentés, captures
+`reading-share-*.png`, README, `docs/CONTRIBUTION.md`. **Reste à faire (autres étapes)** : revue (4.R). **Non vérifié
+ici** : aucun émulateur dans ce conteneur ; les tests instrumentés sont compilés et relus, pas exécutés (la CI de la PR
+les exécute) ; l'envoi réel d'un courriel avec pièce jointe est à faire par un humain.
+
+C'est la **seule exception** à « rien ne quitte le téléphone » : volontaire (trois gestes, jamais d'envoi automatique),
+visible (liste exacte avant consentement), limitée au texte de test (aucune autre dictée, aucun réglage).
+
+### Parcours
+
+1. **Seuil** : la proposition n'existe que si `ReadingResult.offerSharing` (WER > 20 % avec le modèle recommandé, texte
+   complet, règle de 4.1) ; sous le seuil, l'emplacement `reading_share_slot` n'est même pas créé. `ShareOffer.offered`
+   exige en plus la déclaration *oui* et un score du modèle recommandé (défensif).
+2. **Proposition** (carte dans l'emplacement de 4.2) : titre, raison (ressemblance et modèle), puis **« Ce qui partirait,
+   et seulement ça »** : une ligne par élément de l'archive, libellé et **valeur réelle** (texte lu et transcription en
+   entier, score, nom du modèle, version, téléphone, déclaration, date, région ou « non indiquée »). Puis réécoute,
+   destinataire, finalité, « le courriel révèle votre adresse », conservation, voix identifiable, retrait, « c'est vous
+   qui envoyez », politique (chaînes de 4.1, inchangées sauf la liste à puces `contrib_share_sent`, retirée : une liste
+   écrite à la main pouvait diverger de l'archive).
+3. **Région** : champ libre facultatif, une ligne, 60 caractères au plus (`InputFilter` et `normalizeRegion` : espaces
+   réduits, caractères de contrôle et de format retirés, vide → `null`). La ligne « Région » de la liste suit la saisie.
+4. **Consentement** : case `contrib_share_consent` **non cochée par défaut**, puis bouton « Préparer le courriel »,
+   désactivé tant que la case n'est pas cochée. Sans les deux, **aucun fichier, pas même le dossier**. Décocher redésactive
+   le bouton. Après suppression du fichier, la case est décochée : recréer un fichier redemande le geste.
+5. **Fichier prêt** : nom et taille, rappel de l'emplacement et de la suppression ; « Envoyer par courriel », « Partager le
+   fichier autrement », « Supprimer le fichier ». La région et la case disparaissent (le fichier est fait ; pour changer,
+   supprimer puis recommencer).
+6. « **Ne pas partager** » à tout moment : supprime le fichier s'il existe, ferme la proposition (« aucun fichier n'est
+   conservé et rien n'est envoyé »). « Refaire le test » reste dans le pied de page.
+
+### Archive : format et contenu exact
+
+- **Une seule description** : `reading/ArchiveField` (11 éléments, dans l'ordre du fichier) et `ContributionContent.from`,
+  qui produit à la fois la liste affichée (avant consentement, via `ShareOffer.preview`) et ce qu'écrit
+  `ContributionArchive.write`. Chaque élément a son libellé `contrib_field_<nom>` (test qui l'exige) ; l'écran parcourt
+  `content.fields`, l'archive aussi.
+- **Fichier** : `files/contribution/kalmia-blabla-<version>-<AAAA-MM-JJ>.zip`, une seule archive à la fois (une nouvelle
+  remplace l'ancienne), écrite dans un `.part` puis renommée.
+- **Contenu** : `contribution.json` puis `paragraphe-N.wav` (un par paragraphe lu, N à partir de 1).
+  - **WAV** : un fichier par paragraphe plutôt qu'un seul : chaque fichier correspond à une transcription et à un score
+    du JSON, et reste sous 20 s. PCM 16 bits, mono, 16 kHz (`WavReader.encode`, rééchantillonné si besoin).
+  - **JSON** lisible (indentation, clés en français, ordre fixe), écrit par un petit écrivain déterministe (`Json`),
+    pas `org.json` dont l'ordre des clés n'est pas garanti. Clés : `audio` (format et fichiers avec durée au dixième),
+    `version_du_texte`, `texte_lu`, `transcription`, `score` (ressemblance, erreurs, mots, par paragraphe), `modele`
+    (id et nom), `version_de_l_application` (`versionName`), `modele_du_telephone` (`Build.MANUFACTURER` + `Build.MODEL`),
+    `declaration` (« je parle un français québécois »), `date`, `region` (toujours présente, `null` si non indiquée :
+    l'ensemble des clés ne varie pas).
+- **Transcription : modèle recommandé seulement.** C'est sur lui que porte le seuil, et le consentement de 4.1 annonce
+  « la transcription obtenue et le score » au singulier. Choix prudent : les résultats des autres modèles restent sur le
+  téléphone, et l'écran le dit (`contrib_share_only_recommended`, quand plusieurs modèles ont été notés).
+- **Précision de la date** : le jour (`LocalDate`), sans heure ni fuseau : assez pour retrouver une contribution à la
+  demande de la personne (la politique lui demande « la date du test »), pas plus. Les entrées du zip portent toutes la
+  même date fictive (2 janvier 1980, `ENTRY_TIME`) : sinon le zip trahirait l'heure à deux secondes près. Pas de
+  commentaire ni de champ supplémentaire dans le zip.
+- **Aucun identifiant** : ni Android ID, ni identifiant d'installation, ni compte, ni numéro de série, ni version
+  d'Android (non annoncée), ni autre dictée, vocabulaire ou réglage. Le test JVM parcourt tout le JSON et refuse toute clé
+  hors d'une liste fermée.
+
+### Cycle de vie de l'archive
+
+| Événement | Effet |
+| --- | --- |
+| Case cochée + « Préparer le courriel » | création (seul chemin : `ShareOffer.createArchive`, appelé par `ReadingTestModel.prepareArchive`) |
+| « Supprimer le fichier » | suppression du fichier et du dossier ; case décochée |
+| « Ne pas partager » | suppression, proposition fermée |
+| « Refaire le test » | suppression avec les enregistrements |
+| Écran fermé pour de bon (`ViewModel.onCleared` : « Fermer », retour, tâche supprimée) | suppression, envoyé ou non |
+| Nouvel écran de test (nouveau `ReadingTestModel`) | balayage : toute archive restante est supprimée |
+| Démarrage de l'application | balayage des archives de plus de 24 h (`ContributionArchive.MAX_AGE_MILLIS`) |
+
+Raisons : l'archive ne doit pas traîner. Pendant que la messagerie est ouverte, l'écran du test reste dans la pile (il
+n'est pas fini) : l'archive reste lisible le temps d'envoyer. Au démarrage de l'application, on ne supprime **que** ce
+qui a plus d'un jour : le même processus démarre aussi pour le clavier, y compris pendant qu'on écrit le courriel dans la
+messagerie ; tout supprimer à ce moment couperait la pièce jointe d'un envoi en cours. Limite : une messagerie qui lirait
+la pièce jointe seulement après la fermeture de l'écran du test la trouverait supprimée (les messageries courantes la
+copient à l'ouverture du brouillon ; à vérifier sur le téléphone).
+
+### Envoi par courriel
+
+- `ContributionShare.emailIntent` : `ACTION_SEND`, type `application/zip`, `EXTRA_EMAIL` = `Contribution.RECEIVING_ADDRESS`,
+  objet `contrib_email_subject` (avec la version du texte), corps `contrib_email_body` (nom du fichier, liste des éléments
+  générée depuis `ArchiveField`, adresse de la politique), `EXTRA_STREAM` et `ClipData` = l'URI du `FileProvider`,
+  `FLAG_GRANT_READ_URI_PERMISSION` seulement (ni écriture, ni permission persistante), et un **sélecteur `mailto:`** qui
+  limite le choix aux applications de courriel. Démarrée directement : sans messagerie, `ActivityNotFoundException` →
+  message `contrib_share_no_email_app`, le fichier reste supprimable et partageable autrement.
+- `otherIntent` : la même intention sans sélecteur, dans `Intent.createChooser` (sélecteur du système, qui transmet la
+  permission de lecture à l'application choisie).
+- `FileProvider` (`androidx.core`, déjà en dépendance) : `${applicationId}.contribution`, non exporté,
+  `grantUriPermissions`, chemins `res/xml/contribution_paths.xml` = **seulement** `files/contribution/`.
+- L'application ne sait pas si le courriel est parti : après l'ouverture de la messagerie, l'écran dit seulement que rien
+  n'est parti tant que la personne n'a pas appuyé sur « Envoyer », et propose de supprimer le fichier ensuite.
+
+### Réécoute
+
+`ui/ReadingPlayer` : `AudioTrack` en flux, depuis la mémoire, paragraphe après paragraphe ; « Réécouter » / « Arrêter
+l'écoute ». S'arrête quand l'écran passe en arrière-plan, au refus et à la fermeture. Aucun fichier.
+
+### Aucune requête réseau : comment c'est garanti, et la limite
+
+- **Code** : `ReadingPrivacyTest` (JVM) interdit dans tout le code du test et du partage (`reading/`, écran, modèle,
+  surlignage, lecteur, `ContributionShare`) `java.net`, `Socket`, `HttpURLConnection`, `openStream`, `openConnection`,
+  `WebView`, `DownloadManager`, le serveur distant, etc. Il épingle chaque capacité permise à **un seul fichier** :
+  l'écriture disque à `ContributionArchive.kt`, le dossier privé, le `FileProvider` et les intentions de partage à
+  `ContributionShare.kt` ; il vérifie que `ContributionArchive.write` (interne) n'est appelé qu'une fois, dans
+  `ShareOffer.createArchive`, après le test du consentement, que `createArchive` n'est appelé que par
+  `ReadingTestModel.prepareArchive`, que la case n'est réglée que par le geste de la personne, et que le manifeste n'a
+  ni permission ajoutée ni autre fournisseur que celui-ci, limité à son dossier. Ce garde est plus fort qu'en 4.2 :
+  « aucune écriture » devient « une seule écriture, derrière le consentement ».
+- **Exécution** (`ContributionInstrumentedTest`, chaque test) : compteurs `TrafficStats.getUidTxBytes/RxBytes` de l'UID
+  de l'application avant et après (écart exigé : 0 octet) **et** `StrictMode` (`detectUntaggedSockets`,
+  `detectCleartextNetwork`, avec un écouteur qui collecte les violations ; aucune tolérée). Les intentions vers d'autres
+  applications sont interceptées par un `ActivityMonitor` et jamais démarrées.
+- **Limites** : sur un appareil où les compteurs par UID ne sont pas pris en charge (`UNSUPPORTED`), seul `StrictMode`
+  reste (le test l'écrit dans le journal) ; `StrictMode` ne voit que les sockets ouverts depuis Java, pas depuis du code
+  natif (les compteurs, côté noyau, les voient) ; un garde sur les sources ne prouve pas l'absence de tout appel
+  possible. Ce qui envoie vraiment, la messagerie de la personne, n'est jamais démarré par le test. La permission
+  `INTERNET` existe toujours (téléchargement des modèles) ; aucune n'a été ajoutée.
+
+### Tests ajoutés ou adaptés
+
+- JVM : `ContributionArchiveTest` (10 : contenu = liste annoncée, dans les deux sens et dans l'ordre ; région absente =
+  élément `null` ; aucune clé hors liste fermée, aucun identifiant, aucune heure, dates des entrées fixes, pas de champ
+  supplémentaire ; WAV valides 16 kHz mono 16 bits même enregistrés à 48 kHz ; pas d'archive ni de dossier sans
+  consentement ; rien sous le seuil ni sans déclaration ; suppression et remplacement ; balayage à 24 h ; région ; JSON
+  échappé et déterministe), `ReadingPrivacyTest` (7, réécrit comme décrit plus haut), `ContributionConsistencyTest`
+  (la liste à puces est remplacée par les libellés `contrib_field_*` ; un libellé par élément de l'archive ; adresse et
+  durée toujours vérifiées).
+- Instrumentés (compilés, non exécutés ici) : `ContributionInstrumentedTest` : sous le seuil rien n'est proposé ni écrit ;
+  au-dessus, la liste affichée = les éléments de l'archive, case non cochée, bouton désactivé, saisie de région, cocher
+  puis décocher, « Ne pas partager » → **aucun fichier** (répertoires de l'application comparés) ; avec consentement →
+  l'archive contient **exactement** les éléments affichés (clés du JSON = étiquettes de la liste, dans l'ordre), valeurs
+  (version, date, version de l'application, téléphone, déclaration, région, modèle, transcription du modèle recommandé
+  seulement), WAV 16 kHz ; intention de courriel (destinataire, type, sélecteur `mailto:`, objet, corps, URI du
+  fournisseur, lecture seule, contenu servi identique au fichier) ; sélecteur du système ; suppression depuis l'écran ;
+  suppression par « Refaire le test » et à la fermeture ; balayage d'une archive restante à l'ouverture ; **aucune
+  requête réseau** dans chaque test. Le test « emplacement vide » de 4.2 est remplacé par ceux-ci ; « non » → rien
+  (4.2) est gardé. `ScreenshotTest.readingShare` → `reading-share-light.png`, `reading-share-dark.png`.
+
+### À valider par un humain
+
+1. **Recevoir un vrai courriel** de contribution sur un téléphone : pièce jointe présente, lisible, objet et corps ;
+   avec Gmail et une autre messagerie ; comportement du sélecteur `mailto:` (certaines messageries pourraient ignorer
+   la pièce jointe).
+2. Que la pièce jointe survive au retour dans l'application et à la fermeture de l'écran après l'envoi (messagerie qui
+   copierait tard).
+3. Rendu de la proposition (`reading-share-*.png`) : longueur de la liste (texte et transcription en entier), lisibilité.
+4. Wording des nouvelles chaînes (`contrib_field_*`, `contrib_value_*`, `contrib_share_*` ajoutées, `contrib_email_*`).
+5. Réécoute sur un vrai téléphone (volume, enchaînement des paragraphes).
+6. Choix prudents à confirmer : transcription du seul modèle recommandé, date au jour, région limitée à 60 caractères,
+   balayage à 24 h.

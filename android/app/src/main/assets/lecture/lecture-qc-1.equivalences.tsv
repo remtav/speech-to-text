@@ -1,0 +1,19 @@
+# Variantes d'écriture acceptées pour le texte lecture-qc-1 (issue #15, étape 4.1).
+# Une ligne par équivalence, trois colonnes séparées par une tabulation :
+#   forme du texte <TAB> variantes acceptées, séparées par « | » <TAB> raison et source
+# La correspondance vaut dans les deux sens (référence et transcription passent par la même
+# normalisation), sur des mots entiers, après minuscules, ponctuation retirée, apostrophe
+# typographique unifiée, traits d'union remplacés par des espaces et nombres écrits en lettres.
+# Prudence : une équivalence de trop masquerait une vraie erreur. Chaque variante doit noter le
+# MÊME mot dit par la personne ; jamais un synonyme (courriel ≠ email, char ≠ auto, piastre ≠
+# dollar, à matin ≠ ce matin, fin de semaine ≠ week-end) : reconnaître le mot d'ici est
+# précisément ce que le test mesure. Les refus volontaires sont listés dans android/DECISIONS.md.
+version: lecture-qc-1
+chu	chus | chui | chuis | j'suis | je suis	Contraction orale de « je suis » (Wikipédia, « Lexique du français québécois » : « chu, cht' », univerbation de « je suis »). Les modèles écrivent le même son « chu », « chus », « chui » ou rétablissent « je suis ».
+y'a	y a | ya | il y a	Contraction orale de « il y a ». « il n'y a » n'est PAS accepté : le « ne » ajouté est un mot que la personne n'a pas dit.
+t'sais	t'sé | tsé | tsais | tu sais	Contraction orale de « tu sais » (graphie « tsé » relevée par Je parle québécois et le Lexique du français québécois de Wikipédia).
+tiguidou	tigidou	Usito, « tiguidou » : variante graphique « tigidou » donnée par le dictionnaire.
+piastres	piasses	Usito, « piastre » : s'écrit aussi « piasse », pluriel « piastres » ou « piasses ». Le symbole « $ » n'est pas accepté (signe retiré comme ponctuation : le mot compte comme non entendu).
+piastre	piasse	Usito, « piastre » (singulier ; absent du texte v1, gardé pour les versions suivantes).
+saint	st	Abréviation courante dans les toponymes (« Lac-St-Jean ») : le mot dit est bien « saint ».
+sainte	ste	Abréviation courante dans les toponymes (« Ste-Foy ») ; absent du texte v1.

@@ -73,6 +73,15 @@ internal fun ViewGroup.body(text: CharSequence = "", small: Boolean = false) = T
     setPadding(0, context.dp(2), 0, context.dp(2))
 }.also { addView(it) }
 
+/** Text to read aloud (reading test): large and airy. Colour and font come from the theme. */
+internal fun ViewGroup.reading(text: CharSequence, tagValue: String? = null) = TextView(context).apply {
+    this.text = text
+    tagValue?.let { tag = it }
+    setTextAppearance(R.style.TextAppearance_Dictee_Reading)
+    setLineSpacing(0f, 1.4f)
+    setPadding(0, context.dp(12), 0, context.dp(12))
+}.also { addView(it) }
+
 /** A technical value (size, score, timing, state). */
 internal fun ViewGroup.value(text: CharSequence) = TextView(context).apply {
     this.text = text
@@ -192,5 +201,30 @@ internal fun LinearLayout.renderLanguageChoices(settings: AppSettings, onChange:
                 }
             }
         })
+    }
+}
+
+/** Tags of the participation card and its buttons, for tests. */
+internal const val PARTICIPATION_CARD_TAG = "participation_card"
+internal const val PARTICIPATION_START_TAG = "participation_start"
+internal const val PARTICIPATION_DISMISS_TAG = "participation_dismiss"
+
+/**
+ * The card « Aider à améliorer la dictée en français québécois » (issue #15, lot 4): two sentences and a
+ * button that starts the reading test. [onDismiss] adds the close button (main screen only: in the settings
+ * the card stays). Showing it changes nothing in how the app works; the decision to show it is
+ * [io.github.remtav.dictee.reading.Participation].
+ */
+internal fun ViewGroup.participationCard(onStart: () -> Unit, onDismiss: (() -> Unit)?) {
+    val card = card()
+    card.tag = PARTICIPATION_CARD_TAG
+    card.heading(context.getString(R.string.contrib_card_title)).setPadding(0, 0, 0, context.dp(6))
+    card.body(context.getString(R.string.contrib_card_body), small = true)
+    card.row().apply {
+        button(context.getString(R.string.contrib_card_start)) { onStart() }.apply { tag = PARTICIPATION_START_TAG }.spaced()
+        if (onDismiss != null) {
+            button(context.getString(R.string.contrib_card_dismiss), outlined = true) { onDismiss() }
+                .apply { tag = PARTICIPATION_DISMISS_TAG }
+        }
     }
 }

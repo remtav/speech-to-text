@@ -76,7 +76,7 @@ class ThemeContrastTest {
         Triple("colorError", "colorSurface", "erreur du clavier et des écrans (avec texte et icône)"),
         Triple("colorError", "colorSurfaceContainer", "erreur dans une carte et sur le clavier (avec texte et icône)"),
         Triple("colorOnErrorContainer", "colorErrorContainer", "conteneurs d'erreur des composants Material"),
-        Triple("colorOnTertiaryContainer", "colorTertiaryContainer", "conteneurs tertiaires des composants Material"),
+        Triple("colorOnTertiaryContainer", "colorTertiaryContainer", "mots mal compris surlignés du test de lecture (avec soulignement) ; conteneurs tertiaires Material"),
         Triple("colorOnSurfaceInverse", "colorSurfaceInverse", "messages et info-bulles"),
     )
 
@@ -104,6 +104,17 @@ class ThemeContrastTest {
                 assertTrue("$name : colorOutline sur $bg = %.2f:1".format(r), r >= 3.0)
             }
         }
+    }
+
+    @Test
+    fun readingHighlightUsesAMeasuredPairAndAnUnderlineNeverTheErrorColourAlone() {
+        // The misheard words of the reading test: the pair measured above, plus an underline (never the colour alone).
+        val src = res.parentFile.resolve("java/io/github/remtav/dictee/ui/ReadingHighlight.kt").readText()
+        val code = src.replace(Regex("/\\*[\\s\\S]*?\\*/"), "")
+        assertTrue(code.contains("attr.colorTertiaryContainer") && code.contains("attr.colorOnTertiaryContainer"))
+        assertTrue("surlignage sans soulignement", code.contains("UnderlineSpan"))
+        assertTrue("la couleur d'erreur ne sert pas au surlignage", !code.contains("colorError"))
+        assertTrue(Triple("colorOnTertiaryContainer", "colorTertiaryContainer", "") .let { t -> pairs.any { it.first == t.first && it.second == t.second } })
     }
 
     @Test

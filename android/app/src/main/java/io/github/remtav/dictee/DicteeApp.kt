@@ -31,6 +31,7 @@ import io.github.remtav.dictee.stt.WholeDictationEngine
 import io.github.remtav.dictee.stt.WhisperTuning
 import io.github.remtav.dictee.text.RuleCleaner
 import java.io.File
+import kotlin.concurrent.thread
 
 /**
  * Seams for instrumented tests: the test runs in the app process and swaps the
@@ -42,6 +43,11 @@ object TestHooks {
     @Volatile var vadParams: VadParams? = null
     /** Treat every catalog model as installed (scripted engines need no files). */
     @Volatile var assumeInstalled: Boolean = false
+    /**
+     * When set, exactly these on-device catalogue models are "installed" (scripted engines need no
+     * files): lets a test run the reading test with one model, then with several. Wins over [assumeInstalled].
+     */
+    @Volatile var installedModelIds: Set<String>? = null
 }
 
 class DicteeApp : Application() {
@@ -63,6 +69,14 @@ class DicteeApp : Application() {
         // Messages are redacted by RemoteEngine: no token or Cloudflare secret reaches logcat.
         RemoteEngine.defaultLog = RemoteLog { android.util.Log.i("DicteeRemote", it) }
         applyTheme()
+        // Reading-test contribution (issue #15, step 4.3): an archive is deleted with its screen; one that
+        // survived a killed process for more than a day goes now (not younger: the person's mail may still
+        // be reading it, and this process also starts for the keyboard).
+        thread(name = "contribution-sweep") {
+            io.github.remtav.dictee.reading.ContributionArchive.deleteOlderThan(
+                io.github.remtav.dictee.ui.ContributionShare.archiveDir(this),
+            )
+        }
     }
 
     fun applyTheme() {
@@ -77,7 +91,7 @@ class DicteeApp : Application() {
 
     fun isInstalled(spec: ModelSpec): Boolean = when {
         spec.family == ModelFamily.REMOTE -> settings.remoteConfig().isConfigured
-        else -> TestHooks.assumeInstalled || store.isInstalled(spec)
+        else -> TestHooks.installedModelIds?.contains(spec.id) ?: (TestHooks.assumeInstalled || store.isInstalled(spec))
     }
 
     /** Engine factory in effect (scripted in tests). */
