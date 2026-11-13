@@ -21,6 +21,9 @@ import io.github.remtav.dictee.stt.EngineManager
 import io.github.remtav.dictee.stt.ModelStore
 import io.github.remtav.dictee.stt.DefaultEngineFactory
 import io.github.remtav.dictee.stt.EngineOptions
+import io.github.remtav.dictee.stt.EngineChoice
+import io.github.remtav.dictee.stt.EngineRoute
+import io.github.remtav.dictee.stt.ModelCatalog
 import io.github.remtav.dictee.stt.ModelFamily
 import io.github.remtav.dictee.stt.ModelMigration
 import io.github.remtav.dictee.stt.ModelSpec
@@ -49,6 +52,8 @@ object TestHooks {
      * files): lets a test run the reading test with one model, then with several. Wins over [assumeInstalled].
      */
     @Volatile var installedModelIds: Set<String>? = null
+    /** Forces the network state seen by the engine choice (issue #23); null = ask the system. */
+    @Volatile var networkAvailable: Boolean? = null
 }
 
 class DicteeApp : Application() {
@@ -98,11 +103,47 @@ class DicteeApp : Application() {
      * files: nothing is deleted without a click). Run at start-up and when the languages change.
      */
     fun migrateModels() {
+        migrateServerChoice()
         val notice = ModelMigration.plan(settings.activeModelId, settings.languages) { isInstalled(it) } ?: return
         settings.activeModelId = notice.replacement.id
         settings.retiredModelNotice = notice.retired.id
         if (engines.current()?.spec?.id == notice.retired.id) engines.release()
     }
+
+    /**
+     * Issue #23: the server is no longer a model to pick but a mode (server / phone). A user whose active model
+     * was the server gets their old fallback as the on-device model; the mode stays "not chosen" (so: phone)
+     * until they choose "server" again (#36 or the settings), whose text says what happens to the audio,
+     * which the old choice never did.
+     */
+    private fun migrateServerChoice() {
+        if (settings.activeModelId != ModelCatalog.remote.id) return
+        settings.activeModelId = settings.remoteFallbackId.ifEmpty { ModelCatalog.default.id }
+    }
+
+    /** Whether the phone has a network (any: a LAN server needs no internet). */
+    fun networkAvailable(): Boolean {
+        TestHooks.networkAvailable?.let { return it }
+        return try {
+            val cm = getSystemService(android.net.ConnectivityManager::class.java) ?: return true
+            val caps = cm.getNetworkCapabilities(cm.activeNetwork) ?: return false
+            caps.hasCapability(android.net.NetworkCapabilities.NET_CAPABILITY_INTERNET)
+        } catch (_: Exception) {
+            true // unknown: let the server request try, the fallback covers a failure
+        }
+    }
+
+    /** Where the next dictation goes (issue #23): server or phone. */
+    fun route(): EngineRoute = settings.route(networkAvailable())
+
+    /**
+     * The model the next dictation uses: the server only with an address, the "server" mode and a network;
+     * the on-device model otherwise.
+     */
+    fun dictationSpec(): ModelSpec = EngineChoice.spec(route(), settings.activeModel)
+
+    /** The model the keyboard shows: the server when it is the chosen mode (even while offline: the fallback covers it). */
+    fun shownSpec(): ModelSpec = EngineChoice.spec(settings.route(networkAvailable = true), settings.activeModel)
 
     fun isInstalled(spec: ModelSpec): Boolean = when {
         spec.family == ModelFamily.REMOTE -> settings.remoteConfig().isConfigured
@@ -148,7 +189,7 @@ class DicteeApp : Application() {
 
     /** A dictation session for the active model, or null with a reason. */
     fun newSession(): Pair<DictationSession?, String?> {
-        val spec = settings.activeModel
+        val spec = dictationSpec()
         if (benchmarkRunning) return null to "Comparaison des modèles en cours"
         if (!isInstalled(spec)) return null to "Modèle ${spec.shortName} non installé : ouvrez les réglages"
         engines.factory = engineFactory()

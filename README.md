@@ -367,7 +367,9 @@ Set environment variables in `.env` or at startup:
 | `POLISH_API_KEY`    | *(unset)*                                       | Bearer key for a hosted endpoint; environment only, not needed for local Ollama |
 | `POLISH_TIMEOUT`    | `5`                                             | Seconds (0.5–120) before falling back to the raw transcript |
 | `POLISH_DICTIONARY` | *(unset)*                                       | Path to a newline-separated list of names / jargon |
-| `POLISH_LOG`        | *(unset)*                                       | Path to the local JSONL tuning log (contains transcripts) |
+| `POLISH_LOG`        | *(unset)*                                       | Path to the local JSONL tuning log (contains transcripts; ignored when `DICTEE_TOKENS` is set) |
+| `DICTEE_TOKENS`     | *(unset: no authentication)*                    | Comma-separated access tokens. When set, every route except `/`, `/healthz` and `/static/` needs `Authorization: Bearer <token>` (401 otherwise) and each token only sees its own jobs. Set it before exposing the server to the internet: see [docs/DEPLOIEMENT_SERVEUR.md](docs/DEPLOIEMENT_SERVEUR.md) |
+| `DICTEE_RATE_LIMIT` | `30`                                            | With `DICTEE_TOKENS`: transcription / model requests per minute and per token (429 beyond); `0` = no limit. Polling a job is not counted |
 
 Invalid values (e.g. a port above 65535) are logged as warnings and replaced by the default.
 

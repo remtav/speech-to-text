@@ -36,6 +36,7 @@ import io.github.remtav.dictee.dictation.DictationState
 import io.github.remtav.dictee.dictation.TextSink
 import io.github.remtav.dictee.settings.ThemeMode
 import io.github.remtav.dictee.stt.EngineManager
+import io.github.remtav.dictee.stt.TranscriptionMode
 import io.github.remtav.dictee.stt.ModelCatalog
 import io.github.remtav.dictee.stt.DictationResult
 import io.github.remtav.dictee.stt.ModelFamily
@@ -319,7 +320,7 @@ class DicteeImeService : InputMethodService(), DictationListener, EngineManager.
         if (inflatedTheme != null && inflatedTheme != app.settings.theme) rebuildInputView()
         if (passwordField && controller.isActive) controller.cancel()
         // Preload the model so the first tap is fast.
-        val spec = app.settings.activeModel
+        val spec = app.dictationSpec()
         if (!passwordField && !app.benchmarkRunning && app.isInstalled(spec)) {
             app.engines.factory = app.engineFactory()
             app.engines.load(spec, app.engineOptions(spec))
@@ -567,15 +568,16 @@ class DicteeImeService : InputMethodService(), DictationListener, EngineManager.
             showMessage(getString(R.string.msg_no_model), error = true)
             return
         }
+        val shown = app.shownSpec()
         installed.forEachIndexed { i, spec ->
             menu.menu.add(0, i, i, spec.displayName).apply {
                 isCheckable = true
-                isChecked = spec.id == app.settings.activeModelId
+                isChecked = spec.id == shown.id
             }
         }
         menu.setOnMenuItemClickListener { item ->
             val spec = installed[item.itemId]
-            if (spec.id != app.settings.activeModelId) switchModel(spec.id)
+            if (spec.id != app.shownSpec().id) switchModel(spec.id)
             true
         }
         menu.show()
@@ -590,15 +592,38 @@ class DicteeImeService : InputMethodService(), DictationListener, EngineManager.
             showMessage(getString(R.string.msg_stop_to_switch), error = false)
             return
         }
-        app.settings.activeModelId = spec.id
+        val s = app.settings
+        if (spec.family == ModelFamily.REMOTE) {
+            // Issue #23: the "server" mode is the consent to send the audio; it is only recorded where its text
+            // is shown (installation, #36, or the settings), never by a tap in this menu.
+            if (s.transcriptionMode != TranscriptionMode.SERVER) {
+                showMessage(getString(R.string.msg_server_mode_in_settings), error = false)
+                openSettingsScreen()
+                return
+            }
+        } else {
+            s.activeModelId = spec.id
+            // Picking a phone model while the server is the mode means "on the phone" from now on.
+            if (s.transcriptionMode == TranscriptionMode.SERVER) s.transcriptionMode = TranscriptionMode.PHONE
+        }
+        val next = app.dictationSpec()
         app.engines.factory = app.engineFactory()
-        app.engines.load(spec, app.engineOptions(spec))
+        app.engines.load(next, app.engineOptions(next))
         render()
     }
 
     /** The "Comment dicter" screen; from a service the activity needs its own task. */
     private fun openHowTo() {
         startActivity(Intent(this, HowToActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+    }
+
+    /** The settings screen, at the "Envoi au serveur" choice. */
+    private fun openSettingsScreen() {
+        startActivity(
+            Intent(this, io.github.remtav.dictee.ui.SettingsActivity::class.java)
+                .putExtra(io.github.remtav.dictee.ui.SettingsActivity.EXTRA_SCROLL_TO_SERVER_MODE, true)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+        )
     }
 
     private fun openSettings() {
@@ -616,7 +641,7 @@ class DicteeImeService : InputMethodService(), DictationListener, EngineManager.
     private fun render() {
         val mic = micButton ?: return
         val status = statusText ?: return
-        val spec = app.settings.activeModel
+        val spec = app.shownSpec()
         modelButton?.text = spec.shortName
         val state = controller.state
         val listening = state == DictationState.LISTENING

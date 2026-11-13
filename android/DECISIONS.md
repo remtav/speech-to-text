@@ -3728,6 +3728,44 @@ Vérification locale : `./gradlew testDebugUnitTest assembleDebug assembleDebugA
 - `switchModel` (clavier) accepte encore tout identifiant du catalogue : seul le menu filtre (les tests
   instrumentés s'en servent).
 
+## Issue #23 : serveur distant, mode serveur / téléphone, repli local
+
+Décisions de l'utilisateur (2026-11-13) : code seulement, adresse par défaut vide, consentement + suppression.
+Mise à jour de l'issue (#36) : le choix du mode et le consentement se font à l'installation ; pas d'écran de
+consentement à la première dictée. Choix faits pendant l'implémentation (le plus prudent pour la vie privée en cas
+de doute) :
+
+- **Mode** (`TranscriptionMode` : `UNSET`, `SERVER`, `PHONE`, préférence `transcription_mode`) : #36 l'enregistre
+  à l'installation, les Réglages (« Envoi au serveur ») le modifient, sous un texte qui dit que l'audio est envoyé
+  au serveur configuré et supprimé dès la transcription. `PHONE` est « Toujours transcrire sur le téléphone » (pas
+  de second réglage qui ferait doublon).
+- **Choix du moteur** (`EngineChoice.route`) : adresse + mode `SERVER` + réseau → serveur ; tout le reste (sans
+  adresse, `PHONE`, `UNSET`, sans réseau) → téléphone.
+- **Le serveur n'est plus un « modèle » actif.** `activeModelId` désigne toujours le modèle du téléphone, qui sert
+  aussi de repli au serveur ; l'ancien réglage « Si le serveur ne répond pas » disparaît des Réglages.
+  `remoteFallbackId` reste pour la migration seulement : un utilisateur dont le modèle actif était le serveur garde
+  son ancien repli comme modèle du téléphone (Whisper turbo si « aucun ») et son mode reste « pas encore choisi »,
+  donc téléphone, jusqu'à ce qu'il choisisse « serveur » sous le texte (l'ancien choix ne disait pas ce qui arrive
+  à l'audio).
+- Le mode `SERVER` n'est jamais enregistré par un clic ailleurs que sous son texte : « Serveur distant » dans le menu
+  du clavier ou sur l'écran principal ouvre les Réglages sur ce choix. Choisir un modèle du téléphone en mode
+  `SERVER` passe en `PHONE` (choix sans risque) ; en `UNSET`, le mode n'est pas touché (#36 le demandera).
+- **Délai de repli** : 8 s par défaut (2 à 30 s dans les Réglages), compté depuis la fin de la dictée, plus un quart
+  de la durée de l'audio (envoi du WAV et transcription d'une longue dictée), 3 min au plus ; le délai de connexion
+  est plafonné au même délai. L'ancien budget (60 s + la durée de la dictée) attendait trop longtemps.
+- **Réseau** : `ConnectivityManager`, capacité INTERNET (pas VALIDATED : un serveur du réseau local n'a pas besoin
+  d'Internet). En cas de doute, la requête est tentée : le repli couvre l'échec.
+- **Adresse de compilation** : `BuildConfig.DEFAULT_SERVER_URL` (propriété Gradle `defaultServerUrl`, vide par
+  défaut, refusée si ce n'est pas une adresse http(s)). Jamais de jeton dans l'APK. Une adresse saisie (même vide)
+  remplace celle de la compilation.
+- **Serveur** : `DICTEE_TOKENS` défini protège toutes les routes sauf `/`, `/healthz` et `/static/` (la page web
+  ne peut alors plus appeler l'API : usage local seulement) ; défini mais sans jeton utilisable, tout est refusé.
+  Chaque jeton ne voit que ses tâches (404 pour les autres, `/progress` muet). La limite de débit ne compte que les
+  requêtes qui font travailler le serveur (transcription, changement de modèle, éjection), pas le suivi d'une tâche
+  (l'application interroge toutes les 0,4 s). L'audio est supprimé dès que Whisper l'a lu, avant le polissage.
+  `POLISH_LOG` (qui contient des transcriptions) est ignoré quand `DICTEE_TOKENS` est défini.
+- Politique de confidentialité : `docs/CONFIDENTIALITE.md` (il n'y en avait pas).
+
 ## Issue #26 : Whisper turbo en 4 bits (MatMulNBits), essai hôte
 
 - Faisabilité confirmée sur l'hôte (sherpa-onnx 2.0.1, ONNX Runtime 1.28.2, Python et JAR Linux). arm64 non mesuré.

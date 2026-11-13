@@ -26,6 +26,11 @@ services:
       # Only for a hosted endpoint; local Ollama needs no key. Set it in the shell or an
       # untracked env file, never in the tracked .env.
       - POLISH_API_KEY=${POLISH_API_KEY:-}
+      # Internet-facing server (docs/DEPLOIEMENT_SERVEUR.md): access tokens, comma-separated,
+      # and transcription requests per minute per token. Unset = no authentication (local use).
+      # Set the tokens in the shell or an untracked env file, never in the tracked .env.
+      - DICTEE_TOKENS=${DICTEE_TOKENS:-}
+      - DICTEE_RATE_LIMIT=${DICTEE_RATE_LIMIT:-30}
     volumes:
       - model-cache:/root/.cache
     restart: unless-stopped

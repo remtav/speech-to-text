@@ -52,7 +52,8 @@ portent un lien vers une source officielle, lue le 2026-11-12.
 - **Ici, la transcription se fait sur le téléphone, par un modèle que vous
   avez téléchargé et que vous choisissez.** Aucun compte n'est demandé, et le
   code qui le fait est dans ce dépôt, où chacun peut le lire. Un serveur
-  n'intervient que si vous configurez vous-même le « Serveur distant ».
+  n'intervient que si une adresse de « Serveur distant » est configurée **et**
+  que vous choisissez le mode « serveur » (à l'installation ou dans les Réglages).
 - **Chez Google, l'endroit du traitement dépend de la fonction.** Sur la page
   d'aide de Gboard
   [« Utiliser les fonctionnalités avancées de saisie vocale »](https://support.google.com/gboard/answer/11197787?hl=fr),
@@ -357,17 +358,36 @@ référence (ou votre enregistrement) avec chaque modèle installé et affiche
 texte, temps de chargement, facteur temps réel, mémoire en pointe et WER ;
 « Partager » exporte les résultats.
 
-### Serveur distant (optionnel)
+### Serveur distant (mode « serveur »)
 
-Si les modèles du téléphone ne suffisent pas, la dictée peut se faire sur un
-serveur que vous contrôlez : dans les Réglages, section « Serveur distant »,
-saisir l'adresse (par exemple `http://192.168.1.10:8081` pour le serveur
-speech-to-text de ce dépôt, ou l'adresse d'un serveur compatible avec l'API
-OpenAI `/v1/audio/transcriptions`), tester la connexion, puis choisir
-« Serveur distant » comme modèle (écran principal ou bouton du clavier).
-En dehors du réseau local, utilisez HTTPS ou un VPN (WireGuard, Tailscale).
+Sur le téléphone, Whisper transcrit lentement ; un serveur avec GPU répond bien plus
+vite (issue #23). Dans les Réglages, section « Serveur distant », saisir l'adresse
+(par exemple `https://dictee.example.ca` pour le serveur speech-to-text de ce dépôt,
+déployé selon [`docs/DEPLOIEMENT_SERVEUR.md`](../docs/DEPLOIEMENT_SERVEUR.md), ou
+l'adresse d'un serveur compatible avec l'API OpenAI `/v1/audio/transcriptions`) et le
+**jeton d'accès** (une des valeurs de `DICTEE_TOKENS` du serveur, envoyée en
+`Authorization: Bearer`), puis tester la connexion. En dehors du réseau local, utilisez
+HTTPS ou un VPN (WireGuard, Tailscale).
 
-**Dictée entière, polie par le serveur** (issue #13). Avec « Serveur distant »,
+- **Mode serveur ou téléphone.** Le choix se fait à l'installation (#36) ou dans les
+  Réglages (« Envoi au serveur ») : « Sur le serveur configuré » (l'audio y est
+  envoyé, puis supprimé dès la transcription) ou « Toujours transcrire sur le
+  téléphone ». Choisir « serveur » sous ce texte vaut consentement. Sans adresse, en
+  mode « téléphone », tant qu'aucun mode n'est choisi ou sans réseau, tout reste sur
+  le téléphone. Voir la [politique de confidentialité](docs/CONFIDENTIALITE.md).
+- **Repli sur le téléphone.** Le modèle choisi sur l'écran principal (Whisper turbo par
+  défaut) sert de repli : si le serveur est injoignable ou ne répond pas dans le délai
+  (8 s par défaut, plus un quart de la durée de la dictée ; réglage « Délai avant repli
+  sur le téléphone »), la dictée est transcrite sur le téléphone, avec un court message
+  dans le clavier. Le bouton **Annuler** le fait tout de suite.
+- Choisir un modèle du téléphone (écran principal ou bouton du clavier) en mode
+  « serveur » passe en mode « téléphone ». Choisir « Serveur distant » sans le mode
+  « serveur » ouvre les Réglages sur ce choix : seul ce texte enregistre le mode.
+- Adresse par défaut à la compilation : `./gradlew assembleRelease
+  -PdefaultServerUrl=https://dictee.example.ca` (vide par défaut ; jamais de jeton dans
+  l'APK). Une adresse saisie dans les Réglages la remplace.
+
+**Dictée entière, polie par le serveur** (issue #13). Avec le serveur,
 rien ne s'affiche pendant la dictée : à la fin (appui sur stop), toute la
 dictée part au serveur en une seule requête. Le serveur de ce dépôt la
 transcrit (chemin rapide) puis la polit avec son LLM, et le texte poli est
@@ -380,10 +400,10 @@ polissage… » avec un bouton **Annuler**.
 - Si le polissage échoue, le texte brut du serveur est inséré (message
   discret, pas d'erreur).
 - Si le serveur est injoignable, en erreur, refuse l'accès ou ne répond pas à
-  temps (60 s + la durée de la dictée, 6 min au plus), ou si vous appuyez sur
-  Annuler, l'audio gardé sur le téléphone est transcrit par le modèle local de
-  repli (Whisper turbo par défaut) : aucune dictée n'est perdue. Après une panne,
-  le serveur est réessayé au bout de 60 s.
+  temps (délai réglable, 8 s par défaut + un quart de la durée de la dictée, 3 min
+  au plus), ou si vous appuyez sur Annuler, l'audio gardé sur le téléphone est
+  transcrit par le modèle du téléphone : aucune dictée n'est perdue. Après une
+  panne, le serveur est réessayé au bout de 60 s.
 - Une dictée dure au plus 5 minutes : au-delà, l'enregistrement s'arrête et
   ce qui a été dit est envoyé.
 - Les commandes vocales et le vocabulaire s'appliquent au texte final reçu
