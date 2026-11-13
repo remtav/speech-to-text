@@ -182,6 +182,10 @@ pour la seule application choisie). Politique de contribution :
 [`docs/CONTRIBUTION.md`](docs/CONTRIBUTION.md) ; textes, seuils et choix :
 `DECISIONS.md` (« Issue #15, lot 4 »).
 
+| Score par modèle (clair) | Score (sombre) | Proposition de partage (clair) | Partage (sombre) |
+|---|---|---|---|
+| ![Test de lecture, score](docs/screenshots/reading-light.png) | ![Test de lecture, score, sombre](docs/screenshots/reading-dark.png) | ![Proposition de partage](docs/screenshots/reading-share-light.png) | ![Proposition de partage, sombre](docs/screenshots/reading-share-dark.png) |
+
 ## Apparence
 
 L'interface est un thème Material 3 générique : bleu, polices du système,
