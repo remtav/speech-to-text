@@ -93,9 +93,17 @@ class QuickTestInstrumentedTest {
         return out
     }
 
+    /** The text of the view tagged [tag]: its own if it is a text, else every text inside it (a result card). */
     private fun ActivityScenario<*>.textOf(tag: String): String? {
         var out: String? = null
-        onActivity { a -> out = a.window.decorView.findViewWithTag<TextView>(tag)?.text?.toString() }
+        onActivity { a ->
+            val v = a.window.decorView.findViewWithTag<View>(tag)
+            out = when (v) {
+                null -> null
+                is TextView -> v.text.toString()
+                else -> v.allViews().filterIsInstance<TextView>().joinToString("\n") { it.text }
+            }
+        }
         return out
     }
 
