@@ -27,6 +27,7 @@ import io.github.remtav.dictee.dictation.LocalCut
 import io.github.remtav.dictee.dictation.LocalGrouping
 import io.github.remtav.dictee.stt.BenchSample
 import io.github.remtav.dictee.stt.Benchmark
+import io.github.remtav.dictee.stt.EngineChoice
 import io.github.remtav.dictee.stt.ModelCatalog
 import io.github.remtav.dictee.stt.ModelFamily
 import io.github.remtav.dictee.stt.ModelResult
@@ -135,8 +136,10 @@ class CompareActivity : AppCompatActivity() {
         if (busy) return
         val samples = references.filter { it.first.isChecked }.map { it.second }.toMutableList()
         recording?.let { samples += BenchSample("enregistrement", "?", it, null) }
-        // Issue #22: the models offered for the languages, the experimental ones, and the user's server.
-        val models = (ModelCatalog.listed(app.settings.languages) + ModelCatalog.remote).filter { app.isInstalled(it) }
+        // Issue #22: the models offered for the languages, the experimental ones, and the user's server only when
+        // dictations go to it (address and "server" mode, issue #57): an address alone sends nothing.
+        val models = EngineChoice.comparedModels(ModelCatalog.listed(app.settings.languages), app.settings.serverInUse)
+            .filter { app.isInstalled(it) }
         if (models.isEmpty() || samples.isEmpty()) {
             Toast.makeText(this, R.string.compare_nothing, Toast.LENGTH_LONG).show()
             return

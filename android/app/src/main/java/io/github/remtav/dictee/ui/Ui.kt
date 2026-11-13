@@ -104,6 +104,7 @@ internal fun ViewGroup.button(text: String, outlined: Boolean = false, onClick: 
         else com.google.android.material.R.attr.materialButtonStyle,
     ).apply {
         this.text = text
+        setTag(R.id.button_outlined, outlined)
         setOnClickListener(onClick)
     }.also { addView(it) }
 
@@ -123,6 +124,57 @@ internal fun ViewGroup.card(): LinearLayout {
     }
     addView(card)
     return inner
+}
+
+/**
+ * A section folded at opening (issue #57): a header that says what it holds, touched to show or hide
+ * [content]. The header is a title-styled line with a chevron, at least 48 dp tall; its state (folded or
+ * unfolded) is announced to accessibility services.
+ */
+internal class Collapsible(val header: TextView, val content: LinearLayout, private val title: String) {
+    val expanded: Boolean get() = content.visibility == View.VISIBLE
+
+    fun expand(open: Boolean) {
+        content.visibility = if (open) View.VISIBLE else View.GONE
+        header.text = (if (open) "▾ " else "▸ ") + title
+        ViewCompat.setStateDescription(
+            header,
+            header.context.getString(if (open) R.string.collapsible_open else R.string.collapsible_closed),
+        )
+    }
+}
+
+internal fun ViewGroup.collapsible(title: String, headerTag: String, contentTag: String): Collapsible {
+    val header = TextView(context).apply {
+        tag = headerTag
+        setTextAppearance(R.style.TextAppearance_Dictee_Title)
+        setTextColor(context.attrColor(androidx.appcompat.R.attr.colorPrimary))
+        setPadding(0, context.dp(16), 0, context.dp(8))
+        minHeight = context.dp(48)
+        isClickable = true
+        isFocusable = true
+        val ripple = TypedValue()
+        context.theme.resolveAttribute(android.R.attr.selectableItemBackground, ripple, true)
+        setBackgroundResource(ripple.resourceId)
+    }
+    addView(header)
+    val content = LinearLayout(context).apply { orientation = LinearLayout.VERTICAL; tag = contentTag }
+    addView(content)
+    val section = Collapsible(header, content, title)
+    section.expand(false)
+    header.setOnClickListener { section.expand(!section.expanded) }
+    return section
+}
+
+/** Vertical offset of [view] inside [ancestor] (sum of the tops of the views in between). */
+internal fun topWithin(ancestor: View, view: View): Int {
+    var y = 0
+    var v: View = view
+    while (v !== ancestor) {
+        y += v.top
+        v = v.parent as? View ?: break
+    }
+    return y
 }
 
 /** A size in French units (Mo, Go), whatever the language of the phone. */
@@ -214,16 +266,17 @@ internal const val PARTICIPATION_DISMISS_TAG = "participation_dismiss"
 /**
  * The card « Aider à améliorer la dictée en français québécois » (issue #15, lot 4): two sentences and a
  * button that starts the reading test. [onDismiss] adds the close button (main screen only: in the settings
- * the card stays). Showing it changes nothing in how the app works; the decision to show it is
+ * the card stays). [filled] false on the installation screen, whose one filled button is the next step
+ * (issue #55). Showing it changes nothing in how the app works; the decision to show it is
  * [io.github.remtav.dictee.reading.Participation].
  */
-internal fun ViewGroup.participationCard(onStart: () -> Unit, onDismiss: (() -> Unit)?) {
+internal fun ViewGroup.participationCard(onStart: () -> Unit, onDismiss: (() -> Unit)?, filled: Boolean = true) {
     val card = card()
     card.tag = PARTICIPATION_CARD_TAG
     card.heading(context.getString(R.string.contrib_card_title)).setPadding(0, 0, 0, context.dp(6))
     card.body(context.getString(R.string.contrib_card_body), small = true)
     card.row().apply {
-        button(context.getString(R.string.contrib_card_start)) { onStart() }.apply { tag = PARTICIPATION_START_TAG }.spaced()
+        button(context.getString(R.string.contrib_card_start), outlined = !filled) { onStart() }.apply { tag = PARTICIPATION_START_TAG }.spaced()
         if (onDismiss != null) {
             button(context.getString(R.string.contrib_card_dismiss), outlined = true) { onDismiss() }
                 .apply { tag = PARTICIPATION_DISMISS_TAG }
