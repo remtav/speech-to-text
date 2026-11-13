@@ -269,3 +269,89 @@ textes n'ont pas changé.
   en phrases, avec ta voix. « Comparer les modèles » (bouton « Enregistrer une
   phrase ») et le test de lecture du lot 4 en couvrent une partie ; une liste
   de mots isolés d'ici serait une petite issue à part.
+
+## Lot 4 — test de lecture en français québécois
+
+Rappel : la validation juridique en tête de ce fichier précède toute diffusion
+de l'application à d'autres personnes. Tant que tu es le seul à l'installer,
+aucune collecte réelle n'a lieu.
+
+### 16. Le texte de lecture est-il naturel ?
+
+- **Quoi lire** : `android/app/src/main/assets/lecture/lecture-qc-1.txt`
+  (9 paragraphes, 224 mots, avec « friperie »).
+- **À regarder de près** : « on a pogné tous les feux rouges », « d'Hochelaga »,
+  « Y'a rien là ». Quatre formes (« chu », « tsé », « à matin », « pogner »)
+  n'ont été vérifiées que dans des sources secondaires ; les autres mots l'ont
+  été dans Usito.
+- **Où corriger** : le fichier ci-dessus. Tout changement du texte demande un
+  nouveau numéro de version (`lecture-qc-2`), pour ne pas mélanger les
+  résultats ; les variantes d'écriture acceptées sont dans
+  `lecture-qc-1.equivalences.tsv`, à côté.
+
+### 17. Faire le test toi-même, puis avec deux ou trois personnes du Québec
+
+- **Parcours** : carte « Aider à améliorer la dictée en français québécois »
+  (écran principal, une fois la configuration finie, ou Réglages) → question
+  « Parlez-vous un français québécois ? » → lecture paragraphe par paragraphe
+  → score par modèle.
+- **Quoi regarder** : taille et aération du texte à lire ; arrêt à 20 secondes ;
+  lisibilité des mots surlignés, en clair et en sombre ; longueur de l'écran
+  de résultat ; temps de calcul quand plusieurs modèles sont installés (ils
+  sont chargés l'un après l'autre) ; la suggestion « un autre modèle vous
+  comprend nettement mieux ».
+- **Réponse « non »** : vérifier qu'aucun test n'est proposé ensuite, et que la
+  réponse se corrige dans les Réglages.
+- **Choix à confirmer** : le serveur distant est exclu du test (il enverrait
+  la voix sur le réseau) ; « nettement mieux » veut dire au moins 5 points et
+  30 % d'erreurs en moins.
+- **Où corriger** : écran dans
+  `android/app/src/main/java/io/github/remtav/dictee/ui/ReadingTestActivity.kt` ;
+  seuils dans `reading/ReadingThresholds` ; textes `contrib_*` dans
+  `android/app/src/main/res/values/strings.xml`.
+
+### 18. Le seuil de partage (20 %)
+
+- **Règle** : le partage n'est proposé que si le taux d'erreur dépasse 20 %
+  avec le modèle recommandé, sur le texte lu en entier.
+- **Quoi faire** : après quelques essais réels, voir si 20 % sépare bien les
+  lectures mal comprises des autres.
+- **Où corriger** : `SHARE_WER_THRESHOLD_PERCENT` dans le paquet
+  `io.github.remtav.dictee.reading`.
+
+### 19. Recevoir un vrai courriel de contribution
+
+- **Quoi faire** : obtenir un score sous 80 % (lire vite ou mal exprès),
+  cocher le consentement, « Préparer le courriel », puis « Envoyer par
+  courriel » avec Gmail et avec une autre application de courriel.
+- **Quoi vérifier** : le destinataire (`remi@kalmia.ca`), l'objet, le corps,
+  la pièce jointe présente et lisible ; dans l'archive, `contribution.json` et
+  un fichier WAV par paragraphe ; aucun identifiant, la date au jour près.
+- **Risques connus, non vérifiés** : certaines applications de courriel
+  pourraient ignorer la pièce jointe ; une application qui ne lirait la pièce
+  jointe qu'après la fermeture de l'écran du test la trouverait supprimée
+  (l'archive est effacée à la fermeture de l'écran, par « Ne pas partager »,
+  par « Refaire le test », et au démarrage si elle a plus de 24 heures).
+- **Choix à confirmer** : seule la transcription du modèle recommandé part ;
+  la région est un champ libre de 60 caractères au plus.
+- **Où corriger** : contenu de l'archive dans `reading/ContributionArchive.kt`
+  (la liste affichée à l'écran vient de la même description) ; envoi dans
+  `ui/ContributionShare.kt` ; adresse et durée dans `reading/Contribution`.
+
+### 20. Le consentement et la politique publique
+
+- **Quoi lire** : l'écran de partage dans l'application et
+  `android/docs/CONTRIBUTION.md`, qui tient lieu de politique publique. Un
+  test vérifie qu'ils annoncent le même destinataire et la même durée.
+- **À valider** : l'engagement « ne sert à rien d'autre sans un nouveau
+  consentement » ; la durée de 2 ans au plus ; le fait que la destruction se
+  fait à la main dans ta boîte de courriel.
+- **Questions laissées « à préciser »** : qui d'autre que toi a accès à
+  `remi@kalmia.ca` ; où cette messagerie est hébergée ; qui est le responsable
+  de la protection des renseignements personnels ; le cas des mineurs
+  (l'application ne demande pas l'âge) ; la voix comme renseignement sensible
+  ou biométrique.
+- **Non vérifié** : le texte consolidé de la loi sur Légis Québec, qui a
+  refusé l'accès à l'agent. Il a lu le texte officiel de la Loi 25 et quatre
+  pages de la Commission d'accès à l'information. Ce n'est pas un avis
+  juridique.
