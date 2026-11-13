@@ -131,10 +131,10 @@ quand `DICTEE_TOKENS` est défini : elle sert à l'usage local, sans jeton.
 ## 6. Configurer l'application
 
 Dans l'application : **Réglages → Serveur distant**, entrez l'adresse
-(`https://dictee.example.ca`) et le jeton, puis « Tester la connexion ». À la première
-dictée, l'application demande votre accord avant d'envoyer l'audio au serveur ; sans
-accord, ou si le serveur ne répond pas dans le délai (8 s par défaut, réglable), la
-dictée est transcrite sur le téléphone.
+(`https://dictee.example.ca`) et le jeton, puis « Tester la connexion ». Choisissez ensuite le
+mode « Sur le serveur configuré » (à l'installation ou dans Réglages → Serveur distant → Envoi au
+serveur) : sans ce choix, rien n'est envoyé. Si le serveur ne répond pas dans le délai (8 s par
+défaut, réglable), la dictée est transcrite sur le téléphone.
 
 Pour distribuer un APK qui pointe déjà vers votre serveur, compilez-le avec
 `./gradlew assembleRelease -PdefaultServerUrl=https://dictee.example.ca` (le jeton, lui,

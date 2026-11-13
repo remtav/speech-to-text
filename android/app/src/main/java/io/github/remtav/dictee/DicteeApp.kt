@@ -111,15 +111,14 @@ class DicteeApp : Application() {
     }
 
     /**
-     * Issue #23: the server is no longer a model to pick but the default once an address is set and the
-     * user agreed. A user whose active model was the server keeps the server (not "always on the phone");
-     * their old fallback becomes the on-device model. Consent is asked again at the next dictation: the
-     * screen tells what happens to the audio, which the old choice never did.
+     * Issue #23: the server is no longer a model to pick but a mode (server / phone). A user whose active model
+     * was the server gets their old fallback as the on-device model; the mode stays "not chosen" (so: phone)
+     * until they choose "server" again (#36 or the settings), whose text says what happens to the audio,
+     * which the old choice never did.
      */
     private fun migrateServerChoice() {
         if (settings.activeModelId != ModelCatalog.remote.id) return
         settings.activeModelId = settings.remoteFallbackId.ifEmpty { ModelCatalog.default.id }
-        settings.alwaysLocal = false
     }
 
     /** Whether the phone has a network (any: a LAN server needs no internet). */
@@ -134,20 +133,17 @@ class DicteeApp : Application() {
         }
     }
 
-    /** Where the next dictation goes (issue #23): server, phone, or the consent screen first. */
+    /** Where the next dictation goes (issue #23): server or phone. */
     fun route(): EngineRoute = settings.route(networkAvailable())
 
     /**
-     * The model the next dictation uses: the server only with an address, consent and a network; the
-     * on-device model otherwise (also while consent is unanswered: nothing is sent without it).
+     * The model the next dictation uses: the server only with an address, the "server" mode and a network;
+     * the on-device model otherwise.
      */
     fun dictationSpec(): ModelSpec = EngineChoice.spec(route(), settings.activeModel)
 
-    /** The model the keyboard shows: the server as soon as it is the default, even before the consent screen. */
-    fun shownSpec(): ModelSpec {
-        val r = settings.route(networkAvailable = true)
-        return if (r == EngineRoute.LOCAL) settings.activeModel else ModelCatalog.remote
-    }
+    /** The model the keyboard shows: the server when it is the chosen mode (even while offline: the fallback covers it). */
+    fun shownSpec(): ModelSpec = EngineChoice.spec(settings.route(networkAvailable = true), settings.activeModel)
 
     fun isInstalled(spec: ModelSpec): Boolean = when {
         spec.family == ModelFamily.REMOTE -> settings.remoteConfig().isConfigured

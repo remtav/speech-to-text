@@ -24,7 +24,7 @@ import io.github.remtav.dictee.stt.Acceleration
 import io.github.remtav.dictee.stt.ModelCatalog
 import io.github.remtav.dictee.stt.RemoteApi
 import io.github.remtav.dictee.stt.RemoteEngine
-import io.github.remtav.dictee.stt.ServerConsent
+import io.github.remtav.dictee.stt.TranscriptionMode
 import io.github.remtav.dictee.stt.ServerTimeout
 import io.github.remtav.dictee.stt.WhisperTuning
 import io.github.remtav.dictee.stt.asDownloadable
@@ -136,6 +136,12 @@ class SettingsActivity : AppCompatActivity() {
         col.addView(llmBox)
 
         // Opened from the "Comment dicter" screen: show the vocabulary straight away.
+        if (intent.getBooleanExtra(EXTRA_SCROLL_TO_SERVER_MODE, false)) {
+            col.post {
+                val heading = col.findViewWithTag<View>(SERVER_MODE_TAG)
+                (col.parent as? ScrollView)?.scrollTo(0, heading?.top ?: 0)
+            }
+        }
         if (intent.getBooleanExtra(EXTRA_SCROLL_TO_VOCABULARY, false)) {
             col.post {
                 val heading = col.findViewWithTag<View>(VOCABULARY_TAG)
@@ -241,14 +247,30 @@ class SettingsActivity : AppCompatActivity() {
         refreshRemoteLanguage = { remoteLanguageGroup.checkSilently(remoteLanguageIndex(), onRemoteLanguage) }
         col.switch(getString(R.string.settings_remote_polish), s.remotePolish) { s.remotePolish = it }
         col.body(getString(R.string.settings_remote_polish_help), small = true)
-        // Issue #23: server first once an address is set and the user agreed; the phone model is the fallback.
-        col.heading(getString(R.string.settings_server_use))
-        col.switch(getString(R.string.settings_server_consent), s.serverConsent == ServerConsent.ACCEPTED) {
-            s.serverConsent = if (it) ServerConsent.ACCEPTED else ServerConsent.REFUSED
-        }.tag = SERVER_CONSENT_TAG
-        col.body(getString(R.string.settings_server_consent_help), small = true)
-        col.switch(getString(R.string.settings_always_local), s.alwaysLocal) { s.alwaysLocal = it }.tag = ALWAYS_LOCAL_TAG
-        col.body(getString(R.string.settings_always_local_help), small = true)
+        // Issue #23: the mode (server / phone), also chosen at installation (#36). Choosing "server" here, under
+        // a text that says what happens to the audio, is the consent; not chosen yet = phone.
+        col.heading(getString(R.string.settings_server_use)).tag = SERVER_MODE_TAG
+        col.body(getString(R.string.settings_server_mode_help), small = true)
+        val modeGroup = RadioGroup(this)
+        val serverButton = RadioButton(this).apply {
+            id = View.generateViewId(); tag = MODE_SERVER_TAG
+            text = getString(R.string.settings_mode_server)
+            isChecked = s.transcriptionMode == TranscriptionMode.SERVER
+        }
+        val phoneButton = RadioButton(this).apply {
+            id = View.generateViewId(); tag = MODE_PHONE_TAG
+            text = getString(R.string.settings_mode_phone)
+            isChecked = s.transcriptionMode == TranscriptionMode.PHONE
+        }
+        modeGroup.addView(serverButton)
+        modeGroup.addView(phoneButton)
+        modeNote = col.body("", small = true)
+        modeGroup.setOnCheckedChangeListener { _, checkedId ->
+            s.transcriptionMode = if (checkedId == serverButton.id) TranscriptionMode.SERVER else TranscriptionMode.PHONE
+            updateModeNote()
+        }
+        col.addView(modeGroup, col.indexOfChild(modeNote))
+        updateModeNote()
         col.slider(getString(R.string.settings_server_timeout), ServerTimeout.MIN_SECONDS.toFloat(), 30f, 1f,
             s.serverTimeoutSeconds.toFloat(), { "${it.toInt()} s" }) { s.serverTimeoutSeconds = it.toInt() }
         col.body(getString(R.string.settings_server_timeout_help, s.activeModel.displayName), small = true)
@@ -270,6 +292,20 @@ class SettingsActivity : AppCompatActivity() {
         s.remoteModel = remoteModel.text.toString()
         s.cfAccessClientId = cfClientId.text.toString()
         s.cfAccessClientSecret = cfClientSecret.text.toString()
+    }
+
+    private lateinit var modeNote: android.widget.TextView
+
+    /** Why dictations stay on the phone despite the choice (no address) or for lack of one. */
+    private fun updateModeNote() {
+        val s = app.settings
+        val text = when {
+            s.transcriptionMode == TranscriptionMode.UNSET -> getString(R.string.settings_mode_unset)
+            s.transcriptionMode == TranscriptionMode.SERVER && !s.remoteConfig().isConfigured -> getString(R.string.settings_mode_no_address)
+            else -> ""
+        }
+        modeNote.text = text
+        modeNote.visibility = if (text.isEmpty()) View.GONE else View.VISIBLE
     }
 
     private fun updateRemoteWarning() {
@@ -439,8 +475,11 @@ class SettingsActivity : AppCompatActivity() {
         /** Intent extra: scroll to the personal vocabulary on opening. */
         const val EXTRA_SCROLL_TO_VOCABULARY = "scroll_to_vocabulary"
         const val VOCABULARY_TAG = "settings_vocabulary"
-        const val SERVER_CONSENT_TAG = "settings_server_consent"
-        const val ALWAYS_LOCAL_TAG = "settings_always_local"
+        /** Intent extra: scroll to the server / phone choice on opening (issue #23). */
+        const val EXTRA_SCROLL_TO_SERVER_MODE = "scroll_to_server_mode"
+        const val SERVER_MODE_TAG = "settings_server_mode"
+        const val MODE_SERVER_TAG = "settings_mode_server"
+        const val MODE_PHONE_TAG = "settings_mode_phone"
         const val PARTICIPATION_YES_TAG = "settings_participation_yes"
         const val PARTICIPATION_NO_TAG = "settings_participation_no"
         const val PARTICIPATION_EXCLUDED_TAG = "settings_participation_excluded"

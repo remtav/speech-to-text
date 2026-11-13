@@ -1,14 +1,15 @@
 package io.github.remtav.dictee.stt
 
 /**
- * The user's answer to « l'audio est envoyé au serveur configuré » (issue #23). Asked once, at the first
- * dictation that would use the server; changeable in the settings.
+ * Where dictations are transcribed (issue #23). Chosen at installation (#36) or in the settings, whose text says
+ * that the audio is sent to the configured server and deleted after transcription: choosing [SERVER] is the
+ * consent. Until a mode is recorded ([UNSET]), everything stays on the phone.
  */
-enum class ServerConsent {
-    UNASKED, ACCEPTED, REFUSED;
+enum class TranscriptionMode {
+    UNSET, SERVER, PHONE;
 
     companion object {
-        fun fromName(n: String?) = entries.firstOrNull { it.name == n } ?: UNASKED
+        fun fromName(n: String?) = entries.firstOrNull { it.name == n } ?: UNSET
     }
 }
 
@@ -18,30 +19,25 @@ enum class EngineRoute {
     SERVER,
     /** The local model (#22). */
     LOCAL,
-    /** A server is configured but the user has not answered yet: show the consent screen first. */
-    ASK_CONSENT,
 }
 
 /**
- * Server first (issue #23): with a server address **and** the user's consent, dictations go to the server;
- * in every other case they stay on the phone. Never sends audio without a recorded "Accepter".
+ * Server first (issue #23): with a server address **and** the "server" mode recorded, dictations go to the
+ * server; in every other case (no address, mode "phone" or not chosen yet, no network) they stay on the phone.
  */
 object EngineChoice {
     fun route(
         serverConfigured: Boolean,
-        consent: ServerConsent,
-        alwaysLocal: Boolean,
+        mode: TranscriptionMode,
         networkAvailable: Boolean = true,
     ): EngineRoute = when {
-        !serverConfigured || alwaysLocal -> EngineRoute.LOCAL
-        consent == ServerConsent.REFUSED -> EngineRoute.LOCAL
-        consent == ServerConsent.UNASKED -> EngineRoute.ASK_CONSENT
+        !serverConfigured || mode != TranscriptionMode.SERVER -> EngineRoute.LOCAL
         // No network: the server cannot answer, don't make the user wait for a connect timeout.
         !networkAvailable -> EngineRoute.LOCAL
         else -> EngineRoute.SERVER
     }
 
-    /** The model a dictation on [route] uses: the server, or the local model (also for ASK_CONSENT: nothing is sent unasked). */
+    /** The model a dictation on [route] uses: the server, or the local model. */
     fun spec(route: EngineRoute, local: ModelSpec): ModelSpec =
         if (route == EngineRoute.SERVER) ModelCatalog.remote else local
 }

@@ -22,7 +22,7 @@ import io.github.remtav.dictee.R
 import io.github.remtav.dictee.stt.DictationLanguage
 import io.github.remtav.dictee.stt.ModelCatalog
 import io.github.remtav.dictee.stt.ModelFamily
-import io.github.remtav.dictee.stt.ServerConsent
+import io.github.remtav.dictee.stt.TranscriptionMode
 import io.github.remtav.dictee.stt.ModelMigration
 import io.github.remtav.dictee.stt.ModelVisibility
 import io.github.remtav.dictee.stt.ModelRecommendation
@@ -229,8 +229,9 @@ class SetupActivity : AppCompatActivity() {
     }
 
     /**
-     * The user's server (issue #23): the default as soon as its address is set in the settings (after the
-     * consent screen); picking a phone model above means « Toujours transcrire sur le téléphone ».
+     * The user's server (issue #23): used once its address is set and the "server" mode is chosen (#36, or the
+     * settings, whose text says what happens to the audio). Picking a phone model above means « Toujours
+     * transcrire sur le téléphone ».
      */
     private fun renderRemote() {
         val spec = ModelCatalog.remote
@@ -241,9 +242,13 @@ class SetupActivity : AppCompatActivity() {
             isChecked = app.shownSpec().id == spec.id
             isEnabled = config.isConfigured
             setOnClickListener {
-                app.settings.alwaysLocal = false
-                // A refusal is asked again at the next dictation, never turned into consent here.
-                if (app.settings.serverConsent == ServerConsent.REFUSED) app.settings.serverConsent = ServerConsent.UNASKED
+                // The mode is recorded only under its text: never by this radio.
+                if (app.settings.transcriptionMode != TranscriptionMode.SERVER) {
+                    startActivity(
+                        Intent(this@SetupActivity, SettingsActivity::class.java)
+                            .putExtra(SettingsActivity.EXTRA_SCROLL_TO_SERVER_MODE, true),
+                    )
+                }
                 renderModels()
             }
         })
@@ -274,7 +279,7 @@ class SetupActivity : AppCompatActivity() {
             isEnabled = installed
             setOnClickListener {
                 app.settings.activeModelId = spec.id
-                if (app.settings.remoteConfig().isConfigured) app.settings.alwaysLocal = true
+                if (app.settings.transcriptionMode == TranscriptionMode.SERVER) app.settings.transcriptionMode = TranscriptionMode.PHONE
                 renderModels()
             }
         })

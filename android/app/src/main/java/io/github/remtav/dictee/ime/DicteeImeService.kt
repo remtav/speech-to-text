@@ -36,8 +36,7 @@ import io.github.remtav.dictee.dictation.DictationState
 import io.github.remtav.dictee.dictation.TextSink
 import io.github.remtav.dictee.settings.ThemeMode
 import io.github.remtav.dictee.stt.EngineManager
-import io.github.remtav.dictee.stt.EngineRoute
-import io.github.remtav.dictee.stt.ServerConsent
+import io.github.remtav.dictee.stt.TranscriptionMode
 import io.github.remtav.dictee.stt.ModelCatalog
 import io.github.remtav.dictee.stt.DictationResult
 import io.github.remtav.dictee.stt.ModelFamily
@@ -156,10 +155,6 @@ class DicteeImeService : InputMethodService(), DictationListener, EngineManager.
         cancelWaitButton = v.findViewById<MaterialButton>(R.id.cancel_wait).apply {
             setOnClickListener { haptic(it); onCancelWaitTapped() }
         }
-        consentPanel = v.findViewById(R.id.consent_panel)
-        consentText = v.findViewById(R.id.consent_text)
-        v.findViewById<View>(R.id.consent_accept).setOnClickListener { haptic(it); onConsentAnswered(accepted = true) }
-        v.findViewById<View>(R.id.consent_local).setOnClickListener { haptic(it); onConsentAnswered(accepted = false) }
         bindTextKeyboard(v)
         v.findViewById<ImageButton>(R.id.settings).setOnClickListener { openSettings() }
         v.findViewById<ImageButton>(R.id.help).setOnClickListener { haptic(it); openHowTo() }
@@ -336,7 +331,6 @@ class DicteeImeService : InputMethodService(), DictationListener, EngineManager.
     override fun onFinishInputView(finishingInput: Boolean) {
         super.onFinishInputView(finishingInput)
         app.keyboardVisible = false
-        hideConsent() // unanswered: asked again at the next dictation
         hiddenAt = SystemClock.uptimeMillis()
         Log.i(TAG, "finishInputView finishing=$finishingInput")
         // Hidden keyboard: stop listening (what was said is still inserted if the field stays).
@@ -388,11 +382,6 @@ class DicteeImeService : InputMethodService(), DictationListener, EngineManager.
             openSettings()
             return
         }
-        // Issue #23: a server is configured and the user has not answered yet: ask before any audio leaves.
-        if (app.route() == EngineRoute.ASK_CONSENT) {
-            showConsent()
-            return
-        }
         val (session, reason) = app.newSession()
         if (session == null) {
             showMessage(reason ?: getString(R.string.msg_unavailable), error = true)
@@ -405,35 +394,6 @@ class DicteeImeService : InputMethodService(), DictationListener, EngineManager.
         dictationField = currentField
         lastMessage = null
         controller.start(session)
-    }
-
-    // ---------------------------------------------------------------- consent
-
-    private var consentPanel: View? = null
-    private var consentText: TextView? = null
-
-    /** The consent screen is shown (instrumented tests). */
-    val consentShown: Boolean get() = consentPanel?.visibility == View.VISIBLE
-
-    private fun showConsent() {
-        val host = app.settings.remoteConfig().normalizedBase()?.let { runCatching { java.net.URI(it).host }.getOrNull() } ?: "?"
-        consentText?.text = getString(R.string.consent_text, host)
-        consentPanel?.visibility = View.VISIBLE
-    }
-
-    private fun hideConsent() {
-        consentPanel?.visibility = View.GONE
-    }
-
-    /**
-     * « Accepter » or « Rester sur le téléphone »: recorded once (changeable in the settings), then the
-     * dictation the user asked for starts, on the server or on the phone.
-     */
-    fun onConsentAnswered(accepted: Boolean) {
-        app.settings.serverConsent = if (accepted) ServerConsent.ACCEPTED else ServerConsent.REFUSED
-        hideConsent()
-        render()
-        onMicTapped()
     }
 
     override fun onState(state: DictationState, message: String?) {
@@ -634,13 +594,17 @@ class DicteeImeService : InputMethodService(), DictationListener, EngineManager.
         }
         val s = app.settings
         if (spec.family == ModelFamily.REMOTE) {
-            // Back to the server (issue #23): a refusal is asked again at the next dictation, never assumed.
-            s.alwaysLocal = false
-            if (s.serverConsent == ServerConsent.REFUSED) s.serverConsent = ServerConsent.UNASKED
+            // Issue #23: the "server" mode is the consent to send the audio; it is only recorded where its text
+            // is shown (installation, #36, or the settings), never by a tap in this menu.
+            if (s.transcriptionMode != TranscriptionMode.SERVER) {
+                showMessage(getString(R.string.msg_server_mode_in_settings), error = false)
+                openSettingsScreen()
+                return
+            }
         } else {
             s.activeModelId = spec.id
-            // Picking a phone model while the server is the default means "on the phone" from now on.
-            if (s.remoteConfig().isConfigured) s.alwaysLocal = true
+            // Picking a phone model while the server is the mode means "on the phone" from now on.
+            if (s.transcriptionMode == TranscriptionMode.SERVER) s.transcriptionMode = TranscriptionMode.PHONE
         }
         val next = app.dictationSpec()
         app.engines.factory = app.engineFactory()
@@ -651,6 +615,15 @@ class DicteeImeService : InputMethodService(), DictationListener, EngineManager.
     /** The "Comment dicter" screen; from a service the activity needs its own task. */
     private fun openHowTo() {
         startActivity(Intent(this, HowToActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+    }
+
+    /** The settings screen, at the "Envoi au serveur" choice. */
+    private fun openSettingsScreen() {
+        startActivity(
+            Intent(this, io.github.remtav.dictee.ui.SettingsActivity::class.java)
+                .putExtra(io.github.remtav.dictee.ui.SettingsActivity.EXTRA_SCROLL_TO_SERVER_MODE, true)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+        )
     }
 
     private fun openSettings() {

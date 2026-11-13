@@ -35,9 +35,6 @@
     <string name="status_server">Transcription sur le serveur…</string>
     <string name="cd_cancel_wait">Annuler l\'attente du serveur et transcrire sur le téléphone</string>
     <string name="msg_server_fallback">Serveur non utilisé (%1$s) : transcrit sur le téléphone</string>
-    <string name="consent_text">Transcrire sur le serveur configuré ? L\'audio de vos dictées sera envoyé à %1$s, puis supprimé dès la transcription. Sinon, tout reste sur le téléphone. Modifiable dans les Réglages.</string>
-    <string name="consent_accept">Accepter</string>
-    <string name="consent_local">Rester sur le téléphone</string>
     <string name="msg_server_cancelled">Attente annulée : transcrit sur le téléphone</string>
     <string name="msg_polish_failed">Texte non poli (%1$s) : texte brut du serveur inséré</string>
 
@@ -125,7 +122,7 @@
     <string name="settings_llm_note">Le LLM tourne sur l\'appareil (MediaPipe, arm64 uniquement). S\'il est indisponible, le nettoyage par règles est utilisé.</string>
 
     <string name="settings_remote">Serveur distant</string>
-    <string name="settings_remote_help">Le téléphone transcrit lentement avec Whisper : un serveur avec GPU répond bien plus vite. Dès qu\'une adresse est configurée ici, le serveur devient le mode par défaut, après votre accord (demandé à la première dictée). Toute la dictée est alors envoyée au serveur en une fois à la fin, puis le texte transcrit est inséré (poli par son LLM si « Polissage par le serveur » est actif). Le serveur de ce dépôt supprime l\'audio dès la transcription et ne journalise ni l\'audio ni le texte. Sans adresse, ou sans votre accord, tout reste sur le téléphone. Pour installer votre serveur : docs/DEPLOIEMENT_SERVEUR.md dans le dépôt.</string>
+    <string name="settings_remote_help">Le téléphone transcrit lentement avec Whisper : un serveur avec GPU répond bien plus vite. Avec une adresse ici et le choix « Sur le serveur » (à l\'installation ou ci-dessous), vos dictées y sont transcrites. Toute la dictée est alors envoyée au serveur en une fois à la fin, puis le texte transcrit est inséré (poli par son LLM si « Polissage par le serveur » est actif). Le serveur de ce dépôt supprime l\'audio dès la transcription et ne journalise ni l\'audio ni le texte. Sans adresse, ou sans ce choix, tout reste sur le téléphone. Pour installer votre serveur : docs/DEPLOIEMENT_SERVEUR.md dans le dépôt.</string>
     <string name="settings_remote_polish">Polissage par le serveur</string>
     <string name="settings_remote_polish_help">Le serveur repasse sur la dictée entière avec un LLM : il corrige la ponctuation et retire les hésitations. Mais un LLM peut parfois remplacer un mot bien transcrit par un autre. Si vous voyez des mots changés, coupez ce réglage : le texte brut de la transcription est alors inséré tel quel.</string>
     <string name="settings_remote_api">Type d\'API</string>
@@ -134,10 +131,12 @@
     <string name="settings_remote_language">Langue envoyée au serveur (par défaut : selon vos langues, « français » ou « anglais » seulement)</string>
     <string name="settings_remote_lang_auto">Détection automatique</string>
     <string name="settings_server_use">Envoi au serveur</string>
-    <string name="settings_server_consent">J\'accepte d\'envoyer l\'audio de mes dictées au serveur configuré</string>
-    <string name="settings_server_consent_help">L\'audio est envoyé au serveur ci-dessus, puis supprimé dès la transcription. Désactivé : tout reste sur le téléphone. La question est posée une seule fois, à la première dictée qui utiliserait le serveur.</string>
-    <string name="settings_always_local">Toujours transcrire sur le téléphone</string>
-    <string name="settings_always_local_help">Le serveur n\'est jamais utilisé, même avec une adresse et votre accord.</string>
+    <string name="settings_server_mode_help">Où vos dictées sont transcrites. Ce choix se fait aussi à l\'installation.</string>
+    <string name="settings_mode_server">Sur le serveur configuré : l\'audio de vos dictées y est envoyé, puis supprimé dès la transcription</string>
+    <string name="settings_mode_phone">Toujours transcrire sur le téléphone : rien n\'est envoyé</string>
+    <string name="settings_mode_unset">Pas encore choisi : vos dictées restent sur le téléphone.</string>
+    <string name="settings_mode_no_address">Sans adresse de serveur ci-dessus, vos dictées restent sur le téléphone, quel que soit ce choix.</string>
+    <string name="msg_server_mode_in_settings">Choisissez « Sur le serveur » dans les Réglages pour l\'utiliser</string>
     <string name="settings_server_timeout">Délai avant repli sur le téléphone</string>
     <string name="settings_server_timeout_help">Si le serveur est injoignable ou ne répond pas dans ce délai après la fin de la dictée (plus un quart de sa durée), elle est transcrite sur le téléphone avec %1$s. Le bouton « Annuler » le fait tout de suite.</string>
     <string name="settings_remote_test">Tester la connexion</string>

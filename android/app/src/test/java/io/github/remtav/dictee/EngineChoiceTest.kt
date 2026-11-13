@@ -7,8 +7,8 @@ import io.github.remtav.dictee.stt.FallbackEngine
 import io.github.remtav.dictee.stt.ModelCatalog
 import io.github.remtav.dictee.stt.RemoteConfig
 import io.github.remtav.dictee.stt.RemoteEngine
-import io.github.remtav.dictee.stt.ServerConsent
 import io.github.remtav.dictee.stt.ServerTimeout
+import io.github.remtav.dictee.stt.TranscriptionMode
 import io.github.remtav.dictee.stt.WaitControl
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -20,8 +20,8 @@ import java.util.concurrent.CopyOnWriteArrayList
 import kotlin.concurrent.thread
 
 /**
- * Issue #23: server first. Without an address → phone; address + consent → server; address + refusal → phone;
- * unreachable or silent server → the phone model, within the fallback delay.
+ * Issue #23: without an address → phone; address + "server" mode → server; address + "phone" mode or no mode yet
+ * → phone; unreachable or silent server → the phone model, within the fallback delay.
  */
 class EngineChoiceTest {
     private val local = ModelCatalog.whisperTurbo
@@ -29,47 +29,39 @@ class EngineChoiceTest {
     // ------------------------------------------------------------ route
 
     @Test fun noAddressMeansLocal() {
-        for (consent in ServerConsent.entries) {
-            assertEquals(EngineRoute.LOCAL, EngineChoice.route(serverConfigured = false, consent = consent, alwaysLocal = false))
+        for (mode in TranscriptionMode.entries) {
+            assertEquals(EngineRoute.LOCAL, EngineChoice.route(serverConfigured = false, mode = mode))
         }
         assertEquals(local, EngineChoice.spec(EngineRoute.LOCAL, local))
     }
 
-    @Test fun addressAndConsentMeansServer() {
-        val r = EngineChoice.route(serverConfigured = true, consent = ServerConsent.ACCEPTED, alwaysLocal = false)
+    @Test fun addressAndServerModeMeansServer() {
+        val r = EngineChoice.route(serverConfigured = true, mode = TranscriptionMode.SERVER)
         assertEquals(EngineRoute.SERVER, r)
         assertEquals(ModelCatalog.remote, EngineChoice.spec(r, local))
     }
 
-    @Test fun addressAndRefusalMeansLocal() {
-        val r = EngineChoice.route(serverConfigured = true, consent = ServerConsent.REFUSED, alwaysLocal = false)
+    @Test fun addressAndPhoneModeMeansLocal() {
+        val r = EngineChoice.route(serverConfigured = true, mode = TranscriptionMode.PHONE)
         assertEquals(EngineRoute.LOCAL, r)
         assertEquals(local, EngineChoice.spec(r, local))
     }
 
-    @Test fun addressWithoutAnswerAsksAndSendsNothing() {
-        val r = EngineChoice.route(serverConfigured = true, consent = ServerConsent.UNASKED, alwaysLocal = false)
-        assertEquals(EngineRoute.ASK_CONSENT, r)
-        // Whatever happens next, a dictation on this route never uses the server.
+    @Test fun addressWithoutChosenModeMeansLocal() {
+        // #36 asks at installation; until a mode is recorded nothing leaves the phone.
+        val r = EngineChoice.route(serverConfigured = true, mode = TranscriptionMode.UNSET)
+        assertEquals(EngineRoute.LOCAL, r)
         assertEquals(local, EngineChoice.spec(r, local))
-        // Asked even without network: the answer is about the audio, not about this dictation.
-        assertEquals(EngineRoute.ASK_CONSENT, EngineChoice.route(true, ServerConsent.UNASKED, false, networkAvailable = false))
-    }
-
-    @Test fun alwaysLocalWins() {
-        for (consent in ServerConsent.entries) {
-            assertEquals(EngineRoute.LOCAL, EngineChoice.route(true, consent, alwaysLocal = true))
-        }
     }
 
     @Test fun noNetworkMeansLocal() {
-        assertEquals(EngineRoute.LOCAL, EngineChoice.route(true, ServerConsent.ACCEPTED, false, networkAvailable = false))
+        assertEquals(EngineRoute.LOCAL, EngineChoice.route(true, TranscriptionMode.SERVER, networkAvailable = false))
     }
 
-    @Test fun consentNamesRoundTrip() {
-        for (c in ServerConsent.entries) assertEquals(c, ServerConsent.fromName(c.name))
-        assertEquals(ServerConsent.UNASKED, ServerConsent.fromName(null))
-        assertEquals(ServerConsent.UNASKED, ServerConsent.fromName("bogus"))
+    @Test fun modeNamesRoundTrip() {
+        for (m in TranscriptionMode.entries) assertEquals(m, TranscriptionMode.fromName(m.name))
+        assertEquals(TranscriptionMode.UNSET, TranscriptionMode.fromName(null))
+        assertEquals(TranscriptionMode.UNSET, TranscriptionMode.fromName("bogus"))
     }
 
     // ---------------------------------------------------------- timeout

@@ -3728,25 +3728,28 @@ Vérification locale : `./gradlew testDebugUnitTest assembleDebug assembleDebugA
 - `switchModel` (clavier) accepte encore tout identifiant du catalogue : seul le menu filtre (les tests
   instrumentés s'en servent).
 
-## Issue #23 : serveur distant par défaut, consentement, repli local
+## Issue #23 : serveur distant, mode serveur / téléphone, repli local
 
 Décisions de l'utilisateur (2026-11-13) : code seulement, adresse par défaut vide, consentement + suppression.
-Choix faits pendant l'implémentation (le plus prudent pour la vie privée en cas de doute) :
+Mise à jour de l'issue (#36) : le choix du mode et le consentement se font à l'installation ; pas d'écran de
+consentement à la première dictée. Choix faits pendant l'implémentation (le plus prudent pour la vie privée en cas
+de doute) :
 
-- **Choix du moteur** (`EngineChoice.route`) : sans adresse ou avec « Toujours transcrire sur le téléphone » →
-  téléphone ; adresse + refus → téléphone ; adresse sans réponse → écran de consentement d'abord (aucune dictée
-  n'utilise le serveur sur cette route) ; adresse + accord + réseau → serveur ; sans réseau → téléphone.
+- **Mode** (`TranscriptionMode` : `UNSET`, `SERVER`, `PHONE`, préférence `transcription_mode`) : #36 l'enregistre
+  à l'installation, les Réglages (« Envoi au serveur ») le modifient, sous un texte qui dit que l'audio est envoyé
+  au serveur configuré et supprimé dès la transcription. `PHONE` est « Toujours transcrire sur le téléphone » (pas
+  de second réglage qui ferait doublon).
+- **Choix du moteur** (`EngineChoice.route`) : adresse + mode `SERVER` + réseau → serveur ; tout le reste (sans
+  adresse, `PHONE`, `UNSET`, sans réseau) → téléphone.
 - **Le serveur n'est plus un « modèle » actif.** `activeModelId` désigne toujours le modèle du téléphone, qui sert
   aussi de repli au serveur ; l'ancien réglage « Si le serveur ne répond pas » disparaît des Réglages.
   `remoteFallbackId` reste pour la migration seulement : un utilisateur dont le modèle actif était le serveur garde
-  le serveur, son ancien repli devient le modèle du téléphone (Whisper turbo si « aucun »), et **le consentement lui
-  est demandé** à la prochaine dictée (l'ancien choix ne disait pas ce qui arrive à l'audio).
-- Choisir un modèle du téléphone (clavier, écran principal) alors que le serveur est actif active « Toujours
-  transcrire sur le téléphone » ; choisir « Serveur distant » le désactive et, après un refus, repose la question
-  (un clic sur le serveur n'est jamais pris pour un accord).
-- **Écran de consentement** : un panneau dans le clavier (pas une activité séparée : le clavier ne perd pas le
-  champ), avec l'hôte du serveur dans le texte. Un panneau fermé sans réponse (clavier masqué) ne vaut rien : la
-  question revient. Le réglage « J'accepte d'envoyer l'audio… » passe à « accepté » ou « refusé ».
+  son ancien repli comme modèle du téléphone (Whisper turbo si « aucun ») et son mode reste « pas encore choisi »,
+  donc téléphone, jusqu'à ce qu'il choisisse « serveur » sous le texte (l'ancien choix ne disait pas ce qui arrive
+  à l'audio).
+- Le mode `SERVER` n'est jamais enregistré par un clic ailleurs que sous son texte : « Serveur distant » dans le menu
+  du clavier ou sur l'écran principal ouvre les Réglages sur ce choix. Choisir un modèle du téléphone en mode
+  `SERVER` passe en `PHONE` (choix sans risque) ; en `UNSET`, le mode n'est pas touché (#36 le demandera).
 - **Délai de repli** : 8 s par défaut (2 à 30 s dans les Réglages), compté depuis la fin de la dictée, plus un quart
   de la durée de l'audio (envoi du WAV et transcription d'une longue dictée), 3 min au plus ; le délai de connexion
   est plafonné au même délai. L'ancien budget (60 s + la durée de la dictée) attendait trop longtemps.

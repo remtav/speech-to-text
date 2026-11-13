@@ -8,24 +8,22 @@ Sans serveur configuré, votre voix est transcrite **sur le téléphone**, par l
 téléchargé. Ni l'audio ni le texte ne quittent l'appareil. L'application n'a ni compte, ni publicité,
 ni télémétrie.
 
-## Envoi à un serveur (seulement avec votre accord)
+## Envoi à un serveur (seulement si vous le choisissez)
 
 Si une adresse de serveur est configurée (dans les Réglages, ou intégrée à l'APK par la personne qui
-l'a compilé), l'application vous demande votre accord **à la première dictée** qui utiliserait ce
-serveur :
+l'a compilé), vous choisissez où vos dictées sont transcrites, à l'installation ou dans **Réglages →
+Serveur distant → Envoi au serveur** :
 
-- **« Accepter »** : l'audio de chaque dictée est envoyé, à la fin de la dictée, au serveur configuré
-  (dont l'adresse est affichée dans la question), qui renvoie le texte. Le serveur de ce dépôt
-  (`docs/DEPLOIEMENT_SERVEUR.md`) **supprime l'audio dès la transcription**, ne garde le texte qu'en
-  mémoire le temps que le téléphone le récupère, et n'écrit **ni l'audio ni le texte dans ses
-  journaux**. Utilisez une adresse en HTTPS : l'application avertit quand l'audio traverserait
-  Internet en clair.
-- **« Rester sur le téléphone »** : rien n'est envoyé ; les dictées sont transcrites sur le téléphone.
+- **« Sur le serveur configuré »** : l'audio de chaque dictée est envoyé, à la fin de la dictée, au
+  serveur configuré, qui renvoie le texte. Le serveur de ce dépôt (`docs/DEPLOIEMENT_SERVEUR.md`)
+  **supprime l'audio dès la transcription**, ne garde le texte qu'en mémoire le temps que le
+  téléphone le récupère, et n'écrit **ni l'audio ni le texte dans ses journaux**. Utilisez une adresse
+  en HTTPS : l'application avertit quand l'audio traverserait Internet en clair.
+- **« Toujours transcrire sur le téléphone »** : rien n'est envoyé.
 
-Le choix se change à tout moment dans **Réglages → Serveur distant** (« J'accepte d'envoyer l'audio
-de mes dictées au serveur configuré », « Toujours transcrire sur le téléphone »). Sans réseau, ou si
-le serveur ne répond pas dans le délai réglé (8 s par défaut), la dictée est transcrite sur le
-téléphone. Le jeton d'accès au serveur reste dans les préférences privées de l'application,
+Tant qu'aucun choix n'est enregistré, rien n'est envoyé. Le choix se change à tout moment dans les
+Réglages. Sans réseau, ou si le serveur ne répond pas dans le délai réglé (8 s par défaut), la dictée
+est transcrite sur le téléphone. Le jeton d'accès au serveur reste dans les préférences privées de l'application,
 s'affiche masqué et n'apparaît pas dans les journaux.
 
 La personne qui exploite le serveur est responsable de ce qu'il en fait ; avec un serveur autre que

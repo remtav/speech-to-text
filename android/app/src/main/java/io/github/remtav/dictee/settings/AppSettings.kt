@@ -17,7 +17,7 @@ import io.github.remtav.dictee.stt.ModelMigration
 import io.github.remtav.dictee.stt.RemoteApi
 import io.github.remtav.dictee.stt.RemoteConfig
 import io.github.remtav.dictee.stt.ModelSpec
-import io.github.remtav.dictee.stt.ServerConsent
+import io.github.remtav.dictee.stt.TranscriptionMode
 import io.github.remtav.dictee.stt.ServerTimeout
 import io.github.remtav.dictee.stt.WhisperTuning
 import io.github.remtav.dictee.text.Vocabulary
@@ -161,24 +161,23 @@ class AppSettings(context: Context, private val defaultServerUrl: String = io.gi
         get() = prefs.getString("remote_url", null) ?: defaultServerUrl
         set(v) = prefs.edit().putString("remote_url", v.trim()).apply()
 
-    /** The answer to the consent screen (issue #23); asked at the first dictation that would use the server. */
-    var serverConsent: ServerConsent
-        get() = ServerConsent.fromName(prefs.getString("server_consent", null))
-        set(v) = prefs.edit().putString("server_consent", v.name).apply()
-
-    /** « Toujours transcrire sur le téléphone »: the server is never used, even with an address and consent. */
-    var alwaysLocal: Boolean
-        get() = prefs.getBoolean("always_local", false)
-        set(v) = prefs.edit().putBoolean("always_local", v).apply()
+    /**
+     * Server or phone (issue #23), chosen at installation (#36) or in the settings; recording [TranscriptionMode.SERVER]
+     * is the consent to send the audio. [TranscriptionMode.PHONE] is « Toujours transcrire sur le téléphone ».
+     * Not chosen yet: everything stays on the phone.
+     */
+    var transcriptionMode: TranscriptionMode
+        get() = TranscriptionMode.fromName(prefs.getString("transcription_mode", null))
+        set(v) = prefs.edit().putString("transcription_mode", v.name).apply()
 
     /** Seconds the keyboard waits for the server before transcribing on the phone (advanced setting, 8 by default). */
     var serverTimeoutSeconds: Int
         get() = ServerTimeout.sanitize(prefs.getInt("server_timeout", ServerTimeout.DEFAULT_SECONDS))
         set(v) = prefs.edit().putInt("server_timeout", ServerTimeout.sanitize(v)).apply()
 
-    /** Where the next dictation goes: server, phone, or the consent screen first (see [EngineChoice]). */
+    /** Where the next dictation goes: server or phone (see [EngineChoice]). */
     fun route(networkAvailable: Boolean = true): EngineRoute =
-        EngineChoice.route(remoteConfig().isConfigured, serverConsent, alwaysLocal, networkAvailable)
+        EngineChoice.route(remoteConfig().isConfigured, transcriptionMode, networkAvailable)
 
     var remoteApi: RemoteApi
         get() = RemoteApi.fromName(prefs.getString("remote_api", null))

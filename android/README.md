@@ -53,7 +53,7 @@ portent un lien vers une source officielle, lue le 2026-11-12.
   avez téléchargé et que vous choisissez.** Aucun compte n'est demandé, et le
   code qui le fait est dans ce dépôt, où chacun peut le lire. Un serveur
   n'intervient que si une adresse de « Serveur distant » est configurée **et**
-  que vous acceptez, à la première dictée, d'y envoyer l'audio.
+  que vous choisissez le mode « serveur » (à l'installation ou dans les Réglages).
 - **Chez Google, l'endroit du traitement dépend de la fonction.** Sur la page
   d'aide de Gboard
   [« Utiliser les fonctionnalités avancées de saisie vocale »](https://support.google.com/gboard/answer/11197787?hl=fr),
@@ -358,7 +358,7 @@ référence (ou votre enregistrement) avec chaque modèle installé et affiche
 texte, temps de chargement, facteur temps réel, mémoire en pointe et WER ;
 « Partager » exporte les résultats.
 
-### Serveur distant (par défaut dès qu'une adresse est configurée)
+### Serveur distant (mode « serveur »)
 
 Sur le téléphone, Whisper transcrit lentement ; un serveur avec GPU répond bien plus
 vite (issue #23). Dans les Réglages, section « Serveur distant », saisir l'adresse
@@ -369,21 +369,20 @@ l'adresse d'un serveur compatible avec l'API OpenAI `/v1/audio/transcriptions`) 
 `Authorization: Bearer`), puis tester la connexion. En dehors du réseau local, utilisez
 HTTPS ou un VPN (WireGuard, Tailscale).
 
-- **Serveur d'abord, avec votre accord.** Dès qu'une adresse est configurée, la
-  première dictée affiche dans le clavier : l'audio sera envoyé au serveur configuré,
-  puis supprimé après la transcription ; « Accepter » ou « Rester sur le téléphone ».
-  La question n'est posée qu'une fois ; le choix se change dans les Réglages
-  (« J'accepte d'envoyer l'audio… », « Toujours transcrire sur le téléphone »). Sans
-  adresse, sans accord ou sans réseau, tout reste sur le téléphone. Voir la
-  [politique de confidentialité](docs/CONFIDENTIALITE.md).
+- **Mode serveur ou téléphone.** Le choix se fait à l'installation (#36) ou dans les
+  Réglages (« Envoi au serveur ») : « Sur le serveur configuré » (l'audio y est
+  envoyé, puis supprimé dès la transcription) ou « Toujours transcrire sur le
+  téléphone ». Choisir « serveur » sous ce texte vaut consentement. Sans adresse, en
+  mode « téléphone », tant qu'aucun mode n'est choisi ou sans réseau, tout reste sur
+  le téléphone. Voir la [politique de confidentialité](docs/CONFIDENTIALITE.md).
 - **Repli sur le téléphone.** Le modèle choisi sur l'écran principal (Whisper turbo par
   défaut) sert de repli : si le serveur est injoignable ou ne répond pas dans le délai
   (8 s par défaut, plus un quart de la durée de la dictée ; réglage « Délai avant repli
   sur le téléphone »), la dictée est transcrite sur le téléphone, avec un court message
   dans le clavier. Le bouton **Annuler** le fait tout de suite.
-- Choisir un modèle du téléphone (écran principal ou bouton du clavier) alors que le
-  serveur est actif revient à « Toujours transcrire sur le téléphone » ; choisir
-  « Serveur distant » y revient.
+- Choisir un modèle du téléphone (écran principal ou bouton du clavier) en mode
+  « serveur » passe en mode « téléphone ». Choisir « Serveur distant » sans le mode
+  « serveur » ouvre les Réglages sur ce choix : seul ce texte enregistre le mode.
 - Adresse par défaut à la compilation : `./gradlew assembleRelease
   -PdefaultServerUrl=https://dictee.example.ca` (vide par défaut ; jamais de jeton dans
   l'APK). Une adresse saisie dans les Réglages la remplace.

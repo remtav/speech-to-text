@@ -331,8 +331,8 @@ class OptionalFeaturesInstrumentedTest : ImeTestBase() {
             app.settings.remoteUrl = "http://127.0.0.1:${server.port}"
             app.settings.cfAccessClientId = "test-id.access"
             app.settings.cfAccessClientSecret = "test-secret-value"
-            // Issue #23: an address and the user's consent make the server the default.
-            app.settings.serverConsent = io.github.remtav.dictee.stt.ServerConsent.ACCEPTED
+            // Issue #23: an address and the "server" mode send dictations to the server.
+            app.settings.transcriptionMode = io.github.remtav.dictee.stt.TranscriptionMode.SERVER
             TestHooks.networkAvailable = true
             TestHooks.engineFactory = null
             useAudio("fr1", "en1")
