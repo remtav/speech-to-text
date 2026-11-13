@@ -104,7 +104,7 @@ curl -H "Authorization: Bearer <jeton>" https://dictee.example.ca/health   # ét
 | Variable | Défaut | Rôle |
 |---|---|---|
 | `DICTEE_TOKENS` | *(non définie : aucune authentification)* | Liste de jetons séparés par des virgules. Définie, toutes les routes sauf `/`, `/healthz` et `/static/` exigent `Authorization: Bearer <jeton>` (401 sinon), et chaque jeton ne voit que ses propres tâches. Définie mais vide de jetons valides (par exemple `,`), le serveur refuse tout. |
-| `DICTEE_RATE_LIMIT` | `30` | Requêtes de transcription (et de changement de modèle) par minute et par jeton ; 429 au-delà, avec l'en-tête `Retry-After`. `0` = sans limite. Le suivi d'une tâche (`GET /jobs/{id}`) n'est pas compté. |
+| `DICTEE_RATE_LIMIT` | `30` | Requêtes de transcription, de polissage (`POST /polish`) et de changement de modèle par minute et par jeton ; 429 au-delà, avec l'en-tête `Retry-After`. `0` = sans limite. Le suivi d'une tâche (`GET /jobs/{id}`) n'est pas compté. |
 | `WHISPER_MODEL` | `base` | `large-v3-turbo` recommandé sur GPU. |
 | `WHISPER_DEVICE` | `cpu` | `cuda` sur la machine GPU. |
 | `WHISPER_CORS_ORIGINS` | `*` | L'application Android n'en a pas besoin ; vous pouvez le restreindre. |

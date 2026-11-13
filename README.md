@@ -82,6 +82,7 @@ Transcribe an audio file, optionally identifying speakers.
 | `min_speakers` | `int`   | Minimum number of speakers (optional)                              |
 | `max_speakers` | `int`   | Maximum number of speakers (optional)                              |
 | `polish`       | `bool`  | Also return an LLM-polished text (default: `WHISPER_POLISH`, i.e. `false`) |
+| `prompt`       | `string`| `POST /jobs` only: context given to Whisper as `initial_prompt` (≤ 1000 characters, optional) |
 
 **Response (200), without diarization:**
 
@@ -167,11 +168,30 @@ Fast transcription with language detection, skipping alignment and diarization. 
 
 | Method & path                     | Description |
 |-----------------------------------|-------------|
-| `POST /jobs`                      | Same form fields as `/transcribe` (+ `quick=true` for the streaming mode). Returns `202` with the job right away |
+| `POST /jobs`                      | Same form fields as `/transcribe` (+ `quick=true` for the streaming mode, + optional `prompt`). Returns `202` with the job right away |
+| `POST /polish`                    | Polish a text without audio (see below). Returns `202` with a job of `kind` `polish` |
 | `GET /jobs/{id}`                  | `status` (`queued`, `running`, `done`, `error`, `cancelled`), `progress` (0–1), `message`, `stage`, `result`, `error` (`code`, `message`) |
 | `GET /jobs`                       | Recent jobs (without results) |
 | `POST /jobs/{id}/cancel`          | Cancel a queued or running job |
 | `GET /jobs/{id}/export?format=…`  | Download the result as `txt`, `srt`, `vtt` or `json`; add `&polished=true` for the polished text (TXT, JSON; SRT/VTT stay raw) |
+
+**`prompt` (long dictations, block by block).** On `POST /jobs`, `prompt` is passed to Whisper as `initial_prompt`
+(WhisperX fixes it at model load, so the server sets it per call): send the end of the previous block to keep
+punctuation and proper nouns consistent from one block to the next. Blank = ignored; without it nothing changes. It is
+never logged and never echoed back in the job. Over 1000 characters: `400`.
+
+**`POST /polish`.** JSON body `{"text": "...", "language": "fr"}` (`language` optional; `auto`, empty or absent = unknown).
+Errors: `400` (empty or non-string `text`, unsupported `language`), `413` (over 100 000 characters), `401` / `429` as for the
+other routes. The answer is `202` and a job; poll `GET /jobs/{id}`. When `status` is `done`, `result` is
+`{"text": <input>, "language": ..., "polished_text": ..., "polish": {"applied", "model", "latency_ms", "fallback_reason"}}`
+with the same `polish` status and safety check as a polished transcription. When the polish is not applied (`error`,
+`timeout`, `safety_check:<rule>`, or `unsupported` beyond 400 words), the job is still `done`, `polished_text` is absent and
+`polish.applied` is `false`: use `text`. The text is dropped from the server when the job ends and is never logged. Under
+`DICTEE_TOKENS` the job belongs to its token and counts in the rate limit like a transcription.
+
+```bash
+curl -s -H "Content-Type: application/json" -d '{"text":"euh bonjour","language":"fr"}' http://localhost:8081/polish | jq -r .id
+```
 
 ```bash
 JOB=$(curl -s -F "file=@meeting.mp3" -F language=fr http://localhost:8081/jobs | jq -r .id)
