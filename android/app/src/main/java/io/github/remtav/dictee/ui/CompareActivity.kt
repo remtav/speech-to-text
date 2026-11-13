@@ -28,6 +28,7 @@ import io.github.remtav.dictee.stt.Benchmark
 import io.github.remtav.dictee.stt.ModelCatalog
 import io.github.remtav.dictee.stt.ModelFamily
 import io.github.remtav.dictee.stt.ModelResult
+import io.github.remtav.dictee.stt.WhisperTuning
 import java.util.Locale
 import kotlin.concurrent.thread
 
@@ -158,11 +159,13 @@ class CompareActivity : AppCompatActivity() {
             }
             val header = "Kalmia Blabla ${BuildConfig.VERSION_NAME} · ${Build.MANUFACTURER} ${Build.MODEL} · Android ${Build.VERSION.RELEASE}" +
                 " · ${app.settings.threads} threads" +
-                (if (models.any { it.family == ModelFamily.WHISPER }) {
-                    " · silence ajouté Whisper ${app.settings.whisperTailPaddings} · langue Whisper " +
-                        app.engineOptions(models.first { it.family == ModelFamily.WHISPER }).language.ifEmpty { "automatique" }
-                } else "")
-            report = Benchmark.report(results, header)
+                (models.firstOrNull { it.family == ModelFamily.WHISPER }?.let { whisper ->
+                    // The options the engine actually got (issue #49: automatic mode and its correction).
+                    val o = app.engineOptions(whisper)
+                    " · ${WhisperTuning.describe(o.whisperTailPaddings, o.whisperRepetitionFix)} · langue Whisper " +
+                        o.language.ifEmpty { "automatique" }
+                } ?: "")
+            report = Benchmark.report(results, header) { spec -> app.engineOptions(spec).whisperRepetitionFix != null }
             main.post {
                 progress.text = getString(R.string.compare_done)
                 runButton.isEnabled = true
@@ -187,7 +190,8 @@ class CompareActivity : AppCompatActivity() {
         )
         for (s in r.samples) {
             card.value(
-                "${s.sample} · RTF %.3f%s".format(Locale.ROOT, s.rtf, s.wer?.let { " · WER %.1f %%".format(Locale.ROOT, it * 100) } ?: ""),
+                "${s.sample} · RTF %.3f%s".format(Locale.ROOT, s.rtf, s.wer?.let { " · WER %.1f %%".format(Locale.ROOT, it * 100) } ?: "") +
+                    Benchmark.repetitionLabel(s.repetition).let { if (it.isEmpty()) "" else " · $it" },
             )
             card.body("« ${s.text} »")
         }

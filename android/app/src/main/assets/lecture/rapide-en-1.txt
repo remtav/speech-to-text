@@ -1,0 +1,6 @@
+# Texte de lecture du test rapide de l'installation de Kalmia Blabla (issue #36a), anglais.
+# Un seul paragraphe d'environ 40 mots, écrit pour ce projet (libre de droits). Ne jamais modifier une
+# version publiée : créer rapide-en-2.txt à la place.
+version: rapide-en-1
+
+On Saturday morning it was raining a little, so I took my umbrella and walked to the bakery. I bought a loaf of bread, two croissants and a newspaper. When I got home, I parked the car and made breakfast.

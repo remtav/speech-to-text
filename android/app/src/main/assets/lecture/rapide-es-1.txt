@@ -1,0 +1,6 @@
+# Texte de lecture du test rapide de l'installation de Kalmia Blabla (issue #36a), espagnol.
+# Un seul paragraphe d'environ 40 mots, écrit pour ce projet (libre de droits). Non relu par une
+# personne de langue espagnole. Ne jamais modifier une version publiée : créer rapide-es-2.txt à la place.
+version: rapide-es-1
+
+El sábado por la mañana llovía un poco, así que cogí el paraguas y fui a la panadería. Compré una barra de pan, dos croissants y un periódico. Al volver a casa, aparqué el coche y preparé el desayuno.

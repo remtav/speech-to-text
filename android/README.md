@@ -338,7 +338,7 @@ par exemple), mais il est trop lent pour un usage courant : à garder en
 dernier recours. Ce n'est pas une mesure sur appareil ; sur l'ordinateur de la
 CI, le facteur temps réel indicatif est de 0,07 pour Parakeet, 0,3 pour
 Whisper et 0,6 à 0,9 pour Qwen3-ASR (`DECISIONS.md`, étape 1.2), ce qui ne
-prédit pas l'ordre sur un téléphone. La carte de Whisper le dit. Pour le rendre plus rapide, Whisper n'affiche pas de texte provisoire pendant qu'on parle, et un réglage avancé (Réglages, « Silence ajouté pour Whisper », 1 000 par défaut, 600 ou 300) raccourcit le silence qu'il décode à la fin de chaque segment : mesuré sur ordinateur seulement, à valider sur le téléphone (`docs/ACCELERER_WHISPER.md`).
+prédit pas l'ordre sur un téléphone. La carte de Whisper le dit. Pour le rendre plus rapide, Whisper n'affiche pas de texte provisoire pendant qu'on parle, et un réglage avancé (Réglages > Avancé, « Silence ajouté pour Whisper », 1 000 par défaut, 600, 300 ou « Automatique ») raccourcit le silence qu'il décode à la fin de chaque segment ; « Automatique » utilise 300 et corrige les phrases que Whisper recommence (« Correction des répétitions (Whisper) » : redécoder à 1 000 ou couper, issue #49). Mesuré sur ordinateur seulement, à valider sur le téléphone (`docs/ACCELERER_WHISPER.md`).
 
 **Whisper large-v3-turbo, français québécois** (1,04 Go) est le quatrième modèle proposé : c'est
 `ele-sage/whisper-large-v3-turbo-fr-quebecois` (communauté, MIT, d'après OpenAI), affiné sur du français québécois
