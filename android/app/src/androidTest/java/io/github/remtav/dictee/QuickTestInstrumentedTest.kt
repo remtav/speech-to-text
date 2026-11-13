@@ -58,6 +58,9 @@ class QuickTestInstrumentedTest {
 
     @After
     fun cleanUp() {
+        // A slow scripted decode left by a test ends before the next one starts.
+        val end = System.currentTimeMillis() + 15_000
+        while (QuickTestModel.lingering && System.currentTimeMillis() < end) Thread.sleep(100)
         TestHooks.installedModelIds = null
         TestHooks.audioSourceFactory = null
         TestHooks.engineFactory = null
@@ -201,7 +204,9 @@ class QuickTestInstrumentedTest {
             val took = s.readAndWait()
             assertTrue("the test waited ${took} ms for the slow model", took < 5_000)
             assertTrue(s.textOf(QuickTestActivity.resultTag(best))!!.contains("Trop lent"))
-            assertEquals(context.getString(R.string.quick_verdict_best_not_tested), s.textOf(QuickTestActivity.TAG_SENTENCE))
+            assertEquals(context.getString(R.string.quick_verdict_best_too_slow), s.textOf(QuickTestActivity.TAG_SENTENCE))
+            // The keyboard is given back at once, even though the slow decode goes on.
+            assertFalse(app.benchmarkRunning)
         }
     }
 
@@ -232,7 +237,7 @@ class QuickTestInstrumentedTest {
         ActivityScenario.launch(QuickTestActivity::class.java).use { s ->
             s.readAndWait()
             assertTrue(s.has(QuickTestActivity.downloadTag(light)))
-            assertEquals(context.getString(R.string.quick_verdict_light_not_tested), s.textOf(QuickTestActivity.TAG_SENTENCE))
+            assertEquals(context.getString(R.string.quick_verdict_light_not_installed), s.textOf(QuickTestActivity.TAG_SENTENCE))
         }
         assertEquals(listOf(best.id), models.used.distinct())
     }
@@ -254,6 +259,8 @@ class QuickTestInstrumentedTest {
             ActivityScenario.launch(QuickTestActivity::class.java).use { s ->
                 s.readAndWait()
                 assertNotNull(s.textOf(QuickTestActivity.TAG_SENTENCE))
+                // Review of #65: the screen says that dictations go to the server while that setting is on.
+                assertTrue(s.has(QuickTestActivity.TAG_SERVER_NOTE))
                 if (s.has(QuickTestActivity.TAG_ADOPT)) s.click(QuickTestActivity.TAG_ADOPT)
             }
             assertTrue("the server got ${server.requests.size} request(s)", server.requests.isEmpty())
@@ -278,5 +285,79 @@ class QuickTestInstrumentedTest {
         app.settings.languages = setOf(DictationLanguage.FRENCH_QUEBEC)
         TestHooks.installedModelIds = emptySet()
         ActivityScenario.launch(SetupActivity::class.java).use { s -> assertFalse(s.has(SetupActivity.QUICK_TEST_BUTTON_TAG)) }
+    }
+
+    /** Review of #65: the light model (tried first) over the budget: the best one is not tried, the test ends anyway. */
+    @Test
+    fun theLightModelOverTheBudgetEndsTheTestWithAnHonestText() {
+        app.settings.languages = setOf(DictationLanguage.ENGLISH)
+        TestHooks.quickTestBudgetSeconds = 1.0
+        val models = Models(text = { _, ref -> ref }, delayMillis = { if (it.id == light.id) 4_000 else 50 })
+        models.reference = reference(DictationLanguage.ENGLISH)
+        TestHooks.engineFactory = models
+        ActivityScenario.launch(QuickTestActivity::class.java).use { s ->
+            val took = s.readAndWait()
+            assertTrue("the test waited ${took} ms for the slow model", took < 3_500)
+            assertTrue(s.textOf(QuickTestActivity.resultTag(light))!!.contains("Trop lent"))
+            assertEquals(context.getString(R.string.quick_skipped), s.textOf(QuickTestActivity.resultTag(best))!!.lines().last())
+            assertEquals(context.getString(R.string.quick_no_verdict_slow), s.textOf(QuickTestActivity.TAG_SENTENCE))
+            assertFalse(s.has(QuickTestActivity.TAG_ADOPT))
+            assertFalse(app.benchmarkRunning)
+            // A new test is refused until the slow decode ends.
+            assertTrue(QuickTestModel.lingering)
+            s.click(QuickTestActivity.TAG_REDO)
+            s.click(QuickTestActivity.TAG_RECORD)
+            assertEquals(context.getString(R.string.quick_previous_running), s.textOf(QuickTestActivity.TAG_NOTICE))
+        }
+        assertEquals("the best model was never loaded behind the slow one", listOf(light.id), models.used.distinct())
+    }
+
+    /** Review of #65: closing the screen while a model is over its budget must not take the app (and keyboard) down. */
+    @Test
+    fun closingTheScreenDuringTheScoringIsSafe() {
+        app.settings.languages = setOf(DictationLanguage.ENGLISH)
+        TestHooks.quickTestBudgetSeconds = 1.0
+        val models = Models(text = { _, ref -> ref }, delayMillis = { if (it.id == best.id) 3_000 else 50 })
+        models.reference = reference(DictationLanguage.ENGLISH)
+        TestHooks.engineFactory = models
+        ActivityScenario.launch(QuickTestActivity::class.java).use { s ->
+            s.await(QuickTestActivity.TAG_RECORD)
+            s.click(QuickTestActivity.TAG_RECORD)
+            s.await(QuickTestActivity.TAG_SCORING)
+        } // closed during the scoring (onCleared)
+        // Past the budget and past the slow decode: the process is still here, and the keyboard is free.
+        val end = System.currentTimeMillis() + 10_000
+        while ((app.benchmarkRunning || QuickTestModel.lingering) && System.currentTimeMillis() < end) Thread.sleep(100)
+        assertFalse(app.benchmarkRunning)
+        assertFalse(QuickTestModel.lingering)
+    }
+
+    /** Review of #65: a reading cut by the app going to the background is dropped, not scored; a rotation is not a cut. */
+    @Test
+    fun aReadingCutByTheBackgroundIsNotScoredButARotationGoesOn() {
+        app.settings.languages = setOf(DictationLanguage.FRENCH_QUEBEC)
+        TestHooks.audioSourceFactory = AudioSourceFactory {
+            PcmAudioSource(listOf(PcmAudio(FloatArray(4 * 16000) { 0.05f }, 16000)), realTime = true, leadSeconds = 0f, tailSeconds = 0f)
+        }
+        val models = Models(text = { _, ref -> ref }, delayMillis = { 50 })
+        models.reference = reference(DictationLanguage.FRENCH_QUEBEC)
+        TestHooks.engineFactory = models
+        ActivityScenario.launch(QuickTestActivity::class.java).use { s ->
+            s.await(QuickTestActivity.TAG_RECORD)
+            s.click(QuickTestActivity.TAG_RECORD)
+            Thread.sleep(1_000)
+            s.recreate() // rotation: the reading goes on and is scored
+            s.await(QuickTestActivity.TAG_VERDICT, 30_000)
+            s.click(QuickTestActivity.TAG_REDO)
+            s.click(QuickTestActivity.TAG_RECORD)
+            Thread.sleep(1_000)
+            s.moveToState(androidx.lifecycle.Lifecycle.State.CREATED) // to the background: cut
+            s.moveToState(androidx.lifecycle.Lifecycle.State.RESUMED)
+            s.await(QuickTestActivity.TAG_NOTICE, 10_000)
+            assertEquals(context.getString(R.string.quick_interrupted), s.textOf(QuickTestActivity.TAG_NOTICE))
+            assertFalse(s.has(QuickTestActivity.TAG_VERDICT))
+            assertFalse(s.model().holdsRecording)
+        }
+        assertEquals("only the first reading was transcribed", 1, models.used.size)
     }
 }

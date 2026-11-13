@@ -3,7 +3,9 @@ package io.github.remtav.dictee
 import io.github.remtav.dictee.stt.ModeOutcome
 import io.github.remtav.dictee.stt.ModeOutcome.Scored
 import io.github.remtav.dictee.stt.ModeOutcome.TooSlow
-import io.github.remtav.dictee.stt.ModeOutcome.Unavailable
+import io.github.remtav.dictee.stt.ModeOutcome.Failed
+import io.github.remtav.dictee.stt.ModeOutcome.NotInstalled
+import io.github.remtav.dictee.stt.ModeOutcome.Skipped
 import io.github.remtav.dictee.stt.ModelPick
 import io.github.remtav.dictee.stt.QuickTestAdvice
 import io.github.remtav.dictee.stt.QuickTestVerdict
@@ -57,17 +59,25 @@ class QuickTestAdviceTest {
         )
     }
 
-    @Test fun onlyOneScoredWins() {
-        for (missing in listOf<ModeOutcome>(TooSlow, Unavailable)) {
+    private val notScored = listOf<ModeOutcome>(TooSlow, NotInstalled, Failed, Skipped)
+
+    @Test fun onlyTheBestScoredKeepsTheBest() {
+        for (missing in notScored) {
             assertEquals(verdict(ModelPick.BEST, VerdictReason.LIGHT_NOT_TESTED), QuickTestAdvice.decide(missing, Scored(0.5, 20.0)))
-            assertEquals(verdict(ModelPick.LIGHT, VerdictReason.BEST_NOT_TESTED), QuickTestAdvice.decide(Scored(0.5, 2.0), missing))
+        }
+    }
+
+    /** Review of #65: a light model that missed many words is never put forward, even with the best one unmeasured. */
+    @Test fun onlyTheLightScoredNeedsNinetyPercent() {
+        for (missing in notScored) {
+            assertEquals(verdict(ModelPick.LIGHT, VerdictReason.BEST_NOT_TESTED), QuickTestAdvice.decide(Scored(sim(4), 2.0), missing))
+            assertNull(QuickTestAdvice.decide(Scored(0.5, 2.0), missing))
+            assertNull(QuickTestAdvice.decide(Scored(sim(5), 2.0), missing))
         }
     }
 
     @Test fun nothingScoredNoRecommendation() {
-        for (a in listOf<ModeOutcome>(TooSlow, Unavailable)) for (b in listOf<ModeOutcome>(TooSlow, Unavailable)) {
-            assertNull(QuickTestAdvice.decide(a, b))
-        }
+        for (a in notScored) for (b in notScored) assertNull(QuickTestAdvice.decide(a, b))
     }
 
     @Test fun overTheBudgetIsTooSlow() {

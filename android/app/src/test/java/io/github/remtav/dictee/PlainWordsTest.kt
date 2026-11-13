@@ -25,8 +25,45 @@ class PlainWordsTest {
 
     /** The strings of the normal path: the installation screen, the quick test, the model cards and notices, the keyboard. */
     private val normalPath: Map<String, String> get() = strings.filterKeys { name ->
-        listOf("setup_", "quick_", "model_notice_", "model_recommended", "model_publisher", "model_warning", "status_", "delete_")
-            .any { name.startsWith(it) }
+        listOf(
+            "setup_", "quick_", "model_notice_", "model_recommended", "model_publisher", "model_warning", "status_", "delete_",
+            // Review of #65: the tutorial, the reading test, the keyboard's messages and the first-level dictation help.
+            "howto_", "reading_", "contrib_", "msg_", "cd_", "settings_partials",
+        ).any { name.startsWith(it) }
+    }
+
+    /**
+     * The screens of the normal path never format a model's technical name into a text: `displayName`,
+     * `shortName` and `description` are for « Avancé », the comparison and the diagnostic.
+     */
+    private val normalPathSources = listOf(
+        "ui/SetupActivity.kt", "ui/QuickTestActivity.kt", "ui/QuickTestModel.kt", "ui/HowToActivity.kt",
+        "ui/ReadingTestActivity.kt", "ui/ReadingTestModel.kt", "ime/DicteeImeService.kt", "DicteeApp.kt",
+        "stt/EngineManager.kt",
+    )
+
+    /**
+     * Known, justified uses, each with its reason. Remove an entry as soon as its reason goes.
+     * - `HowToActivity`: « Recommandé pour vos langues : Whisper large-v3-turbo » is removed by PR #63 (tutorial);
+     *   delete this entry when #63 is merged into this branch.
+     * - `ReadingTestModel`: the contribution archive (sent by the person, read by the people who improve the
+     *   models) keeps the technical name next to the id; the screen shows the plain name.
+     */
+    private val allowed = mapOf(
+        "ui/HowToActivity.kt" to "recommendation.model.displayName",
+        "ui/ReadingTestModel.kt" to "val technical = onDevice(result.recommendedModelId)?.displayName",
+    )
+
+    @Test
+    fun theNormalPathNeverFormatsATechnicalModelName() {
+        val problems = normalPathSources.flatMap { path ->
+            main.resolve("java/io/github/remtav/dictee/$path").readLines().mapIndexedNotNull { i, line ->
+                val code = line.substringBefore("//")
+                val uses = Regex("\\.(displayName|shortName|description)\\b").containsMatchIn(code)
+                if (uses && allowed[path]?.let { line.contains(it) } != true) "$path:${i + 1} : ${line.trim()}" else null
+            }
+        }
+        assertEquals(emptyList<String>(), problems)
     }
 
     @Test

@@ -124,7 +124,8 @@ class EngineManager(
         }
         val msg = when (e) {
             is OutOfMemoryError -> "Mémoire insuffisante pour ${ModelPlainNames.inSentence(spec)}"
-            else -> "Échec du chargement (${ModelPlainNames.inSentence(spec)}) : ${e.message ?: e.javaClass.simpleName}"
+            // Issue #37: no raw exception text in the keyboard (it can name files); the cause stays on the future.
+            else -> "Échec du chargement (${ModelPlainNames.inSentence(spec)}). Réessayez, ou téléchargez le modèle à nouveau."
         }
         publish(State.Failed(spec, msg))
         future.completeExceptionally(e)

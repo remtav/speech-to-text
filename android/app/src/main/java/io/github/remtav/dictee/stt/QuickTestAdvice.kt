@@ -7,11 +7,20 @@ sealed interface ModeOutcome {
     /** The model answered within the budget: [similarity] is 1 − WER (0..1, `ReadingScore`), [delaySeconds] the transcription delay. */
     data class Scored(val similarity: Double, val delaySeconds: Double) : ModeOutcome
 
-    /** The model did not answer within [QuickTestAdvice.TRANSCRIPTION_BUDGET_SECONDS]: shown as « trop lent ». */
+    /** The model did not answer within what was left of the budget: shown as « trop lent ». */
     data object TooSlow : ModeOutcome
 
-    /** The model could not be tested: not installed, or it failed. */
-    data object Unavailable : ModeOutcome
+    /** The model is not on the phone. */
+    data object NotInstalled : ModeOutcome
+
+    /** Loading or transcribing failed. */
+    data object Failed : ModeOutcome
+
+    /**
+     * Not tried: the previous model went over the budget and is still computing (a decode cannot be interrupted,
+     * and the next model could not load until it ends).
+     */
+    data object Skipped : ModeOutcome
 }
 
 /** Which of the two phone models the quick test recommends. */
@@ -27,9 +36,9 @@ enum class VerdictReason {
     LIGHT_TOO_INACCURATE,
     /** The light model is more than [QuickTestAdvice.MAX_GAP] behind the best one. */
     LIGHT_FAR_BEHIND,
-    /** The light model was not tested (not installed), went over the budget or failed: the best one. */
+    /** The light model has no score (not installed, over the budget, failed): the best one, the default. */
     LIGHT_NOT_TESTED,
-    /** The best model was not tested (not installed), went over the budget or failed: the light one. */
+    /** The best model has no score, and the light one reached [QuickTestAdvice.LIGHT_MIN_SIMILARITY]: the light one. */
     BEST_NOT_TESTED,
 }
 
@@ -73,14 +82,19 @@ object QuickTestAdvice {
 
     /**
      * - neither model scored → no recommendation (null);
-     * - only one scored → that one;
-     * - both scored → the light one is recommended only if it is good enough (similarity ≥ 90 % and within
-     *   5 points of the best) **and** the best one is slow (delay > 5 s); otherwise the best one, the default.
+     * - only the best one scored → the best one;
+     * - only the light one scored → the light one if it reached 90 %, else no recommendation (null): a light model
+     *   that missed many words is never put forward, even when the best one could not be measured;
+     * - both scored → the light one only if it is good enough (similarity ≥ 90 % and within 5 points of the best)
+     *   **and** the best one is slow (delay > 5 s); otherwise the best one, the default.
      */
     fun decide(light: ModeOutcome, best: ModeOutcome): QuickTestVerdict? {
         if (best !is ModeOutcome.Scored && light !is ModeOutcome.Scored) return null
         if (light !is ModeOutcome.Scored) return QuickTestVerdict(ModelPick.BEST, VerdictReason.LIGHT_NOT_TESTED)
-        if (best !is ModeOutcome.Scored) return QuickTestVerdict(ModelPick.LIGHT, VerdictReason.BEST_NOT_TESTED)
+        if (best !is ModeOutcome.Scored) {
+            return if (light.similarity >= LIGHT_MIN_SIMILARITY - EPSILON) QuickTestVerdict(ModelPick.LIGHT, VerdictReason.BEST_NOT_TESTED)
+            else null
+        }
         return when {
             light.similarity < LIGHT_MIN_SIMILARITY - EPSILON ->
                 QuickTestVerdict(ModelPick.BEST, VerdictReason.LIGHT_TOO_INACCURATE)

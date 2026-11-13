@@ -58,6 +58,7 @@ class QuickTestActivity : AppCompatActivity() {
         if (!::model.isInitialized) return
         model.onChange = { render() }
         model.onProgress = { updateRecordingText() }
+        QuickTestModel.onLingeringEnded = { render() }
         Downloads.addListener(downloadsChanged)
         render()
     }
@@ -66,7 +67,9 @@ class QuickTestActivity : AppCompatActivity() {
         if (::model.isInitialized) {
             model.onChange = null
             model.onProgress = null
-            model.stopRecording()
+            QuickTestModel.onLingeringEnded = null
+            // The microphone is not kept in the background; a rotation is not leaving (the model survives it).
+            if (!isChangingConfigurations) model.interruptRecording()
             Downloads.removeListener(downloadsChanged)
         }
         super.onStop()
@@ -117,10 +120,12 @@ class QuickTestActivity : AppCompatActivity() {
             card.tag = resultTag(spec)
             val title = ModelPlainNames.of(spec) + if (spec.id == active.id) " " + getString(R.string.quick_current_suffix) else ""
             card.heading(title).setPadding(0, 0, 0, dp(6))
-            when (val o = model.outcomes[spec.id] ?: ModeOutcome.Unavailable) {
+            when (val o = model.outcomes[spec.id] ?: ModeOutcome.Failed) {
                 is ModeOutcome.Scored -> card.value(getString(R.string.quick_score, percent(o.similarity), seconds(o.delaySeconds)))
                 ModeOutcome.TooSlow -> card.value(getString(R.string.quick_too_slow, QuickTestAdvice.TRANSCRIPTION_BUDGET_SECONDS))
-                ModeOutcome.Unavailable -> renderUnavailable(card, spec)
+                ModeOutcome.Skipped -> card.value(getString(R.string.quick_skipped))
+                ModeOutcome.Failed -> card.value(getString(R.string.quick_failed))
+                ModeOutcome.NotInstalled -> renderUnavailable(card, spec)
             }
         }
         renderVerdict(active)
@@ -153,21 +158,34 @@ class QuickTestActivity : AppCompatActivity() {
         card.tag = TAG_VERDICT
         val verdict = model.verdict
         val best = model.choice.best
-        if (model.choice.light == null) {
+        val light = model.choice.light
+        val bestOutcome = model.outcomes[best.id] ?: ModeOutcome.Failed
+        if (light == null) {
             // One model makes sense for these languages: the test simply gives its score.
-            val o = model.outcomes[best.id]
             card.body(
-                when (o) {
-                    is ModeOutcome.Scored -> getString(R.string.quick_single_scored, percent(o.similarity))
+                when (bestOutcome) {
+                    is ModeOutcome.Scored -> getString(R.string.quick_single_scored, percent(bestOutcome.similarity))
                     ModeOutcome.TooSlow -> getString(R.string.quick_single_too_slow)
-                    else -> getString(R.string.quick_single_unavailable)
+                    ModeOutcome.NotInstalled -> getString(R.string.quick_single_unavailable)
+                    else -> getString(R.string.quick_single_failed)
                 },
             ).tag = TAG_SENTENCE
-            if (o is ModeOutcome.Scored && active.id != best.id) adoptButton(card, best)
+            if (bestOutcome is ModeOutcome.Scored && active.id != best.id) adoptButton(card, best)
+            renderServerNote(card)
             return
         }
+        val lightOutcome = model.outcomes[light.id] ?: ModeOutcome.Failed
         if (verdict == null) {
-            card.body(getString(R.string.quick_no_verdict)).tag = TAG_SENTENCE
+            card.body(
+                when {
+                    // Measured but below 90 %, the best one unmeasured: the default stays, nothing to adopt.
+                    lightOutcome is ModeOutcome.Scored -> getString(R.string.quick_keep_best_unmeasured)
+                    lightOutcome == ModeOutcome.NotInstalled && bestOutcome == ModeOutcome.NotInstalled ->
+                        getString(R.string.quick_no_verdict)
+                    else -> getString(R.string.quick_no_verdict_slow)
+                },
+            ).tag = TAG_SENTENCE
+            renderServerNote(card)
             return
         }
         val pick = model.specOf(verdict.pick)
@@ -177,8 +195,16 @@ class QuickTestActivity : AppCompatActivity() {
                 VerdictReason.LIGHT_GOOD_ENOUGH_AND_FASTER -> getString(R.string.quick_verdict_light_enough)
                 VerdictReason.LIGHT_TOO_INACCURATE -> getString(R.string.quick_verdict_light_inaccurate)
                 VerdictReason.LIGHT_FAR_BEHIND -> getString(R.string.quick_verdict_light_behind)
-                VerdictReason.LIGHT_NOT_TESTED -> getString(R.string.quick_verdict_light_not_tested)
-                VerdictReason.BEST_NOT_TESTED -> getString(R.string.quick_verdict_best_not_tested)
+                VerdictReason.LIGHT_NOT_TESTED -> when (lightOutcome) {
+                    ModeOutcome.NotInstalled -> getString(R.string.quick_verdict_light_not_installed)
+                    ModeOutcome.TooSlow -> getString(R.string.quick_verdict_light_too_slow)
+                    else -> getString(R.string.quick_verdict_light_failed)
+                }
+                VerdictReason.BEST_NOT_TESTED -> when (bestOutcome) {
+                    ModeOutcome.NotInstalled -> getString(R.string.quick_verdict_best_not_installed)
+                    ModeOutcome.TooSlow, ModeOutcome.Skipped -> getString(R.string.quick_verdict_best_too_slow)
+                    else -> getString(R.string.quick_verdict_best_failed)
+                }
             },
         ).tag = TAG_SENTENCE
         if (pick.id == active.id) {
@@ -187,6 +213,15 @@ class QuickTestActivity : AppCompatActivity() {
             adoptButton(card, pick)
         }
         if (verdict.pick == ModelPick.LIGHT) card.body(getString(R.string.quick_light_note), small = true)
+        renderServerNote(card)
+    }
+
+    /**
+     * Review of #65: with a server set up and chosen in « Avancé », dictations go there whatever the phone model:
+     * the screen says so, so that « Utiliser … » does not look like it changes where the voice goes.
+     */
+    private fun renderServerNote(card: LinearLayout) {
+        if (app.settings.serverInUse) card.body(getString(R.string.quick_server_note), small = true).tag = TAG_SERVER_NOTE
     }
 
     private fun adoptButton(card: LinearLayout, spec: ModelSpec) {
@@ -208,6 +243,7 @@ class QuickTestActivity : AppCompatActivity() {
         const val TAG_ADOPT = "quick_adopt"
         const val TAG_ALREADY = "quick_already"
         const val TAG_REDO = "quick_redo"
+        const val TAG_SERVER_NOTE = "quick_server_note"
         const val TAG_CLOSE = "quick_close"
         fun resultTag(spec: ModelSpec) = "quick_result_${spec.id}"
         fun downloadTag(spec: ModelSpec) = "quick_download_${spec.id}"

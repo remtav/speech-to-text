@@ -407,7 +407,11 @@ class SetupActivity : AppCompatActivity() {
             when {
                 Downloads.isBusy(spec.id) && status != null ->
                     getString(R.string.setup_downloading, status.percent, size(status.downloaded), size(status.total))
-                status?.error != null -> getString(R.string.setup_download_error, status.error)
+                // Issue #37: a plain message here; the technical detail (file names, checksums) goes to the log.
+                status?.error != null -> {
+                    android.util.Log.w("DicteeSetup", "download of ${spec.id} failed: ${status.error}")
+                    getString(R.string.setup_download_failed)
+                }
                 installed -> getString(R.string.setup_installed, size(app.store.installedBytes(spec.asDownloadable())))
                 else -> getString(R.string.setup_not_installed, size(spec.totalBytes))
             },

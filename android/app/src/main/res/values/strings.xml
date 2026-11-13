@@ -105,6 +105,7 @@
     <string name="settings_experimental_help">Jamais recommandés : à essayer et à comparer sur votre téléphone (« Comparer les modèles », ci-dessus).</string>
     <string name="setup_downloading">Téléchargement : %1$d %% (%2$s / %3$s)</string>
     <string name="setup_downloading_label">Téléchargement : %1$s</string>
+    <string name="setup_download_failed">Échec du téléchargement. Vérifiez la connexion et l\'espace libre, puis réessayez.</string>
     <string name="setup_download_error">Échec : %1$s</string>
     <string name="setup_installed">Installé (%1$s)</string>
     <string name="setup_not_installed">Non installé (%1$s à télécharger)</string>
@@ -118,7 +119,7 @@
     <string name="settings_languages">Vos langues</string>
     <string name="settings_dictation">Dictée</string>
     <string name="settings_partials">Texte provisoire pendant qu\'on parle</string>
-    <string name="settings_partials_help">Affiché souligné, remplacé par le texte final à chaque pause. Consomme plus de calcul. Sans effet avec Whisper, qui ne montre pas de texte provisoire (le texte final arrive plus vite ainsi).</string>
+    <string name="settings_partials_help">Affiché souligné, remplacé par le texte final à chaque pause. Consomme plus de calcul. Sans effet avec le modèle plus précis, qui ne montre pas de texte provisoire (le texte final arrive plus vite ainsi).</string>
     <string name="settings_commands">Commandes vocales</string>
     <string name="settings_commands_help">Ponctuation : « deux-points », « point-virgule », « point d\'interrogation », « point d\'exclamation », « ouvrir / fermer les guillemets », « ouvrir / fermer la parenthèse ». Mise en forme : « nouvelle ligne », « nouveau paragraphe ». Effacement, dit seul : « efface la dernière phrase », « efface le dernier mot ». Les commandes suivent vos langues de dictée (français, anglais) ; dans une phrase ordinaire (« j\'ai marqué deux points »), les mots restent du texte.</string>
     <string name="settings_pause">Pause qui termine un segment</string>
@@ -394,13 +395,26 @@
     <string name="quick_single_scored">Le modèle choisi pour vos langues vous a compris à %1$d %%.</string>
     <string name="quick_single_too_slow">Le modèle choisi pour vos langues n\'a pas répondu à temps sur ce téléphone.</string>
     <string name="quick_single_unavailable">Le modèle choisi pour vos langues n\'est pas encore téléchargé.</string>
-    <string name="quick_no_verdict">Aucun modèle n\'a pu être testé. Téléchargez-en un sur l\'écran principal, puis refaites le test.</string>
+    <string name="quick_no_verdict">Aucun des deux modèles n\'est encore téléchargé. Téléchargez-en un sur l\'écran principal, puis refaites le test.</string>
     <string name="quick_verdict_best_quick">Gardez le modèle plus précis : il vous a bien compris, et assez vite.</string>
     <string name="quick_verdict_light_enough">Prenez le modèle plus léger : il vous comprend presque aussi bien, et plus vite.</string>
     <string name="quick_verdict_light_inaccurate">Prenez le modèle plus précis : le plus léger a raté trop de mots.</string>
     <string name="quick_verdict_light_behind">Prenez le modèle plus précis : il vous a nettement mieux compris.</string>
-    <string name="quick_verdict_light_not_tested">Gardez le modèle plus précis. Pour le comparer au plus léger, téléchargez celui-ci, puis refaites le test.</string>
-    <string name="quick_verdict_best_not_tested">Prenez le modèle plus léger : le plus précis n\'a pas pu être testé à temps.</string>
+    <string name="quick_verdict_light_not_installed">Gardez le modèle plus précis. Le plus léger n\'est pas encore téléchargé : téléchargez-le, puis refaites le test pour comparer.</string>
+    <string name="quick_verdict_best_too_slow">Prenez le modèle plus léger : il vous a bien compris. Le plus précis n\'a pas répondu à temps sur ce téléphone.</string>
+    <!-- Review of #65: one text per real case. -->
+    <string name="quick_verdict_light_too_slow">Gardez le modèle plus précis : le plus léger n\'a pas répondu à temps sur ce téléphone.</string>
+    <string name="quick_verdict_light_failed">Gardez le modèle plus précis : le plus léger n\'a pas pu être essayé.</string>
+    <string name="quick_verdict_best_not_installed">Prenez le modèle plus léger : il vous a bien compris. Pour le comparer au plus précis, téléchargez celui-ci, puis refaites le test.</string>
+    <string name="quick_verdict_best_failed">Prenez le modèle plus léger : il vous a bien compris. Le plus précis n\'a pas pu être essayé.</string>
+    <string name="quick_keep_best_unmeasured">Gardez le modèle plus précis : le plus léger a raté trop de mots, et le plus précis n\'a pas pu être mesuré.</string>
+    <string name="quick_no_verdict_slow">Aucun des deux modèles n\'a répondu à temps sur ce téléphone : pas de recommandation. Le modèle plus précis reste votre modèle.</string>
+    <string name="quick_single_failed">Le modèle choisi pour vos langues n\'a pas pu être essayé.</string>
+    <string name="quick_skipped">Pas essayé : le modèle précédent calculait encore.</string>
+    <string name="quick_failed">L\'essai a échoué.</string>
+    <string name="quick_interrupted">Lecture interrompue (l\'application est passée en arrière-plan) : elle n\'est pas notée. Recommencez quand vous voulez.</string>
+    <string name="quick_previous_running">Le calcul d\'un test précédent se termine. Réessayez dans un instant.</string>
+    <string name="quick_server_note">Vos dictées passent par le serveur distant configuré dans les réglages avancés : le modèle du téléphone ne sert qu\'en repli tant que ce réglage est actif.</string>
     <string name="quick_adopt">Utiliser %1$s</string>
     <string name="quick_already">C\'est déjà votre modèle.</string>
     <string name="quick_light_note">Vous pourrez toujours revenir au modèle plus précis sur l\'écran principal.</string>

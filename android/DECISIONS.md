@@ -4205,6 +4205,43 @@ jargon » ; de #37, tout sauf le serveur préconfiguré.
 - **Pas de traduction anglaise de l'application** : elle n'a que des écrans en français ; l'anglais est
   livré pour la fiche du Play Store.
 
+### Revue indépendante de la PR (corrections)
+
+Revue par un autre agent, relayée par l'orchestrateur ; chaque constat vérifié dans le code avant correction.
+
+- **Plantage à la fermeture de l'écran** (bloquant, confirmé) : `onCleared()` arrêtait l'exécuteur, puis le
+  fil de calcul y soumettait la libération après un dépassement : `RejectedExecutionException` non attrapée,
+  qui tuait le processus, clavier compris. Plus d'exécuteur : chaque transcription a son propre fil, le fil de
+  calcul est entièrement protégé (`try`/`finally`), et `benchmarkRunning` est rendu dans le `finally`.
+  Test : fermer l'écran pendant le calcul, avec un modèle qui dépasse.
+- **Dépassement du modèle léger** (bloquant, confirmé) : sherpa-onnx ne permet pas d'interrompre un décodage.
+  Le décodage en retard gardait le verrou du moteur, et le chargement du meilleur modèle attendait sans
+  limite. Désormais, après un dépassement, le test n'essaie plus aucun modèle (« Pas essayé : le modèle
+  précédent calculait encore »), se termine tout de suite avec un texte honnête, et rend le clavier
+  (`benchmarkRunning` faux) sans attendre. Il ne libère pas le moteur, qui pourrait déjà servir au clavier ; la
+  libération automatique du clavier (modèle gardé en mémoire N minutes) s'en charge. Un nouveau test est
+  refusé tant que ce décodage n'est pas fini (`QuickTestModel.lingering`, pour tout le processus), si bien que
+  deux décodages ne se disputent jamais le moteur. `benchmarkRunning` n'est rendu que par le test qui l'a pris
+  (jeton), donc un test ancien ne peut pas le remettre à faux au milieu d'un nouveau. Le cas « libération mise
+  en file par un test précédent » ne peut plus se produire : il n'y a plus de libération différée.
+- **Léger recommandé sans contrôle** (confirmé) : quand le meilleur modèle n'a pas de score, le léger n'est
+  recommandé que s'il fait au moins 90 % ; sinon, pas de recommandation, et le plus précis reste.
+- **Un texte par cas réel** : non téléchargé, trop lent, échec, pas essayé, pour chacun des deux modèles ; « les
+  deux trop lents » ne dit plus d'en télécharger un.
+- **Lecture interrompue** : quitter l'écran pendant la lecture coupe le micro et la lecture n'est pas notée
+  (« Lecture interrompue… Recommencez quand vous voulez. ») ; une rotation ne coupe rien.
+- **Noms techniques hors des chaînes** : une erreur de téléchargement affiche « Échec du téléchargement… » sur
+  l'écran principal (détail dans le journal ; il reste visible dans « Avancé ») ; un échec de chargement ne
+  recopie plus le texte brut de l'exception dans le clavier ; l'aide des « Résultats provisoires » dit « le
+  modèle plus précis » ; le test de lecture québécois nomme les modèles par leur effet à l'écran (l'archive de
+  contribution garde le nom technique, à côté de l'identifiant, pour qui améliore les modèles).
+- **`PlainWordsTest` étendu** : aux chaînes `howto_`, `reading_`, `contrib_`, `msg_`, `cd_`, et aux écrans
+  du parcours normal, où `displayName`, `shortName` et `description` ne doivent pas être formatés dans un
+  texte. Exception provisoire, nommée dans le test : `HowToActivity` (« Recommandé pour vos langues :
+  Whisper large-v3-turbo »), que la PR #63 retire ; l'exception est à supprimer dès que #63 est fusionnée ici.
+- **Serveur configuré** : le résultat du test le dit (« Vos dictées passent par le serveur distant… ») pour
+  que « Utiliser … » ne laisse pas croire que la voix change de chemin.
+
 ### Hors de cette PR, à noter
 
 - « Comment dicter » affiche encore le nom du modèle actif (#56, hors de portée ici).

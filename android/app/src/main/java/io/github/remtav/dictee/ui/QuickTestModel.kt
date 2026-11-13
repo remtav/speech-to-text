@@ -23,7 +23,8 @@ import io.github.remtav.dictee.stt.ModelSpec
 import io.github.remtav.dictee.stt.PhoneModelChoice
 import io.github.remtav.dictee.stt.QuickTestAdvice
 import io.github.remtav.dictee.stt.QuickTestVerdict
-import java.util.concurrent.Executors
+import java.util.concurrent.CompletableFuture
+import java.util.concurrent.ExecutionException
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.TimeoutException
 import kotlin.concurrent.thread
@@ -40,6 +41,11 @@ import kotlin.concurrent.thread
  * - **One minute**: reading ≤ 25 s ([QuickTestAdvice.READING_BUDGET_SECONDS]), transcription ≤ 30 s for the two
  *   models together. A model over what is left of the budget is marked « trop lent » and the test ends without
  *   waiting for it. Neither a download nor the loading of a model counts.
+ * - **A decode cannot be interrupted** (sherpa-onnx has no cancel): a model over the budget keeps computing on its
+ *   own thread. The test does not wait for it, tries no other model after it (that model could not load until the
+ *   decode ends, it would hold the engine's lock), gives the keyboard back at once (`benchmarkRunning` false), and
+ *   refuses a new test until that decode has ended ([lingering]). The engine is then left to the keyboard's own
+ *   idle release: releasing it here could free a model the keyboard has started to use.
  */
 class QuickTestModel(
     private val app: DicteeApp,
@@ -77,8 +83,9 @@ class QuickTestModel(
     val holdsRecording: Boolean get() = audio != null
 
     @Volatile private var stopRequested = false
+    /** The recording was cut by the screen going to the background: it is dropped, never scored. */
+    @Volatile private var interrupted = false
     @Volatile private var cleared = false
-    private val worker = Executors.newSingleThreadExecutor { r -> Thread(r, "quick-test-transcribe") }
 
     private fun changed() { onChange?.invoke() }
 
@@ -91,6 +98,11 @@ class QuickTestModel(
             return
         }
         if (phase != Phase.READY) return
+        if (lingering) {
+            notice = app.getString(R.string.quick_previous_running)
+            changed()
+            return
+        }
         val micAllowed = TestHooks.audioSourceFactory != null ||
             ContextCompat.checkSelfPermission(app, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
         if (!micAllowed) {
@@ -99,6 +111,7 @@ class QuickTestModel(
             return
         }
         stopRequested = false
+        interrupted = false
         phase = Phase.RECORDING
         recordingSeconds = 0
         notice = null
@@ -122,6 +135,7 @@ class QuickTestModel(
             main.post {
                 if (cleared) return@post
                 when {
+                    interrupted -> { phase = Phase.READY; notice = app.getString(R.string.quick_interrupted) }
                     error != null -> { phase = Phase.READY; notice = app.getString(R.string.reading_mic_error, error) }
                     recorded == null -> { phase = Phase.READY; notice = app.getString(R.string.reading_too_short) }
                     else -> { audio = recorded; score() }
@@ -131,69 +145,107 @@ class QuickTestModel(
         }
     }
 
-    /** The screen leaves the foreground: a recording in progress ends (the microphone is not kept in the background). */
-    fun stopRecording() { stopRequested = true }
+    /**
+     * The screen leaves the foreground (not a rotation): a recording in progress ends, since the microphone is not
+     * kept in the background, and the cut reading is dropped rather than scored as if it were complete.
+     */
+    fun interruptRecording() {
+        if (phase != Phase.RECORDING) return
+        interrupted = true
+        stopRequested = true
+    }
 
     private fun score() {
         val clip = audio ?: return
         phase = Phase.SCORING
-        // The comparison screen's guard: the keyboard must not load another model meanwhile.
-        app.benchmarkRunning = true
+        val token = Any()
+        claimBenchmark(token)
         thread(name = "quick-test-score") {
             val results = LinkedHashMap<String, ModeOutcome>()
-            var spent = 0.0
-            var stillRunning = false
-            val budget = TestHooks.quickTestBudgetSeconds ?: QuickTestAdvice.TRANSCRIPTION_BUDGET_SECONDS.toDouble()
-            // The light model first: it is quick, and leaves the best one the rest of the budget.
-            for (spec in listOfNotNull(choice.light, choice.best)) {
-                if (cleared) break
-                val onDevice = onDevice(spec.id)
-                if (onDevice == null || !app.isInstalled(onDevice)) { results[spec.id] = ModeOutcome.Unavailable; continue }
-                main.post { scoringModel = onDevice; changed() }
-                val left = (budget - spent).coerceAtLeast(0.0)
-                try {
-                    app.engines.factory = app.engineFactory()
-                    val options = app.engineOptions(onDevice)
-                    app.engines.load(onDevice, options).get() // loading does not count
-                    val job = worker.submit<Pair<String, Double>> {
-                        app.engines.use(onDevice, options) { engine ->
-                            val t0 = System.nanoTime()
-                            val text = engine.transcribe(clip.samples, clip.sampleRate).text
-                            text to (System.nanoTime() - t0) / 1e9
-                        }
+            try {
+                var spent = 0.0
+                val budget = TestHooks.quickTestBudgetSeconds ?: QuickTestAdvice.TRANSCRIPTION_BUDGET_SECONDS.toDouble()
+                var stopped = false
+                // The light model first: it is quick, and leaves the best one the rest of the budget.
+                for (spec in listOfNotNull(choice.light, choice.best)) {
+                    if (cleared) break
+                    if (stopped) { results[spec.id] = ModeOutcome.Skipped; continue }
+                    val onDevice = onDevice(spec.id)
+                    if (onDevice == null || !app.isInstalled(onDevice)) { results[spec.id] = ModeOutcome.NotInstalled; continue }
+                    main.post { if (!cleared) { scoringModel = onDevice; changed() } }
+                    val left = (budget - spent).coerceAtLeast(0.0)
+                    val outcome = try {
+                        transcribe(onDevice, clip, left)
+                    } catch (_: Exception) {
+                        results[spec.id] = ModeOutcome.Failed
+                        continue
                     }
-                    val (text, delay) = job.get((left * 1000).toLong() + GRACE_MILLIS, TimeUnit.MILLISECONDS)
-                    spent += delay
-                    val similarity = ReadingScoring.global(listOf(ReadingScoring.scoreParagraph(material, 0, text)), 1).similarity
-                    results[spec.id] = QuickTestAdvice.outcome(similarity, delay, left)
-                } catch (_: TimeoutException) {
-                    // Not waited for: the test ends within the minute; the engine finishes in the background.
-                    results[spec.id] = ModeOutcome.TooSlow
-                    spent = budget
-                    stillRunning = true
-                } catch (_: Exception) {
-                    results[spec.id] = ModeOutcome.Unavailable
+                    if (outcome == null) {
+                        results[spec.id] = ModeOutcome.TooSlow
+                        stopped = true
+                    } else {
+                        val (text, delay) = outcome
+                        spent += delay
+                        val similarity = ReadingScoring.global(listOf(ReadingScoring.scoreParagraph(material, 0, text)), 1).similarity
+                        results[spec.id] = QuickTestAdvice.outcome(similarity, delay, left)
+                    }
                 }
+                // A model stopped on the way (a decode still running) keeps the engine: nothing is released here.
+                if (!stopped) app.engines.release()
+            } catch (_: Throwable) {
+                // Never let this thread take the process (and the keyboard) down: whatever is missing is « échec ».
+            } finally {
+                // Nothing is kept: the reading goes as soon as the scores are known.
+                audio = null
+                releaseBenchmark(token)
             }
-            // Nothing is kept: the reading goes as soon as the scores are known.
-            audio = null
-            val light = choice.light?.let { results[it.id] } ?: ModeOutcome.Unavailable
-            val best = results[choice.best.id] ?: ModeOutcome.Unavailable
+            val light = choice.light?.let { results[it.id] } ?: ModeOutcome.NotInstalled
+            val best = results[choice.best.id] ?: ModeOutcome.Failed
             val decided = if (choice.light == null) null else QuickTestAdvice.decide(light, best)
-            if (stillRunning) {
-                worker.execute { app.engines.release(); app.benchmarkRunning = false }
-            } else {
-                app.engines.release()
-                app.benchmarkRunning = false
-            }
             main.post {
                 if (cleared) return@post
-                outcomes = choice.candidates.associate { it.id to (results[it.id] ?: ModeOutcome.Unavailable) }
+                outcomes = choice.candidates.associate { it.id to (results[it.id] ?: ModeOutcome.Failed) }
                 verdict = decided
                 scoringModel = null
                 phase = Phase.RESULT
                 changed()
             }
+        }
+    }
+
+    /**
+     * Loads [spec] (untimed) and transcribes [clip] on a thread of its own, waiting at most [leftSeconds] (plus a
+     * small grace) for the transcription. Returns the text and the transcription delay, null when it went over
+     * (the decode then goes on alone: [lingering] until it ends), or throws on a failure.
+     */
+    private fun transcribe(spec: ModelSpec, clip: PcmAudio, leftSeconds: Double): Pair<String, Double>? {
+        app.engines.factory = app.engineFactory()
+        val options = app.engineOptions(spec)
+        app.engines.load(spec, options).get() // loading does not count
+        val job = CompletableFuture<Pair<String, Double>>()
+        lingering = true
+        thread(name = "quick-test-transcribe") {
+            try {
+                job.complete(
+                    app.engines.use(spec, options) { engine ->
+                        val t0 = System.nanoTime()
+                        val text = engine.transcribe(clip.samples, clip.sampleRate).text
+                        text to (System.nanoTime() - t0) / 1e9
+                    },
+                )
+            } catch (e: Throwable) {
+                job.completeExceptionally(e)
+            } finally {
+                lingering = false
+                main.post { onLingeringEnded?.invoke() }
+            }
+        }
+        return try {
+            job.get((leftSeconds * 1000).toLong() + GRACE_MILLIS, TimeUnit.MILLISECONDS)
+        } catch (_: TimeoutException) {
+            null
+        } catch (e: ExecutionException) {
+            throw e.cause ?: e
         }
     }
 
@@ -223,11 +275,41 @@ class QuickTestModel(
         stopRequested = true
         onChange = null
         audio = null
-        worker.shutdown()
+    }
+
+    /** `benchmarkRunning` belongs to this test from now: the keyboard does not load another model meanwhile. */
+    private fun claimBenchmark(token: Any) {
+        synchronized(Companion) {
+            owner = token
+            app.benchmarkRunning = true
+        }
+    }
+
+    /** Gives the keyboard back, unless a newer test (or nothing) owns it already. */
+    private fun releaseBenchmark(token: Any) {
+        synchronized(Companion) {
+            if (owner === token) {
+                owner = null
+                app.benchmarkRunning = false
+            }
+        }
     }
 
     companion object {
         /** Margin over the budget before a model is given up (thread hand-over, scoring). */
         const val GRACE_MILLIS = 500L
+
+        /**
+         * A transcription of an earlier quick test is still running (over its budget, it cannot be interrupted).
+         * Process-wide: a new screen refuses to start a test until it ends, so two decodes never fight for the engine.
+         */
+        @Volatile var lingering = false
+            private set
+
+        /** The screen to tell when [lingering] ends (main thread), so it can let the person start again. */
+        @Volatile var onLingeringEnded: (() -> Unit)? = null
+
+        /** Which quick test set `benchmarkRunning` (guarded by the companion's monitor). */
+        private var owner: Any? = null
     }
 }
