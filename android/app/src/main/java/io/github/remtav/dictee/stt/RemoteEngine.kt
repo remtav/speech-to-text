@@ -58,6 +58,12 @@ data class RemoteConfig(
     val waitBaseMillis: Long = 60_000,
     val waitCapMillis: Long = 360_000,
     val pollIntervalMillis: Long = 400,
+    /**
+     * Ask the server to polish the whole dictation with its LLM (issue #15). When false the
+     * client sends `polish=false` explicitly (a server started with WHISPER_POLISH=on would
+     * otherwise polish anyway) and inserts the raw transcript.
+     */
+    val polish: Boolean = true,
 ) {
     val isConfigured: Boolean get() = normalizedBase() != null
 
@@ -274,12 +280,12 @@ class RemoteEngine(
         )
     }
 
-    private fun syncFields(polish: Boolean): LinkedHashMap<String, String> {
+    private fun syncFields(polish: Boolean, explicitOff: Boolean = false): LinkedHashMap<String, String> {
         val fields = LinkedHashMap<String, String>()
         when (config.api) {
             RemoteApi.DICTEE_SERVER -> {
                 if (config.language.isNotBlank()) fields["language"] = config.language
-                if (polish) fields["polish"] = "true"
+                if (polish) fields["polish"] = "true" else if (explicitOff) fields["polish"] = "false"
             }
             RemoteApi.OPENAI -> {
                 fields["model"] = config.model.ifBlank { "whisper-1" }
@@ -322,7 +328,7 @@ class RemoteEngine(
             RemoteApi.DICTEE_SERVER -> {
                 val fields = LinkedHashMap<String, String>().apply {
                     put("quick", "true")
-                    put("polish", "true")
+                    put("polish", if (config.polish) "true" else "false")
                     if (config.language.isNotBlank()) put("language", config.language)
                 }
                 // If we give up while the upload is still going (Annuler, deadline), the job may be
@@ -336,9 +342,9 @@ class RemoteEngine(
                     if (e.httpCode != 404 && e.httpCode != 405) throw e
                     // A server without the job API: the synchronous route, same options.
                     log("job API unavailable (HTTP ${e.httpCode}): synchronous request")
-                    val body = postCancellable(config.transcriptionUrl(), syncFields(polish = true), wav, deadline, control)
+                    val body = postCancellable(config.transcriptionUrl(), syncFields(polish = config.polish, explicitOff = true), wav, deadline, control)
                     val upload = elapsed(start)
-                    return serverResult(parse(body), upload, elapsed(start), seconds, "sync")
+                    return serverResult(parse(body), upload, elapsed(start), seconds, "sync", config.polish)
                 }
                 val upload = elapsed(start)
                 val id = parse(created).optString("id", "")
@@ -354,13 +360,22 @@ class RemoteEngine(
                     if (e.failure != RemoteFailure.CANCELLED && e.failure != RemoteFailure.JOB_FAILED) cancelJobAsync(id)
                     throw e
                 }
-                serverResult(result, upload, elapsed(start), seconds, "jobs")
+                serverResult(result, upload, elapsed(start), seconds, "jobs", config.polish)
             }
         }
     }
 
-    private fun serverResult(json: JSONObject, upload: Long, total: Long, seconds: Float, transport: String): DictationResult {
+    private fun serverResult(json: JSONObject, upload: Long, total: Long, seconds: Float, transport: String, polishRequested: Boolean = true): DictationResult {
         val raw = json.optString("text", "").trim()
+        if (!polishRequested) {
+            // Polish turned off in the settings: the raw transcript, whatever the server added.
+            log("result: polish not requested, ${raw.length} chars raw, $total ms")
+            return DictationResult(
+                texts = listOf(raw), source = DictationResult.Source.SERVER_RAW, rawText = raw,
+                polishStatus = "not requested", language = json.optString("language", ""),
+                uploadMillis = upload, totalMillis = total, audioSeconds = seconds, transport = transport,
+            )
+        }
         val polishedRaw = if (json.isNull("polished_text")) "" else json.optString("polished_text", "").trim()
         val polish = json.optJSONObject("polish")
         val applied = polish?.optBoolean("applied", false) == true

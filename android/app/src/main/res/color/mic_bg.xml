@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Micro : couleur principale au repos, couleur d'erreur (rouge) à l'écoute (vue activée). -->
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:alpha="0.12" android:color="?attr/colorOnSurface" android:state_enabled="false" />
+    <item android:color="?attr/colorError" android:state_activated="true" />
+    <item android:color="?attr/colorPrimary" />
+</selector>

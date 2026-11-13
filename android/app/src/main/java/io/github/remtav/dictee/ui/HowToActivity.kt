@@ -120,7 +120,7 @@ class HowToActivity : AppCompatActivity() {
         }.tag = VOCABULARY_BUTTON_TAG
     }
 
-    /** One line of the full list: the main wording in Plex Mono, what it gives and the other wordings. */
+    /** One line of the full list: the main wording as a value, what it gives and the other wordings. */
     private fun LinearLayout.commandLine(entry: CommandEntry) {
         value(entry.primary).tag = COMMAND_TAG
         val others = entry.forms.drop(1).joinToString(" · ") { it.text }

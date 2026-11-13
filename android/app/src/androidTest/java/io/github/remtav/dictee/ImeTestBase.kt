@@ -165,12 +165,39 @@ abstract class ImeTestBase {
     protected fun field2(): String { var t = ""; scenario.onActivity { t = it.field2.text.toString() }; return t }
 
     protected fun focus(which: Int) {
+        // The keyboard only hears of a focus change inside a window that has the window focus. A
+        // system dialog over the test activity (an "isn't responding" box on a loaded emulator)
+        // takes it, and the change never reaches the keyboard: wait for the focus first, then for
+        // the keyboard's new input (a fresh EditorInfo), so a test never runs on a change the
+        // keyboard did not see (independent review of lot 3, flaky RobustnessInstrumentedTest).
+        awaitWindowFocus()
+        val before = onMain { DicteeImeService.instance?.get()?.currentInputEditorInfo }
         scenario.onActivity {
             val f = when (which) { 1 -> it.field1; 2 -> it.field2; 4 -> it.noId1; 5 -> it.noId2; else -> it.password }
             f.requestFocus()
         }
         instrumentation.waitForIdleSync()
+        waitFor("keyboard told of the focus change to field $which", 10_000) {
+            onMain { DicteeImeService.instance?.get()?.currentInputEditorInfo }.let { it != null && it !== before }
+        }
     }
+
+    /** Waits until the test activity has the window focus, answering "Wait" to a not-responding box. */
+    protected fun awaitWindowFocus(timeout: Long = 10_000) {
+        val end = SystemClock.uptimeMillis() + timeout
+        while (SystemClock.uptimeMillis() < end) {
+            var focused = false
+            scenario.onActivity { focused = it.hasWindowFocus() }
+            if (focused) return
+            dismissNotRespondingDialogs()
+            SystemClock.sleep(100)
+        }
+        fail("the test activity never got the window focus\n${windowFocus()}")
+    }
+
+    private fun windowFocus(): String = runCatching {
+        shell("dumpsys window").lines().filter { "mCurrentFocus" in it || "mFocusedApp" in it }.joinToString("\n")
+    }.getOrDefault("")
 
     /** Taps the keyboard's microphone button, through the accessibility tree like a user. */
     protected fun tapMic() {
@@ -201,8 +228,10 @@ abstract class ImeTestBase {
         }
         val fields = if (::scenario.isInitialized) runCatching { "field1=\"${field1()}\" field2=\"${field2()}\"" }.getOrDefault("") else ""
         val st = runCatching { "state=${state()} engine=${app.engines.state}" }.getOrDefault("")
-        val log = runCatching { shell("logcat -d -t 60 -s DicteeIme:I") }.getOrDefault("")
-        fail("timed out waiting for: $what ($fields $st)\n$log")
+        // Enough lines for the keyboard's own lifecycle (startInput, finishInputView, "still hidden: stop"),
+        // and which window had the focus: the two causes seen in flaky runs on a loaded emulator.
+        val log = runCatching { shell("logcat -d -s DicteeIme:I").lines().takeLast(40).joinToString("\n") }.getOrDefault("")
+        fail("timed out waiting for: $what ($fields $st)\n${windowFocus()}\n$log")
     }
 
     protected fun assertWithin(actual: Float, expected: Float, tolerance: Float) =

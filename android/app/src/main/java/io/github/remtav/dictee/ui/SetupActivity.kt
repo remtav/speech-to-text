@@ -45,7 +45,6 @@ class SetupActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         app = DicteeApp.from(this)
         val col = scrollingColumn()
-        col.logo()
         col.title(getString(R.string.app_name))
         col.body(getString(R.string.setup_intro))
         col.button(getString(R.string.setup_howto), outlined = true) {
@@ -211,6 +210,7 @@ class SetupActivity : AppCompatActivity() {
             )
         }
         card.body("${spec.publisher} · ${spec.description}", small = true)
+        if (spec.note.isNotEmpty()) card.body(spec.note, small = true).tag = modelNoteTag(spec)
         card.body(getString(R.string.model_license_runs_local, spec.license), small = true)
         val status = Downloads.status[spec.id]
         val failed = !Downloads.isBusy(spec.id) && status?.error != null
@@ -258,6 +258,8 @@ class SetupActivity : AppCompatActivity() {
     companion object {
         /** Tag of a model card, for tests. */
         fun modelCardTag(spec: ModelSpec) = "model_card_${spec.id}"
+        /** Tag of a model's note (ModelSpec.note), for tests. */
+        fun modelNoteTag(spec: ModelSpec) = "model_note_${spec.id}"
         const val WARNING_TAG = "model_warning"
         const val HOWTO_BUTTON_TAG = "setup_howto_button"
     }

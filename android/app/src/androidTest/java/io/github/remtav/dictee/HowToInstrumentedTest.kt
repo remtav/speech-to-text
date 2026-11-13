@@ -93,15 +93,23 @@ class HowToInstrumentedTest : ImeTestBase() {
         // 2. A model is ready: the first setup is complete, the tutorial opens by itself.
         TestHooks.assumeInstalled = true
         val first = monitorHowTo()
-        ActivityScenario.launch(SetupActivity::class.java).use {
-            assertNotNull("opened at the end of the setup", first.waitForActivityWithTimeout(10_000))
+        val firstScreen = ActivityScenario.launch(SetupActivity::class.java).use {
+            first.waitForActivityWithTimeout(10_000)
         }
+        assertNotNull("opened at the end of the setup", firstScreen)
         assertTrue("remembered", app.settings.howToShown)
 
-        // 3. The second time, nothing opens.
+        // 3. The second time, nothing opens. The first screen is closed and gone, and the first
+        // monitor removed, before the second arrival: an instance still alive from step 2, or
+        // re-created by a configuration change (night mode, rotation left by another test), is
+        // not a second opening by the setup screen.
+        instrumentation.removeMonitor(first)
+        instrumentation.runOnMainSync { if (!firstScreen!!.isFinishing) firstScreen.finish() }
+        waitFor("the first tutorial screen is destroyed", 10_000) { firstScreen!!.isDestroyed }
         val second = monitorHowTo()
         ActivityScenario.launch(SetupActivity::class.java).use { setup ->
             assertNull("only once", second.waitForActivityWithTimeout(3_000))
+            assertEquals("no tutorial instance created", 0, second.hits)
             assertEquals(1, setup.viewsTagged(SetupActivity.HOWTO_BUTTON_TAG).size)
         }
     }

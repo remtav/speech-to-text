@@ -42,6 +42,31 @@ class ModelRecommendationTest {
         }
     }
 
+    @Test fun quebecWhisperCoversFrenchOnlyAndIsNeverRecommendedByTheTable() {
+        val qc = ModelCatalog.whisperQuebec
+        assertTrue(ModelRecommendations.covers(qc, DictationLanguage.FRENCH_QUEBEC))
+        assertTrue(ModelRecommendations.covers(qc, DictationLanguage.FRENCH_FRANCE))
+        for (l in DictationLanguage.entries.filter { it.engineCode != "fr" }) {
+            assertFalse(l.toString(), ModelRecommendations.covers(qc, l))
+        }
+        for (combo in allCombinations()) {
+            assertTrue(combo.toString(), ModelRecommendations.recommend(combo).model != qc)
+        }
+    }
+
+    @Test fun quebecWhisperIsOfferedButParakeetStaysRecommendedForQuebecFrench() {
+        val qc = ModelCatalog.whisperQuebec
+        assertTrue(qc in downloadable)
+        val fr = setOf(DictationLanguage.FRENCH_QUEBEC)
+        assertEquals(ModelCatalog.parakeet, ModelRecommendations.recommend(fr).model)
+        assertTrue(ModelRecommendations.uncovered(qc, fr).isEmpty())
+        // Adding English: the card warns "ne couvre pas ... anglais".
+        val withEnglish = fr + DictationLanguage.ENGLISH
+        assertEquals(listOf(DictationLanguage.ENGLISH), ModelRecommendations.uncovered(qc, withEnglish))
+        assertEquals("anglais", ModelRecommendations.uncovered(qc, withEnglish).single().inSentence)
+        assertEquals(ModelCatalog.parakeet, ModelRecommendations.recommend(withEnglish).model)
+    }
+
     @Test fun quebecFrenchAloneRecommendsParakeet() {
         val rec = ModelRecommendations.recommend(setOf(DictationLanguage.FRENCH_QUEBEC))
         assertEquals(ModelCatalog.parakeet, rec.model)
@@ -109,6 +134,17 @@ class ModelRecommendationTest {
         assertEquals("mandarin", DictationLanguage.MANDARIN.inSentence)
         val reason = ModelRecommendations.recommend(setOf(DictationLanguage.FRENCH_QUEBEC, DictationLanguage.URDU)).reason
         assertTrue(reason, reason.contains("ourdou") && !reason.contains("Ourdou"))
+    }
+
+    @Test fun whisperIsPresentedAsALastResortFromAnObservation() {
+        // Issue #15: the user's observation on his phone, not a measured latency.
+        assertTrue(ModelCatalog.whisperTurbo.note.contains("dernier recours"))
+        assertTrue(ModelCatalog.whisperTurbo.note.startsWith("Observé"))
+        assertEquals("", ModelCatalog.parakeet.note)
+        assertEquals("", ModelCatalog.qwen3.note)
+        val rec = ModelRecommendations.recommend(setOf(DictationLanguage.BENGALI))
+        assertEquals(ModelCatalog.whisperTurbo, rec.model)
+        assertTrue(rec.reason, rec.reason.contains("plus lent") && rec.reason.contains("observé"))
     }
 
     @Test fun parakeetCoversExactlySixOfTheEleven() {

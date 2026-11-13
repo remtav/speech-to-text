@@ -26,6 +26,7 @@ import io.github.remtav.dictee.audio.WavReader
 import io.github.remtav.dictee.stt.BenchSample
 import io.github.remtav.dictee.stt.Benchmark
 import io.github.remtav.dictee.stt.ModelCatalog
+import io.github.remtav.dictee.stt.ModelFamily
 import io.github.remtav.dictee.stt.ModelResult
 import java.util.Locale
 import kotlin.concurrent.thread
@@ -142,7 +143,11 @@ class CompareActivity : AppCompatActivity() {
         resultsBox.removeAllViews()
         // Free the keyboard's model: measurements start from a clean slate.
         app.engines.release()
-        val bench = Benchmark(app.engineFactory(), { app.store.dirFor(it.id) }, app.engineOptions(io.github.remtav.dictee.stt.ModelCatalog.remote).copy(remote = app.settings.remoteConfig().takeIf { it.isConfigured }, remoteFallback = null))
+        // The same options as the dictation (forced language when one language is chosen, Whisper
+        // padding), so the screen measures what the keyboard does; the server never falls back here.
+        val bench = Benchmark(app.engineFactory(), { app.store.dirFor(it.id) }, optionsFor = { spec ->
+            app.engineOptions(spec).copy(remote = app.settings.remoteConfig().takeIf { it.isConfigured }, remoteFallback = null)
+        })
         thread(name = "compare-run") {
             val results = ArrayList<ModelResult>()
             for (spec in models) {
@@ -151,7 +156,11 @@ class CompareActivity : AppCompatActivity() {
                 main.post { renderResult(r) }
             }
             val header = "Kalmia Blabla ${BuildConfig.VERSION_NAME} · ${Build.MANUFACTURER} ${Build.MODEL} · Android ${Build.VERSION.RELEASE}" +
-                " · ${app.settings.threads} threads"
+                " · ${app.settings.threads} threads" +
+                (if (models.any { it.family == ModelFamily.WHISPER }) {
+                    " · silence ajouté Whisper ${app.settings.whisperTailPaddings} · langue Whisper " +
+                        app.engineOptions(models.first { it.family == ModelFamily.WHISPER }).language.ifEmpty { "automatique" }
+                } else "")
             report = Benchmark.report(results, header)
             main.post {
                 progress.text = getString(R.string.compare_done)

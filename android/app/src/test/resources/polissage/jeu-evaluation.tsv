@@ -1,0 +1,159 @@
+# Jeu d'évaluation du polissage sur le téléphone (issue #15, lot 3, étape 3.1).
+# Lu par PolishEvalSet (src/test/java/io/github/remtav/dictee/polish/PolishEval.kt) ;
+# méthode, provenance et limites : android/DECISIONS.md, section « étape 3.1 ».
+#
+# Format : UTF-8, une paire par ligne, champs séparés par une tabulation, aucune
+# tabulation ni retour à la ligne dans un champ. Les lignes « # » sont des commentaires.
+#
+# Colonnes :
+#   id          identifiant stable : <énoncé>-<modèle> pour une sortie de modèle,
+#               <langue>-<catégorie>-rNN pour une ligne rédigée
+#   langue      fr (français québécois) ou en
+#   categorie   à corriger : noms-propres, toponymes, web, courriel, epellation
+#               contrôles (ne doivent PAS changer, attendu = brut) :
+#                 controle               phrases ordinaires et pièges (« point commun », « plan B », « arobase » comme mot)
+#                 controle-mots-rares    mots rares ou d'ici bien transcrits (friperie, poudrerie, cégep…)
+#                 controle-deja-correct  mot visé que le modèle a déjà bien transcrit (GitHub, Rimouski…)
+#   dit         ce que la personne dit ; pour une ligne tts+…, le texte exact donné à la synthèse vocale
+#   brut        transcription du modèle, telle quelle : l'entrée du polissage (un segment)
+#   attendu     ce que le polissage doit rendre : le brut corrigé sur le passage visé (nom, adresse,
+#               épellation, y compris les mots que la transcription y a fondus), le reste identique au brut,
+#               fautes non visées comprises
+#   provenance  tts+<modèle>[+<modèle>…] : sortie réelle de Parakeet, Qwen3-ASR ou Whisper (sherpa-onnx 2.0.1,
+#               modèles int8 du catalogue, sur l'hôte Linux) pour un audio de synthèse Piper (voix fr_FR-siwis-medium
+#               ou en_US-lessac-medium) ; plusieurs modèles quand leurs sorties sont identiques.
+#               rédigé : écrit à la main, d'après les erreurs observées sur les sorties réelles.
+#               Une voix de synthèse n'est pas une voix québécoise.
+id	langue	categorie	dit	brut	attendu	provenance
+fr-np-01-parakeet	fr	noms-propres	Mon code est sur GitHub, je t'envoie le lien sur WhatsApp.	Mon code est sur J-Hub, je t'envoie le lien sur WhatsApp.	Mon code est sur GitHub, je t'envoie le lien sur WhatsApp.	tts+parakeet
+fr-np-01-qwen3	fr	noms-propres	Mon code est sur GitHub, je t'envoie le lien sur WhatsApp.	Mon code est sur github. Je t'envoie le lien sur whatsapp.	Mon code est sur GitHub. Je t'envoie le lien sur WhatsApp.	tts+qwen3
+fr-np-01-whisper	fr	noms-propres	Mon code est sur GitHub, je t'envoie le lien sur WhatsApp.	Mon code est sur jhub, je t'envoie le lien sur WhatsApp.	Mon code est sur GitHub, je t'envoie le lien sur WhatsApp.	tts+whisper
+fr-np-02-whisper	fr	noms-propres	J'ai acheté un nouvel iPhone chez Best Buy.	J'ai acheté un nouvel iPhone chez BestBuy	J'ai acheté un nouvel iPhone chez Best Buy	tts+whisper
+fr-np-03-parakeet	fr	noms-propres	On fait la réunion sur Teams ou sur Zoom?	On fait la réunion sur Team ou sur Zoom?	On fait la réunion sur Teams ou sur Zoom?	tts+parakeet
+fr-np-03-whisper	fr	noms-propres	On fait la réunion sur Teams ou sur Zoom?	On fait la réunion sur Team ou sur Zoom ?	On fait la réunion sur Teams ou sur Zoom ?	tts+whisper
+fr-np-05-parakeet	fr	noms-propres	Je l'ai mis sur Google Drive et dans Dropbox.	Je l'ai mis sur Google Drive et dans Drawbox.	Je l'ai mis sur Google Drive et dans Dropbox.	tts+parakeet
+fr-np-r01	fr	noms-propres	J'ai poussé le correctif sur GitHub hier soir.	J'ai poussé le correctif sur git hub hier soir.	J'ai poussé le correctif sur GitHub hier soir.	rédigé
+fr-np-r02	fr	noms-propres	Installe l'application sur ton iPhone.	Installe l'application sur ton iphone.	Installe l'application sur ton iPhone.	rédigé
+fr-np-r03	fr	noms-propres	Partage le document dans Google Docs.	Partage le document dans google docs.	Partage le document dans Google Docs.	rédigé
+fr-np-r04	fr	noms-propres	On se parle sur FaceTime ce soir.	On se parle sur face time ce soir.	On se parle sur FaceTime ce soir.	rédigé
+en-np-r01	en	noms-propres	I pushed the fix to GitHub last night.	I pushed the fix to git hub last night.	I pushed the fix to GitHub last night.	rédigé
+en-np-r02	en	noms-propres	Send it to me on WhatsApp.	Send it to me on whats app.	Send it to me on WhatsApp.	rédigé
+en-np-r03	en	noms-propres	Open the slides in PowerPoint.	Open the slides in power point.	Open the slides in PowerPoint.	rédigé
+fr-to-01-parakeet	fr	toponymes	Je pars pour Rimouski demain matin.	Je pars pour et Mouski demain matin.	Je pars pour Rimouski demain matin.	tts+parakeet
+fr-to-01-qwen3	fr	toponymes	Je pars pour Rimouski demain matin.	Je pars pour Imouski demain matin.	Je pars pour Rimouski demain matin.	tts+qwen3
+fr-to-01-whisper	fr	toponymes	Je pars pour Rimouski demain matin.	Je pars pour Emuski demain matin.	Je pars pour Rimouski demain matin.	tts+whisper
+fr-to-02-parakeet	fr	toponymes	On a pris un café à Chicoutimi avant d'aller au Lac-Saint-Jean.	On a pris un café à Chikouti avant d'aller au lac Saint-Jean.	On a pris un café à Chicoutimi avant d'aller au Lac-Saint-Jean.	tts+parakeet
+fr-to-02-qwen3	fr	toponymes	On a pris un café à Chicoutimi avant d'aller au Lac-Saint-Jean.	On a pris un café à Chikutimi avant d'aller au lac Saint Jean.	On a pris un café à Chicoutimi avant d'aller au Lac-Saint-Jean.	tts+qwen3
+fr-to-03-qwen3	fr	toponymes	Ma sœur habite à Trois-Rivières, mon frère en Abitibi.	Ma sœur habite à trois rivieres, mon frère en habite tibit.	Ma sœur habite à Trois-Rivières, mon frère en Abitibi.	tts+qwen3
+fr-to-05-parakeet	fr	toponymes	Il travaille chez Hydro-Québec à Saguenay.	Il travaille chez Hydro Québec à Sacney.	Il travaille chez Hydro-Québec à Saguenay.	tts+parakeet
+fr-to-05-qwen3	fr	toponymes	Il travaille chez Hydro-Québec à Saguenay.	Il travaille chez Iroqebac à Saguenay.	Il travaille chez Hydro-Québec à Saguenay.	tts+qwen3
+fr-to-05-whisper	fr	toponymes	Il travaille chez Hydro-Québec à Saguenay.	Il travaille chez Hydro-Québec à Sacné.	Il travaille chez Hydro-Québec à Saguenay.	tts+whisper
+fr-to-06-parakeet	fr	toponymes	On s'est rencontrés dans Hochelaga, près du métro Joliette.	On s'est rencontrés dans Auchas, près du métro Joliette	On s'est rencontrés dans Hochelaga, près du métro Joliette	tts+parakeet
+fr-to-06-qwen3	fr	toponymes	On s'est rencontrés dans Hochelaga, près du métro Joliette.	On s'est rencontré dans Chlagar, près du métro Joliette.	On s'est rencontré dans Hochelaga, près du métro Joliette.	tts+qwen3
+fr-to-07-parakeet	fr	toponymes	La Société de l'assurance automobile du Québec a fermé le bureau de Matane.	La société de l'assurance automobile du Québec a fermé le bureau de Matane.	La Société de l'assurance automobile du Québec a fermé le bureau de Matane.	tts+parakeet
+fr-to-07-qwen3	fr	toponymes	La Société de l'assurance automobile du Québec a fermé le bureau de Matane.	La société de l'assurance Automobile du Québec a fermé le bureau de Matane.	La Société de l'assurance automobile du Québec a fermé le bureau de Matane.	tts+qwen3
+fr-to-08-parakeet	fr	toponymes	On va faire du ski au Mont-Sainte-Anne puis souper à Sherbrooke.	On va faire du ski au Mont-Sainte-Anne puis souper à Chebouk.	On va faire du ski au Mont-Sainte-Anne puis souper à Sherbrooke.	tts+parakeet
+fr-to-08-qwen3	fr	toponymes	On va faire du ski au Mont-Sainte-Anne puis souper à Sherbrooke.	On va faire du ski au mont Sainte-Annie puis souper à Chebok.	On va faire du ski au Mont-Sainte-Anne puis souper à Sherbrooke.	tts+qwen3
+fr-ctl-10-parakeet	fr	toponymes	Le train passe à Rivière-du-Loup vers midi.	Le train passe à Rivière du Loup vers midi.	Le train passe à Rivière-du-Loup vers midi.	tts+parakeet
+en-to-01-parakeet	en	toponymes	We drove from Montreal to Rimouski along the Saint Lawrence.	We drove from Montreal to Remelsky along the St. Lawrence.	We drove from Montreal to Rimouski along the St. Lawrence.	tts+parakeet
+en-to-01-whisper	en	toponymes	We drove from Montreal to Rimouski along the Saint Lawrence.	We drove from Montreal to Rimelski along the St. Lawrence.	We drove from Montreal to Rimouski along the St. Lawrence.	tts+whisper
+en-to-02-parakeet	en	toponymes	The conference is in Chicoutimi, in the Saguenay region.	The conference is in Chickaltomy in the Segne region.	The conference is in Chicoutimi in the Saguenay region.	tts+parakeet
+en-to-02-qwen3	en	toponymes	The conference is in Chicoutimi, in the Saguenay region.	The conference is in Chakotay, in the Saguenay region.	The conference is in Chicoutimi, in the Saguenay region.	tts+qwen3
+en-to-02-whisper	en	toponymes	The conference is in Chicoutimi, in the Saguenay region.	The conference is in Chikautami in the Saguenay region.	The conference is in Chicoutimi in the Saguenay region.	tts+whisper
+fr-to-r01	fr	toponymes	Le colloque a lieu à l'Université du Québec à Rimouski.	Le colloque a lieu à l'université du Québec à Rimouski.	Le colloque a lieu à l'Université du Québec à Rimouski.	rédigé
+fr-to-r02	fr	toponymes	On passe par la Gaspésie cet été.	On passe par la gaspésie cet été.	On passe par la Gaspésie cet été.	rédigé
+fr-to-r03	fr	toponymes	Il habite à Magog depuis deux ans.	Il habite à Magogue depuis deux ans.	Il habite à Magog depuis deux ans.	rédigé
+fr-to-r04	fr	toponymes	Mon compte est à la caisse Desjardins.	Mon compte est à la caisse des jardins.	Mon compte est à la caisse Desjardins.	rédigé
+en-to-r01	en	toponymes	She moved to Trois-Rivières last year.	She moved to Trois Rivieres last year.	She moved to Trois-Rivières last year.	rédigé
+en-to-r02	en	toponymes	We visited Abitibi and Lac-Saint-Jean.	We visited Abitibi and Lac Saint Jean.	We visited Abitibi and Lac-Saint-Jean.	rédigé
+fr-web-01-parakeet	fr	web	Va voir coiffe rimouski point com.	Va voir coiffrimouski.com	Va voir coifferimouski.com	tts+parakeet
+fr-web-01-qwen3	fr	web	Va voir coiffe rimouski point com.	Vas voir coiffe rymusky point com.	Vas voir coifferimouski.com.	tts+qwen3
+fr-web-01-whisper	fr	web	Va voir coiffe rimouski point com.	Va voir coiffe Rimouski.com	Va voir coifferimouski.com	tts+whisper
+fr-web-02-parakeet	fr	web	Le site, c'est kalmia point ca.	Le site, c'est Kalmia.ka	Le site, c'est kalmia.ca	tts+parakeet
+fr-web-02-whisper	fr	web	Le site, c'est kalmia point ca.	Le site c'est kelmia.ca.	Le site c'est kalmia.ca.	tts+whisper
+fr-web-03-parakeet	fr	web	Inscris-toi sur québec point ca barre oblique emploi.	Inscris-toi sur québec.kabaroblique emploi	Inscris-toi sur quebec.ca/emploi	tts+parakeet
+fr-web-03-qwen3	fr	web	Inscris-toi sur québec point ca barre oblique emploi.	Inscris-toi sur kebec point kababobliqueemploi	Inscris-toi sur quebec.ca/emploi	tts+qwen3
+fr-web-04-parakeet	fr	web	Tout est sur w w w point hydro québec point com.	Tout est sur www.hydrokebec.com	Tout est sur www.hydroquebec.com	tts+parakeet
+fr-web-04-qwen3	fr	web	Tout est sur w w w point hydro québec point com.	Tout est sur www.iroquebec.com.	Tout est sur www.hydroquebec.com.	tts+qwen3
+en-web-01-parakeet	en	web	Go to kalmia dot ca slash contact.	Go to kalmea.ca slash contact.	Go to kalmia.ca/contact.	tts+parakeet
+en-web-01-qwen3	en	web	Go to kalmia dot ca slash contact.	Go to klmia.com/contact.	Go to kalmia.ca/contact.	tts+qwen3
+en-web-01-whisper	en	web	Go to kalmia dot ca slash contact.	Go to kalmayer.co/contact	Go to kalmia.ca/contact	tts+whisper
+fr-web-r01	fr	web	Va sur coiffe rimouski point com.	Va sur coiffe rimouski point com.	Va sur coifferimouski.com.	rédigé
+fr-web-r02	fr	web	Le formulaire est sur québec point ca.	Le formulaire est sur québec point ca.	Le formulaire est sur quebec.ca.	rédigé
+fr-web-r03	fr	web	Renouvelle ton permis sur saaq point gouv point qc point ca.	Renouvelle ton permis sur SAAQ point gouv point QC point ca.	Renouvelle ton permis sur saaq.gouv.qc.ca.	rédigé
+en-web-r01	en	web	Check out github dot com slash kalmia.	Check out github dot com slash Kalmia.	Check out github.com/kalmia.	rédigé
+fr-cou-01-qwen3	fr	courriel	Écris-moi à rémi arobase kalmia point ca.	Écris-moi à Rémi@robazcalmier.ca	Écris-moi à remi@kalmia.ca	tts+qwen3
+fr-cou-01-whisper	fr	courriel	Écris-moi à rémi arobase kalmia point ca.	Écris-moi à remy.scalmia.ca	Écris-moi à remi@kalmia.ca	tts+whisper
+fr-cou-02-qwen3	fr	courriel	Mon courriel, c'est marie point tremblay arobase gmail point com.	Mon courriel c'est marie point tremblay à 18 gmail com.	Mon courriel c'est marie.tremblay@gmail.com.	tts+qwen3
+fr-cou-03-parakeet	fr	courriel	Envoie la facture à info arobase coiffe rimouski point com.	Envoie la facture infoirobase coiffremouski.com	Envoie la facture info@coifferimouski.com	tts+parakeet
+fr-cou-03-qwen3	fr	courriel	Envoie la facture à info arobase coiffe rimouski point com.	Envoie la facture à info@bascoafrymousqui.com	Envoie la facture à info@coifferimouski.com	tts+qwen3
+en-cou-01-parakeet	en	courriel	Email me at remi at kalmia dot ca.	Email me at reme atkelmya.com	Email me at remi@kalmia.ca	tts+parakeet
+en-cou-01-whisper	en	courriel	Email me at remi at kalmia dot ca.	Email me at remy@kelmia.com	Email me at remi@kalmia.ca	tts+whisper
+fr-cou-r01	fr	courriel	Écris à info arobase uqar point ca.	Écris à info arobase UQAR point ca.	Écris à info@uqar.ca.	rédigé
+fr-cou-r02	fr	courriel	Mon adresse, c'est jean point tremblay arobase videotron point ca.	Mon adresse, c'est jean.tremblay arobase vidéotron.ca.	Mon adresse, c'est jean.tremblay@videotron.ca.	rédigé
+en-cou-r01	en	courriel	Write to support at github dot com.	Write to support at GitHub dot com.	Write to support@github.com.	rédigé
+en-cou-r02	en	courriel	My email is marie dot gagnon at gmail dot com.	My email is Marie dot Gagnon at gmail.com.	My email is marie.gagnon@gmail.com.	rédigé
+fr-ep-01-parakeet	fr	epellation	Mon nom de famille s'épelle G, A, G, N, O, N.	Mon nom de famille s'appelle G, A G N O N.	Mon nom de famille s'appelle Gagnon.	tts+parakeet
+fr-ep-02-parakeet	fr	epellation	Le code postal est G 5 L, 3 A 1.	Le code postal est G5L, 3A1.	Le code postal est G5L 3A1.	tts+parakeet
+fr-ep-02-qwen3	fr	epellation	Le code postal est G 5 L, 3 A 1.	Le code postal est G cinq L trois A un.	Le code postal est G5L 3A1.	tts+qwen3
+fr-ep-02-whisper	fr	epellation	Le code postal est G 5 L, 3 A 1.	Le code postal est G5L3A1.	Le code postal est G5L 3A1.	tts+whisper
+fr-ep-03-parakeet	fr	epellation	c, o, i, f, f, e, r, i, m, o, u, s, k, i, point com.	C O I F F E R I M O U S K Icom	coifferimouski.com	tts+parakeet
+fr-ep-03-whisper	fr	epellation	c, o, i, f, f, e, r, i, m, o, u, s, k, i, point com.	C-O-I-F-F-E-R-I-M-O-U-S-K-I.com	coifferimouski.com	tts+whisper
+en-ep-01-whisper	en	epellation	My last name is spelled T, R, E, M, B, L, A, Y.	My last name is spelled T-R-E-M-B-L-A-Y.	My last name is spelled Tremblay.	tts+whisper
+fr-ep-r01	fr	epellation	Ça s'écrit B, O, U, C, H, A, R, D.	Ça s'écrit B O U C H A R D.	Ça s'écrit Bouchard.	rédigé
+fr-ep-r02	fr	epellation	Le code postal, c'est H 2 X, 1 Y 4.	Le code postal, c'est H2X, 1Y4.	Le code postal, c'est H2X 1Y4.	rédigé
+en-ep-r01	en	epellation	That's spelled K, A, L, M, I, A.	That's spelled K-A-L-M-I-A.	That's spelled Kalmia.	rédigé
+en-ep-r02	en	epellation	My postal code is G 5 L, 3 A 1.	My postal code is G5L, 3A1.	My postal code is G5L 3A1.	rédigé
+fr-ctl-01-parakeet	fr	controle	On a trouvé un point commun entre les deux projets.	On a trouvé un point commun entre les deux projets.	On a trouvé un point commun entre les deux projets.	tts+parakeet+qwen3+whisper
+fr-ctl-02-parakeet	fr	controle	Mets un point final à cette histoire.	Mais un point final à cette histoire.	Mais un point final à cette histoire.	tts+parakeet+qwen3+whisper
+fr-ctl-03-parakeet	fr	controle	On s'est arrêtés à la barre oblique du terrain.	On s'est arrêté à la barre oblique du terrain.	On s'est arrêté à la barre oblique du terrain.	tts+parakeet+qwen3
+fr-ctl-05-parakeet	fr	controle	On a un plan B si le plan A ne marche pas.	On a un plan B si le plan A ne marche pas.	On a un plan B si le plan A ne marche pas.	tts+parakeet+whisper
+en-ctl-01-parakeet	en	controle	That company died in the dot com bubble.	That company died in the dot-com bubble.	That company died in the dot-com bubble.	tts+parakeet+qwen3+whisper
+en-ctl-02-qwen3	en	controle	She got an A in math and a B in French.	She got an A in math and a B in French.	She got an A in math and a B in French.	tts+qwen3
+en-ctl-03-parakeet	en	controle	Take vitamin D in the winter.	Take vitamin D in the winter.	Take vitamin D in the winter.	tts+parakeet+qwen3+whisper
+en-ctl-04-parakeet	en	controle	Plan B is to take the bus.	Plan B is to take the bus.	Plan B is to take the bus.	tts+parakeet+qwen3+whisper
+fr-ctl-r01	fr	controle	Le symbole arobase vient d'une ancienne unité de mesure.	Le symbole arobase vient d'une ancienne unité de mesure.	Le symbole arobase vient d'une ancienne unité de mesure.	rédigé
+fr-ctl-r02	fr	controle	Ils ont fait faillite pendant la bulle des point com.	Ils ont fait faillite pendant la bulle des point com.	Ils ont fait faillite pendant la bulle des point com.	rédigé
+fr-ctl-r03	fr	controle	Mets un point final à cette discussion.	Mets un point final à cette discussion.	Mets un point final à cette discussion.	rédigé
+fr-ctl-r04	fr	controle	Il dit arobase au lieu de a commercial.	Il dit arobase au lieu de a commercial.	Il dit arobase au lieu de a commercial.	rédigé
+fr-ctl-r05	fr	controle	J'ai eu un C en maths et un A en français.	J'ai eu un C en maths et un A en français.	J'ai eu un C en maths et un A en français.	rédigé
+fr-ctl-r06	fr	controle	Prends de la vitamine C pendant l'hiver.	Prends de la vitamine C pendant l'hiver.	Prends de la vitamine C pendant l'hiver.	rédigé
+fr-ctl-r07	fr	controle	Le point de presse est à dix heures.	Le point de presse est à dix heures.	Le point de presse est à dix heures.	rédigé
+fr-ctl-r08	fr	controle	Trace une barre oblique au bout de la ligne.	Trace une barre oblique au bout de la ligne.	Trace une barre oblique au bout de la ligne.	rédigé
+fr-ctl-r09	fr	controle	On a un point commun, c'est le hockey.	On a un point commun, c'est le hockey.	On a un point commun, c'est le hockey.	rédigé
+fr-ctl-r10	fr	controle	Le Canadien a gagné hier soir au Centre Bell.	Le Canadien a gagné hier soir au Centre Bell.	Le Canadien a gagné hier soir au Centre Bell.	rédigé
+fr-ctl-r11	fr	controle	Le plan B, c'est de partir plus tôt.	Le plan B, c'est de partir plus tôt.	Le plan B, c'est de partir plus tôt.	rédigé
+en-ctl-r01	en	controle	Be there at nine on the dot.	Be there at nine on the dot.	Be there at nine on the dot.	rédigé
+en-ctl-r02	en	controle	He said at least three times that it was fine.	He said at least three times that it was fine.	He said at least three times that it was fine.	rédigé
+en-ctl-r03	en	controle	The letter C stands for carbon.	The letter C stands for carbon.	The letter C stands for carbon.	rédigé
+en-ctl-r04	en	controle	Use a forward slash between the two dates.	Use a forward slash between the two dates.	Use a forward slash between the two dates.	rédigé
+fr-rar-01-parakeet	fr	controle-mots-rares	J'ai trouvé ce manteau dans une friperie de Rimouski.	J'ai trouvé ce manteau dans une friperie de Rimouski.	J'ai trouvé ce manteau dans une friperie de Rimouski.	tts+parakeet
+fr-rar-02-parakeet	fr	controle-mots-rares	Avec la poudrerie, on voyait rien sur l'autoroute.	Avec la poudrerie, on voyait rien sur l'autoroute.	Avec la poudrerie, on voyait rien sur l'autoroute.	tts+parakeet+qwen3
+fr-rar-04-whisper	fr	controle-mots-rares	On a loué un chalet dans une pourvoirie en Mauricie.	On a loué un chalet dans une pourvoirie en Mauricie.	On a loué un chalet dans une pourvoirie en Mauricie.	tts+whisper
+fr-rar-05-parakeet	fr	controle-mots-rares	Il y a beaucoup d'achalandage à la tabagie le samedi.	Il y a beaucoup d'achalandage à la tabagie le samedi.	Il y a beaucoup d'achalandage à la tabagie le samedi.	tts+parakeet
+fr-rar-06-parakeet	fr	controle-mots-rares	On jasait par clavardage avec le service à la clientèle.	On jasait par clavardage avec le service à la clientèle.	On jasait par clavardage avec le service à la clientèle.	tts+parakeet+qwen3+whisper
+fr-ctl-08-parakeet	fr	controle-mots-rares	On va magasiner en fin de semaine.	On va magasiner en fin de semaine.	On va magasiner en fin de semaine.	tts+parakeet+qwen3+whisper
+fr-ctl-09-parakeet	fr	controle-mots-rares	Le point de rencontre est à côté du dépanneur.	Le point de rencontre est à côté du dépanneur.	Le point de rencontre est à côté du dépanneur.	tts+parakeet+qwen3+whisper
+fr-rar-r01	fr	controle-mots-rares	Elle travaille dans une friperie sur la rue Saint-Joseph.	Elle travaille dans une friperie sur la rue Saint-Joseph.	Elle travaille dans une friperie sur la rue Saint-Joseph.	rédigé
+fr-rar-r02	fr	controle-mots-rares	Mets ta tuque, il fait frette dehors.	Mets ta tuque, il fait frette dehors.	Mets ta tuque, il fait frette dehors.	rédigé
+fr-rar-r03	fr	controle-mots-rares	Envoie-moi un courriel quand tu seras arrivé.	Envoie-moi un courriel quand tu seras arrivé.	Envoie-moi un courriel quand tu seras arrivé.	rédigé
+fr-rar-r04	fr	controle-mots-rares	Il y avait un gros banc de neige devant le garage.	Il y avait un gros banc de neige devant le garage.	Il y avait un gros banc de neige devant le garage.	rédigé
+fr-rar-r05	fr	controle-mots-rares	On va à la cabane à sucre dimanche.	On va à la cabane à sucre dimanche.	On va à la cabane à sucre dimanche.	rédigé
+fr-rar-r06	fr	controle-mots-rares	Arrête de m'achaler avec ça.	Arrête de m'achaler avec ça.	Arrête de m'achaler avec ça.	rédigé
+fr-rar-r07	fr	controle-mots-rares	J'ai rien compris pantoute.	J'ai rien compris pantoute.	J'ai rien compris pantoute.	rédigé
+fr-rar-r08	fr	controle-mots-rares	Mon chum a stationné son char devant le dépanneur.	Mon chum a stationné son char devant le dépanneur.	Mon chum a stationné son char devant le dépanneur.	rédigé
+fr-rar-r09	fr	controle-mots-rares	Elle finit son cégep au printemps.	Elle finit son cégep au printemps.	Elle finit son cégep au printemps.	rédigé
+fr-rar-r10	fr	controle-mots-rares	La pourvoirie ouvre à la mi-mai.	La pourvoirie ouvre à la mi-mai.	La pourvoirie ouvre à la mi-mai.	rédigé
+fr-rar-r11	fr	controle-mots-rares	On a jasé pendant une heure au téléphone.	On a jasé pendant une heure au téléphone.	On a jasé pendant une heure au téléphone.	rédigé
+en-rar-r01	en	controle-mots-rares	We stopped at the dépanneur for poutine.	We stopped at the dépanneur for poutine.	We stopped at the dépanneur for poutine.	rédigé
+fr-np-02-parakeet	fr	controle-deja-correct	J'ai acheté un nouvel iPhone chez Best Buy.	J'ai acheté un nouvel iPhone chez Best Buy.	J'ai acheté un nouvel iPhone chez Best Buy.	tts+parakeet+qwen3
+fr-np-04-parakeet	fr	controle-deja-correct	Ouvre le fichier dans Visual Studio Code.	Ouvre le fichier dans Visual Studio Code.	Ouvre le fichier dans Visual Studio Code.	tts+parakeet+whisper
+fr-np-05-qwen3	fr	controle-deja-correct	Je l'ai mis sur Google Drive et dans Dropbox.	Je l'ai mis sur Google Drive et dans Dropbox.	Je l'ai mis sur Google Drive et dans Dropbox.	tts+qwen3+whisper
+fr-np-06-parakeet	fr	controle-deja-correct	Mets ça dans le Slack de l'équipe.	Mets ça dans le Slack de l'équipe.	Mets ça dans le Slack de l'équipe.	tts+parakeet
+fr-to-03-parakeet	fr	controle-deja-correct	Ma sœur habite à Trois-Rivières, mon frère en Abitibi.	Ma sœur habite à Trois-Rivières, mon frère en Abitibi.	Ma sœur habite à Trois-Rivières, mon frère en Abitibi.	tts+parakeet
+fr-to-07-whisper	fr	controle-deja-correct	La Société de l'assurance automobile du Québec a fermé le bureau de Matane.	La Société de l'assurance automobile du Québec a fermé le bureau de Matane.	La Société de l'assurance automobile du Québec a fermé le bureau de Matane.	tts+whisper
+fr-web-04-whisper	fr	controle-deja-correct	Tout est sur w w w point hydro québec point com.	Tout est sur www.hydroquebec.com.	Tout est sur www.hydroquebec.com.	tts+whisper
+en-np-01-parakeet	en	controle-deja-correct	My code is on GitHub, send me the link on WhatsApp.	My code is on GitHub, send me the link on WhatsApp.	My code is on GitHub, send me the link on WhatsApp.	tts+parakeet
+en-np-01-qwen3	en	controle-deja-correct	My code is on GitHub, send me the link on WhatsApp.	My code is on GitHub. Send me the link on WhatsApp.	My code is on GitHub. Send me the link on WhatsApp.	tts+qwen3+whisper
+en-np-02-parakeet	en	controle-deja-correct	I updated my iPhone and my MacBook last night.	I updated my iPhone and my MacBook last night.	I updated my iPhone and my MacBook last night.	tts+parakeet+qwen3
+en-to-01-qwen3	en	controle-deja-correct	We drove from Montreal to Rimouski along the Saint Lawrence.	We drove from Montreal to Rimouski along the Saint Lawrence.	We drove from Montreal to Rimouski along the Saint Lawrence.	tts+qwen3

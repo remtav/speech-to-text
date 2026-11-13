@@ -1,0 +1,137 @@
+# approche: simulation-llm-oracle-gardefou
+# llm: oui
+# description: SIMULATION, aucun LLM n'a tourné (MediaPipe : arm64 seulement). Lexique : lexique-simulation.txt (plafond optimiste). Approche 3 : LLM « oracle » simulé : rend exactement le texte attendu. Garde-fou assoupli avec lexique, sans proximité. = plafond de l'approche 3.
+# Fichier généré par LlmSimulationTest : ne pas modifier à la main. Ce n'est PAS une mesure.
+id	brut	sortie
+fr-np-01-parakeet	Mon code est sur J-Hub, je t'envoie le lien sur WhatsApp.	Mon code est sur J-Hub, je t'envoie le lien sur WhatsApp.
+fr-np-01-qwen3	Mon code est sur github. Je t'envoie le lien sur whatsapp.	Mon code est sur GitHub. Je t'envoie le lien sur WhatsApp.
+fr-np-01-whisper	Mon code est sur jhub, je t'envoie le lien sur WhatsApp.	Mon code est sur jhub, je t'envoie le lien sur WhatsApp.
+fr-np-02-whisper	J'ai acheté un nouvel iPhone chez BestBuy	J'ai acheté un nouvel iPhone chez Best Buy
+fr-np-03-parakeet	On fait la réunion sur Team ou sur Zoom?	On fait la réunion sur Team ou sur Zoom?
+fr-np-03-whisper	On fait la réunion sur Team ou sur Zoom ?	On fait la réunion sur Team ou sur Zoom ?
+fr-np-05-parakeet	Je l'ai mis sur Google Drive et dans Drawbox.	Je l'ai mis sur Google Drive et dans Drawbox.
+fr-np-r01	J'ai poussé le correctif sur git hub hier soir.	J'ai poussé le correctif sur GitHub hier soir.
+fr-np-r02	Installe l'application sur ton iphone.	Installe l'application sur ton iPhone.
+fr-np-r03	Partage le document dans google docs.	Partage le document dans Google Docs.
+fr-np-r04	On se parle sur face time ce soir.	On se parle sur FaceTime ce soir.
+en-np-r01	I pushed the fix to git hub last night.	I pushed the fix to GitHub last night.
+en-np-r02	Send it to me on whats app.	Send it to me on WhatsApp.
+en-np-r03	Open the slides in power point.	Open the slides in PowerPoint.
+fr-to-01-parakeet	Je pars pour et Mouski demain matin.	Je pars pour et Mouski demain matin.
+fr-to-01-qwen3	Je pars pour Imouski demain matin.	Je pars pour Imouski demain matin.
+fr-to-01-whisper	Je pars pour Emuski demain matin.	Je pars pour Emuski demain matin.
+fr-to-02-parakeet	On a pris un café à Chikouti avant d'aller au lac Saint-Jean.	On a pris un café à Chikouti avant d'aller au lac Saint-Jean.
+fr-to-02-qwen3	On a pris un café à Chikutimi avant d'aller au lac Saint Jean.	On a pris un café à Chikutimi avant d'aller au lac Saint Jean.
+fr-to-03-qwen3	Ma sœur habite à trois rivieres, mon frère en habite tibit.	Ma sœur habite à trois rivieres, mon frère en habite tibit.
+fr-to-05-parakeet	Il travaille chez Hydro Québec à Sacney.	Il travaille chez Hydro Québec à Sacney.
+fr-to-05-qwen3	Il travaille chez Iroqebac à Saguenay.	Il travaille chez Iroqebac à Saguenay.
+fr-to-05-whisper	Il travaille chez Hydro-Québec à Sacné.	Il travaille chez Hydro-Québec à Sacné.
+fr-to-06-parakeet	On s'est rencontrés dans Auchas, près du métro Joliette	On s'est rencontrés dans Auchas, près du métro Joliette
+fr-to-06-qwen3	On s'est rencontré dans Chlagar, près du métro Joliette.	On s'est rencontré dans Chlagar, près du métro Joliette.
+fr-to-07-parakeet	La société de l'assurance automobile du Québec a fermé le bureau de Matane.	La Société de l'assurance automobile du Québec a fermé le bureau de Matane.
+fr-to-07-qwen3	La société de l'assurance Automobile du Québec a fermé le bureau de Matane.	La Société de l'assurance automobile du Québec a fermé le bureau de Matane.
+fr-to-08-parakeet	On va faire du ski au Mont-Sainte-Anne puis souper à Chebouk.	On va faire du ski au Mont-Sainte-Anne puis souper à Chebouk.
+fr-to-08-qwen3	On va faire du ski au mont Sainte-Annie puis souper à Chebok.	On va faire du ski au mont Sainte-Annie puis souper à Chebok.
+fr-ctl-10-parakeet	Le train passe à Rivière du Loup vers midi.	Le train passe à Rivière-du-Loup vers midi.
+en-to-01-parakeet	We drove from Montreal to Remelsky along the St. Lawrence.	We drove from Montreal to Remelsky along the St. Lawrence.
+en-to-01-whisper	We drove from Montreal to Rimelski along the St. Lawrence.	We drove from Montreal to Rimelski along the St. Lawrence.
+en-to-02-parakeet	The conference is in Chickaltomy in the Segne region.	The conference is in Chickaltomy in the Segne region.
+en-to-02-qwen3	The conference is in Chakotay, in the Saguenay region.	The conference is in Chakotay, in the Saguenay region.
+en-to-02-whisper	The conference is in Chikautami in the Saguenay region.	The conference is in Chikautami in the Saguenay region.
+fr-to-r01	Le colloque a lieu à l'université du Québec à Rimouski.	Le colloque a lieu à l'Université du Québec à Rimouski.
+fr-to-r02	On passe par la gaspésie cet été.	On passe par la Gaspésie cet été.
+fr-to-r03	Il habite à Magogue depuis deux ans.	Il habite à Magogue depuis deux ans.
+fr-to-r04	Mon compte est à la caisse des jardins.	Mon compte est à la caisse Desjardins.
+en-to-r01	She moved to Trois Rivieres last year.	She moved to Trois-Rivières last year.
+en-to-r02	We visited Abitibi and Lac Saint Jean.	We visited Abitibi and Lac-Saint-Jean.
+fr-web-01-parakeet	Va voir coiffrimouski.com	Va voir coiffrimouski.com
+fr-web-01-qwen3	Vas voir coiffe rymusky point com.	Vas voir coiffe rymusky point com.
+fr-web-01-whisper	Va voir coiffe Rimouski.com	Va voir coifferimouski.com
+fr-web-02-parakeet	Le site, c'est Kalmia.ka	Le site, c'est Kalmia.ka
+fr-web-02-whisper	Le site c'est kelmia.ca.	Le site c'est kelmia.ca.
+fr-web-03-parakeet	Inscris-toi sur québec.kabaroblique emploi	Inscris-toi sur québec.kabaroblique emploi
+fr-web-03-qwen3	Inscris-toi sur kebec point kababobliqueemploi	Inscris-toi sur kebec point kababobliqueemploi
+fr-web-04-parakeet	Tout est sur www.hydrokebec.com	Tout est sur www.hydrokebec.com
+fr-web-04-qwen3	Tout est sur www.iroquebec.com.	Tout est sur www.iroquebec.com.
+en-web-01-parakeet	Go to kalmea.ca slash contact.	Go to kalmea.ca slash contact.
+en-web-01-qwen3	Go to klmia.com/contact.	Go to klmia.com/contact.
+en-web-01-whisper	Go to kalmayer.co/contact	Go to kalmayer.co/contact
+fr-web-r01	Va sur coiffe rimouski point com.	Va sur coifferimouski.com.
+fr-web-r02	Le formulaire est sur québec point ca.	Le formulaire est sur quebec.ca.
+fr-web-r03	Renouvelle ton permis sur SAAQ point gouv point QC point ca.	Renouvelle ton permis sur saaq.gouv.qc.ca.
+en-web-r01	Check out github dot com slash Kalmia.	Check out github.com/kalmia.
+fr-cou-01-qwen3	Écris-moi à Rémi@robazcalmier.ca	Écris-moi à Rémi@robazcalmier.ca
+fr-cou-01-whisper	Écris-moi à remy.scalmia.ca	Écris-moi à remy.scalmia.ca
+fr-cou-02-qwen3	Mon courriel c'est marie point tremblay à 18 gmail com.	Mon courriel c'est marie point tremblay à 18 gmail com.
+fr-cou-03-parakeet	Envoie la facture infoirobase coiffremouski.com	Envoie la facture infoirobase coiffremouski.com
+fr-cou-03-qwen3	Envoie la facture à info@bascoafrymousqui.com	Envoie la facture à info@bascoafrymousqui.com
+en-cou-01-parakeet	Email me at reme atkelmya.com	Email me at reme atkelmya.com
+en-cou-01-whisper	Email me at remy@kelmia.com	Email me at remy@kelmia.com
+fr-cou-r01	Écris à info arobase UQAR point ca.	Écris à info@uqar.ca.
+fr-cou-r02	Mon adresse, c'est jean.tremblay arobase vidéotron.ca.	Mon adresse, c'est jean.tremblay@videotron.ca.
+en-cou-r01	Write to support at GitHub dot com.	Write to support@github.com.
+en-cou-r02	My email is Marie dot Gagnon at gmail.com.	My email is marie.gagnon@gmail.com.
+fr-ep-01-parakeet	Mon nom de famille s'appelle G, A G N O N.	Mon nom de famille s'appelle Gagnon.
+fr-ep-02-parakeet	Le code postal est G5L, 3A1.	Le code postal est G5L 3A1.
+fr-ep-02-qwen3	Le code postal est G cinq L trois A un.	Le code postal est G5L 3A1.
+fr-ep-02-whisper	Le code postal est G5L3A1.	Le code postal est G5L 3A1.
+fr-ep-03-parakeet	C O I F F E R I M O U S K Icom	C O I F F E R I M O U S K Icom
+fr-ep-03-whisper	C-O-I-F-F-E-R-I-M-O-U-S-K-I.com	coifferimouski.com
+en-ep-01-whisper	My last name is spelled T-R-E-M-B-L-A-Y.	My last name is spelled Tremblay.
+fr-ep-r01	Ça s'écrit B O U C H A R D.	Ça s'écrit Bouchard.
+fr-ep-r02	Le code postal, c'est H2X, 1Y4.	Le code postal, c'est H2X 1Y4.
+en-ep-r01	That's spelled K-A-L-M-I-A.	That's spelled Kalmia.
+en-ep-r02	My postal code is G5L, 3A1.	My postal code is G5L 3A1.
+fr-ctl-01-parakeet	On a trouvé un point commun entre les deux projets.	On a trouvé un point commun entre les deux projets.
+fr-ctl-02-parakeet	Mais un point final à cette histoire.	Mais un point final à cette histoire.
+fr-ctl-03-parakeet	On s'est arrêté à la barre oblique du terrain.	On s'est arrêté à la barre oblique du terrain.
+fr-ctl-05-parakeet	On a un plan B si le plan A ne marche pas.	On a un plan B si le plan A ne marche pas.
+en-ctl-01-parakeet	That company died in the dot-com bubble.	That company died in the dot-com bubble.
+en-ctl-02-qwen3	She got an A in math and a B in French.	She got an A in math and a B in French.
+en-ctl-03-parakeet	Take vitamin D in the winter.	Take vitamin D in the winter.
+en-ctl-04-parakeet	Plan B is to take the bus.	Plan B is to take the bus.
+fr-ctl-r01	Le symbole arobase vient d'une ancienne unité de mesure.	Le symbole arobase vient d'une ancienne unité de mesure.
+fr-ctl-r02	Ils ont fait faillite pendant la bulle des point com.	Ils ont fait faillite pendant la bulle des point com.
+fr-ctl-r03	Mets un point final à cette discussion.	Mets un point final à cette discussion.
+fr-ctl-r04	Il dit arobase au lieu de a commercial.	Il dit arobase au lieu de a commercial.
+fr-ctl-r05	J'ai eu un C en maths et un A en français.	J'ai eu un C en maths et un A en français.
+fr-ctl-r06	Prends de la vitamine C pendant l'hiver.	Prends de la vitamine C pendant l'hiver.
+fr-ctl-r07	Le point de presse est à dix heures.	Le point de presse est à dix heures.
+fr-ctl-r08	Trace une barre oblique au bout de la ligne.	Trace une barre oblique au bout de la ligne.
+fr-ctl-r09	On a un point commun, c'est le hockey.	On a un point commun, c'est le hockey.
+fr-ctl-r10	Le Canadien a gagné hier soir au Centre Bell.	Le Canadien a gagné hier soir au Centre Bell.
+fr-ctl-r11	Le plan B, c'est de partir plus tôt.	Le plan B, c'est de partir plus tôt.
+en-ctl-r01	Be there at nine on the dot.	Be there at nine on the dot.
+en-ctl-r02	He said at least three times that it was fine.	He said at least three times that it was fine.
+en-ctl-r03	The letter C stands for carbon.	The letter C stands for carbon.
+en-ctl-r04	Use a forward slash between the two dates.	Use a forward slash between the two dates.
+fr-rar-01-parakeet	J'ai trouvé ce manteau dans une friperie de Rimouski.	J'ai trouvé ce manteau dans une friperie de Rimouski.
+fr-rar-02-parakeet	Avec la poudrerie, on voyait rien sur l'autoroute.	Avec la poudrerie, on voyait rien sur l'autoroute.
+fr-rar-04-whisper	On a loué un chalet dans une pourvoirie en Mauricie.	On a loué un chalet dans une pourvoirie en Mauricie.
+fr-rar-05-parakeet	Il y a beaucoup d'achalandage à la tabagie le samedi.	Il y a beaucoup d'achalandage à la tabagie le samedi.
+fr-rar-06-parakeet	On jasait par clavardage avec le service à la clientèle.	On jasait par clavardage avec le service à la clientèle.
+fr-ctl-08-parakeet	On va magasiner en fin de semaine.	On va magasiner en fin de semaine.
+fr-ctl-09-parakeet	Le point de rencontre est à côté du dépanneur.	Le point de rencontre est à côté du dépanneur.
+fr-rar-r01	Elle travaille dans une friperie sur la rue Saint-Joseph.	Elle travaille dans une friperie sur la rue Saint-Joseph.
+fr-rar-r02	Mets ta tuque, il fait frette dehors.	Mets ta tuque, il fait frette dehors.
+fr-rar-r03	Envoie-moi un courriel quand tu seras arrivé.	Envoie-moi un courriel quand tu seras arrivé.
+fr-rar-r04	Il y avait un gros banc de neige devant le garage.	Il y avait un gros banc de neige devant le garage.
+fr-rar-r05	On va à la cabane à sucre dimanche.	On va à la cabane à sucre dimanche.
+fr-rar-r06	Arrête de m'achaler avec ça.	Arrête de m'achaler avec ça.
+fr-rar-r07	J'ai rien compris pantoute.	J'ai rien compris pantoute.
+fr-rar-r08	Mon chum a stationné son char devant le dépanneur.	Mon chum a stationné son char devant le dépanneur.
+fr-rar-r09	Elle finit son cégep au printemps.	Elle finit son cégep au printemps.
+fr-rar-r10	La pourvoirie ouvre à la mi-mai.	La pourvoirie ouvre à la mi-mai.
+fr-rar-r11	On a jasé pendant une heure au téléphone.	On a jasé pendant une heure au téléphone.
+en-rar-r01	We stopped at the dépanneur for poutine.	We stopped at the dépanneur for poutine.
+fr-np-02-parakeet	J'ai acheté un nouvel iPhone chez Best Buy.	J'ai acheté un nouvel iPhone chez Best Buy.
+fr-np-04-parakeet	Ouvre le fichier dans Visual Studio Code.	Ouvre le fichier dans Visual Studio Code.
+fr-np-05-qwen3	Je l'ai mis sur Google Drive et dans Dropbox.	Je l'ai mis sur Google Drive et dans Dropbox.
+fr-np-06-parakeet	Mets ça dans le Slack de l'équipe.	Mets ça dans le Slack de l'équipe.
+fr-to-03-parakeet	Ma sœur habite à Trois-Rivières, mon frère en Abitibi.	Ma sœur habite à Trois-Rivières, mon frère en Abitibi.
+fr-to-07-whisper	La Société de l'assurance automobile du Québec a fermé le bureau de Matane.	La Société de l'assurance automobile du Québec a fermé le bureau de Matane.
+fr-web-04-whisper	Tout est sur www.hydroquebec.com.	Tout est sur www.hydroquebec.com.
+en-np-01-parakeet	My code is on GitHub, send me the link on WhatsApp.	My code is on GitHub, send me the link on WhatsApp.
+en-np-01-qwen3	My code is on GitHub. Send me the link on WhatsApp.	My code is on GitHub. Send me the link on WhatsApp.
+en-np-02-parakeet	I updated my iPhone and my MacBook last night.	I updated my iPhone and my MacBook last night.
+en-to-01-qwen3	We drove from Montreal to Rimouski along the Saint Lawrence.	We drove from Montreal to Rimouski along the Saint Lawrence.

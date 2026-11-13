@@ -42,7 +42,7 @@ import java.util.concurrent.atomic.AtomicInteger
 class WholeDictationTest {
     private val secret = "cf-secret-0123456789abcdef"
     private val clientId = "abcd1234.access"
-    private val raw = "bonjour euh je voulais dire que le serveur marche"
+    @Volatile private var raw = "bonjour euh je voulais dire que le serveur marche"
     private val polished = "Bonjour, je voulais dire que le serveur marche."
 
     /** What the fake server answers. */
@@ -95,10 +95,11 @@ class WholeDictationTest {
         api: RemoteApi = RemoteApi.DICTEE_SERVER,
         url: String = base(),
         waitBase: Long = 5_000,
+        polish: Boolean = true,
     ) = RemoteConfig(
         url, api, language = "fr",
         cfAccessClientId = if (cf) clientId else "", cfAccessClientSecret = if (cf) secret else "",
-        connectTimeoutMillis = 500, waitBaseMillis = waitBase, pollIntervalMillis = 30,
+        connectTimeoutMillis = 500, waitBaseMillis = waitBase, pollIntervalMillis = 30, polish = polish,
     )
 
     private fun remote(c: RemoteConfig = config()) = RemoteEngine(ModelCatalog.remote, c)
@@ -172,6 +173,54 @@ class WholeDictationTest {
         assertEquals(listOf(true, false), rec.waits.toList())
         assertEquals(DictationState.IDLE, c.state)
         assertFalse(c.waitingServer)
+    }
+
+    // ----------------------------------------- polish turned off in the settings (issue #15)
+
+    @Test fun polishOffAsksTheServerForNoPolishAndInsertsTheRawText() {
+        polishJson = """"polished_text": null""" // what a server returns when it did not polish
+        val (sink, rec, _) = dictate(remote(config(polish = false)))
+        assertEquals("Bonjour euh je voulais dire que le serveur marche", sink.text)
+        // Explicit false: a server started with WHISPER_POLISH=on would polish if the field were absent.
+        assertEquals("false", field(jobPosts().single().body, "polish"))
+        val r = rec.results.single()
+        assertEquals(DictationResult.Source.SERVER_RAW, r.source)
+        assertEquals("not requested", r.polishStatus) // no "texte non poli" message in the keyboard
+        assertNull(r.polishedText)
+    }
+
+    @Test fun polishOffInsertsFriperieEvenIfTheServerPolishedAnyway() {
+        raw = "je suis allé à la friperie hier"
+        polishJson = """"polished_text": "Je suis allé à la fripperie hier.", "polish": {"applied": true, "model": "m", "fallback_reason": null}"""
+        val (off, _, _) = dictate(remote(config(polish = false)))
+        assertEquals("Je suis allé à la friperie hier", off.text)
+        val (on, _, _) = dictate(remote(config(polish = true)))
+        assertEquals("Je suis allé à la fripperie hier.", on.text) // the degradation the setting lets the user avoid
+    }
+
+    @Test fun polishOffAlsoHoldsOnTheSynchronousFallback() {
+        jobsCode = 404
+        polishJson = """"polished_text": null"""
+        val (sink, rec, _) = dictate(remote(config(polish = false)))
+        assertEquals("Bonjour euh je voulais dire que le serveur marche", sink.text)
+        val post = reqs().single { it.path == "/transcribe/streaming" }
+        assertEquals("false", field(post.body, "polish"))
+        assertEquals("not requested", rec.results.single().polishStatus)
+        assertEquals("sync", rec.results.single().transport)
+    }
+
+    /** Independent review of lot 3: the voice commands do not depend on the server polish. */
+    @Test fun polishOffStillAppliesVoiceCommandsToTheRawText() {
+        raw = "Première ligne. Nouvelle ligne. Deuxième ligne."
+        polishJson = """"polished_text": "Première ligne, nouvelle ligne, deuxième ligne.", "polish": {"applied": true}"""
+        val (sink, _, _) = dictate(remote(config(polish = false)))
+        assertEquals("Première ligne.\nDeuxième ligne.", sink.text)
+    }
+
+    @Test fun polishOnStillAsksForPolish() {
+        assertTrue(RemoteConfig("http://h").polish) // default of the client config
+        dictate(remote(config(polish = true)))
+        assertEquals("true", field(jobPosts().single().body, "polish"))
     }
 
     @Test fun voiceCommandsAndAssemblyApplyToThePolishedText() {

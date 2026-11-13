@@ -1,6 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<!-- Texte secondaire et indications de saisie : atténué ; désactivé, encre à 38 %. -->
-<selector xmlns:android="http://schemas.android.com/apk/res/android">
-    <item android:alpha="0.38" android:color="?attr/colorOnSurface" android:state_enabled="false" />
-    <item android:color="?attr/colorOnSurfaceVariant" />
-</selector>

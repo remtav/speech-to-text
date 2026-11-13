@@ -1,0 +1,53 @@
+# Lexique de SIMULATION (issue #15, lot 3, étape 3.3). Une entrée par ligne, lignes « # » ignorées.
+#
+# Rédigé à partir des noms qui figurent dans jeu-evaluation.tsv : il contient donc tous les noms
+# que le jeu demande de rétablir. Les chiffres obtenus avec lui sont un PLAFOND OPTIMISTE, pas une
+# mesure : un vrai lexique livré (étape 3.2) plus le vocabulaire de l'utilisateur couvriront une
+# partie seulement de ces noms, et en contiendront d'autres. Aucune adresse web ni courriel : une
+# adresse ne se corrige que si elle a été dite en entier (garde-fou assoupli, règle ADDRESS).
+#
+# Utilisé par LlmSimulationTest (JVM) et par LlmPolishRecordingTest (téléphone, assets du test).
+# Noms techniques et produits
+GitHub
+WhatsApp
+iPhone
+MacBook
+Best Buy
+Teams
+Zoom
+Dropbox
+Google Drive
+Google Docs
+FaceTime
+PowerPoint
+Visual Studio Code
+Slack
+# Lieux et institutions du Québec
+Rimouski
+Chicoutimi
+Saguenay
+Lac-Saint-Jean
+Trois-Rivières
+Abitibi
+Gaspésie
+Hochelaga
+Joliette
+Matane
+Mauricie
+Magog
+Sherbrooke
+Mont-Sainte-Anne
+Rivière-du-Loup
+Hydro-Québec
+Desjardins
+Centre Bell
+Montréal
+Montreal
+St. Lawrence
+Société de l'assurance automobile du Québec
+Université du Québec à Rimouski
+# Noms de personnes et de marque du jeu
+Kalmia
+Gagnon
+Tremblay
+Bouchard

@@ -1889,3 +1889,1297 @@ montre les mots dits) : comportement attendu, documenté.
   modifié (hors portée).
 - Vie privée : aucune permission ni requête réseau ajoutée par le lot (manifeste :
   une activité non exportée).
+
+## Issue #15, lot 3 — étape 3.1 : jeu d'évaluation et notation
+
+L'instrument de mesure du polissage sur le téléphone, sans aucune approche de
+polissage (étapes 3.2 et 3.3). Rien ne change sous `app/src/main` : tout est
+dans les sources de test, donc absent de l'APK.
+
+### Jeu d'évaluation
+
+`app/src/test/resources/polissage/jeu-evaluation.tsv` : TSV UTF-8 commenté
+(en-tête `#` qui documente les colonnes), une paire par ligne :
+`id`, `langue` (`fr` / `en`), `categorie`, `dit` (ce que la personne dit),
+`brut` (sortie du modèle, entrée du polissage), `attendu`, `provenance`.
+
+**132 paires** : 79 à corriger, 53 contrôles qui ne doivent pas changer.
+
+| Catégorie | fr | en | Rôle |
+| --- | --- | --- | --- |
+| `noms-propres` (GitHub, WhatsApp, iPhone, Dropbox, Teams…) | 11 | 3 | à corriger |
+| `toponymes` (Rimouski, Chicoutimi, Lac-Saint-Jean, Hochelaga, Hydro-Québec, SAAQ, UQAR…) | 20 | 7 | à corriger |
+| `web` (dont `coifferimouski.com`, cas de l'issue) | 12 | 4 | à corriger |
+| `courriel` | 7 | 4 | à corriger |
+| `epellation` (lettres, codes postaux) | 8 | 3 | à corriger |
+| `controle` : phrases ordinaires et pièges (« un point commun », « mets un point final », « la barre oblique du terrain », « arobase » comme mot, « bulle des point com », « plan B », « vitamine C », « on the dot »…) | 15 | 8 | inchangé |
+| `controle-mots-rares` : mots rares ou d'ici bien transcrits (friperie, dépanneur, poudrerie, tuque, magasiner, clavardage, pourvoirie, cégep, courriel, achalandage, tabagie, pantoute, achaler…) | 18 | 1 | inchangé |
+| `controle-deja-correct` : mot visé que le modèle a déjà bien transcrit | 7 | 4 | inchangé |
+
+`controle-mots-rares` a été ajoutée à la demande de l'utilisateur : un
+polissage par LLM a abîmé « friperie », qui était bien transcrit. Ces lignes
+comptent dans le taux de contrôles abîmés et sont rapportées à part (colonne
+« dont mots rares » et ligne de catégorie) : c'est la mesure clé des approches
+à LLM de l'étape 3.3.
+
+**Règle de l'attendu.** Le brut corrigé sur le passage visé (le nom,
+l'adresse, l'épellation, y compris les mots que la transcription y a fondus :
+`kabaroblique emploi` → `.ca/emploi`), et identique au brut partout ailleurs,
+fautes non visées comprises (`Mais un point final…`, `Vas voir…`). Un
+polissage qui corrige aussi une faute non visée est donc compté « modifié à
+tort » : c'est voulu, on mesure ce qu'on a demandé. Les sorties où
+l'information est perdue (« remtav » rendu `rentave`, une lettre épelée en
+moins, une fin de phrase coupée par Whisper) n'ont pas été retenues comme cas
+à corriger. Conventions : une épellation de nom donne le nom en casse de nom
+propre (`Gagnon`), une adresse ou un courriel épelé donne des minuscules
+collées ; un code postal s'écrit `G5L 3A1`.
+
+### Provenance des transcriptions brutes
+
+Personne ne peut dicter dans le conteneur. Ce qui a été fait :
+
+- **80 lignes `tts+<modèle>`** : vraies sorties des trois modèles du
+  catalogue (Parakeet 41 lignes, Qwen3-ASR 33, Whisper 30 ; plusieurs modèles
+  sur une ligne quand leurs sorties sont identiques), 54 cas à corriger et
+  26 contrôles. 52 énoncés ont été synthétisés hors du dépôt avec
+  [Piper](https://github.com/rhasspy/piper) (`pip install piper-tts`, voix
+  `fr_FR-siwis-medium` et `en_US-lessac-medium` de `rhasspy/piper-voices`),
+  rééchantillonnés en 16 kHz mono (ffmpeg), puis transcrits sur l'hôte Linux
+  par `PolishSetTranscriptionHostTest`, qui passe par `SherpaEngine` (code de
+  l'application, sherpa-onnx 2.0.1, modèles int8 vérifiés par `ModelStore`),
+  Whisper avec la langue forcée comme le fait l'application pour une seule
+  langue. Le texte donné à la synthèse est dans la colonne `dit`.
+- **52 lignes `rédigé`** : écrites à la main, vraisemblables, d'après les
+  erreurs observées sur ces sorties réelles (mots coupés `git hub`, casse
+  perdue `iphone`, signes dictés laissés en toutes lettres `point ca`,
+  `arobase`, lettres séparées) ; et les contrôles rédigés.
+
+Ni l'audio ni l'outil de synthèse ne sont dans le dépôt. Pour régénérer les
+lignes `tts+…` : produire `liste.tsv` (`id<TAB>langue<TAB>dit`) et un
+`<id>.wav` par ligne dans un dossier, puis
+`./gradlew testDebugUnitTest --tests '*PolishSetTranscriptionHostTest*' -PmodelsDir=… -PpolishAudioDir=…`,
+qui écrit `transcriptions.tsv` dans ce dossier ; sans ces deux propriétés, le
+test est ignoré (il l'est en CI).
+
+**Limites.** Une voix de synthèse n'est pas une voix québécoise : elle est
+propre, régulière, à l'accent de France pour le français, et elle prononce
+les noms anglais à la française (`GitHub` → `J-Hub`). Les erreurs réelles
+d'une personne du Québec seront différentes (souvent plus nombreuses).
+L'épellation par synthèse est artificielle (lettres séparées par des
+virgules pour forcer une pause). Le jeu mesure donc la capacité d'un
+polissage à réparer des erreurs typiques, pas la qualité de bout en bout sur
+une vraie voix ; des lignes issues de vraies dictées pourront s'ajouter
+(nouvelle provenance à définir, par exemple `dictee+<modèle>`).
+
+### Notation
+
+Sources de test, paquet `io.github.remtav.dictee.polish` :
+
+- `PolishEval.kt` : `EvalCase`, `PolishEvalSet` (lecture et catégories),
+  l'interface `PolishApproach` (`name`, `needsLlm`, `description`,
+  `polish(raw: String, language: String): String`), `IdentityApproach`,
+  `RecordedApproach` (sorties enregistrées rejouées), `PolishNormalization`,
+  `Percentiles`, `PolishScorer`.
+- `PolishApproaches.kt` : le registre (`live`, plus les fichiers de
+  `src/test/resources/polissage/sorties/*.tsv`).
+- `PolishReport.kt` : tableau lisible et rapport machine.
+- `PolishEvaluationTest` : note toutes les approches du registre, imprime le
+  tableau, écrit `app/build/reports/polissage/resultats.json`,
+  `resultats.md` et `sorties-<approche>.tsv` (sortie et verdict de chaque
+  cas). Tourne dans `./gradlew testDebugUnitTest` (CI), sans modèle ni réseau,
+  en moins d'une seconde.
+- `PolishScorerTest` (le noteur lui-même) et `PolishEvalSetTest` (taille,
+  couverture, contrôles identiques, cas à corriger réellement différents,
+  unicité, provenance bien formée).
+
+**Mesures.** Taux de cas corrigés (sortie = attendu, sur les cas à corriger),
+taux de « modifiés à tort » (changé mais faux), taux de contrôles abîmés (doit
+rester à 0), erreurs (exception ou sortie enregistrée absente), le tout au
+total, par catégorie et par langue ; latence p50 / p95 par appel (rang le plus
+proche), mesurée **sur l'hôte** : un passage d'échauffement puis 5 passages
+chronométrés. Ce n'est pas la latence sur le téléphone.
+
+**Normalisation (stricte).** Avant comparaison : NFC, apostrophe typographique
+= apostrophe droite, suites d'espaces ou tabulations = un espace, espaces de
+bord retirés. Tout le reste compte : casse (`Github` ≠ `GitHub`), accents,
+traits d'union, ponctuation, espace dans un mot ou une adresse
+(`coifferimouski. com` ≠ `coifferimouski.com`) et espaces insécables (la
+typographie est le travail de `TextAssembler`, après le polissage).
+
+**Référence.** `identite` (ne change rien) donne 0/79 corrigés et 0/53 abîmés :
+le dispositif ne compte rien par erreur (`identityCorrectsNothingAndDamagesNothing`).
+
+### Brancher une approche
+
+- **Sans LLM (étape 3.2)** : l'ajouter à `PolishApproaches.live`, par exemple
+  `PolishApproach.of("regles", needsLlm = false) { raw, lang -> … }`. La garde
+  `approachesWithoutLlmDamageNoControlSentence` fait alors échouer la CI si
+  elle abîme une seule phrase de contrôle ou lève une exception. Le code de
+  l'approche reste hors du chemin par défaut de l'application.
+- **Avec LLM (étape 3.3)** : MediaPipe n'existe que pour arm64, l'approche ne
+  s'exécute pas sur l'hôte. On enregistre ses sorties sur un téléphone dans
+  `src/test/resources/polissage/sorties/<approche>.tsv` (en-têtes facultatifs
+  `# approche:`, `# llm: oui`, `# description:` ; colonnes
+  `id<TAB>brut<TAB>sortie[<TAB>latence_ms]`). Le noteur les rejoue : la
+  qualité est notée comme pour les autres, aucune latence d'hôte n'est
+  inventée ; une `latence_ms` mesurée sur le téléphone est rapportée comme
+  « appareil ». Une ligne dont le `brut` ne correspond plus au jeu (jeu
+  modifié depuis l'enregistrement) ou absente compte comme erreur, jamais
+  comme réussite. Les approches à LLM ne sont pas bloquées par la garde : le
+  rapport de l'étape 3.4 tranche avec les chiffres.
+
+## Issue #15, lot 3 — étape 3.2 : règles déterministes et vocabulaire enrichi
+
+Approches 1 et 2 de l'évaluation du polissage local, sans modèle. **Rien n'est
+activé** : le code est dans l'application mais aucun appel ne le branche (pas
+d'appel depuis `TextPipeline` ni `DicteeApp`, aucun réglage). Le comportement
+par défaut est inchangé ; `DefaultPathUnchangedTest` le garantit (le pipeline
+par défaut laisse intactes des phrases que les règles transformeraient, et
+aucun fichier hors de `text/polish/` ne mentionne le paquet).
+
+### Où est le code
+
+- `app/src/main/java/io/github/remtav/dictee/text/polish/PolishRules.kt` :
+  les règles (Kotlin pur, JVM, aucune dépendance Android).
+- `app/src/main/java/io/github/remtav/dictee/text/polish/ShippedVocabulary.kt` :
+  la liste livrée, appliquée par le mécanisme existant de `text/Vocabulary.kt`
+  (corrections `mal entendu -> correct`, insensibles à la casse, sur frontières
+  de mots).
+- Dans les sources de test : `polish/RuleBasedApproaches.kt` (les approches
+  `PolishApproach` qui enveloppent ce code), enregistrées dans
+  `PolishApproaches.live` : `regles`, `vocabulaire`, `vocabulaire-general`
+  (mesure du surapprentissage, voir plus bas) et `regles+vocabulaire`.
+- Tests : `PolishRulesTest` (chaque règle, chaque piège, signal),
+  `ShippedVocabularyTest` (noms hors du jeu, phrases ordinaires, adresses
+  masquées), `DefaultPathUnchangedTest`, et le noteur
+  (`PolishEvaluationTest`, garde « aucun contrôle abîmé » inchangée et verte).
+
+### API, dont le signal « cas probable » pour l'étape 3.3
+
+```kotlin
+object PolishRules {
+    fun polish(text: String, language: String): String       // le texte corrigé
+    fun assess(text: String, language: String): RuleResult   // texte + signal, jamais d'exception
+}
+enum class RuleSignal { UNCHANGED, CORRECTED, PROBABLE_CASE }
+data class RuleResult(val text: String, val signal: RuleSignal, val hasAddress: Boolean)
+
+object ShippedVocabulary {
+    val entries: List<Entry>                                  // (heard, correct, language, origin)
+    fun apply(text: String, language: String, origins: Set<Origin> = all): String
+    fun forLanguage(language: String, ...): Vocabulary
+}
+```
+
+`language` : `"fr"` ou `"en"` (toute autre valeur donne le français).
+
+- `UNCHANGED` : aucun contexte d'adresse ni d'épellation, texte intact.
+- `CORRECTED` : les règles ont réécrit quelque chose et rien de suspect ne
+  reste.
+- `PROBABLE_CASE` : une adresse ou une épellation est probablement là mais les
+  règles ne l'ont **pas résolue** (le texte peut avoir été modifié ailleurs).
+  Déclencheurs : « point com » / « dot ca » précédé d'un nom sans mot
+  d'introduction (« l'entreprise point com »), « arobase » (ou « at » après un
+  nom) suivi d'un domaine qu'on n'a pas su lire, suite d'au moins quatre lettres
+  isolées sans indice d'épellation et qui n'est pas dans l'ordre alphabétique
+  (`C O I F F E R I M O U S K Icom`). Les pièges (« un point commun », « des
+  point com », « arobase » employé comme mot) ne sont **pas** signalés : un
+  signal sur un contrôle enverrait inutilement le segment au LLM.
+- `hasAddress` : la sortie contient une adresse web ou un courriel (construite
+  ou déjà écrite par le modèle). Les règles ne peuvent pas vérifier
+  l'orthographe du nom (`kalmea.ca`, `coifferymusky.com`) : la combinaison de
+  3.3 peut choisir d'envoyer aussi ces segments au LLM.
+  Proposition pour 3.3 : LLM sur `signal == PROBABLE_CASE || hasAddress`, avec
+  `text` (déjà recollé) comme entrée.
+
+### Règles (approche 1)
+
+Principe : **dans le doute, ne rien changer**. Une adresse dite n'est réécrite
+que si toute sa forme est là : un nom (1 à 3 mots collés par unité, ex. « coiffe
+rimouski » → `coifferimouski`) précédé d'un mot d'introduction (sur, à, voir,
+va, c'est, est, to, at, on, visit, check out, is… ou début de segment ou
+ponctuation), les mots de point, et une fin connue (com, ca, org, net, edu, io,
+info, gov). Sinon rien.
+
+- « point » / « dot » → `.` ; « arobase » / « at » → `@` (en anglais « at »
+  exige un nom avant et un domaine lisible après) ; « barre oblique » /
+  « slash » → `/` suivi d'un mot (`quebec.ca/emploi`) ; « tiret », « trait
+  d'union », « dash », « hyphen » → `-` ; « underscore », « tiret du bas » →
+  `_` ; tout cela seulement **à l'intérieur** d'une adresse ou d'un courriel
+  reconnu, en français ou en anglais selon `language`.
+- Adresse construite : minuscules et accents retirés (`québec` → `quebec`,
+  `vidéotron` → `videotron`). Une adresse déjà écrite n'est jamais mise en
+  minuscules ni désaccentuée ; seuls les espaces parasites sont retirés
+  (`remi @ kalmia . ca` → `remi@kalmia.ca`, `www . kalmia . ca`) et le chemin
+  dit après (`kalmea.ca slash contact` → `kalmea.ca/contact`).
+- Jamais de mots ordinaires collés à une adresse écrite (`super kalmia.ca`
+  reste tel quel).
+- Épellation : `T-R-E-M-B-L-A-Y` (quatre lettres et plus), `B O U C H A R D` et
+  `G, A G N O N` quand un mot d'indice précède (« s'écrit », « s'appelle »,
+  « s'épelle », « spelled »… dans les 4 mots avant), lettres devant « point /
+  dot / arobase » (`c, o, i, f, f… point com`), `w w w`. Majuscules : un nom
+  épelé en majuscules devient `Gagnon` ; dans une adresse, minuscules. Une suite
+  dans l'ordre alphabétique (`A, B, C, D`) est une liste, pas une épellation.
+- Code postal canadien : `G 5 L, 3 A 1`, `G5L, 3A1`, `G5L3A1` → `G5L 3A1`
+  (majuscules seulement).
+
+Ce que les règles ne font pas : deviner un nom mal transcrit (`coiffrimouski`,
+`kelmia`, `kababoblique`), lire les chiffres dits (`G cinq L trois A un`),
+reconnaître une adresse sans mot d'introduction (signalée seulement), lire un
+domaine épelé sans mot de point (`… K Icom`).
+
+### Vocabulaire livré (approche 2)
+
+178 formes (158 « générales », 20 relevées dans le jeu) pour environ 125 noms
+réels et connus : marques et outils (GitHub, WhatsApp, iPhone, YouTube,
+Facebook, Instagram, Dropbox, PowerPoint, FaceTime, ChatGPT…), lieux du Québec
+(Rimouski, Chicoutimi, Saguenay, Trois-Rivières, Abitibi, Gaspésie,
+Sherbrooke, Hochelaga, Rivière-du-Loup, Lac-Mégantic, Sept-Îles, régions…),
+institutions et entreprises d'ici (Hydro-Québec, Desjardins, SAAQ, RAMQ,
+Vidéotron, Cirque du Soleil, universités, Centre Bell…). Chaque entrée porte sa
+langue (`fr`, `en` ou `*`) et son **origine** : `GENERAL` (forme qu'on listerait
+de toute façon : nom collé ou coupé, accent ou trait d'union manquant, casse,
+graphies phonétiques usuelles) ou `OBSERVED` (forme ajoutée parce qu'elle figure
+mot pour mot dans une transcription brute du jeu).
+
+Règles de la liste : une forme entendue qui n'est pas un mot ordinaire ; quand
+le mot nu est ordinaire, le contexte fait partie de la forme (`caisse des
+jardins` → `caisse Desjardins`, `sur team` → `sur Teams`, pas `team` seul ni
+`des jardins`). Les adresses écrites (tout ce qui contient `@` ou un point suivi
+de com, ca, org…) sont masquées avant application : aucune correction à
+l'intérieur de `github.com`. Variante à apostrophe typographique générée
+automatiquement. Entrée discutable, laissée telle quelle et signalée dans le
+code : « lac Saint-Jean » → `Lac-Saint-Jean` (le jeu l'attend, mais le lac
+lui-même s'écrit « lac Saint-Jean » ; la région, `Lac-Saint-Jean`).
+
+### Scores (jeu de 132 paires : 79 à corriger, 53 contrôles)
+
+Latence : **hôte Linux**, pas téléphone, un appel par phrase.
+
+| Approche | Corrigés | Modifiés à tort | Contrôles abîmés | dont mots rares | p50 / p95 ms (hôte) |
+| --- | --- | --- | --- | --- | --- |
+| identite | 0/79 (0,0 %) | 0 | 0/53 | 0/19 | 0,009 / 0,032 |
+| regles | 17/79 (21,5 %) | 2 (2,5 %) | 0/53 | 0/19 | 0,119 / 0,259 |
+| vocabulaire | 38/79 (48,1 %) | 1 (1,3 %) | 0/53 | 0/19 | 0,319 / 0,769 |
+| vocabulaire-general (sans les 20 formes relevées) | 19/79 (24,1 %) | 5 (6,3 %) | 0/53 | 0/19 | 0,264 / 0,579 |
+| regles+vocabulaire | 55/79 (69,6 %) | 2 (2,5 %) | 0/53 | 0/19 | 0,260 / 0,412 |
+
+Par catégorie (corrigés / à corriger) et par langue :
+
+| Approche | noms-propres (14) | toponymes (27) | web (16) | courriel (11) | épellation (11) | fr (58) | en (21) |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| regles | 0 | 0 | 4 | 4 | 9 | 11 | 6 |
+| vocabulaire | 14 | 24 | 0 | 0 | 0 | 31 | 7 |
+| vocabulaire-general | 11 | 8 | 0 | 0 | 0 | 14 | 5 |
+| regles+vocabulaire | 14 | 24 | 4 | 4 | 9 | 42 | 13 |
+
+Contrôles : 0 phrase abîmée sur 53 pour toutes les approches, dont les 19
+contrôles de mots rares (friperie, poudrerie, pourvoirie, tuque…), les 11
+contrôles déjà corrects et les pièges des règles (« un point commun », « mets un
+point final », « à la barre oblique du terrain », « arobase » employé comme
+mot, « plan B », « vitamine C », « dot com bubble »). La garde de la CI est
+inchangée.
+
+### Cas non corrigés les plus instructifs (regles+vocabulaire, 24 sur 79)
+
+- **Nom mal transcrit dans une adresse** (la majorité des 24) : `coiffrimouski.com`,
+  `Kalmia.ka`, `kelmia.ca`, `hydrokebec.com`, `kalmayer.co`, `Rémi@robazcalmier.ca`.
+  Les règles ne savent que recoller et mettre la ponctuation, pas retrouver
+  « kalmia » : c'est le travail d'un modèle (étape 3.3), ou d'un vocabulaire de
+  l'utilisateur.
+- **Adresse déjà fusionnée par le modèle** : `québec.kabaroblique emploi`,
+  `infoirobase coiffremouski.com`, `atkelmya.com` : le mot de jonction est
+  fondu dans un autre mot ; aucune règle sûre.
+- **Chiffres dits en lettres** : `G cinq L trois A un`. Faisable (nombres 0-9
+  dans un code postal) mais pas fait : hors de la portée de cette étape.
+- **Épellation + suffixe fondu** : `C O I F F E R I M O U S K Icom`. Signalé
+  `PROBABLE_CASE` (suite de lettres sans indice) mais non réécrit.
+- **Noms anglais mal transcrits** (`Chickaltomy`, `Chakotay`, `Chikautami`) :
+  aucune forme plausible générale ; ne pas les ajouter.
+- **Deux « modifiés à tort »** : `coifferymusky.com` (le modèle a mal entendu le
+  nom, les règles ont bien formé l'adresse : la forme est juste, le nom non) et
+  `kalmea.ca/contact` (« slash » bien recollé, nom faux). Ce sont des
+  améliorations partielles que la notation stricte compte comme erreurs.
+
+### Surapprentissage possible (à lire avant de se fier aux chiffres)
+
+- Le jeu était connu quand la liste a été écrite : les noms visés (GitHub,
+  WhatsApp, Rimouski, Hydro-Québec…) sont dans le jeu parce que ce sont les
+  noms d'ici et d'outils les plus courants, et dans la liste pour la même
+  raison. Cette coïncidence est voulue mais gonfle le score.
+- Sur les 38 cas corrigés par le vocabulaire, **19 le sont grâce à des formes
+  tirées mot pour mot du jeu** (20 formes tagguées `OBSERVED`) ; sans elles, le
+  vocabulaire corrige 19/79 (24,1 %) et se trompe 5 fois (corrections
+  partielles : un nom corrigé, l'autre non). Pour les noms propres, la part
+  générale est élevée (11/14), pour les toponymes elle est faible (8/27) : les
+  mauvaises transcriptions de toponymes d'ici sont irrégulières (`Sacney`,
+  `Chebouk`, `Auchas`), ce qui est le vrai constat : une liste ne couvre que ce
+  qu'on y a vu.
+- Les règles n'ont pas de liste à ajuster, mais leurs mots d'introduction et
+  leurs pièges ont été réglés sur les 53 contrôles : un contrôle jamais vu
+  (« c'était une bulle point com » sans « des ») pourrait être réécrit si un mot
+  d'introduction précède le nom. Aucune mesure hors jeu n'est possible tant que
+  de vraies dictées n'ont pas été ajoutées.
+- Les tests unitaires (`PolishRulesTest`, `ShippedVocabularyTest`) utilisent des
+  phrases hors du jeu (`you tube`, `sept iles`, `jean trait d'union luc arobase`),
+  ce qui vérifie le mécanisme, pas la couverture.
+
+### Limites
+
+- Le jeu est en partie synthétique : voix de synthèse Piper (pas une voix
+  québécoise), lignes rédigées à la main pour les cas non obtenus. Les erreurs
+  réelles d'un accent québécois seront différentes.
+- Des listes d'introduction, de mots vides et de fins d'adresse (`TLDS`) en
+  français et en anglais : une adresse en `.quebec`, `.gouv.qc.ca` dit
+  « point gouv point qc point ca » est couverte, un `.coop` ou un `.ai` non.
+- Des noms de domaine à plusieurs mots coupés par un mot vide (« ville de
+  québec point ca ») ne sont pas recollés.
+- Latences d'hôte seulement ; sur téléphone, ces approches sont négligeables
+  (microsecondes à millisecondes) mais ne sont pas mesurées.
+- Rien n'est branché : pour les activer, il faudrait un réglage, un ADR et une
+  décision de l'étape 3.4.
+
+## Issue #15, lot 3 — étape 3.3 : petit LLM local, garde-fou assoupli, combinaison
+
+Approches 3 (petit LLM local, prompt élargi) et 4 (règles d'abord, LLM sur
+les cas probables). **Code d'évaluation seulement, hors du chemin par
+défaut** : nouveaux fichiers sous `app/src/main/java/io/github/remtav/dictee/cleanup/eval/`,
+appelés par aucun écran, aucun réglage, ni `DicteeApp` ni `TextPipeline` ;
+`CleanupMode`, `LlmCleaner`, son prompt et `SafetyCheck` sont inchangés.
+L'application se comporte exactement comme avant.
+
+**Aucun LLM n'a tourné pendant cette étape** (MediaPipe n'existe que pour
+arm64, le conteneur est x86-64). Tous les chiffres ci-dessous sont soit des
+propriétés du garde-fou (testables ici), soit des **simulations** nommées
+comme telles. Les vraies sorties, la latence et la mémoire restent **à faire
+sur le téléphone** (procédure plus bas).
+
+### Fichiers
+
+| Fichier | Rôle |
+| --- | --- |
+| `cleanup/eval/RelaxedSafetyCheck.kt` | garde-fou assoupli (spécification ci-dessous) |
+| `cleanup/eval/WidePrompt.kt` | prompt élargi (gabarits ChatML pour Qwen, Gemma) et `LexiconHints` |
+| `cleanup/eval/EvalPolishers.kt` | `LlmCall`, `GuardedLlmPolisher` (approche 3), `ProbableCaseDetector`, `SegmentClass`, `ProvisionalProbableCaseDetector`, `RulesThenLlmPolisher` (approche 4) |
+| `src/test/.../cleanup/eval/RelaxedSafetyCheckTest.kt` | 24 tests du garde-fou, sorties de LLM simulées bonnes et mauvaises |
+| `src/test/.../polish/LlmSimulationTest.kt` | plafond, protection, simulations, génération des fichiers `simulation-*` |
+| `src/test/resources/polissage/lexique-simulation.txt` | lexique de simulation (voir limites) |
+| `src/test/resources/polissage/sorties/simulation-*.tsv` | 6 sorties simulées, rejouées par le noteur de l'étape 3.1 |
+| `src/androidTest/.../LlmPolishRecordingTest.kt` | enregistrement sur téléphone (ignoré sans argument) |
+| `app/build.gradle.kts` | le jeu et le lexique sont copiés dans les assets de l'**APK de test** seulement |
+
+### Approche 3 : prompt élargi
+
+`WidePrompt.system` (consignes en anglais, que les petits modèles suivent
+mieux, exemples français et anglais) : corriger **seulement** les noms de
+produits et techniques (`git hub` → `GitHub`), les noms de lieux et
+d'institutions du Québec (`lac Saint Jean` → `Lac-Saint-Jean`), les lettres
+épelées et codes postaux, les adresses web et courriels dits à voix haute
+(`info arobase uqar point ca` → `info@uqar.ca`) ; recopier tout le reste
+lettre pour lettre, **même un mot rare, familier ou qui semble mal écrit**,
+avec une liste de mots d'ici à ne pas toucher (friperie, poudrerie,
+dépanneur, cégep, pourvoirie, achalandage, tabagie, clavardage, achaler,
+pantoute, magasiner, tuque, frette, char, chum) ; ne jamais ajouter,
+retirer, traduire, réordonner, reformuler ; ne pas toucher la ponctuation ni
+les majuscules hors des noms corrigés ; ne jamais inventer d'adresse.
+`LexiconHints` ajoute au prompt au plus 12 noms du lexique proches d'un
+groupe de 1 à 3 mots du segment (prompt court, donc latence contenue).
+
+Différences avec `LlmCleaner` : pas de `RuleCleaner` avant (les hésitations
+restent le travail du prompt de production), pas de seuil de 4 mots (« Va
+voir coiffe rimouski point com » est court), pas de délai de 4 s dans la
+variante (le test sur téléphone mesure la latence réelle ; l'étape 3.4
+compte les appels au-delà de 4 s).
+
+### Spécification du garde-fou assoupli
+
+`RelaxedSafetyCheck.check(entrée, sortie, options)` accepte la sortie
+seulement si elle se **dérive** de l'entrée, de gauche à droite, par une
+suite de réécritures autorisées, chacune consommant une suite contiguë de
+jetons de l'entrée et produisant une suite contiguë de jetons de la sortie
+(programmation dynamique, la dérivation acceptée est rendue dans `steps`).
+Jetons : mots (lettres et chiffres, traits d'union et apostrophes internes,
+élisions françaises séparées : `l'`, `assurance`), signes isolés, et
+adresses entières. Les espaces ne comptent que comme espacement avant un
+jeton, qui doit être conservé.
+
+| Règle | Permis | Exemple |
+| --- | --- | --- |
+| `KEEP` | même jeton, même texte (NFC, ’ = '), même espacement | |
+| `MIXED_CASE` | 1 à 3 mots de lettres → 1 mot, mêmes lettres, casse « mixte » (majuscule après la 1re lettre et à chaque jonction, au moins une minuscule) | `git hub` → `GitHub`, `iphone` → `iPhone` |
+| `HYPHEN_JOIN` | 2 à 4 mots joints par des traits d'union, lettres et casse inchangées, 1re lettre majuscule | `Rivière du Loup` → `Rivière-du-Loup` |
+| `SPELLING` | 3 lettres épelées ou plus (virgules ou tirets entre elles permis) → un mot de exactement ces lettres, casse libre | `G, A G N O N` → `Gagnon` |
+| `POSTAL_CODE` | lettres, chiffres et chiffres dits qui forment exactement un code postal → `A1A 1A1` | `G cinq L trois A un` → `G5L 3A1` |
+| `ADDRESS` | lecture fixe : `point`/`dot` = `.`, `arobase`/`at`/`a commercial` = `@`, `barre oblique`/`slash` = `/`, `tiret`/`dash`/`trait d'union` = `-`, espaces retirés, accents et casse repliés, lettres épelées jointes ; l'adresse doit être en minuscules, **égale exactement** à cette lecture, finir par un domaine connu (com, ca, org, net…) ; aucun mot-outil (de, des, la, the…) dans le passage | `québec point ca` → `quebec.ca` |
+| `LEXICON_FORM` | avec un lexique : le passage épelle une entrée, casse, accents, espaces, traits d'union et apostrophes mis à part | `Trois Rivieres` → `Trois-Rivières` |
+| `LEXICON_NEAR` | **désactivé par défaut** (`allowLexiconNear`) : 1 à 3 mots à faible distance d'édition d'un nom du lexique (0 sous 5 lettres, puis (n + 2) / 4), sans avaler un mot voisin (refusé si le passage sans son premier ou dernier mot est aussi proche) ; ou une adresse à distance ≤ max(1, n / 6) d'une adresse du lexique | `Drawbox` → `Dropbox` |
+
+**Tout le reste est refusé** : mot ajouté, retiré, remplacé (hors lexique),
+réordonné ; ponctuation ou espacement changé ; majuscule simple d'un mot
+ordinaire (`Fin de semaine`) ; préambule (« Voici le texte corrigé : ») ;
+saut de ligne ajouté ; chiffre changé ; adresse modifiée d'une lettre,
+complétée (`www.`, `https://`) ou au domaine changé ; sortie vide ou plus de
+deux fois plus longue. Un mot ne peut devenir qu'une entrée du lexique,
+jamais autre chose : `friperie` → `fripperie` est refusé dans toutes les
+configurations.
+
+Le lexique serait le vocabulaire de l'utilisateur plus la liste livrée par
+l'étape 3.2. Sans lexique, seules les réécritures qui ne changent aucune
+lettre (casse mixte, traits d'union, épellation, code postal, adresse)
+passent.
+
+**Tests** (`RelaxedSafetyCheckTest`, 24 tests) : chaque transformation
+permise ; et, avec les options les plus permissives (lexique + proximité),
+le refus d'hypercorrections de mots rares (`fripperie`, `CEGEP`, `Cégep`,
+`froid` pour `frette`, `voiture` pour `char`…), d'hallucinations, de
+traductions, de reformulations, de changements de ponctuation et
+d'espacement, d'adresses inventées ou altérées, des pièges des contrôles
+(`la bulle des point com` → `des.com`, `arobase` → `@`, `point final` →
+`.`), de changements de nombres, de remplacements hors lexique et
+d'épellations incomplètes.
+
+### Modèles vérifiés (le 2026-11-12)
+
+- **Qwen2.5 0,5B et 1,5B Instruct** (`.task` q8, Apache-2.0,
+  `litert-community` sur Hugging Face) : déjà dans `LlmCatalog`, inchangés.
+- **MediaPipe LLM Inference** : la dernière version de
+  `com.google.mediapipe:tasks-genai` sur le dépôt Maven de Google est
+  **0.10.35** (celle du projet ; métadonnées du 2026-04-27). Les pages de
+  documentation MediaPipe LLM Inference renvoient maintenant vers LiteRT-LM
+  (mise à jour du 2026-10-06) ; les résultats de recherche citent la
+  documentation officielle disant que l'API Android est en maintenance
+  seulement (dépréciée) et recommandant LiteRT-LM.
+- **Modèle plus récent et petit au format `.task`** : un seul vérifiable,
+  `litert-community/Gemma3-1B-IT` (fichier `gemma3-1b-it-int4.task`, 555 Mo,
+  aussi en q8 ~1,05 Go), **licence Gemma** (conditions d'utilisation de
+  Google, pas Apache) et **dépôt à accès restreint** (il faut un compte
+  Hugging Face et accepter la licence pour télécharger) : incompatible avec
+  le téléchargement anonyme de l'application, donc **pas ajouté** au
+  catalogue. Il peut être mesuré par le test sur téléphone (fichier poussé,
+  `-e llmTemplate gemma`).
+- **Non retenus** : Qwen3-0.6B (Apache-2.0, 328 Mio en int4), Qwen3.5-0.8B,
+  SmolLM2-360M, LFM2.5-1.2B : publiés seulement en `.litertlm`, qui demande
+  le moteur LiteRT-LM (`com.google.ai.edge.litertlm:litertlm-android`,
+  0.19.1), une nouvelle dépendance ; que `tasks-genai` 0.10.35 charge un
+  `.litertlm` n'a pas été vérifié. Passer à LiteRT-LM est une décision à
+  part (hors de cette étape), à reconsidérer puisque MediaPipe LLM Inference
+  n'évolue plus sur Android.
+
+Sources : `https://huggingface.co/api/models?author=litert-community`,
+`https://huggingface.co/litert-community/Qwen3-0.6B`,
+`https://dl.google.com/android/maven2/com/google/mediapipe/tasks-genai/maven-metadata.xml`,
+`https://developers.google.com/edge/mediapipe/solutions/genai/llm_inference/android`.
+
+### Chiffres calculés ici
+
+**(a) Plafond du garde-fou** : part des 79 cas à corriger acceptée si le LLM
+rendait exactement le texte attendu (`ceilingOfTheRelaxedGuard`, chiffres
+épinglés dans le test).
+
+| Configuration | Acceptés | noms-propres | toponymes | web | courriel | épellation |
+| --- | --- | --- | --- | --- | --- | --- |
+| sans lexique | 28/79 (35 %) | 7/14 | 2/27 | 5/16 | 4/11 | 10/11 |
+| lexique (forme) | 36/79 (46 %) | 9/14 | 8/27 | 5/16 | 4/11 | 10/11 |
+| lexique + proximité | 44/79 (56 %) | 12/14 | 13/27 | 5/16 | 4/11 | 10/11 |
+
+Les 35 refus restants sont voulus : nom trop déformé pour être rapproché
+(`J-Hub`, `Chebouk`, `Iroqebac`, `Auchas` → `Hochelaga`), mot voisin avalé
+(`et Mouski` → `Rimouski`), adresse dont la transcription a perdu ou changé
+des lettres (`coiffrimouski.com`, `kelmia.ca`, `kalmea.ca slash contact`,
+`remy@kelmia.com`) : rétablir ces adresses, c'est inventer des lettres, ce
+que le garde-fou interdit sauf si l'adresse est dans le lexique.
+
+**(a bis) Protection des 53 contrôles** : 9 modes de sortie fautive
+fabriqués (hypercorrection type `fripperie`, mot retiré, mot ajouté,
+ponctuation, majuscule, préambule, adresse inventée, accent retiré,
+synonyme) appliqués à chaque contrôle quand ils s'appliquent : **399
+sorties fautives, 399 refusées** dans chacune des trois configurations. Les
+mêmes modes appliqués au texte attendu des 79 cas (le nom est corrigé mais
+autre chose est abîmé) : **539 sorties, 0 acceptée** (un cas écarté et
+justifié dans le test : `Trois-Rivieres` sans accent est une réécriture
+permise du brut `Trois Rivieres`, aucune lettre du brut n'est changée).
+
+**(b) Simulations rejouées par le noteur** (`PolishEvaluationTest`, fichiers
+`sorties/simulation-*.tsv`, en-tête « SIMULATION, aucun LLM n'a tourné ») :
+
+| Fichier | Corrigés | Modifiés à tort | Contrôles abîmés |
+| --- | --- | --- | --- |
+| `simulation-llm-oracle-gardefou` (approche 3, LLM parfait, lexique) | 36/79 | 0 | 0/53 |
+| `simulation-llm-oracle-gardefou-proximite` (idem + proximité) | 44/79 | 0 | 0/53 |
+| `simulation-llm-bruyant-gardefou` (approche 3, LLM bruyant) | 13/79 | 0 | 0/53 |
+| `simulation-llm-bruyant-sans-gardefou` (même LLM, sans garde-fou) | 39/79 | 28/79 | 13/53 (dont 4/19 mots rares) |
+| `simulation-combinaison-oracle` (approche 4, LLM parfait) | 34/79 | 0 | 0/53 |
+| `simulation-combinaison-bruyant` (approche 4, LLM bruyant) | 12/79 | 0 | 0/53 |
+
+Le LLM « bruyant » est une invention déterministe (`NoisyLlm`, CRC32 de
+l'identifiant) : sur les cas à corriger, 55 % texte attendu, 15 % attendu
+abîmé, 15 % brut inchangé, 15 % brut abîmé ; sur les contrôles, 70 % intacts,
+30 % abîmés. Ce n'est **pas** un modèle de Qwen : il montre seulement que le
+garde-fou transforme les erreurs du LLM en « rien fait » plutôt qu'en mots
+abîmés, au prix de corrections perdues (39 → 13). Combinaison : avec les
+règles en identité (celles de 3.2 ne sont pas raccordées) et le détecteur
+provisoire, le LLM est appelé sur 75 des 132 segments (56/79 cas à corriger,
+19/53 contrôles) ; il manque 2 cas par rapport à l'approche 3 (adresse
+`coiffe Rimouski.com`, code postal en toutes lettres) que le détecteur
+provisoire ne signale pas.
+
+**Limites des simulations.** Le lexique de simulation contient les noms du
+jeu : les plafonds avec lexique sont optimistes. L'oracle mesure ce que le
+garde-fou laisse passer, pas ce qu'un modèle de 0,5 ou 1,5 milliard de
+paramètres sait faire. Aucune latence n'est simulée.
+
+### Interface à raccorder aux règles de 3.2 (approche 4)
+
+```kotlin
+enum class SegmentClass { UNCHANGED, CORRECTED, PROBABLE_CASE }
+fun interface ProbableCaseDetector { fun classify(raw: String, afterRules: String, language: String): SegmentClass }
+class RulesThenLlmPolisher(rules: (String, String) -> String, detector: ProbableCaseDetector, llm: GuardedLlmPolisher)
+```
+
+`ProvisionalProbableCaseDetector` (provisoire) signale : adresse dite
+(`point|dot` + com, ca, org, net, qc, gouv ; `arobase` ; `at … dot` ;
+`barre oblique` ; `slash`), 3 lettres majuscules épelées ou plus, code
+postal mal formé, groupe de 1 à 3 mots proche d'un nom du lexique ou qui
+l'épelle autrement. À raccorder (orchestrateur ou étape 3.4) : passer la
+fonction des règles de 3.2 en `rules` et sa classification en `detector` ;
+le garde-fou compare la sortie du LLM au texte **après** les règles (les
+règles ont leur propre garde en CI). Puis régénérer
+`simulation-combinaison-*` (le test `simulatedOutputFilesAreUpToDate` dit
+quoi copier) et relancer l'enregistrement sur téléphone.
+
+### Procédure de mesure sur téléphone (étape 3.4, point de contrôle)
+
+Téléphone arm64, débogage USB activé.
+
+1. Installer le modèle : dans l'application, Réglages → nettoyage « Petit LLM local + garde-fou » →
+   télécharger Qwen2.5 0,5B (et 1,5B), puis remettre le nettoyage sur
+   « Désactivé ». Pour Gemma 3 1B (accès restreint) : le télécharger sur un
+   ordinateur après avoir accepté la licence, puis
+   `adb push gemma3-1b-it-int4.task /sdcard/Android/data/io.github.remtav.dictee/files/llm/`.
+2. Construire et installer l'application et l'APK de test, depuis `android/` :
+   `./gradlew installDebug installDebugAndroidTest`.
+3. Lancer l'enregistrement (un modèle à la fois ; 1 ou 2 appels au LLM par
+   segment, compter plusieurs minutes) :
+
+   ```
+   adb shell am instrument -w \
+     -e class io.github.remtav.dictee.LlmPolishRecordingTest \
+     -e llmModel llm-qwen2.5-0.5b-instruct-q8 \
+     io.github.remtav.dictee.test/androidx.test.runner.AndroidJUnitRunner
+   ```
+
+   Variantes : `-e llmModel llm-qwen2.5-1.5b-instruct-q8` ;
+   `-e llmModel /sdcard/Android/data/io.github.remtav.dictee/files/llm/gemma3-1b-it-int4.task -e llmTemplate gemma -e llmName gemma3-1b` ;
+   `-e nearMatch true` pour le garde-fou avec proximité (changer aussi
+   `llmName`). Suivi : `adb logcat -s LlmPolishRecording`.
+4. Récupérer les fichiers :
+   `adb pull /sdcard/Android/data/io.github.remtav.dictee/files/polissage/ .`
+   puis copier les `llm-*.tsv` dans `app/src/test/resources/polissage/sorties/`
+   (le noteur les reprend tels quels, latence « appareil ») et reporter
+   `memoire-<nom>.txt` dans le rapport.
+5. `./gradlew testDebugUnitTest --tests '*PolishEvaluationTest*'` : tableau
+   avec qualité réelle et latence p50 / p95 mesurée sur le téléphone.
+
+Fichiers écrits : `llm-<nom>-prompt-large.tsv` (approche 3, après
+garde-fou), `llm-<nom>-prompt-large-sans-gardefou.tsv` (mêmes sorties avant
+garde-fou : ce que le garde-fou a empêché), `llm-<nom>-combinaison.tsv`
+(approche 4 ; latence du segment entier, presque nulle quand le LLM n'est
+pas appelé), `memoire-<nom>.txt` (PSS et VmRSS / VmHWM avant chargement,
+après chargement, après les passages ; durée de chargement). Un passage
+d'échauffement précède les mesures. Le test est ignoré sans `llmModel` : la
+CI (émulateur) ne charge jamais MediaPipe.
+
+### Risques
+
+- **C'est précisément ce genre de passe qui peut abîmer un mot correct.** Le
+  prompt demande de ne rien toucher d'autre, mais un modèle de 0,5 ou
+  1,5 milliard de paramètres ne suit pas toujours la consigne ; seule la
+  dérivation stricte du garde-fou l'empêche d'arriver dans le texte. Sans
+  garde-fou, le LLM simulé abîme 13 contrôles sur 53, dont 4 mots rares.
+- **Limites connues, acceptées par construction** (épinglées dans
+  `knownLimitsAreAcceptedByConstruction`) : une entrée du lexique qui est
+  aussi une expression ordinaire (`des jardins` → `Desjardins`) ; avec la
+  proximité, un mot ordinaire proche d'un nom (`la team` → `la Teams`) ;
+  deux prénoms joints (`Pierre Jean` → `Pierre-Jean`). Le garde-fou ne voit
+  pas le contexte : la proximité reste désactivée par défaut et le lexique
+  livré (3.2) devrait éviter les noms qui sont aussi des mots courants.
+- **Le garde-fou ne remplace pas la mesure** : un plafond de 36 à 44 cas sur
+  79 ne dit rien de la part que Qwen atteindra ; les « rien fait » coûtent de
+  la latence pour rien.
+- **MediaPipe LLM Inference ne bouge plus sur Android** : un éventuel
+  passage en production devra peut-être passer par LiteRT-LM (nouvelle
+  décision).
+
+## Issue #15 — demande de l'utilisateur : pouvoir couper le polissage (« friperie »)
+
+Demande : « Le mot "friperie" sortait bien avant que le petit LLM repasse dessus
+pour du polissage. J'ai l'impression que le petit LLM détériore parfois la
+qualité de l'entrée. Ce serait mieux de donner au moins l'option de le
+désactiver. »
+
+### Constaté
+
+- Deux LLM peuvent repasser sur le texte :
+  - **Nettoyage local** (`cleanup/LlmCleaner.kt`, `AppSettings.cleanupMode`) :
+    déjà désactivable (`OFF` par défaut ; `DicteeApp.cleaner()` renvoie
+    `TextCleaner.NONE` en `OFF`, et `DicteeApp` ne crée même pas de
+    `LazyCleaner`). Son garde-fou (`text/Filters.kt`) est local ; il ne s'active
+    que si l'utilisateur a choisi « LLM ».
+  - **Polissage du serveur** (modèle « Serveur », dictée entière, #13) :
+    `RemoteEngine` envoyait toujours `polish=true` et insérait `polished_text`.
+    **Aucun réglage ne permettait de le couper.** C'était le suspect principal
+    à ce moment (écarté ensuite : voir « Suite du diagnostic » plus bas).
+- Le serveur (`app/main.py`, champ `polish: Optional[bool]`) retombe sur
+  `WHISPER_POLISH` quand le champ est absent : un serveur démarré avec
+  `WHISPER_POLISH=on` polirait même si le client n'envoie rien. Le client
+  envoie donc **`polish=false` explicitement** quand le réglage est coupé.
+- Sans polissage, le serveur ne renvoie ni `polish` ni `polished_text` utile :
+  l'ancien code aurait lu « not returned » et affiché « Texte non poli ».
+
+### Ajouté
+
+- Réglage **« Polissage par le serveur »** (Réglages, section Serveur distant ;
+  `AppSettings.remotePolish` → `RemoteConfig.polish`). Coupé : `polish=false`
+  (API à tâches et repli synchrone), texte brut inséré, `polishStatus =
+  "not requested"` (aucun message d'erreur), `polished_text` ignoré même si le
+  serveur en renvoie un. Le texte d'aide dit que le polissage corrige ponctuation
+  et hésitations mais qu'un LLM peut remplacer un mot bien transcrit.
+- Texte d'aide du nettoyage local complété par la même mise en garde.
+- Tests (`WholeDictationTest`) : `polish=false` envoyé et texte brut inséré ;
+  cas « friperie » (le serveur renvoie « fripperie » poli : coupé → « friperie »,
+  actif → mot altéré) ; repli synchrone ; réglage actif inchangé.
+
+### Défaut retenu : activé
+
+Le comportement par défaut de l'application ne change pas dans cette itération,
+et l'utilisateur coupe lui-même le réglage. **À trancher par l'utilisateur** :
+passer le défaut à désactivé (le plus sûr pour la fidélité des mots, au prix de
+la ponctuation et des hésitations non retirées). Un changement d'une ligne
+(`getBoolean("remote_polish", true)`).
+
+### Non fait
+
+- **Retour au texte brut après coup** : le clavier garde `rawText` et
+  `polishedText` dans `DictationResult` (`lastDictation`), mais rien ne permet de
+  remplacer le texte déjà inséré (il faudrait suivre la plage insérée dans le
+  champ, qui peut avoir été modifiée entre-temps) : plus qu'un petit changement.
+  Piste : bouton « Texte brut » à côté de « Annuler » juste après l'insertion,
+  qui remplace la plage insérée tant que le curseur n'a pas bougé.
+- **Cause côté serveur** : le garde-fou de `app/polish.py` laisse passer certaines
+  substitutions de mots (« friperie » → un mot voisin). Hors portée (#6, #13) :
+  à traiter dans une issue séparée sur le serveur.
+- Test instrumenté du réglage : aucun test existant des Réglages ne s'y prête
+  sans fragilité.
+
+### Ce que l'utilisateur doit dire
+
+Avec quel modèle le mot a été changé : **« Serveur »** (donc le polissage du
+serveur ; question posée avant la suite du diagnostic, qui l'a écarté) ou un **modèle du téléphone** (Parakeet, Qwen3-ASR,
+Whisper) avec le nettoyage réglé sur « LLM » (le nettoyage est `OFF` par défaut :
+à vérifier dans Réglages > Nettoyage du texte). Test simple : couper le
+polissage, redicter « friperie » ; si le mot sort bien, le LLM du serveur était
+en cause.
+
+### Suite du diagnostic (2026-11-12) et arrêt de l'enquête
+
+Chronologie :
+
+1. **Polissage du serveur** : suspect de départ ; l'interrupteur ci-dessus a
+   été ajouté. Écarté : l'utilisateur dictait avec un modèle du téléphone.
+2. **LLM local** (« Petit LLM local + garde-fou ») : écarté par l'utilisateur,
+   le nettoyage était sur « Désactivé ». Le trou trouvé dans le garde-fou est
+   réel et corrigé (ci-dessous), mais ce n'était pas la cause.
+3. **Texte provisoire puis décodage final** : l'utilisateur voyait
+   « friperie » s'afficher, puis changer quelques millisecondes plus tard.
+   Non conclu (voir constats).
+4. **Langue non transmise** : mot dicté seul, avec Parakeet et avec
+   Qwen3-ASR ; les deux rendent des mots qui ressemblent à de l'anglais deviné.
+   Pas de correction de vocabulaire. Non conclu.
+
+**Enquête arrêtée à la demande de l'utilisateur le 2026-11-12** : plusieurs
+mots québécois échouent. Il préfère prioriser un modèle déjà affiné sur le
+français québécois. Aucune mesure n'a été faite sur un enregistrement de
+« friperie » : il n'en existe pas dans le dépôt.
+
+#### Constats vérifiés
+
+- **Audio du provisoire et du final** (`DictationController.captureLoop`,
+  sources de sherpa-onnx 2.0.1 `voice-activity-detector.cc` et
+  `silero-vad-model.cc`, lues sur GitHub au tag `v2.0.1`) :
+  - le provisoire décode `ring.last(len)`, soit depuis la détection de parole
+    moins `LOOKBACK` (0,6 s) jusqu'à l'instant présent ; le dernier provisoire
+    avant le final contient donc jusqu'à ~0,5 s de silence après le mot ;
+  - le final décode le segment du VAD. Il commence à
+    `Tail - 2 × fenêtre - min_speech` au moment du déclenchement (~0,1 s avant
+    la première fenêtre jugée parole). Il finit à `Tail - min_silence`, soit
+    juste après la première fenêtre sous le seuil bas (0,35) : aucune marge
+    après le mot ;
+  - au-delà de 20 s sans pause, le VAD passe à `min_silence` 0,1 s et à un
+    seuil de 0,9, et peut couper au milieu d'une phrase.
+  - Sur l'hôte, en rejouant les 9 extraits de référence avec le vrai Silero, les
+    segments finals commencent 0,29 s après la fenêtre du provisoire et
+    finissent 0,5 s avant elle. Mots faux sur 141 : Parakeet, extrait entier 6,
+    final 9, provisoire le plus large 7, final avec 0,3 s de marge 9. Qwen3-ASR :
+    entier 11, final 6, provisoire 7, final avec marge 6. Les écarts vont dans
+    les deux sens et une marge de 0,3 s n'améliore rien : **aucune correction
+    sûre trouvée**, rien n'a été changé dans le découpage. Phrases entières
+    seulement, pas de mots isolés.
+- **Langue** (classes de l'AAR 2.0.1 lues par `javap`, plus sources C++
+  `offline-recognizer-qwen3-asr-impl.cc` et l'exemple officiel
+  `python-api-examples/offline-qwen3-asr-decode-files.py`) :
+  - **Qwen3-ASR** : `OfflineQwen3AsrModelConfig` n'a pas de champ de langue
+    (seulement `hotwords`), mais le flux en accepte une :
+    `OfflineStream.setOption("language", "French")`. `BuildSourceIds` écrit
+    alors « language French » dans le prompt au lieu de laisser le modèle
+    deviner. **Désormais transmise** (`SherpaEngine`, `AppSettings.engineOptions`,
+    `DictationLanguages.qwen3Language`), avec la même règle que Whisper : un
+    seul code de langue choisi. Le nom vient d'une table (fr → French,
+    en → English, zh, hi, es, ar, pt, ru). Bengali et ourdou ne sont pas des
+    langues de Qwen3-ASR : détection automatique. **Effet non mesuré** à ce
+    stade : la mesure sur l'hôte a été interrompue (mémoire, puis arrêt de
+    l'enquête). Mesuré ensuite par la revue indépendante du lot 3 (dernière
+    section) : pas de dégradation sur les sept extraits français.
+  - **Parakeet TDT v3** : aucune entrée de langue. `OfflineTransducerModelConfig`
+    n'a qu'encodeur, décodeur, joiner et `qnnConfig`, et
+    `offline-recognizer-transducer-nemo-impl.h` ne lit aucune option de flux.
+    La langue est implicite dans le modèle. Sur un mot seul, il a très peu de
+    contexte pour la deviner. L'application ne lui passe pas de hotwords (décodage
+    `greedy_search`) ; aucun palliatif n'a été essayé.
+  - Pour l'orchestrateur (table de recommandation inchangée) : avec une seule
+    langue choisie, Whisper et désormais Qwen3-ASR reçoivent la langue, pas
+    Parakeet.
+
+#### Whisper « en dernier recours » (observation de l'utilisateur, 2026-11-12)
+
+Sur son téléphone, Whisper transcrit bien les mots d'ici, dont ceux que
+Parakeet et Qwen3-ASR prennent pour de l'anglais, mais trop lentement pour un
+usage courant. Aucune latence n'a été mesurée sur appareil. Sur l'hôte, les
+facteurs temps réel indicatifs (étape 1.2) sont de 0,07 pour Parakeet, 0,3 pour
+Whisper et 0,6 à 0,9 pour Qwen3-ASR. Ils ne prédisent pas l'ordre sur le
+téléphone. Changements :
+
+- nouveau champ `ModelSpec.note`, affiché sous la description de chaque carte
+  de modèle (`SetupActivity`, style `BodySmall` du thème, pas d'avertissement).
+  Seul Whisper en a une : `ModelCatalog.WHISPER_NOTE`, formulée comme une
+  observation (« Observé sur un téléphone : … À garder en dernier recours … ») ;
+- la raison affichée quand la table désigne Whisper (bengali, ourdou) ajoute
+  « Il est plus lent que les deux autres (observé sur un téléphone) ». La
+  logique de la table n'a pas changé ;
+- `README.md`, section Modèles, donne la même précision.
+
+#### Garde-fou du LLM local (durcissement, hors cause)
+
+- **Trou trouvé** (`text/Filters.kt`, ancien `SafetyCheck.check`) :
+  - les segments de 8 mots ou plus toléraient jusqu'à 3 mots « nouveaux »
+    (8 % des mots de contenu). À partir d'environ 13 mots de contenu, un mot
+    changé passait : « friperie » → « fripperie », « friperies »,
+    « boutique »… ;
+  - `Normalize.fold` retirait les accents et la casse : « cégep » → « cegep »
+    passait, même dans une phrase courte ;
+  - la comparaison se faisait par ensemble, donc l'ordre était ignoré ;
+  - les mots grammaticaux étaient exclus du contrôle : un mot remplacé ou
+    supprimé passait (« la friperie » → « la ») ;
+  - jusqu'à 25 % (50 % en phrase courte) des mots de contenu pouvaient
+    disparaître ;
+  - les mots du vocabulaire comptaient comme permis partout.
+
+  Le test `SafetyCheckTest` reproduit ces cas : il échouait sur l'ancien code
+  (10 tests sur 19).
+- **Correction** : `SafetyCheck` (implémente la nouvelle interface
+  `CleanupGuard`) exige que chaque mot de la sortie soit un mot de l'entrée,
+  identique, dans le même ordre. Normalisation minimale : NFC, apostrophe et
+  trait d'union typographiques unifiés, ponctuation et espaces ignorés, casse de
+  la première lettre seulement. Le trait d'union fait partie du mot
+  (« peut-être » ≠ « peut être »). Les mots retirés doivent former des suites
+  qui sont chacune :
+  - des hésitations pures (euh, um… ; « ben », « bon », « like », « quoi » n'en font plus partie, car ils ont un sens) ;
+  - une répétition des mots voisins ;
+  - un faux départ repris juste après (« on va au, on va à ») ;
+  - une autocorrection terminée par un marqueur détaché par une virgule
+    (« lundi, non, » / « je veux dire, »).
+
+  Les contrôles négation, nombres et formule d'assistant sont gardés. Le
+  vocabulaire n'est plus passé au garde-fou : le LLM n'est plus rechargé quand
+  il change. Le prompt demande en plus de ne jamais corriger ni réépeler un
+  mot.
+- Le texte d'aide du réglage décrit la règle exacte (il remplace la mise en
+  garde ajoutée plus haut) : le nettoyage ne corrige jamais un mot mal entendu.
+- Une variante assouplie pour l'évaluation (lot 3, étape 3.3) implémentera
+  `CleanupGuard` à côté, sans toucher `SafetyCheck`. `LlmCleaner.createFromPath`
+  accepte un `guard`. Défaut inchangé : `CleanupMode.OFF`.
+- Limites : la sortie réelle de Qwen2.5 (MediaPipe, arm64) n'a pas été rejouée.
+  Le garde-fou strict rejettera plus de nettoyages : une autocorrection sans
+  virgule, ou une reformulation de ponctuation qui fusionne des mots. Le texte
+  nettoyé par règles est alors gardé.
+
+## Issue #15, lot 3 — étape 3.4 : rapport et recommandation
+
+Rapport : `android/docs/POLISSAGE_LOCAL.md` (question, jeu et ses limites,
+tableau comparatif mesuré / simulé / à faire sur le téléphone, cas
+`coifferimouski.com`, risques, recommandation, procédure de mesure, décision à
+prendre). Lien depuis `android/README.md`.
+
+### Raccord de 3.2 et 3.3 (approche 4)
+
+- Nouveau fichier `app/src/main/java/io/github/remtav/dictee/cleanup/eval/WiredCombination.kt` :
+  - `WiredRules.apply` : `PolishRules.polish`, puis `ShippedVocabulary.apply`.
+    **Choix** : l'étage déterministe est « règles + vocabulaire », pas les
+    règles seules, parce que c'est la meilleure approche sans LLM (55/79,
+    0 contrôle abîmé). La combinaison mesure ainsi ce qu'un LLM ajoute à ce
+    qu'on livrerait sans lui.
+  - `RuleSignalDetector` : envoie au LLM les segments où
+    `PolishRules.assess(brut)` donne `PROBABLE_CASE` ou `hasAddress` (la
+    proposition de 3.2). Les noms mal transcrits ne sont pas envoyés : c'est la
+    définition de l'approche 4 dans l'issue (LLM seulement là où une règle
+    signale un cas probable). Le LLM est appelé sur 22 segments sur 132
+    (21 cas à corriger : web 9, courriel 10, épellation 2 ; 1 contrôle,
+    `fr-web-04-whisper`, une adresse déjà écrite).
+  - `ShippedLexicon.names` : formes correctes de `ShippedVocabulary`
+    (lexique du garde-fou assoupli, à la place du lexique de simulation).
+  - `wiredCombination(llm, allowLexiconNear, template)`.
+- `ProvisionalProbableCaseDetector` est gardé pour comparaison, il n'est plus
+  utilisé par la combinaison.
+- Le raccord est dans `cleanup/eval/` (et non dans `text/polish/`) : les règles
+  ne dépendent pas du code d'évaluation du LLM.
+
+### Simulations régénérées et ajoutées
+
+`src/test/resources/polissage/sorties/` :
+`simulation-combinaison-oracle` et `simulation-combinaison-bruyant` (approche 4
+raccordée : 56/79, 2 modifiés à tort, 0/53 abîmés, oracle comme bruyant) ;
+nouveaux `simulation-llm-oracle-gardefou-lexique-livre` (36/79) et
+`simulation-llm-bruyant-gardefou-lexique-livre` (13/79), l'approche 3 avec le
+lexique qu'on livrerait. Les autres simulations de 3.3 sont inchangées.
+
+Plafonds épinglés dans `LlmSimulationTest` (LLM oracle) :
+
+| Variante | Corrigés / 79 |
+| --- | --- |
+| Approche 3, lexique livré | 36 |
+| Approche 4 raccordée, avec ou sans proximité | 56 |
+| Règles + vocabulaire puis LLM sur **tous** les segments | 57 (58 avec proximité) |
+
+Conclusion tirée dans le rapport : derrière le garde-fou, un LLM, même
+parfait, n'ajoute qu'un à trois cas aux 55 de règles + vocabulaire ; la
+mesure sur le téléphone ne peut pas renverser ce plafond.
+
+### Autres changements
+
+- Nouvelle approche notée `regles+vocabulaire-general` (règles + vocabulaire
+  sans les 20 formes `OBSERVED`) : 36/79, 6 modifiés à tort, 0/53 abîmés.
+  C'est la borne basse de la meilleure approche, que le rapport cite à côté
+  de 55/79.
+- Noteur : pour une latence « appareil », compte des segments au-delà de 4 s
+  (délai de `LlmCleaner`). Il apparaît dans `resultats.md`
+  (`… (appareil, 3/132 > 4 s)`) et dans `resultats.json` (`au_dela_4s`).
+  Testé dans `PolishScorerTest`.
+- `LlmPolishRecordingTest` : garde-fou avec le lexique livré, combinaison
+  raccordée (`wiredCombination`, même gabarit et même option de proximité).
+  Procédure dans le rapport.
+- `DefaultPathUnchangedTest` : seul `cleanup/eval/` peut citer les règles. Un
+  nouveau test vérifie qu'aucun fichier hors de `cleanup/eval/` ne cite le
+  paquet d'évaluation du LLM (garde-fou assoupli, prompt élargi, détecteurs,
+  combinaison). Un autre vérifie que `text/polish/` ne dépend pas de
+  `cleanup.eval`.
+
+### Comportement par défaut, vérifié
+
+- Recherche dans `app/src/main` : seuls `cleanup/eval/` et `text/polish/`
+  citent ces classes. Aucun appel depuis `DicteeApp`, `TextPipeline` ou
+  `SettingsActivity`. `CleanupMode.fromName` retombe sur `OFF`.
+- Changements « friperie », relus dans les commits `fc65b55` et `8c1eb05` :
+  - **un seul changement de défaut**, la langue transmise à Qwen3-ASR quand une
+    seule langue est choisie (le choix initial, « Français (Québec) » seul,
+    est dans ce cas). Il n'avait pas été mesuré à cette étape ; le rapport le
+    dit dans une section à part (mesuré depuis par la revue indépendante :
+    voir la dernière section) ;
+  - `remote_polish` vaut `true` par défaut, et le client envoie `polish=true`
+    comme avant ;
+  - le garde-fou strict et le nouveau prompt ne jouent qu'en mode LLM, qui
+    n'est pas le défaut ;
+  - le reste ne change que des textes affichés.
+
+### Recommandation (résumé)
+
+- Rien n'est activé par défaut.
+- Ne pas livrer de LLM de polissage.
+- Dans une itération suivante, au choix de l'utilisateur, une option
+  désactivée par défaut : d'abord les règles, puis le vocabulaire livré après
+  relecture.
+- Aucun passage en défaut sans zéro contrôle abîmé sur de vraies dictées
+  québécoises absentes du jeu.
+- Priorité au modèle de transcription affiné sur le français québécois.
+
+## Issue #15 — demande de l'utilisateur : modèle affiné sur le français québécois
+
+**Portée.** L'issue classait « l'ajout de nouveaux modèles au catalogue » hors portée. La demande explicite de
+l'utilisateur (« vérifie si tu es capable de trouver ce modèle et si oui, ajoute-le ») la remplace pour ce modèle
+précis seulement ; rien d'autre n'est ajouté.
+
+**Le modèle (trouvé, identifié sans ambiguïté).** `ele-sage/whisper-large-v3-turbo-fr-quebecois`
+(https://huggingface.co/ele-sage/whisper-large-v3-turbo-fr-quebecois), compte communautaire `ele-sage`, créé le
+2025-11-10, modifié le 2025-12-28. Fiche : « It achieves a Word Error Rate (WER) of 6.65% on the validation set »,
+dernière ligne du tableau d'entraînement (pas 2400 : 6,65 %). Base : `openai/whisper-large-v3-turbo` (809 M de
+paramètres, 4 couches de décodeur, la même architecture que le Whisper du catalogue). Données : ~69 h, soit
+Assemblée nationale du Québec (13 h), Common Voice « Français du Canada » (16,5 h) et Common Voice autres
+français (39 h), 1 époque. **Le jeu de validation n'est pas décrit** (ni sa composition, ni s'il est disjoint de
+l'entraînement) : le 6,65 % n'est comparable ni à nos six extraits ni au WER de l'article cité par l'issue.
+**Licence : MIT** (déclarée sur la fiche ; les données d'entraînement ont leurs propres licences, non vérifiées ici).
+Formats publiés : safetensors (3,2 Go, fp32) ; dépôt jumeau `…-ct2` (CTranslate2 fp16). Autres dépôts qui le
+reprennent (GGML : `MaderaTools/…`, CT2/OpenVINO/GGML : `ArchTianui/…`). Autres candidats « québécois » trouvés et
+écartés : `rishabbahal/whisper-small-quebecois-1` (adaptateur LoRA, pas de WER, pas de licence),
+`micross50/Whisper_FineTuned_Quebecois` (aucune fiche). Le seul avec 6,65 % est celui d'ele-sage.
+
+**Conversion sherpa-onnx.** Aucune n'existe (recherche sur Hugging Face : `csukuangfj`, `k2-fsa` et les comptes qui
+publient des Whisper turbo ajustés ; aucun pour ce modèle). Conversion faite ici, hors dépôt : poids transformers →
+format OpenAI (`hf_vers_openai.py`) → export `scripts/whisper/export-onnx.py` de sherpa-onnx (`exporter.py`) →
+int8 (`quantifier_int8.py`). Trois écarts à la procédure habituelle, documentés dans
+`android/tools/whisper-hf-vers-sherpa/README.md` : l'exporteur TorchScript (`dynamo=False`) parce que celui de
+torch 2.15 casse le décodeur ; une quantification int8 sobre en mémoire parce que celle d'onnxruntime dépasse 7 Go ;
+rien d'autre n'est modifié. Sortie : 674 348 342 + 360 961 539 octets (Whisper turbo d'origine : 674 716 297 +
+361 080 764), `tokens` identique. Contrôle : `openai-whisper` sur le point de contrôle converti, puis
+onnxruntime sur les ONNX int8, puis `SherpaEngine` : mêmes phrases que ci-dessous.
+
+**Mesures ici** (hôte Linux x86-64, 4 fils, sherpa-onnx 2.0.1, mêmes extraits `assets/reference`, même exécution de
+`ModelAccuracyHostTest`). WER, en erreurs / mots :
+
+| Modèle | en (2 extraits, 66 mots) | fr1 (16 mots) | frqc1..6 (59 mots) |
+|---|---|---|---|
+| Parakeet | 3,0 % (2) | 0,0 % (0) | 6,8 % (4) |
+| **Whisper QC** | 4,5 % (3) | 0,0 % (0) | **8,5 % (5)** |
+| Whisper turbo | 4,5 % (3) | 6,3 % (1) | 10,2 % (6) |
+| Qwen3-ASR | 4,5 % (3) | 0,0 % (0) | 13,6 % (8) |
+
+Par extrait québécois (WER) : Whisper QC 9,1 / 14,3 / 33,3 / 0 / 0 / 0 ; Whisper turbo 9,1 / 14,3 / 44,4 / 0 / 0 / 0.
+Le modèle affiné est donc à une erreur de moins que Whisper turbo et à une de plus que Parakeet sur 59 mots :
+**aucune différence significative** (un mot vaut 1,7 point). Il garde son anglais (même WER que Whisper turbo).
+Temps réel (RTF moyen, mêmes exécutions) : Parakeet 0,19 ; Qwen3-ASR 0,79 ; Whisper turbo 1,00 ; Whisper QC 1,16.
+**Ces RTF sont bruités** : la machine exécutait en parallèle les tests d'autres agents (le RTF d'un même extrait
+varie de 0,3 à 2,2 d'une exécution à l'autre pour le même modèle). La seule lecture fiable : Whisper QC a exactement
+l'architecture, la taille (1 036 Mo contre 1 037 Mo) et donc le coût de Whisper turbo, ~5 fois celui de Parakeet.
+Ce que l'utilisateur reproche à Whisper turbo sur son téléphone (trop lent) vaut donc pour ce modèle aussi.
+Non mesuré : le mot « friperie » dicté seul (pas d'enregistrement ; à essayer sur le téléphone une fois le modèle
+publié).
+
+**Hébergement : publié le 2026-11-12, sous le compte de l'utilisateur, à sa demande.** L'issue mettait l'ajout de
+modèles hors de sa portée ; l'utilisateur l'a demandé explicitement, et a lui-même publié la conversion (dépôt public,
+non restreint) : `https://huggingface.co/remiavelo/sherpa-onnx-whisper-large-v3-turbo-fr-quebecois-int8`. Sommes et
+tailles vérifiées sur le serveur (identiques à `ModelCatalog.whisperQuebec`). `WHISPER_QC` est renseignée, donc
+`ModelCatalog.all` contient le modèle (écran d'installation, Réglages, comparaison). Le test hôte
+`ModelAccuracyHostTest.whisperQuebec`, lancé réellement avec le téléchargeur de l'application, a téléchargé les trois
+fichiers (sommes vérifiées) et mesuré : en 4,5 % (3/66), fr 0 % (0/16), frqc 8,5 % (5/59) ; plafonds identiques à ceux
+de Whisper turbo. Limite : le proxy de cette session ajoute un jeton aux requêtes vers huggingface.co, donc ce test ne
+prouve pas l'accès anonyme (le dépôt est public d'après l'API). Carte : texte honnête (WER annoncé, mesure ici et sa
+limite, français seulement) et note « même coût que Whisper, donc plus lent » (observation sur Whisper turbo, pas une
+mesure sur appareil).
+
+**Couverture de langues** (`ModelRecommendations.coverage`) : français (Québec et France) seulement ; la logique de
+recommandation n'est pas modifiée (un test vérifie que la table ne le recommande jamais). Les mesures ne justifient
+pas de le recommander à la place de Parakeet pour « Français (Québec) » : 8,5 % contre 6,8 %, et un coût cinq
+fois plus élevé.
+
+**CI.** `ModelAccuracyHostTest.whisperQuebec` n'est plus ignoré : le job `models` télécharge ~1 Go de plus (total
+~3,8 Go de modèles, largement dans le disque d'un runner `ubuntu-latest`) et décode six extraits de plus (environ
++2 minutes, très en dessous du délai de 60 min ; le cache est indexé sur `ModelCatalog.kt`, donc invalidé par ce
+changement). Le workflow n'est pas modifié (approbation de Rémi) ; seul son titre « 3 models » est devenu inexact.
+
+**À valider par l'utilisateur** : redistribuer une conversion int8 d'un modèle MIT est permis par la licence ;
+l'auteur est cité sur la carte (éditeur « ele-sage (communauté), d'après OpenAI », licence MIT). Le jeu
+d'entraînement inclut les débats de l'Assemblée nationale et Common Voice (CC0) : rien ne l'interdit, mais je n'ai
+pas vérifié leurs conditions d'utilisation pour un modèle dérivé ; à trancher avant de publier le dépôt de conversion.
+
+## Issue #15 — demande de l'utilisateur : accélérer Whisper large-v3-turbo
+
+Enquête menée le 2026-11-12, sans modification du code de l'application. Rapport complet, avec sources, mesures hôte et
+procédure de mesure sur téléphone : [`docs/ACCELERER_WHISPER.md`](docs/ACCELERER_WHISPER.md). Test de mesure ajouté :
+`app/src/test/java/io/github/remtav/dictee/WhisperSpeedHostTest.kt` (sauté sans `-PmodelsDir`).
+
+Constats vérifiés dans le code de sherpa-onnx 2.0.1 et dans les fichiers du modèle :
+
+- L'encodeur de l'export sherpa-onnx accepte une longueur variable : ce n'est **pas** une fenêtre fixe de 30 s. Mais
+  sherpa-onnx ajoute **1 000 images (10 s) de silence** à chaque segment (`tail_paddings`, défaut -1 = 1 000) ; l'AAR
+  2.0.1 expose `OfflineWhisperModelConfig.tailPaddings`, que `SherpaEngine` ne renseigne pas.
+- Le décodeur a déjà un cache KV et un décodage glouton (le seul que sherpa offre pour Whisper) ; la langue forcée est
+  déjà transmise (elle n'économise qu'une étape de décodeur : 0 à 6 % mesuré).
+- Le modèle int8 est quantifié dynamiquement (`MatMulInteger`, `DynamicQuantizeLinear`), opérateurs absents des listes de
+  XNNPACK et de NNAPI d'onnxruntime : pas de gain attendu de ces fournisseurs, risque de ralentissement.
+
+Mesures hôte (x86-64, 4 cœurs, machine partagée : tendances, pas la latence du téléphone) : sur 1 thread, la fenêtre fixe
+de 30 s coûterait 8,4 s contre 2,1 s pour la marge par défaut, 1,3 s à 600 et 0,86 s à 300 (mot de 1 s) ; à 300 des
+répétitions apparaissent (WER 14,7 % contre 9,3 %), à 100 la sortie est inutilisable (42,7 %). Les provisoires consomment
+2,8 fois le calcul du final pour 5 s de parole et le final attend en moyenne 1,5 s (jusqu'à 5,9 s) derrière un provisoire
+non interruptible.
+
+Décisions proposées (à confirmer par l'utilisateur ; rien n'est appliqué) :
+
+1. **Couper le texte provisoire pour Whisper** (une ligne dans `DicteeApp.kt`) : gain le plus sûr, faisable tout de suite.
+2. **Ajouter un réglage `tailPaddings`** (`EngineOptions`, `SherpaEngine`, `AppSettings`), défaut inchangé (1 000) ; passer
+   à 600 seulement après mesure sur le téléphone avec des voix réelles et des mots isolés ; ajouter un filtre de phrase
+   répétée si 300 à 600 est retenu.
+3. **Mesurer sur le téléphone** (procédure du rapport) le nombre de threads (3 à 5), XNNPACK et NNAPI avant tout changement
+   de `defaultThreads()` ou du fournisseur par défaut.
+4. **Écarter** : Whisper small (WER 16 % contre 9,3 %), medium, tiny/base, distillations (même encodeur, donc pas plus
+   rapides sur segments courts ; distil-large-v3 est anglais seulement), whisper.cpp, QNN (étude séparée si Whisper devient
+   courant). Le modèle québécois en évaluation par ailleurs a la même architecture donc la même vitesse : ces leviers
+   lui sont applicables tels quels.
+
+### Mise en œuvre du 2026-11-12 (les deux gains les plus sûrs, plus l'écran de comparaison)
+
+Décisions 1 et 2 ci-dessus appliquées à la demande de l'utilisateur ; la 3 reste à faire sur le téléphone, la 4 inchangée.
+
+- **Plus de texte provisoire avec Whisper** (turbo et québécois) : `WhisperTuning.provisionalAllowed(spec, réglage)`
+  (`stt/WhisperTuning.kt`) est faux pour Whisper et pour le serveur, quel que soit le réglage « Texte provisoire » ; il le
+  suit pour Parakeet et Qwen3-ASR. Pas de réglage de remplacement : l'aide du réglage dit qu'il est sans effet avec Whisper.
+  Raison : mesuré sur l'hôte, les provisoires consomment 2,8 fois le calcul du final et le retardent de 1,5 s en moyenne.
+  Aucun test existant ne supposait du texte provisoire avec Whisper (`ControllerTest` et `ImeInstrumentedTest` utilisent un
+  moteur simulé de spec Parakeet ou le réglage seul ; vérifié).
+- **Réglage avancé « Silence ajouté pour Whisper »** (Réglages > Performance) : champ sherpa-onnx 2.0.1
+  `OfflineWhisperModelConfig.tailPaddings`, `Int` (vérifié par `javap`). `EngineOptions.whisperTailPaddings`, stocké par
+  `AppSettings.whisperTailPaddings`. Choix : **1 000 (défaut, valeur d'origine)**, 600 (plus rapide), 300 (encore plus
+  rapide, peut répéter des phrases) ; une valeur stockée hors de ces trois se relit 1 000. Passé à Whisper seulement ; pour les
+  autres modèles `engineOptions` met toujours 1 000, donc la clé de `EngineManager` ne change pas et rien ne se recharge ;
+  pour Whisper, changer la valeur recharge le modèle.
+- **Défaut gardé à 1 000** : le comportement ne change pas tant que l'utilisateur n'a pas validé 600 sur son téléphone (la
+  mesure hôte, −36 % de calcul à 600, ne dit rien de la qualité sur ses voix et ses mots isolés ; WER hôte 14,7 % contre
+  9,3 % à 300).
+- **« Comparer les modèles »** : `Benchmark` accepte des options par modèle ; l'écran passe `engineOptions(modèle)` (langue
+  forcée si une seule langue, threads, accélération, silence ajouté) au lieu d'options calquées sur le serveur. Effet de bord
+  voulu : Qwen3-ASR y reçoit aussi sa langue forcée et ses mots favorisés, comme au clavier. L'en-tête du rapport indique la
+  valeur du silence ajouté et la langue de Whisper.
+- **Tests** : `WhisperTuningTest` (provisoire, défaut, valeurs acceptées, valeur transmise à Whisper seulement, clé du moteur) ;
+  `ModelAccuracyHostTest.whisperTurbo*` (avec `-PmodelsDir`) vérifie que Whisper se charge avec le nouveau champ.
+- **Pas fait, volontairement** : filtre de phrase répétée, threads par défaut, décodage à blanc, XNNPACK/NNAPI/QNN.
+- **À mesurer sur le téléphone** : temps et texte de « friperie », d'une phrase de 5 s et de 15 s à 1 000, 600 et 300 (écran
+  « Comparer les modèles », une exécution par valeur) ; ne passer le défaut à 600 que sans répétition ni mot manquant sur
+  5 essais par valeur (ce serait un changement de défaut, donc une nouvelle décision) ; puis les threads (3 à 5).
+
+## Issue #15, lot 3 — revue indépendante
+
+Revue du diff `origin/main...HEAD` (branche du lot 3, PR #18) contre les critères du lot 3, la section
+« Positionnement » et la règle 8 de l'issue, sans les comptes rendus des agents. Les changements demandés par
+l'utilisateur en cours de route (interrupteur du polissage serveur, garde-fou strict, langue de Qwen3-ASR, modèle
+québécois, vitesse de Whisper) ont été relus en priorité : ils touchent le comportement réel.
+
+### Critères du lot 3
+
+- **Jeu et noteur exécutables en CI sans modèle ni réseau** : oui (`PolishEvaluationTest`, `LlmSimulationTest` dans
+  `testDebugUnitTest`). Relancé : `app/build/reports/polissage/resultats.md` donne exactement les chiffres du rapport
+  (55, 36, 17, 38, 19 ; 36, 44, 13, 39/28/13 ; 56) et les plafonds 56 / 57 / 58 ; les fichiers de simulation
+  régénérés sont identiques à ceux du dépôt. Seules les latences d'ordinateur diffèrent (le rapport le dit).
+- **Rapport** (`docs/POLISSAGE_LOCAL.md`) : mesuré / simulé / à faire sur téléphone séparés dans chaque tableau ;
+  aucun chiffre simulé présenté comme mesure ; recommandation (ne rien activer, ne pas livrer de LLM) cohérente avec
+  les plafonds. Corrigé : la réponse courte disait « 58 sur 79 s'il passait sur tous les segments », or 58 exige la
+  proximité (désactivée par défaut) : 57, 58 avec proximité.
+- **Aucune approche branchée** : `DefaultPathUnchangedTest` cherche les noms des classes de `text/polish/` et de
+  `cleanup/eval/` dans tout `src/main/java` ; vérifié aussi à la main (aucun appel depuis `DicteeApp`,
+  `TextPipeline`, `SettingsActivity`, `DicteeImeService`). C'est suffisant tant que personne ne passe par la
+  réflexion. Le code d'évaluation est compilé dans l'APK (permis par l'issue : « code hors du chemin par défaut ») ;
+  le jeu et le lexique de simulation ne sont que dans l'APK de test (vérifié par `unzip -l` sur les deux APK).
+
+### Garde-fou strict du LLM local : huit trous trouvés et fermés
+
+Cas adverses écrits dans `SafetyCheckAdversarialTest` ; tous **passaient** avant la correction (`text/Filters.kt`,
+`SafetyCheck`) :
+
+1. Pronoms réfléchis et doublements grammaticaux pris pour une répétition : « Vous vous lavez » → « Vous lavez »,
+   « nous nous », « had had », « that that ».
+2. Nombres épelés : « cinq cinq cinq, un deux trois quatre » → « cinq, un deux trois quatre » (numéro de téléphone).
+3. Lettres épelées : « c o i f f e r i m o u s k i » → « c o i f e r… » (le cas même du lot 3), « a n n e » →
+   « a n e ». Le faux départ laissait aussi passer ces cas (préfixe répété sans reste).
+4. Répétition à travers une fin de phrase : « Je vois Marie. Marie arrive » → « Je vois Marie. Arrive » (sujet
+   supprimé).
+5. Autocorrection qui n'en est pas une : « Il pleut, enfin. Je reste » → « Je reste » (phrase entière supprimée).
+6. Majuscule abaissée au milieu d'une phrase : « j'ai vu Pierre » → « j'ai vu pierre », « Apple » → « apple ».
+7. Séparateur d'un nombre : « 3, 5 kilos » ↔ « 3,5 kilos » (seuls les chiffres étaient comparés).
+8. Question changée en affirmation : « Tu viens demain? » → « Tu viens demain. ».
+
+Correction : répétition et faux départ refusés s'ils traversent une fin de phrase (`?`, `!`, point simple ; les
+points de suspension restent une hésitation) ou s'ils retirent un mot d'un caractère, un nombre en lettres ou un
+doublement grammatical (`NO_DEDUP`) ; autocorrection limitée à sa phrase ; une majuscule de l'entrée ne s'abaisse
+qu'en début de phrase (la mettre reste permis partout, « pierre » → « Pierre ») ; nombres comparés avec leurs
+séparateurs internes ; un `?` de l'entrée ne disparaît pas. Les nettoyages légitimes passent toujours (hésitations,
+« Je… je pense », « très très », « Bon. Donc » → « Bon, donc », « Une une maison », autocorrections avec virgule,
+majuscule de phrase). Un cas de `SafetyCheckTest` attendait l'inverse (« la Friperie » → « la friperie » accepté) :
+désormais refusé, c'est le même mécanisme que « Pierre » → « pierre ». Le prix est faible : un refus garde le texte
+nettoyé par les règles.
+
+Non corrigé, connu : une virgule de sens (« Mange, Marie » / « Mange Marie ») n'est pas contrôlée, puisque le prompt
+demande de corriger la ponctuation ; « un un » et « une une » restent retirables (bégaiement fréquent ; les chiffres
+sont contrôlés à part) ; un doublement de nom sans ponctuation (« Paul aime Marie Marie aime Paul ») reste ambigu.
+
+### Interrupteur « Polissage par le serveur »
+
+Relu dans `RemoteEngine` : coupé, `polish=false` explicite sur l'API à tâches et sur le repli synchrone, texte brut
+inséré même si le serveur renvoie `polished_text`, statut « not requested » (le clavier n'affiche alors aucun
+message) ; activé, requêtes identiques à avant. Le chemin OpenAI et le décodage par segment n'ont jamais demandé de
+polissage. Le serveur lit bien `polish=false` (`app/main.py`). Ajouté : `polishOffStillAppliesVoiceCommandsToTheRawText`
+(les commandes vocales s'appliquent au texte brut).
+
+### Langue transmise à Qwen3-ASR : vérifiée et mesurée
+
+- `javap` sur `app/libs/sherpa-onnx-2.0.1.aar` : `OfflineStream.setOption(String, String)` existe ;
+  `OfflineQwen3AsrModelConfig` n'a pas de champ de langue. Sources au tag `v2.0.1`
+  (`offline-recognizer-qwen3-asr-impl.cc`) : l'option de flux `language` est écrite telle quelle dans le prompt
+  (`"language " + language`), puis le préfixe « language X<asr_text> » est retiré de la sortie ; l'exemple officiel
+  passe « Korean, Chinese, English ». Les noms viennent de la liste officielle de Qwen3-ASR
+  (`qwen_asr/inference/utils.py`, `SUPPORTED_LANGUAGES`) : French, English, Chinese, Hindi, Spanish, Arabic,
+  Portuguese, Russian y sont tous, à la casse près ; bengali et ourdou n'y sont pas et ne reçoivent rien. Table exacte.
+- **Mesure** (hôte x86-64, sherpa-onnx 2.0.1, 4 threads, `fr1` + `frqc1..6`, 75 mots, une exécution) : détection
+  automatique **8 erreurs (10,7 %)**, « French » forcé **6 erreurs (8,0 %)**. Écarts : `frqc2` 3 → 2, `frqc3` 4 → 3,
+  le reste identique. Pas de dégradation : le défaut est gardé. Trop peu pour parler d'un gain ; les mots dits seuls
+  ne sont pas mesurés. Épinglé par `ModelAccuracyHostTest.qwen3ForcedFrenchDoesNotDegradeTheFrenchReferences`
+  (au plus 2 erreurs de plus que l'automatique), placé dans `ModelAccuracyHostTest` pour que le job `models` de la CI
+  le lance (il ne sélectionne que `*ModelAccuracyHostTest*` et `*EndToEndHostTest*`).
+
+### Modèle québécois
+
+- API publique Hugging Face (`?blobs=true`) : tailles et SHA-256 des deux `.onnx` identiques au catalogue ; dépôt
+  public, non restreint ; `turbo-tokens.txt` (hors LFS, sans somme dans l'API) téléchargé et vérifié : `b34b360d…a126`.
+  Fiche d'origine (`ele-sage`) : MIT, WER 6,65 % sur sa validation, données Assemblée nationale + Common Voice.
+- **Corrigé** : nos six extraits québécois viennent de Common Voice « Français du Canada », une des sources
+  d'entraînement du modèle : il a pu les entendre. La carte et le README le disent maintenant à côté du « 5 erreurs
+  sur 59 mots ». La raison de recommandation disait « le plus léger des trois », « le moins d'erreurs des trois »,
+  « le seul des trois » : il y a quatre modèles (toujours vrai à quatre : 4 erreurs contre 5, 6 et 8). Jamais
+  recommandé (test unitaire et instrumenté), français seulement, lenteur donnée comme observation.
+- Scripts de conversion : aucun secret, aucun chemin absolu de cette machine, crédit et licence corrects. Corrigé
+  dans leur README une phrase sur « le `package-lock.json` et `requirements.txt` de kalmia.ca », sans rapport avec
+  ce dépôt. Reste : `convertir.sh` télécharge `export-onnx.py` depuis `master` (somme vérifiée, mais seulement
+  avertie si elle change).
+- Portée : l'issue mettait l'ajout de modèles hors portée ; la demande explicite de l'utilisateur l'a levée pour ce
+  modèle seul (section plus haut).
+
+### Whisper
+
+- `WhisperTuning.provisionalAllowed` : coupé pour Whisper et le serveur, réglage respecté ailleurs ;
+  `tailPaddingsFor` : la valeur du réglage pour la famille Whisper seulement, 1 000 sinon (donc pas de rechargement
+  des autres moteurs) ; valeur stockée invalide → 1 000 (tests `WhisperTuningTest`, `StoreTest`). L'écran de
+  comparaison passe les options de la dictée à chaque modèle et les nomme dans l'en-tête.
+- `docs/ACCELERER_WHISPER.md` : mesures étiquetées « mesuré hôte ». Corrigé : l'étape 6 de la procédure demandait
+  de comparer « texte provisoire activé puis désactivé » alors qu'il est toujours coupé avec Whisper (et une phrase
+  finale « l'étape ne compare plus que les autres modèles, ou l'état avant cette mise à jour ») : réécrite (temps
+  jusqu'au texte final, comparé à la version précédente si on l'a). Le tableau des changements disait
+  `whisperTailPaddings = 0` et « exécuter Whisper en double » comme faits : corrigé (1 000 ; fait en partie).
+
+### Thème, exactitude, vie privée
+
+Aucune couleur ni police en dur dans le diff (la note de modèle utilise `body(…, small = true)`). Aucune permission
+ajoutée, aucune nouvelle requête réseau hors du téléchargement du modèle québécois depuis huggingface.co. Rien sur
+Google. Les textes d'aide des réglages ajoutés sont vrais au regard du code.
+
+### DECISIONS.md
+
+Chronologie « friperie » rendue cohérente : la section de l'interrupteur disait le polissage serveur « suspect
+principal » puis « désormais coupable », alors que la suite l'écarte ; renvois ajoutés vers la mesure de la langue
+de Qwen3-ASR (ex-« non mesuré »).
+
+### Échecs de `RobustnessInstrumentedTest` sur 1d0e815 (verts sur c63f218)
+
+Trois échecs dans la CI émulateur de 1d0e815, aucun sur c63f218 ni sur `main`. **c63f218 ne les a pas corrigés** :
+il ne touche ni `ime/`, ni `dictation/`, ni les réglages de session. Le lot 3 non plus, sur ce chemin : avec
+Parakeet (modèle des tests), `WhisperTuning.provisionalAllowed` rend exactement l'ancienne valeur
+(`partials && famille != REMOTE`), `tailPaddingsFor` rend 1 000 pour tout modèle non Whisper donc la clé du moteur
+ne change pas, la langue de Parakeet reste vide, et `CleanupGuard` ne joue qu'en mode LLM (désactivé). Lecture du
+code exercé (`DicteeImeService.onStartInput`, `onFinishInputView`, `stopIfHidden`) :
+
+- `changingFieldMidDictation…` et `changingBetweenFieldsWithTheSameKey…` : la dictée reste en LISTENING et, dans le
+  premier, le texte arrive **dans le champ 1** : le clavier n'a jamais reçu le `onStartInput` du nouveau champ. Or
+  le test déplaçait le focus par `requestFocus()` sans vérifier que le clavier l'avait vu ; Android ne signale un
+  changement de focus au clavier que dans une fenêtre qui a le focus de fenêtre. Cause la plus probable : une fenêtre
+  système (boîte « isn't responding » d'un émulateur chargé, déjà rencontrée par `ImeTestBase`) au-dessus de
+  l'activité à ce moment. Le produit se comporte alors correctement (il écrit dans le champ que le clavier sert).
+- `rotationDuringDictationKeepsDictating` : état IDLE, journal « dictation IDLE » : `stopIfHidden` a arrêté la dictée,
+  c'est-à-dire que le clavier est resté caché plus de `HIDE_GRACE_MS` (4 s) pendant la rotation. Sur un émulateur
+  chargé, rotation + réaffichage (plus les 3 s d'attente d'`ensureKeyboardShown` avant de toucher le champ) peut
+  dépasser 4 s. C'est une limite connue du produit (une rotation de plus de 4 s arrête la dictée, le texte déjà dit
+  est gardé), pas une régression.
+
+Conclusion : fragilité des tests sous charge, pas de course nouvelle dans le produit ; je ne peux pas le prouver
+sans journal (le message d'échec ne gardait que 60 lignes de logcat avant filtrage, d'où une seule ligne utile).
+Changé dans `ImeTestBase`, sans affaiblir aucun test : `focus()` attend le focus de fenêtre (en répondant « Wait » à
+une boîte « isn't responding ») puis **exige** que le clavier ait reçu la nouvelle entrée (`EditorInfo` neuf) avant de
+continuer, avec un échec explicite sinon ; le message d'échec de `waitFor` donne maintenant la fenêtre qui a le focus
+et les 40 dernières lignes `DicteeIme` (dont « keyboard still hidden: stop »), pour trancher au prochain échec. Le
+délai de grâce de rotation n'est pas allongé : ce serait changer le produit sans mesure.
+
+### Vérification
+
+`./gradlew testDebugUnitTest assembleDebug assembleDebugAndroidTest lintDebug` : code de retour 0. Mesure Qwen3 :
+`--tests '*ModelAccuracyHostTest.qwen3Forced*' -PmodelsDir=…`. Les tests instrumentés ne tournent que dans la CI
+(pas d'émulateur ici) : `ImeTestBase` modifié compile, son effet se verra à la prochaine exécution.
+
+### État de la revue
+
+- Fait : points 1 à 9 de la consigne (critères du lot 3, garde-fou, interrupteur serveur, langue de Qwen3-ASR mesurée,
+  modèle québécois, Whisper, thème et exactitude, tests instrumentés, cohérence de ce fichier) ; analyse des échecs de
+  `RobustnessInstrumentedTest`.
+- Reste : confirmer dans la CI que `ImeTestBase` modifié passe ; corrections à reporter dans `docs/A_VERIFIER.md`
+  (listées dans le rapport de revue à l'orchestrateur, ce fichier-là n'est pas modifié par la revue).
+
+`--tests '*ModelAccuracyHostTest.qwen3Forced*' -PmodelsDir=…`.
+
+### Échec de CI : `HowToInstrumentedTest.opensAtTheEndOfTheFirstSetupAndNotTheSecondTime` (« only once »)
+
+Diagnostic : pas un défaut du produit. `maybeOpenHowTo` pose `howToShown` (`SetupActivity.kt`, avant
+`startActivity`) ; `apply()` met la valeur à jour en mémoire tout de suite dans l'instance de `SharedPreferences`
+unique du processus (seule l'écriture disque est asynchrone), et tout se passe sur le fil principal : un deuxième appel
+(`onResume`, `onWindowFocusChanged`, fin de téléchargement) voit déjà le drapeau. Le tutoriel ne peut donc pas
+s'ouvrir deux fois pour l'utilisateur. Le test, lui, était fragile : le moniteur `second` est enregistré pendant que la
+`HowToActivity` de l'étape 2 est encore vivante (seul `SetupActivity` est fermé) ; un moniteur d'activité compte aussi
+la création d'une instance par `Instrumentation.newActivity`, donc la recréation de cet ancien écran (mode nuit
+appliqué par `ScreenshotTest`, rotation laissée par un autre test) ou sa destruction concurrente au lancement
+NEW_TASK|CLEAR_TASK suffit à lui faire « voir » une instance. Cela correspond à l'apparition de l'échec après
+`bd7f6e5` et `2911387` (durée et ordre des autres tests changés), sans autre cause dans le chemin d'ouverture.
+Cause exacte non reproductible sans émulateur : le test est corrigé sans l'affaiblir.
+
+Correction : à l'étape 3, le moniteur de l'étape 2 est retiré, le premier écran est fermé et on attend sa
+destruction, puis seulement le moniteur `second` est posé ; on attend 3 s sans instance (`assertNull`) et on vérifie
+`hits == 0`. L'assertion reste : une seconde arrivée sur l'écran de configuration n'ouvre pas le tutoriel.
+
+## Issue #15 — demande de l'utilisateur : retour au style générique
+
+Date : 2026-11-13. Demande : « Retire tout le style lié à Kalmia. Reviens au style générique. » Elle remplace la
+section « Identité visuelle Kalmia » de l'issue et l'étape 1.5 : **la section 1.5 de ce fichier et « Identité
+visuelle Kalmia » de l'issue sont désormais caduques** (elles restent plus haut comme historique).
+
+Référence du « style générique » : l'apparence d'avant l'étape 1.5 (commit `800d08e`) : thème Material 3 DayNight
+bleu (`#2E5E8C`), polices du système, coins arrondis (touches à 12 dp), ombres Material ordinaires, icône de
+lancement bleue d'origine.
+
+Portée tranchée par l'orchestrateur (prudente) :
+
+**Retiré**
+- La palette Kalmia (papier, encre, vert sauge, fleur…) et les rôles qui la faisaient correspondre à Material 3.
+- Les polices embarquées Newsreader et IBM Plex Mono (`res/font/*`, 1,2 Mo) et leurs licences
+  (`assets/licences/OFL-*.txt`) : plus aucune police dans l'application.
+- Les angles droits imposés, l'ombre pleine décalée (`kalmia_ombre_bouton`), les majuscules espacées « façon
+  étiquette », les styles `Widget.Kalmia.*`, `ShapeAppearance.Kalmia.*`, `TextAppearance.Kalmia.*`.
+- Le logo Kalmia (`kalmia_logo`, le logo de l'écran d'accueil, `cd_kalmia_logo`), l'icône de lancement dérivée du logo
+  et sa couche monochrome ; retour à l'icône d'origine (micro blanc sur fond bleu).
+- Les sélecteurs `res/color/kalmia_button_*` et `kalmia_key_text` (les boutons reprennent les couleurs Material).
+
+**Gardé**
+- Le **nom** « Kalmia Blabla » et tous les textes (la demande porte sur le style, pas sur le nom ni le
+  positionnement) ; toutes les fonctionnalités des lots 1 à 3.
+- Les acquis d'accessibilité et de robustesse, qui ne sont pas du « style Kalmia » : erreurs en rouge avec icône
+  (`markError`, `ic_error`) ; zones tactiles d'au moins 48 dp (boutons du clavier, bouton d'aide) ; symboles des
+  touches d'au moins 20 sp (24 sp) ; écart entre touches en marge interne (zone tactile continue) ; clavier qui
+  suit le réglage Système / Clair / Sombre ; texte lisible dans les deux thèmes ; styles de texte nommés
+  (`TextAppearance.Dictee.*`, utilisés par `ui/Ui.kt`) qui pointent maintenant vers les apparences Material par
+  défaut ; aucun rôle de couleur laissé au thème Material par défaut (tous les rôles utilisés sont définis, clair
+  et sombre, y compris les couleurs de texte du cadre Android).
+- Le micro garde un état visuel distinct à l'écoute : rouge (couleur d'erreur du thème) au lieu de bleu au repos,
+  icône « stop » (jamais la couleur seule).
+
+**Faits**
+- `values/colors.xml` et `values-night/colors.xml` : palette Material 3 bleue (noms `md_*`), seul endroit où un
+  hexadécimal s'écrit, plus `launcher_bg` et `launcher_fg` pour l'icône. `values/themes.xml` : un seul thème
+  `Theme.Dictee` (parent `Theme.Material3.DayNight.NoActionBar`), `KeyButton` (tonal, 12 dp, 52 dp de haut) et le
+  style du micro `Widget.Dictee.Button.Mic`. Les barres système suivent un booléen `light_system_bars` (clair/sombre).
+- `LevelMeterView` : retour à la version d'avant 1.5 (piste `colorSurfaceVariant`, barre `colorPrimary`).
+- Tests : `ThemeContrastTest` garde le principe (ressources lues, 4,5:1 pour chaque paire texte/fond utilisée, clair
+  et sombre, contour 3:1, tous les rôles définis, micro, touches, boutons du clavier à 48 dp) ; il perd « palette =
+  source Kalmia » et ajoute « bleu d'origine ». `NoHardcodedStyleTest` garde « aucune couleur ni police en dur » et
+  « aucune police téléchargeable », et exige maintenant qu'aucune police ne soit embarquée ni nommée. Les tests
+  instrumentés n'utilisaient aucune ressource supprimée.
+- Les captures de `docs/screenshots/` montrent encore le thème Kalmia : elles sont régénérées par la CI
+  (`ScreenshotTest`, mêmes noms de fichiers).

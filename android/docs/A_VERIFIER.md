@@ -41,22 +41,22 @@ corriger si ça ne convient pas. Les chemins partent de la racine du dépôt.
 - **Où corriger** : la table et le libellé de la raison sont dans
   `android/app/src/main/java/io/github/remtav/dictee/stt/ModelRecommendation.kt`.
 
-### 3. Rendu du thème Kalmia sur le téléphone, en clair et en sombre
+### 3. Rendu de l'apparence générique sur le téléphone, en clair et en sombre
 
-Reconnaît-on Kalmia au premier coup d'œil ? À regarder en particulier :
+Le thème Kalmia (palette, polices Newsreader et IBM Plex Mono, angles droits,
+logo) a été retiré à ta demande le 2026-11-13. L'application a retrouvé
+l'apparence d'origine : thème Material bleu, polices du système, coins
+arrondis, icône au micro blanc sur fond bleu. Le nom « Kalmia Blabla » et les
+textes n'ont pas changé.
 
 | Point | Où corriger |
 | --- | --- |
-| Lisibilité des touches `, . ? !` (IBM Plex Mono 24 sp au lieu du serif) | `android/app/src/main/res/layout/keyboard_view.xml`, styles dans `res/values/themes.xml` |
-| Bouton micro carré de 100 dp avec ombre décalée (ombre claire en thème sombre) : trop massif ? | `keyboard_view.xml`, `res/drawable/kalmia_ombre_bouton.xml` |
-| Libellés de boutons en majuscules espacées : passent-ils bien à la ligne quand ils sont longs ? | style `TextAppearance.Kalmia.Button` dans `res/values/themes.xml` |
-| Filet des cartes et piste du curseur, volontairement discrets (contraste 1,48 : 1) | `colorOutlineVariant` dans `res/values/themes.xml` |
-| Icône de lancement (claire, sombre, monochrome d'Android 13) et logo de l'accueil | `res/drawable/ic_launcher_foreground.xml`, `ic_launcher_monochrome.xml`, `kalmia_logo.xml` |
-| Champs de saisie : soulignement Material conservé | `android/app/src/main/java/io/github/remtav/dictee/ui/Ui.kt` |
-| Largeur des touches : environ 36 à 40 dp chacune (huit touches sur une rangée), sous les 48 dp visés ; hauteur de 48 dp respectée. Confortable au pouce ? Sinon, passer à deux rangées | `android/app/src/main/res/layout/keyboard_view.xml` |
+| Clavier à l'écoute : micro rouge avec l'icône d'arrêt, lisible en clair et en sombre | `android/app/src/main/res/layout/keyboard_view.xml`, `res/color/mic_bg.xml` |
+| Touches : coins de 12 dp, symboles de 24 sp ; largeur d'environ 36 à 40 dp chacune (huit sur une rangée), sous les 48 dp visés. Confortable au pouce ? | `keyboard_view.xml`, style `KeyButton` dans `res/values/themes.xml` |
+| Couleurs : seuls le bleu d'origine et le rouge d'erreur viennent de l'ancienne version ; les autres teintes ont été écrites à la main par l'agent. Rien de violet ni de mal assorti en sombre ? | `res/values/colors.xml`, `res/values-night/colors.xml` |
 | Changer Clair / Sombre dans les Réglages, puis rouvrir le clavier dans une autre application : il doit suivre | `android/app/src/main/java/io/github/remtav/dictee/ime/DicteeImeService.kt` |
-| Erreurs en rouge avec icône (échec de téléchargement, comparaison, test du serveur) : rendu correct ? | `markError()` dans `android/app/src/main/java/io/github/remtav/dictee/ui/Ui.kt` |
-| Couleurs elles-mêmes (reprises telles quelles de la source Kalmia) | `res/values/colors.xml`, `res/values-night/colors.xml` |
+| Erreurs en rouge avec icône (échec de téléchargement, comparaison, test du serveur) | `markError()` dans `android/app/src/main/java/io/github/remtav/dictee/ui/Ui.kt` |
+| Écran d'accueil sans logo, icône de lancement d'origine | `ui/SetupActivity.kt`, `res/drawable/ic_launcher_foreground.xml` |
 
 ### 4. Le texte d'accueil dit-il ce que tu veux dire ?
 
@@ -136,7 +136,7 @@ Reconnaît-on Kalmia au premier coup d'œil ? À regarder en particulier :
 | Point | Où corriger |
 | --- | --- |
 | Longueur de l'écran (jusqu'à 8 cartes, puis la liste complète) | `android/app/src/main/java/io/github/remtav/dictee/ui/HowTo.kt` (`HowToExamples`) |
-| Lisibilité des phrases dites en IBM Plex Mono quand elles passent sur plusieurs lignes | `ui/HowToActivity.kt` |
+| Lisibilité des phrases dites quand elles passent sur plusieurs lignes | `ui/HowToActivity.kt` |
 | Moment de l'ouverture automatique : une seule fois, quand le clavier est activé, le micro autorisé et un modèle prêt | `SetupProgress` dans `ui/HowTo.kt`, appelé par `ui/SetupActivity.kt` |
 | Bouton d'aide du clavier sur la ligne d'état : reste-t-il assez de place au texte d'état sur un téléphone étroit ? | `android/app/src/main/res/layout/keyboard_view.xml` |
 | Le lien « vocabulaire » fait-il bien défiler les Réglages au bon endroit ? | `ui/SettingsActivity.kt` |
@@ -154,3 +154,118 @@ Reconnaît-on Kalmia au premier coup d'œil ? À regarder en particulier :
 - **Où corriger** : hors portée de cette itération (prompt et garde-fou du
   serveur, `app/polish.py`). La limite est décrite dans `android/README.md`,
   section « Dicter la ponctuation ».
+
+## Lot 3 — polissage local, et demandes ajoutées en cours de route
+
+### 10. Lire le rapport et décider de ce qui sera livré
+
+- **Quoi lire** : `android/docs/POLISSAGE_LOCAL.md`, section « La décision à
+  prendre ».
+- **Recommandation du rapport** : ne livrer aucun LLM de polissage. Sur le jeu
+  de 132 paires, « règles + vocabulaire » corrige 55 cas sur 79 sans abîmer
+  aucune des 53 phrases de contrôle ; un LLM parfait (simulé) derrière le
+  garde-fou n'en ajoute qu'un. Aucun LLM n'a réellement tourné : ces chiffres
+  sont des plafonds et des simulations.
+- **Réserves** : la liste de vocabulaire a été écrite en connaissant le jeu
+  (sans les formes tirées du jeu : 36 cas corrigés, 6 modifiés à tort) ; les
+  transcriptions viennent d'une voix de synthèse à accent de France ;
+  « coifferimouski.com » n'est rétabli que si la transcription a gardé toutes
+  les lettres du nom.
+- **Choix fait en attendant** : rien n'est branché ni activé.
+- **Où corriger** : pour proposer « règles + vocabulaire » en option, brancher
+  `android/app/src/main/java/io/github/remtav/dictee/text/polish/PolishRules.kt`
+  et `ShippedVocabulary.kt` derrière un nouveau réglage ; relire d'abord la
+  liste de `ShippedVocabulary.kt` (une forme qui serait un mot ordinaire
+  abîmerait du texte) et ajouter de vraies dictées québécoises au jeu
+  `android/app/src/test/resources/polissage/jeu-evaluation.tsv`.
+- **Facultatif** : mesurer le LLM sur le téléphone avec la procédure du
+  rapport. Elle n'a jamais été exécutée : signaler toute étape fausse.
+
+### 11. Le modèle Whisper affiné sur le français québécois
+
+- **Ce que c'est** : `ele-sage/whisper-large-v3-turbo-fr-quebecois` (MIT),
+  converti et publié sous ton compte :
+  https://huggingface.co/remiavelo/sherpa-onnx-whisper-large-v3-turbo-fr-quebecois-int8.
+  Relire la fiche de ce dépôt : elle est sous ton nom.
+- **Quoi faire** : le télécharger depuis l'écran de configuration, dicter
+  « friperie » seul et les autres mots d'ici qui échouaient, puis le comparer
+  aux autres dans « Comparer les modèles » avec ta voix.
+- **Mesuré ici** : 5 erreurs sur 59 mots sur les six extraits québécois
+  (Parakeet 4, Whisper turbo 6, Qwen3-ASR 8). Trop peu pour conclure ; les
+  mots isolés n'ont pas été mesurés. Ce score est peut-être flatté : le modèle
+  a été entraîné en partie sur Common Voice « Français du Canada », d'où
+  viennent ces six extraits ; il a pu les entendre. Le WER de 6,65 % est celui annoncé par
+  l'auteur sur son propre jeu.
+- **À savoir** : même taille et même coût que Whisper turbo, donc aussi lent ;
+  français seulement. Parakeet reste le modèle recommandé.
+- **Non vérifié** : le téléchargement sans compte depuis un téléphone (le
+  dépôt est public d'après Hugging Face, mais l'essai fait ici passait par ton
+  jeton) ; les conditions des données d'entraînement de l'auteur pour la
+  redistribution d'un dérivé.
+- **Où corriger** : `android/app/src/main/java/io/github/remtav/dictee/stt/ModelCatalog.kt`
+  (entrée `whisperQuebec`) ; la recommandation est dans `stt/ModelRecommendation.kt`.
+- **Jeton** : le jeton Hugging Face est enregistré sur ton environnement
+  « Default » de Claude Code ; le retirer s'il ne sert plus.
+
+### 12. Vitesse de Whisper (turbo et québécois)
+
+- **Changé pour tous** : avec un modèle Whisper, plus de texte provisoire
+  pendant qu'on parle (il retardait le résultat final). Vérifier dans le
+  clavier que le texte arrive plus tôt après la pause.
+- **À essayer** : Réglages > Performance > « Silence ajouté pour Whisper ».
+  Valeur par défaut 1 000 (inchangée). Dans « Comparer les modèles », faire
+  une exécution à jeter puis une par valeur (1 000, 600, 300), avec
+  « friperie » seul, une phrase de 5 s et une dictée de 15 s ; regarder le
+  texte autant que le temps. Ne garder 600 que sans répétition ni mot manquant
+  sur environ cinq essais ; à 300, des phrases répétées ont été observées.
+- **Mesuré sur ordinateur seulement** (x86-64, machine partagée) : ce sont des
+  tendances, pas la latence du téléphone. Procédure complète, threads compris :
+  `android/docs/ACCELERER_WHISPER.md`.
+- **Si une dictée s'arrête toute seule après une rotation de l'écran** : la
+  dictée s'arrête quand le clavier reste caché plus de 4 secondes. Sur un
+  émulateur chargé, un test de la CI a échoué une fois ainsi ; à juger sur le
+  téléphone (`ime/DicteeImeService.kt`).
+- **Où corriger** : `stt/WhisperTuning.kt` (texte provisoire),
+  `settings/AppSettings.kt` (`whisperTailPaddings`, défaut).
+
+### 13. Langue transmise à Qwen3-ASR (changement de défaut)
+
+- **Ce qui a changé** : quand une seule langue est cochée — c'est le cas du
+  choix initial, « Français (Québec) » —, Qwen3-ASR reçoit maintenant cette
+  langue, comme Whisper. Parakeet n'accepte aucune langue : il devine toujours,
+  ce qui explique qu'un mot dit seul parte vers l'anglais.
+- **Mesuré par la revue** (ordinateur, 7 extraits français, 75 mots) :
+  6 erreurs avec « French » forcé contre 8 en détection automatique. Pas de
+  dégradation ; trop peu pour parler de gain, et les mots dits seuls n'ont pas
+  été mesurés.
+- **Quoi faire** : avec Qwen3-ASR, dicter des mots d'ici dits seuls, puis une
+  phrase française contenant quelques mots anglais ; vérifier que rien n'est
+  francisé à tort.
+- **Où corriger** : `DictationLanguages.qwen3Language` dans
+  `android/app/src/main/java/io/github/remtav/dictee/stt/DictationLanguages.kt`
+  et `AppSettings.engineOptions`.
+
+### 14. Polissage : ce qui peut encore repasser sur le texte
+
+- **Polissage par le serveur** : nouvel interrupteur dans les Réglages,
+  activé par défaut (comportement inchangé). Le couper insère le texte brut.
+  À décider : le laisser activé ou le couper par défaut (une ligne,
+  `AppSettings.remotePolish`).
+- **Petit LLM local** : toujours désactivé par défaut. Son garde-fou refuse
+  maintenant tout mot changé, même d'une lettre, ainsi qu'une majuscule
+  abaissée en cours de phrase, un nombre ou une lettre épelée retirés comme
+  « répétition », et un point d'interrogation supprimé. Il rejettera donc plus
+  souvent la sortie du LLM ; le texte nettoyé par règles est alors gardé.
+  Limites connues : une virgule qui change le sens, « un un ». Pour le confirmer : l'activer,
+  dicter des phrases longues contenant des mots d'ici, vérifier qu'aucun mot
+  ne change, puis le remettre sur « Désactivé ».
+- **Enquête « friperie »** : arrêtée à ta demande, sans cause trouvée. Le cas
+  exact n'a jamais été reproduit, faute d'enregistrement. Chronologie dans
+  `android/DECISIONS.md`, section « pouvoir couper le polissage ».
+
+### 15. Un vrai banc d'essai avec ta voix (proposé, non fait)
+
+- **Idée** : mesurer les quatre modèles sur des mots québécois dits seuls et
+  en phrases, avec ta voix. « Comparer les modèles » (bouton « Enregistrer une
+  phrase ») et le test de lecture du lot 4 en couvrent une partie ; une liste
+  de mots isolés d'ici serait une petite issue à part.

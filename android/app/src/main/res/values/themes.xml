@@ -1,236 +1,105 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  Thème Kalmia (issue #15, étape 1.5). Les couleurs viennent de colors.xml (clair) et
-  values-night/colors.xml (sombre) : ce fichier ne contient aucune valeur de couleur, seulement
-  la correspondance « couleur de marque -> rôle Material 3 », pour que tous les composants
-  en héritent. Tout rôle Material 3 utilisé par un composant est défini ici : aucun ne retombe
-  sur la palette violette par défaut. Le test ThemeContrastTest relit ce fichier.
+  Thème générique Material 3 (clair et sombre, DayNight), polices du système, formes et ombres par
+  défaut de Material. Les couleurs viennent de colors.xml (clair) et values-night/colors.xml (sombre) :
+  ce fichier ne contient aucune valeur de couleur, seulement la correspondance « couleur -> rôle
+  Material 3 », avec tous les rôles utilisés par un composant, pour qu'aucun ne retombe sur la
+  palette violette par défaut en thème sombre. Le test ThemeContrastTest relit ce fichier.
 -->
 <resources>
     <style name="Theme.Dictee" parent="Theme.Material3.DayNight.NoActionBar">
-        <!-- Principal : vert feuille (liens, sélection, badge « Recommandé ») -->
-        <item name="colorPrimary">@color/kalmia_green</item>
-        <item name="colorOnPrimary">@color/kalmia_paper</item>
-        <item name="colorPrimaryInverse">@color/kalmia_inverse_primary</item>
-        <!-- Conteneur principal : couleur bouton (sauge), texte encre -->
-        <item name="colorPrimaryContainer">@color/kalmia_button</item>
-        <item name="colorOnPrimaryContainer">@color/kalmia_on_button</item>
-        <!-- Secondaire : atténué ; conteneur : papier 2 -->
-        <item name="colorSecondary">@color/kalmia_muted</item>
-        <item name="colorOnSecondary">@color/kalmia_paper</item>
-        <item name="colorSecondaryContainer">@color/kalmia_paper_2</item>
-        <item name="colorOnSecondaryContainer">@color/kalmia_ink</item>
-        <!-- Tertiaire : fleur (accent rare : micro à l'écoute, mots surlignés du test) -->
-        <item name="colorTertiary">@color/kalmia_flower</item>
-        <item name="colorOnTertiary">@color/kalmia_on_flower</item>
-        <item name="colorTertiaryContainer">@color/kalmia_flower</item>
-        <item name="colorOnTertiaryContainer">@color/kalmia_on_flower</item>
-        <!-- Erreur : rouge, jamais la fleur -->
-        <item name="colorError">@color/kalmia_error</item>
-        <item name="colorOnError">@color/kalmia_on_error</item>
-        <item name="colorErrorContainer">@color/kalmia_paper_2</item>
-        <item name="colorOnErrorContainer">@color/kalmia_error</item>
-        <!-- Fond et surfaces : papier ; cartes, touches, zones de saisie : papier 2 -->
-        <item name="android:colorBackground">@color/kalmia_paper</item>
-        <item name="colorOnBackground">@color/kalmia_ink</item>
-        <item name="colorSurface">@color/kalmia_paper</item>
-        <item name="colorOnSurface">@color/kalmia_ink</item>
-        <item name="colorSurfaceVariant">@color/kalmia_paper_2</item>
-        <item name="colorOnSurfaceVariant">@color/kalmia_muted</item>
-        <item name="colorSurfaceInverse">@color/kalmia_inverse_surface</item>
-        <item name="colorOnSurfaceInverse">@color/kalmia_on_inverse_surface</item>
-        <item name="colorSurfaceDim">@color/kalmia_paper</item>
-        <item name="colorSurfaceBright">@color/kalmia_paper</item>
-        <item name="colorSurfaceContainerLowest">@color/kalmia_paper</item>
-        <item name="colorSurfaceContainerLow">@color/kalmia_paper</item>
-        <item name="colorSurfaceContainer">@color/kalmia_paper_2</item>
-        <item name="colorSurfaceContainerHigh">@color/kalmia_paper_2</item>
-        <item name="colorSurfaceContainerHighest">@color/kalmia_paper_2</item>
-        <!-- Contour : atténué pour les contrôles (contraste 3:1 exigé), filet pour les séparateurs -->
-        <item name="colorOutline">@color/kalmia_muted</item>
-        <item name="colorOutlineVariant">@color/kalmia_rule</item>
-        <!-- Rôles « fixes » (identiques en clair et en sombre chez Material) : mêmes correspondances
-             que leurs équivalents, pour qu'aucun ne retombe sur la palette Material par défaut. -->
-        <item name="colorPrimaryFixed">@color/kalmia_button</item>
-        <item name="colorPrimaryFixedDim">@color/kalmia_button</item>
-        <item name="colorOnPrimaryFixed">@color/kalmia_on_button</item>
-        <item name="colorOnPrimaryFixedVariant">@color/kalmia_on_button</item>
-        <item name="colorSecondaryFixed">@color/kalmia_paper_2</item>
-        <item name="colorSecondaryFixedDim">@color/kalmia_paper_2</item>
-        <item name="colorOnSecondaryFixed">@color/kalmia_ink</item>
-        <item name="colorOnSecondaryFixedVariant">@color/kalmia_muted</item>
-        <item name="colorTertiaryFixed">@color/kalmia_flower</item>
-        <item name="colorTertiaryFixedDim">@color/kalmia_flower</item>
-        <item name="colorOnTertiaryFixed">@color/kalmia_on_flower</item>
-        <item name="colorOnTertiaryFixedVariant">@color/kalmia_on_flower</item>
+        <item name="colorPrimary">@color/md_primary</item>
+        <item name="colorOnPrimary">@color/md_on_primary</item>
+        <item name="colorPrimaryInverse">@color/md_inverse_primary</item>
+        <item name="colorPrimaryContainer">@color/md_primary_container</item>
+        <item name="colorOnPrimaryContainer">@color/md_on_primary_container</item>
+        <item name="colorSecondary">@color/md_secondary</item>
+        <item name="colorOnSecondary">@color/md_on_secondary</item>
+        <item name="colorSecondaryContainer">@color/md_secondary_container</item>
+        <item name="colorOnSecondaryContainer">@color/md_on_secondary_container</item>
+        <item name="colorTertiary">@color/md_tertiary</item>
+        <item name="colorOnTertiary">@color/md_on_tertiary</item>
+        <item name="colorTertiaryContainer">@color/md_tertiary_container</item>
+        <item name="colorOnTertiaryContainer">@color/md_on_tertiary_container</item>
+        <item name="colorError">@color/md_error</item>
+        <item name="colorOnError">@color/md_on_error</item>
+        <item name="colorErrorContainer">@color/md_error_container</item>
+        <item name="colorOnErrorContainer">@color/md_on_error_container</item>
+        <item name="android:colorBackground">@color/md_background</item>
+        <item name="colorOnBackground">@color/md_on_background</item>
+        <item name="colorSurface">@color/md_surface</item>
+        <item name="colorOnSurface">@color/md_on_surface</item>
+        <item name="colorSurfaceVariant">@color/md_surface_variant</item>
+        <item name="colorOnSurfaceVariant">@color/md_on_surface_variant</item>
+        <item name="colorSurfaceInverse">@color/md_inverse_surface</item>
+        <item name="colorOnSurfaceInverse">@color/md_inverse_on_surface</item>
+        <item name="colorSurfaceDim">@color/md_surface_dim</item>
+        <item name="colorSurfaceBright">@color/md_surface_bright</item>
+        <item name="colorSurfaceContainerLowest">@color/md_surface_container_lowest</item>
+        <item name="colorSurfaceContainerLow">@color/md_surface_container_low</item>
+        <item name="colorSurfaceContainer">@color/md_surface_container</item>
+        <item name="colorSurfaceContainerHigh">@color/md_surface_container_high</item>
+        <item name="colorSurfaceContainerHighest">@color/md_surface_container_highest</item>
+        <item name="colorOutline">@color/md_outline</item>
+        <item name="colorOutlineVariant">@color/md_outline_variant</item>
 
         <!-- Couleurs de texte du cadre Android : sans elles, tout TextView, case à cocher ou bouton
-             radio sans couleur explicite prend l'encre violette de la palette Material par défaut
-             (m3_default_color_primary_text). Elles renvoient aux rôles ci-dessus (res/color). -->
-        <item name="android:textColorPrimary">@color/kalmia_text_primary</item>
-        <item name="android:textColorSecondary">@color/kalmia_text_secondary</item>
-        <item name="android:textColorTertiary">@color/kalmia_text_secondary</item>
-        <item name="android:textColorPrimaryDisableOnly">@color/kalmia_text_primary</item>
-        <item name="android:textColorAlertDialogListItem">@color/kalmia_text_primary</item>
-        <item name="android:textColorHint">@color/kalmia_text_secondary</item>
-        <item name="android:textColorHighlight">@color/kalmia_text_highlight</item>
-        <item name="android:textColorPrimaryInverse">@color/kalmia_on_inverse_surface</item>
-        <item name="android:textColorSecondaryInverse">@color/kalmia_on_inverse_surface</item>
-        <item name="android:textColorTertiaryInverse">@color/kalmia_on_inverse_surface</item>
-        <item name="android:textColorPrimaryInverseDisableOnly">@color/kalmia_on_inverse_surface</item>
-        <item name="android:textColorHintInverse">@color/kalmia_on_inverse_surface</item>
-        <item name="android:textColorHighlightInverse">@color/kalmia_inverse_primary</item>
+             radio sans couleur explicite prendrait la couleur de texte de la palette Material par
+             défaut, incohérente avec les surfaces ci-dessus. Elles renvoient aux rôles (res/color). -->
+        <item name="android:textColorPrimary">@color/text_primary</item>
+        <item name="android:textColorSecondary">@color/text_secondary</item>
+        <item name="android:textColorTertiary">@color/text_secondary</item>
+        <item name="android:textColorPrimaryDisableOnly">@color/text_primary</item>
+        <item name="android:textColorAlertDialogListItem">@color/text_primary</item>
+        <item name="android:textColorHint">@color/text_secondary</item>
+        <item name="android:textColorHighlight">@color/text_highlight</item>
+        <item name="android:textColorPrimaryInverse">@color/md_inverse_on_surface</item>
+        <item name="android:textColorSecondaryInverse">@color/md_inverse_on_surface</item>
+        <item name="android:textColorTertiaryInverse">@color/md_inverse_on_surface</item>
+        <item name="android:textColorPrimaryInverseDisableOnly">@color/md_inverse_on_surface</item>
+        <item name="android:textColorHintInverse">@color/md_inverse_on_surface</item>
+        <item name="android:textColorHighlightInverse">@color/md_inverse_primary</item>
 
         <item name="android:statusBarColor">?attr/colorSurface</item>
         <item name="android:navigationBarColor">?attr/colorSurface</item>
-        <item name="android:windowLightStatusBar">@bool/kalmia_light_system_bars</item>
-        <item name="android:windowLightNavigationBar">@bool/kalmia_light_system_bars</item>
-
-        <!-- Typographie : Newsreader partout, IBM Plex Mono pour étiquettes et valeurs -->
-        <item name="android:fontFamily">@font/newsreader</item>
-        <item name="textAppearanceDisplayLarge">@style/TextAppearance.Kalmia.Headline</item>
-        <item name="textAppearanceDisplayMedium">@style/TextAppearance.Kalmia.Headline</item>
-        <item name="textAppearanceDisplaySmall">@style/TextAppearance.Kalmia.Headline</item>
-        <item name="textAppearanceHeadlineLarge">@style/TextAppearance.Kalmia.Headline</item>
-        <item name="textAppearanceHeadlineMedium">@style/TextAppearance.Kalmia.Headline</item>
-        <item name="textAppearanceHeadlineSmall">@style/TextAppearance.Kalmia.Headline</item>
-        <item name="textAppearanceTitleLarge">@style/TextAppearance.Kalmia.Title</item>
-        <item name="textAppearanceTitleMedium">@style/TextAppearance.Kalmia.TitleSmall</item>
-        <item name="textAppearanceTitleSmall">@style/TextAppearance.Kalmia.TitleSmall</item>
-        <item name="textAppearanceBodyLarge">@style/TextAppearance.Kalmia.Body</item>
-        <item name="textAppearanceBodyMedium">@style/TextAppearance.Kalmia.Body</item>
-        <item name="textAppearanceBodySmall">@style/TextAppearance.Kalmia.BodySmall</item>
-        <item name="textAppearanceLabelLarge">@style/TextAppearance.Kalmia.Button</item>
-        <item name="textAppearanceLabelMedium">@style/TextAppearance.Kalmia.Label</item>
-        <item name="textAppearanceLabelSmall">@style/TextAppearance.Kalmia.Label</item>
-
-        <!-- Formes : angles droits partout -->
-        <item name="shapeAppearanceCornerExtraSmall">@style/ShapeAppearance.Kalmia.Square</item>
-        <item name="shapeAppearanceCornerSmall">@style/ShapeAppearance.Kalmia.Square</item>
-        <item name="shapeAppearanceCornerMedium">@style/ShapeAppearance.Kalmia.Square</item>
-        <item name="shapeAppearanceCornerLarge">@style/ShapeAppearance.Kalmia.Square</item>
-        <item name="shapeAppearanceCornerExtraLarge">@style/ShapeAppearance.Kalmia.Square</item>
-        <item name="shapeAppearanceSmallComponent">@style/ShapeAppearance.Kalmia.Square</item>
-        <item name="shapeAppearanceMediumComponent">@style/ShapeAppearance.Kalmia.Square</item>
-        <item name="shapeAppearanceLargeComponent">@style/ShapeAppearance.Kalmia.Square</item>
-
-        <!-- Composants -->
-        <item name="materialButtonStyle">@style/Widget.Kalmia.Button</item>
-        <item name="materialButtonOutlinedStyle">@style/Widget.Kalmia.OutlinedButton</item>
-        <item name="materialCardViewStyle">@style/Widget.Kalmia.CardView</item>
-        <item name="materialCardViewOutlinedStyle">@style/Widget.Kalmia.CardView</item>
-        <item name="sliderStyle">@style/Widget.Kalmia.Slider</item>
+        <item name="android:windowLightStatusBar">@bool/light_system_bars</item>
+        <item name="android:windowLightNavigationBar">@bool/light_system_bars</item>
     </style>
 
     <!-- Le clavier se thème comme l'application ; la nuit est choisie par le service (voir DicteeImeService). -->
     <style name="Theme.Dictee.Keyboard" parent="Theme.Dictee"/>
 
-    <!-- ===== Formes ===== -->
-    <style name="ShapeAppearance.Kalmia.Square" parent="">
-        <item name="cornerFamily">rounded</item>
-        <item name="cornerSize">0dp</item>
-    </style>
-
-    <!-- ===== Styles de texte nommés ===== -->
-    <!-- Titre d'écran : Newsreader 400, serré -->
-    <style name="TextAppearance.Kalmia.Headline" parent="">
-        <item name="android:fontFamily">@font/newsreader</item>
-        <item name="android:textSize">28sp</item>
-        <item name="android:letterSpacing">-0.02</item>
-        <item name="android:lineSpacingMultiplier">1.05</item>
-    </style>
-    <!-- Titre de section -->
-    <style name="TextAppearance.Kalmia.Title" parent="">
-        <item name="android:fontFamily">@font/newsreader</item>
-        <item name="android:textSize">22sp</item>
-        <item name="android:letterSpacing">-0.01</item>
-        <item name="android:lineSpacingMultiplier">1.1</item>
-    </style>
-    <style name="TextAppearance.Kalmia.TitleSmall" parent="">
-        <item name="android:fontFamily">@font/newsreader</item>
-        <item name="android:textFontWeight">500</item>
-        <item name="android:textSize">18sp</item>
-        <item name="android:lineSpacingMultiplier">1.1</item>
-    </style>
-    <!-- Corps : Newsreader 400, interligne aéré -->
-    <style name="TextAppearance.Kalmia.Body" parent="">
-        <item name="android:fontFamily">@font/newsreader</item>
-        <item name="android:textSize">17sp</item>
-        <item name="android:lineSpacingMultiplier">1.25</item>
-    </style>
-    <style name="TextAppearance.Kalmia.BodySmall" parent="">
-        <item name="android:fontFamily">@font/newsreader</item>
-        <item name="android:textSize">15sp</item>
-        <item name="android:lineSpacingMultiplier">1.25</item>
-    </style>
-    <!-- Étiquette : IBM Plex Mono, majuscules espacées, 13 sp au minimum (règle de la marque) -->
-    <style name="TextAppearance.Kalmia.Label" parent="">
-        <item name="android:fontFamily">@font/ibm_plex_mono</item>
-        <item name="android:textSize">13sp</item>
-        <item name="android:letterSpacing">0.14</item>
-        <item name="android:textAllCaps">true</item>
-    </style>
-    <!-- Libellé de bouton : IBM Plex Mono 500, majuscules -->
-    <style name="TextAppearance.Kalmia.Button" parent="">
-        <item name="android:fontFamily">@font/ibm_plex_mono</item>
-        <item name="android:textFontWeight">500</item>
-        <item name="android:textSize">14sp</item>
-        <item name="android:letterSpacing">0.1</item>
-        <item name="android:textAllCaps">true</item>
-    </style>
-    <!-- Valeur technique : taille d'un modèle, score, état du clavier -->
-    <style name="TextAppearance.Kalmia.Value" parent="">
-        <item name="android:fontFamily">@font/ibm_plex_mono</item>
-        <item name="android:textSize">14sp</item>
-        <item name="android:lineSpacingMultiplier">1.2</item>
-    </style>
-    <!-- Symbole d'une touche du clavier : Plex Mono 500, 24 sp (lisibilité d'abord, sans serif ni majuscules) -->
-    <style name="TextAppearance.Kalmia.Key" parent="">
-        <item name="android:fontFamily">@font/ibm_plex_mono</item>
-        <item name="android:textFontWeight">500</item>
+    <!-- ===== Styles de texte nommés (apparences Material par défaut, polices du système) ===== -->
+    <style name="TextAppearance.Dictee.Headline" parent="TextAppearance.Material3.HeadlineSmall"/>
+    <style name="TextAppearance.Dictee.Title" parent="TextAppearance.Material3.TitleMedium"/>
+    <style name="TextAppearance.Dictee.Body" parent="TextAppearance.Material3.BodyMedium"/>
+    <style name="TextAppearance.Dictee.BodySmall" parent="TextAppearance.Material3.BodySmall"/>
+    <!-- Étiquette : petit texte secondaire (la couleur est posée par l'appelant). -->
+    <style name="TextAppearance.Dictee.Label" parent="TextAppearance.Material3.LabelMedium"/>
+    <!-- Valeur technique : taille d'un modèle, score, état du clavier. -->
+    <style name="TextAppearance.Dictee.Value" parent="TextAppearance.Material3.BodyMedium"/>
+    <!-- Symbole d'une touche du clavier : 24 sp (lisibilité d'abord, 20 sp au minimum). -->
+    <style name="TextAppearance.Dictee.Key" parent="TextAppearance.Material3.LabelLarge">
         <item name="android:textSize">24sp</item>
     </style>
 
     <!-- ===== Composants ===== -->
-    <!-- Bouton d'action : fond sauge, texte encre, ombre pleine décalée encre (4 dp, dessinée par
-         kalmia_ombre_bouton dans les marges internes droite et bas). -->
-    <style name="Widget.Kalmia.Button" parent="Widget.Material3.Button">
-        <item name="shapeAppearance">@style/ShapeAppearance.Kalmia.Square</item>
-        <item name="cornerRadius">0dp</item>
-        <item name="backgroundTint">@color/kalmia_button_bg</item>
-        <item name="iconTint">@color/kalmia_button_text</item>
-        <item name="android:textColor">@color/kalmia_button_text</item>
-        <item name="android:minHeight">48dp</item>
-        <item name="android:insetLeft">0dp</item>
-        <item name="android:insetTop">0dp</item>
-        <item name="android:insetRight">4dp</item>
-        <item name="android:insetBottom">4dp</item>
-        <item name="android:foreground">@drawable/kalmia_ombre_bouton</item>
-        <item name="android:stateListAnimator">@null</item>
-    </style>
-    <!-- Bouton secondaire : filet encre de 1 dp, sans ombre. -->
-    <style name="Widget.Kalmia.OutlinedButton" parent="Widget.Material3.Button.OutlinedButton">
-        <item name="shapeAppearance">@style/ShapeAppearance.Kalmia.Square</item>
-        <item name="cornerRadius">0dp</item>
-        <item name="strokeColor">?attr/colorOnSurface</item>
-        <item name="strokeWidth">1dp</item>
-        <item name="iconTint">@color/kalmia_key_text</item>
-        <item name="android:textColor">@color/kalmia_key_text</item>
-        <item name="android:minHeight">48dp</item>
-    </style>
-    <!-- Micro du clavier : bouton d'action carré ; fleur quand la vue est activée (écoute). -->
-    <style name="Widget.Kalmia.Button.Mic" parent="Widget.Kalmia.Button">
-        <item name="backgroundTint">@color/kalmia_mic_bg</item>
-        <item name="iconTint">@color/kalmia_mic_icon</item>
+    <!-- Micro du clavier : bouton rond ; couleur d'erreur (rouge) quand la vue est activée (écoute). -->
+    <style name="Widget.Dictee.Button.Mic" parent="Widget.Material3.Button">
+        <item name="backgroundTint">@color/mic_bg</item>
+        <item name="iconTint">@color/mic_icon</item>
+        <item name="cornerRadius">50dp</item>
         <item name="iconSize">44dp</item>
         <item name="iconGravity">textStart</item>
         <item name="iconPadding">0dp</item>
+        <item name="android:insetTop">0dp</item>
+        <item name="android:insetBottom">0dp</item>
         <item name="android:padding">0dp</item>
     </style>
-    <!-- Touche du clavier : papier 2, filet atténué (3:1 sur le papier), pas d'ombre, symbole Plex Mono 24 sp.
+    <!-- Touche du clavier : bouton tonal, coins de 12 dp, symbole de 24 sp, 52 dp de haut.
          L'écart entre deux touches est une marge interne (insetLeft/insetRight), pas une marge externe :
          la zone tactile couvre ainsi toute la largeur de la case, écart compris. -->
-    <style name="KeyButton" parent="Widget.Kalmia.OutlinedButton">
+    <style name="KeyButton" parent="Widget.Material3.Button.TonalButton">
         <item name="android:layout_width">0dp</item>
         <item name="android:layout_height">52dp</item>
         <item name="android:layout_weight">1</item>
@@ -241,23 +110,10 @@
         <item name="android:minWidth">0dp</item>
         <item name="android:paddingStart">0dp</item>
         <item name="android:paddingEnd">0dp</item>
-        <item name="android:textAppearance">@style/TextAppearance.Kalmia.Key</item>
-        <item name="backgroundTint">?attr/colorSurfaceContainer</item>
-        <item name="strokeColor">?attr/colorOutline</item>
+        <item name="android:textAppearance">@style/TextAppearance.Dictee.Key</item>
         <item name="iconGravity">textStart</item>
         <item name="iconPadding">0dp</item>
         <item name="iconSize">24dp</item>
-    </style>
-    <!-- Carte : papier 2, filet fin, angles droits, sans élévation. -->
-    <style name="Widget.Kalmia.CardView" parent="Widget.Material3.CardView.Outlined">
-        <item name="shapeAppearance">@style/ShapeAppearance.Kalmia.Square</item>
-        <item name="cardCornerRadius">0dp</item>
-        <item name="cardBackgroundColor">?attr/colorSurfaceContainer</item>
-        <item name="cardElevation">0dp</item>
-        <item name="strokeColor">?attr/colorOutlineVariant</item>
-        <item name="strokeWidth">1dp</item>
-    </style>
-    <style name="Widget.Kalmia.Slider" parent="Widget.Material3.Slider">
-        <item name="trackColorInactive">?attr/colorOutlineVariant</item>
+        <item name="cornerRadius">12dp</item>
     </style>
 </resources>

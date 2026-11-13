@@ -22,6 +22,7 @@ import io.github.remtav.dictee.stt.Acceleration
 import io.github.remtav.dictee.stt.ModelCatalog
 import io.github.remtav.dictee.stt.RemoteApi
 import io.github.remtav.dictee.stt.RemoteEngine
+import io.github.remtav.dictee.stt.WhisperTuning
 import java.util.Locale
 
 /** Dictation preferences (lots 2 and 3). Every optional feature can be turned off. */
@@ -91,6 +92,13 @@ class SettingsActivity : AppCompatActivity() {
         col.body(getString(R.string.settings_acceleration), small = false)
         col.radio(Acceleration.entries.map { it.label }, s.acceleration.ordinal) { s.acceleration = Acceleration.entries[it] }
         col.body(getString(R.string.settings_acceleration_help), small = true)
+        col.body(getString(R.string.settings_whisper_tail), small = false)
+        val tailLabels = listOf(R.string.settings_whisper_tail_1000, R.string.settings_whisper_tail_600, R.string.settings_whisper_tail_300)
+            .map { getString(it) }
+        col.radio(tailLabels, WhisperTuning.TAIL_PADDING_CHOICES.indexOf(s.whisperTailPaddings).coerceAtLeast(0)) {
+            s.whisperTailPaddings = WhisperTuning.TAIL_PADDING_CHOICES[it]
+        }
+        col.body(getString(R.string.settings_whisper_tail_help), small = true)
 
         buildRemoteSection(col)
 
@@ -159,6 +167,8 @@ class SettingsActivity : AppCompatActivity() {
         val onRemoteLanguage: (Int) -> Unit = { s.remoteLanguage = langs[it].first }
         val remoteLanguageGroup = col.radio(langs.map { it.second }, remoteLanguageIndex(), onRemoteLanguage)
         refreshRemoteLanguage = { remoteLanguageGroup.checkSilently(remoteLanguageIndex(), onRemoteLanguage) }
+        col.switch(getString(R.string.settings_remote_polish), s.remotePolish) { s.remotePolish = it }
+        col.body(getString(R.string.settings_remote_polish_help), small = true)
         col.body(getString(R.string.settings_remote_fallback), small = true)
         val fallbacks = listOf("" to getString(R.string.settings_remote_no_fallback)) +
             ModelCatalog.all.map { it.id to it.displayName }

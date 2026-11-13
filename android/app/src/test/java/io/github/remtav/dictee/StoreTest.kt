@@ -9,6 +9,7 @@ import io.github.remtav.dictee.stt.Downloadable
 import io.github.remtav.dictee.stt.EngineManager
 import io.github.remtav.dictee.stt.EngineOptions
 import io.github.remtav.dictee.stt.ModelCatalog
+import io.github.remtav.dictee.stt.ModelFamily
 import io.github.remtav.dictee.stt.ModelFile
 import io.github.remtav.dictee.stt.ModelStore
 import io.github.remtav.dictee.stt.SttEngineFactory
@@ -33,7 +34,7 @@ private fun sha(b: ByteArray) = MessageDigest.getInstance("SHA-256").digest(b).j
 
 class CatalogTest {
     @Test fun catalogIsWellFormed() {
-        assertEquals(3, ModelCatalog.all.size)
+        assertEquals(4, ModelCatalog.all.size)
         assertEquals("parakeet-tdt-0.6b-v3-int8", ModelCatalog.default.id)
         assertEquals(ModelCatalog.all.size, ModelCatalog.all.map { it.id }.toSet().size)
         val items: List<Downloadable> = ModelCatalog.all.map { object : Downloadable {
@@ -50,6 +51,42 @@ class CatalogTest {
         assertTrue(ModelCatalog.parakeet.totalBytes in 600_000_000L..800_000_000L)
         assertTrue(ModelCatalog.qwen3.totalBytes in 900_000_000L..1_100_000_000L)
         assertTrue(ModelCatalog.whisperTurbo.totalBytes in 900_000_000L..1_200_000_000L)
+    }
+
+    /**
+     * The Quebec French Whisper (issue #15, user request): offered, with the files published
+     * on the user's Hugging Face account, with the exact sizes and checksums of the server.
+     */
+    @Test fun quebecWhisperIsListedAndPointsAtThePublishedFiles() {
+        val m = ModelCatalog.whisperQuebec
+        assertTrue(m in ModelCatalog.all)
+        assertTrue(m in ModelCatalog.selectable)
+        val base = "https://huggingface.co/remiavelo/sherpa-onnx-whisper-large-v3-turbo-fr-quebecois-int8/resolve/main"
+        assertEquals(
+            listOf(
+                Triple("$base/turbo-encoder.int8.onnx", "3f774a722b473fb85fca92e24591afffec5159c53564089fed4dc191fe6fabfc", 674_348_342L),
+                Triple("$base/turbo-decoder.int8.onnx", "9775633c180fa256f096fd97ad8825cfff2d159090d8a6f98542d82ae01e567e", 360_961_539L),
+                Triple("$base/turbo-tokens.txt", "b34b360dbb493e781e479794586d661700670d65564001f23024971d1f2fa126", 816_730L),
+            ),
+            m.files.map { Triple(it.url, it.sha256, it.size) },
+        )
+        assertEquals(ModelCatalog.WHISPER_QC_NOTE, m.note)
+        assertTrue(m.note.contains("plus lent"))
+        assertTrue(m.description.contains("6,65 %"))
+        assertTrue(m.description.contains("un indice, pas une preuve"))
+        // Same engine branch, same file names as Whisper large-v3-turbo; its own directory and id.
+        assertEquals(ModelFamily.WHISPER, m.family)
+        assertEquals(ModelCatalog.whisperTurbo.files.map { it.path }, m.files.map { it.path })
+        assertTrue(m.id != ModelCatalog.whisperTurbo.id)
+        assertEquals("MIT", m.license)
+        assertTrue(m.publisher.contains("ele-sage"))
+        for (f in m.files) assertTrue(f.sha256, Regex("[0-9a-f]{64}").matches(f.sha256))
+        // int8 conversion of the same architecture: same size as the original, within 5 %.
+        val ref = ModelCatalog.whisperTurbo.totalBytes.toDouble()
+        assertTrue(m.totalBytes in (ref * 0.95).toLong()..(ref * 1.05).toLong())
+        // Different weights than the original: no file may share its checksum, except the tokens.
+        val original = ModelCatalog.whisperTurbo.files.associate { it.path to it.sha256 }
+        for (f in m.files.filter { it.path.endsWith(".onnx") }) assertTrue(f.sha256 != original[f.path])
     }
 }
 
