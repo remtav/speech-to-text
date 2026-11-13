@@ -61,4 +61,8 @@ non exécuté) avant de lancer le script d'export de sherpa-onnx. Les noms de fi
 **Attention : en l'état, `convertir_lite.sh` produit un encodeur int8 cassé** (sortie « ... »). L'export fp32 et le
 décodeur int8 sont corrects ; c'est la quantification int8 de l'encodeur (multiplications qui partent de la
 représentation réduite) qui casse le modèle. La seule variante correcte trouvée (ces multiplications laissées en fp32)
-est plus grosse et plus lente que turbo. Essais, mesures et pistes : issue #25. Rien n'est publié.
+est plus grosse et plus lente que turbo. Essais, mesures et pistes : issue #25.
+
+Cette variante est publiée à titre expérimental (2026-11-13, à la demande de l'utilisateur) :
+`https://huggingface.co/remiavelo/sherpa-onnx-lite-whisper-large-v3-turbo-acc-int8` (encodeur 799 004 644 octets,
+`ccefad7d…`). Elle n'est pas encore reproduite par `convertir_lite.sh` (voir #25) ; intégration dans l'app : #22.
