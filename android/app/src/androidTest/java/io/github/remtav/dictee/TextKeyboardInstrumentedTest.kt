@@ -52,19 +52,14 @@ class TextKeyboardInstrumentedTest : ImeTestBase() {
     }
 
     @Test
-    fun shiftCapitalisesOneLetterAndLockHoldsThem() {
+    fun shiftCapitalisesOneLetterOnly() {
         launchFields()
         showTextKeyboard()
         device.findObject(By.desc("Majuscule")).click()
         tap("A")
         tap("b")
         waitFor("one capital", 5_000) { field1() == "Ab" }
-        // Double tap: locked until tapped again.
-        device.findObject(By.desc("Majuscule")).click()
-        device.findObject(By.descContains("activée")).click()
-        device.wait(Until.hasObject(By.desc("Majuscules verrouillées")), 3_000)
-        tap("C", "D")
-        waitFor("locked capitals", 5_000) { field1() == "AbCD" }
+        // The lock (double tap within 400 ms) is covered by KeyboardLayoutTest: a UI automator tap is too slow for it.
     }
 
     @Test

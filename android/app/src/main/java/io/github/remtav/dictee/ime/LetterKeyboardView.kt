@@ -166,13 +166,13 @@ class LetterKeyboardView @JvmOverloads constructor(
                     onKeyPressed?.invoke(v)
                     if (isLetter) handler.postDelayed(longPress, LONG_PRESS_MS)
                 }
-                MotionEvent.ACTION_MOVE -> popup?.let { highlightAt(e.rawX) }
+                MotionEvent.ACTION_MOVE -> popup?.let { highlightAt(e.rawX, e.rawY) }
                 MotionEvent.ACTION_UP -> {
                     handler.removeCallbacks(longPress)
                     v.background = keyBackground()
                     if (longPressed) {
                         // The finger slid onto an accent: type it. Released on the key: the window stays, tap an accent.
-                        chosenAt(e.rawX)?.let { typeAccent(it) }
+                        chosenAt(e.rawX, e.rawY)?.let { typeAccent(it) }
                     } else {
                         listener?.onText(KeyboardLayout.label(base, shift))
                         if (isLetter) afterLetter()
@@ -290,16 +290,17 @@ class LetterKeyboardView @JvmOverloads constructor(
         popup = pw
     }
 
-    private fun viewAt(rawX: Float): TextView? {
+    /** The accent under the finger: inside the window both ways (released on the key below it, none). */
+    private fun viewAt(rawX: Float, rawY: Float): TextView? {
         val loc = IntArray(2)
         return accentViews.firstOrNull { v ->
             v.getLocationOnScreen(loc)
-            rawX >= loc[0] && rawX < loc[0] + v.width
+            rawX >= loc[0] && rawX < loc[0] + v.width && rawY >= loc[1] && rawY < loc[1] + v.height
         }
     }
 
-    private fun highlightAt(rawX: Float) {
-        val hit = viewAt(rawX)
+    private fun highlightAt(rawX: Float, rawY: Float) {
+        val hit = viewAt(rawX, rawY)
         for (v in accentViews) v.background = if (v === hit) {
             GradientDrawable().apply {
                 cornerRadius = dp(8).toFloat()
@@ -308,7 +309,7 @@ class LetterKeyboardView @JvmOverloads constructor(
         } else null
     }
 
-    private fun chosenAt(rawX: Float): String? = viewAt(rawX)?.text?.toString()
+    private fun chosenAt(rawX: Float, rawY: Float): String? = viewAt(rawX, rawY)?.text?.toString()
 
     private fun typeAccent(accent: String) {
         listener?.onText(accent)
