@@ -30,8 +30,10 @@ class BlockDictation(
     private var language = ""
     /** Why some block did not go to the server (the first reason). */
     private var reason: String? = null
-    /** Without a local model: blocks that failed, tried once more on the server at the end. */
+    /** Blocks neither the server nor the phone transcribed yet: tried once more at the end. */
     private val retry = ArrayList<Pair<Int, AudioBlock>>()
+    /** Blocks lost after every try: the others are still inserted. */
+    private var lostBlocks = 0
     private var endDeadline = Long.MAX_VALUE
     private var ended = false
     /** The phone took over after the end of the dictation: the wait is over, no polish request after it. */
@@ -119,24 +121,29 @@ class BlockDictation(
             note(why)
         }
         if (control.mode == WaitControl.Mode.ABANDON) return
-        if (!backend.canFallBack) {
-            // No local model: keep the audio, the server gets one more try at the end.
-            retry += i to block
-            return
-        }
-        transcribeLocally(i, block)
+        // No local model, or it failed: keep the audio, the block gets one more try at the end.
+        if (!backend.canFallBack || !transcribeLocally(i, block)) retry += i to block
     }
 
-    private fun transcribeLocally(i: Int, block: AudioBlock) {
+    /** False when the local model failed (not loaded, out of memory...): the block is kept for a retry. */
+    private fun transcribeLocally(i: Int, block: AudioBlock): Boolean {
         if (ended) localAfterEnd = true
         control.localStarted()
         val out = ArrayList<String>()
-        for (piece in localPieces(block)) {
-            if (control.mode == WaitControl.Mode.ABANDON || Thread.currentThread().isInterrupted) return
-            backend.transcribeLocally(piece).trim().takeIf { it.isNotEmpty() }?.let { out += it }
+        try {
+            for (piece in localPieces(block)) {
+                if (control.mode == WaitControl.Mode.ABANDON || Thread.currentThread().isInterrupted) return true
+                backend.transcribeLocally(piece).trim().takeIf { it.isNotEmpty() }?.let { out += it }
+            }
+        } catch (e: InterruptedException) {
+            throw e
+        } catch (e: Throwable) {
+            note("modèle du téléphone : ${e.javaClass.simpleName}")
+            return false
         }
         texts[i] = out
         localBlocks++
+        return true
     }
 
     /** Phone models take segments of up to ~20 s: the block's VAD segments, or its audio in 20 s pieces. */
@@ -158,26 +165,43 @@ class BlockDictation(
 
     /**
      * After the last block: the raw text of every block, polished once on the server when that is wanted and
-     * still sensible. Throws only when a block could be transcribed neither locally (no local model) nor on its
-     * second try on the server: the same loss as a whole dictation without fallback.
+     * still sensible. A block that failed everywhere gets one more try (server, then phone); if that fails
+     * too, it is counted in [DictationResult.lostBlocks] and the other blocks are still returned. Throws only
+     * when no block at all could be transcribed (nothing to insert: the controller shows the error).
      */
     fun finish(): DictationResult {
         val seconds = audioSamples / SttEngine.SAMPLE_RATE.toFloat()
         val server = backend.blockServer
         if (control.mode == WaitControl.Mode.ABANDON) return empty(seconds)
+        var lastError: Exception? = null
         for ((i, block) in retry) {
-            if (control.mode == WaitControl.Mode.ABANDON || server == null) return empty(seconds)
-            val child = control.child()
-            try {
-                val r = server.transcribeBlock(block.audio, language, previousText(i), false, Long.MAX_VALUE, child)
-                texts[i] = listOfNotNull(r.text.takeIf { it.isNotBlank() })
-                serverBlocks++
-                if (language.isEmpty()) language = r.language
-            } finally {
-                child.close()
+            if (control.mode == WaitControl.Mode.ABANDON) return empty(seconds)
+            var done = false
+            if (server != null && control.mode == WaitControl.Mode.NONE) {
+                val child = control.child()
+                try {
+                    val r = server.transcribeBlock(block.audio, language, previousText(i), false, Long.MAX_VALUE, child)
+                    texts[i] = listOfNotNull(r.text.takeIf { it.isNotBlank() })
+                    serverBlocks++
+                    if (language.isEmpty()) language = r.language
+                    done = true
+                } catch (e: InterruptedException) {
+                    throw e
+                } catch (e: Exception) {
+                    lastError = e
+                    note(e.message)
+                } finally {
+                    child.close()
+                }
             }
+            if (!done && backend.canFallBack && control.mode != WaitControl.Mode.ABANDON) done = transcribeLocally(i, block)
+            if (!done) lostBlocks++
         }
         retry.clear()
+        if (control.mode == WaitControl.Mode.ABANDON) return empty(seconds)
+        if (lostBlocks > 0 && lostBlocks == texts.size) {
+            throw lastError as? RemoteException ?: RemoteException(reason ?: "aucun bloc transcrit", lastError)
+        }
         val raw = texts.flatten()
         val joined = raw.joinToString(" ")
         var polished: String? = null
@@ -219,8 +243,8 @@ class BlockDictation(
             },
             rawText = joined, polishedText = p, polishStatus = status, language = language,
             audioSeconds = seconds, transport = "blocks",
-            fallbackReason = if (localBlocks > 0) reason else null,
-            blocks = texts.size, localBlocks = localBlocks,
+            fallbackReason = if (localBlocks > 0 || lostBlocks > 0) reason else null,
+            blocks = texts.size, localBlocks = localBlocks, lostBlocks = lostBlocks,
         )
     }
 

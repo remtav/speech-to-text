@@ -463,6 +463,14 @@ class DicteeImeService : InputMethodService(), DictationListener, EngineManager.
         blocksDone = 0
         blocksTotal = 0
         val polishReason = if (result.polishStatus == "unsupported") getString(R.string.polish_too_long) else result.polishStatus
+        if (result.lostBlocks > 0) {
+            showMessage(
+                getString(R.string.msg_blocks_lost, result.lostBlocks, result.blocks, (result.fallbackReason ?: "?").take(120)),
+                error = true, rerender = false,
+            )
+            cancelledWait = false
+            return
+        }
         if (result.localBlocks > 0 && result.source != DictationResult.Source.LOCAL_FALLBACK) {
             // Some blocks went to the phone: say so, whether or not the whole text was polished afterwards.
             showMessage(

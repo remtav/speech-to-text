@@ -67,10 +67,23 @@ internal class BlockCutter(
             s = s.copyOfRange(drop.toInt(), s.size)
         }
         if (s.isEmpty()) return
+        val segStart = maxOf(seg.startSample, lastCut)
+        // What follows this segment, if speech goes on (the VAD cuts long speech without a pause, at 20 s):
+        // a later hard cut must not add this segment's audio a second time.
+        utteranceAbs = maxOf(utteranceAbs, segStart + s.size)
         if (!inBlock) {
-            // The VAD never reported this utterance as speech while it was said: its audio is the block.
+            // The VAD never reported this utterance as speech while it was said: its audio is the block,
+            // in pieces of at most [maxSamples] (Whisper's window).
+            var from = 0
+            while (s.size - from > maxSamples) {
+                val piece = s.copyOfRange(from, from + maxSamples)
+                emit(AudioBlock(index++, piece, listOf(piece)))
+                from += maxSamples
+                lastCut = segStart + from
+            }
+            if (from > 0) s = s.copyOfRange(from, s.size)
             inBlock = true
-            startAbs = maxOf(seg.startSample, lastCut)
+            startAbs = segStart + from
             append(s, 0, s.size)
         }
         segs += s

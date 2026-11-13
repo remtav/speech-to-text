@@ -3834,9 +3834,11 @@ pendant la dictée ». Le contrat du serveur est celui de la PR #46 (`POST /poli
   même si son id arrive après coup), aucun bloc en file n'est envoyé, rien n'est poli, rien n'est inséré.
   Chaque requête a son propre `WaitControl` (`child()`), refermé à sa fin : une annulation n'envoie donc pas
   de `cancel` pour les tâches déjà terminées.
-- **Sans modèle de repli** (« Afficher une erreur » ou modèle non installé) : un bloc en échec garde son audio
-  et repart une fois au serveur à la fin, avant le polissage. Si ce second essai échoue, la dictée est perdue
-  avec une erreur, comme pour une dictée entière sans repli (limite connue de #13).
+- **Bloc que ni le serveur ni le téléphone n'ont transcrit** (pas de modèle de repli, ou modèle du téléphone
+  en échec : non chargé, mémoire) : son audio est gardé et il est réessayé une fois à la fin (serveur, puis
+  téléphone), avant le polissage. S'il échoue encore, il est compté comme perdu, et **les autres blocs sont
+  quand même insérés**, avec le message d'erreur « N bloc(s) sur M non transcrit(s) ». Une erreur sans
+  insertion n'arrive que si aucun bloc n'a pu être transcrit.
 - Chaque appel au moteur passe par `EngineManager.use` (`LentBlockBackend`) : un moteur libéré ou remplacé
   pendant la dictée n'est jamais utilisé.
 
@@ -3903,3 +3905,27 @@ pendant la dictée ». Le contrat du serveur est celui de la PR #46 (`POST /poli
   non envoyés, aucun échantillon dans deux blocs, rien de perdu à la coupe forcée.
 - Tests instrumentés mis à jour : `dictationOnARemoteServer` (une dictée d'un bloc : une tâche polie, plus la
   sonde) et `serverChosenInTheSettingsIsRespected` (faux serveur sans `POST /polish` : dictée entière).
+
+### Revue indépendante (agent sans le contexte de conception) et corrections
+
+- **Un bloc perdu faisait perdre toute la dictée** : une exception du modèle du téléphone, ou l'échec du
+  second essai sans modèle local, remontait jusqu'au fil de décodage. Les textes déjà reçus n'étaient alors
+  pas insérés. Corrigé : chaque bloc est rattrapé à part (voir ci-dessus, `lostBlocks`). Tests :
+  `localModelFailingOnABlockKeepsItForTheEndAndTheOtherTexts`, `aBlockLostEverywhereDoesNotLoseTheOthers`,
+  `everyBlockLostIsAnErrorAndTheWaitEnds`.
+- **Indicateur d'attente resté allumé** si le fil de décodage s'arrêtait sur une erreur avant la fin de la
+  capture. Corrigé : la capture éteint l'attente qu'elle vient d'allumer si le décodage est déjà terminé
+  (`decodeEnded`).
+- **Audio en double dans le repli local** : le VAD Silero coupe une parole continue à 20 s sans nouveau début
+  de parole. La coupe forcée à 30 s ajoutait alors une seconde fois ces 20 s aux segments du bloc. Corrigé :
+  le début de l'énoncé en cours avance à la fin de chaque segment rendu par le VAD. Test
+  `vadCuttingLongSpeechWithoutPauseDoesNotDuplicateTheLocalFallbackAudio`, qui échoue sans la correction.
+- **Segment isolé de plus de 30 s** (le VAD n'a pas signalé le début de la parole) : découpé en blocs de 30 s
+  au plus.
+- Non corrigé, limites connues :
+  - un bloc déjà en cours d'envoi à l'arrêt garde son propre budget (8 s + un quart de sa durée, au plus
+    15,5 s avec le réglage par défaut) avant que le budget commun de fin s'applique aux suivants : l'attente
+    peut donc dépasser un peu le réglage ;
+  - si le serveur est en échec récent au début de la dictée, la sonde n'est pas faite. Un ancien serveur
+    reçoit alors des blocs (sans polissage), et le texte brut est inséré au lieu du texte poli. Rien n'est
+    perdu.

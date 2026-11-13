@@ -23,10 +23,10 @@ class BlockCutterTest {
     }
 
     /** Runs [audio] through the cutter the way the controller's capture loop does. */
-    private fun cut(audio: FloatArray, min: Float = 2f, max: Float = 4f): List<AudioBlock> {
+    private fun cut(audio: FloatArray, min: Float = 2f, max: Float = 4f, vadMaxSpeech: Float = 20f): List<AudioBlock> {
         val blocks = ArrayList<AudioBlock>()
         val history = ArrayList<Float>()
-        val vad = EnergyVad(minSilence = rate / 2, maxSpeech = rate * 20)
+        val vad = EnergyVad(minSilence = rate / 2, maxSpeech = (rate * vadMaxSpeech).toInt())
         val cutter = BlockCutter((min * rate).toInt(), (max * rate).toInt(), { n -> history.takeLast(n).toFloatArray() }) { blocks += it }
         var total = 0L
         var was = false
@@ -90,6 +90,15 @@ class BlockCutterTest {
         assertEquals(10 * rate, held)
         val inSegments = blocks.sumOf { b -> b.segments.sumOf { s -> s.count { it != 0f } } }
         assertEquals(10 * rate, inSegments)
+    }
+
+    @Test fun vadCuttingLongSpeechWithoutPauseDoesNotDuplicateTheLocalFallbackAudio() {
+        // The VAD pops a segment at its own maximum (here 3 s) while the speech goes on, with no new onset;
+        // the block's hard cut (4 s) must not add that segment's audio a second time.
+        val blocks = cut(stream(-0.5f, 12f, -0.6f), vadMaxSpeech = 3f)
+        assertNoAudioTwice(blocks)
+        val inSegments = blocks.sumOf { b -> b.segments.sumOf { s -> s.count { it != 0f } } }
+        assertEquals(12 * rate, inSegments)
     }
 
     @Test fun longPauseBetweenUtterancesIsNotSent() {

@@ -218,6 +218,8 @@ class DictationController(
         /** End of the capture (monotonic ms, 0 while capturing), and the audio still to transcribe then. */
         @Volatile private var stoppedAt = 0L
         @Volatile private var pendingAtStop = 0L
+        /** The decode thread has ended (also after an error): nobody will end a wait started now. */
+        @Volatile private var decodeEnded = false
         private val capture = Thread({ captureLoop() }, "dictation-capture").apply { priority = Thread.MAX_PRIORITY }
         private val decode = Thread({ decodeLoop() }, "dictation-decode")
 
@@ -360,7 +362,11 @@ class DictationController(
                     pendingAtStop = pendingSamples.get()
                     stoppedAt = monotonicMillis()
                     // The user waits from now on: "Transcription et polissage…" and "Annuler".
-                    if (last != null || blocksQueued.get() > 0 || audio != null) setWaiting(id, true)
+                    if (last != null || blocksQueued.get() > 0 || audio != null) {
+                        setWaiting(id, true)
+                        // The decode thread stopped on an error meanwhile: it already ended the wait, do it again.
+                        if (decodeEnded) setWaiting(id, false)
+                    }
                     jobs.offer(Job.Finish(id, last, audio, if (keep) ArrayList(segments) else emptyList(), error))
                 } else if (wholeMode) {
                     stoppedAt = monotonicMillis()
@@ -478,6 +484,7 @@ class DictationController(
                 error = "Erreur de transcription : ${detail ?: e.javaClass.simpleName}"
                 stopRequested = true
             }
+            decodeEnded = true
             setWaiting(id, false)
             if (sessionId.get() == id) {
                 post(id) {

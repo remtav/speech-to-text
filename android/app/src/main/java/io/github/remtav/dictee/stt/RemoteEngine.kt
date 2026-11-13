@@ -252,6 +252,8 @@ data class DictationResult(
     /** Block dictation (issue #35): number of blocks, and how many of them the phone transcribed. */
     val blocks: Int = 0,
     val localBlocks: Int = 0,
+    /** Blocks transcribed neither by the server nor by the phone (the others are inserted). */
+    val lostBlocks: Int = 0,
     /** Time from the end of the dictation (stop, or the end of the audio) to the result, set by the controller. */
     val waitMillis: Long = 0,
 ) {

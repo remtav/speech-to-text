@@ -341,6 +341,48 @@ class BlockDictationTest {
         assertEquals("serveur non utilisé", r.polishStatus)
     }
 
+    @Test fun localModelFailingOnABlockKeepsItForTheEndAndTheOtherTexts() {
+        failBlocks += 2
+        // The phone model throws (not loaded, out of memory): block 2 is kept and sent again at the end.
+        val broken = object : SttEngine {
+            override val spec = ModelCatalog.parakeet
+            override val provider = "broken"
+            override fun transcribe(samples: FloatArray, sampleRate: Int): io.github.remtav.dictee.stt.Transcription =
+                throw IllegalStateException("model not loaded")
+            override fun release() {}
+        }
+        val engine = FallbackEngine(remote(), { broken }, retryAfterMillis = 0)
+        val run = dictate(engine, before = { part -> if (part == 1) waitFor("block 1") { jobCount.get() >= 1 } })
+        assertNoGateFailure()
+        // Jobs 1, 3, 4 for blocks 1, 3, 4, then job 5 for block 2 again: order kept, nothing lost.
+        assertEquals("un cinq trois quatre", JSONObject(String(realPolishPosts().single().body)).getString("text"))
+        assertEquals(polished, run.sink.text)
+        assertEquals(0, run.rec.results.single().lostBlocks)
+    }
+
+    @Test fun aBlockLostEverywhereDoesNotLoseTheOthers() {
+        failBlocks += setOf(2, 5)
+        val run = dictate(remote())
+        assertNoGateFailure()
+        // Block 2 failed, and failed again at the end (job 5): the three other blocks are still inserted.
+        assertEquals("un trois quatre", JSONObject(String(realPolishPosts().single().body)).getString("text"))
+        assertEquals(polished, run.sink.text)
+        val r = run.rec.results.single()
+        assertEquals(1, r.lostBlocks)
+        assertTrue(r.fallbackReason!!, r.fallbackReason!!.contains("502"))
+        assertEquals(DictationState.IDLE, run.c.state)
+        assertFalse(run.c.waitingServer)
+    }
+
+    @Test fun everyBlockLostIsAnErrorAndTheWaitEnds() {
+        failBlocks += (1..8).toSet()
+        val run = dictate(remote())
+        assertTrue(run.rec.results.isEmpty())
+        assertEquals(DictationState.ERROR, run.c.state)
+        assertFalse(run.c.waitingServer)
+        assertEquals(false, run.rec.waits.last())
+    }
+
     @Test fun rateLimitedBlockGoesLocalAndTheServerIsBackAfterRetryAfter() {
         RetryAfterServer(1).use {
             val c2 = config().copy(baseUrl = "http://127.0.0.1:${it.port}")
