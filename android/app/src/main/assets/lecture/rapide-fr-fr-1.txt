@@ -1,0 +1,6 @@
+# Texte de lecture du test rapide de l'installation de Kalmia Blabla (issue #36a), français de France.
+# Un seul paragraphe d'environ 40 mots, écrit pour ce projet (libre de droits). Ne jamais modifier une
+# version publiée : créer rapide-fr-fr-2.txt à la place.
+version: rapide-fr-fr-1
+
+Dimanche matin, il pleuvait un peu, alors j'ai pris mon parapluie pour aller à la boulangerie. J'ai acheté une baguette, des croissants et un journal. En rentrant, j'ai garé la voiture devant la maison et j'ai préparé le déjeuner.

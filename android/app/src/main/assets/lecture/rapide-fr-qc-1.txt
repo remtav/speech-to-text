@@ -1,0 +1,6 @@
+# Texte de lecture du test rapide de l'installation de Kalmia Blabla (issue #36a), français du Québec.
+# Un seul paragraphe d'environ 40 mots, écrit pour ce projet (libre de droits). Ne jamais modifier une
+# version publiée : créer rapide-fr-qc-2.txt à la place.
+version: rapide-fr-qc-1
+
+Samedi matin, il y avait de la poudrerie, alors j'ai mis ma tuque et mes mitaines pour aller au dépanneur. J'ai acheté du lait, des bleuets et un journal. Au retour, j'ai stationné l'auto et j'ai préparé le souper.

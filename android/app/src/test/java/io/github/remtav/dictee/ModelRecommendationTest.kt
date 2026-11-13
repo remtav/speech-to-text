@@ -43,9 +43,12 @@ class ModelRecommendationTest {
         }
     }
 
-    @Test fun parakeetIsOfferedOnlyForEnglishAlone() {
+    // Issue #36: widened from English alone to the languages of the "light phone model" row of the install table.
+    @Test fun parakeetIsOfferedOnlyWhenEveryLanguageIsLightAndQuebecIsAbsent() {
+        val light = setOf(DictationLanguage.FRENCH_FRANCE, DictationLanguage.ENGLISH,
+            DictationLanguage.SPANISH, DictationLanguage.PORTUGUESE)
         for (combo in allCombinations()) {
-            assertEquals(combo.toString(), combo == english, ModelCatalog.parakeet in ModelCatalog.offered(combo))
+            assertEquals(combo.toString(), light.containsAll(combo), ModelCatalog.parakeet in ModelCatalog.offered(combo))
         }
     }
 
