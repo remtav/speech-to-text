@@ -109,6 +109,26 @@ class HowToExamplesTest {
     }
 
     @Test
+    fun theCommandAppearsExactlyOnceInEachFirstScreenSentence() {
+        // The marked range comes from the first occurrence (indexOf): a sentence that repeated its command, or
+        // that contained another wording of it, would be marked in the wrong place without any other test seeing it.
+        for (chosen in listOf(quebec, english, quebecAndEnglish, setOf(DictationLanguage.FRENCH_FRANCE), setOf(DictationLanguage.SPANISH))) {
+            for (ex in HowToExamples.firstScreen(chosen)) {
+                for (form in ex.entry.forms.map { it.text }) {
+                    val n = Regex(Regex.escape(form), RegexOption.IGNORE_CASE).findAll(ex.said).count()
+                    val marked = ex.said.substring(ex.commandRange!!)
+                    if (form.equals(marked, ignoreCase = true)) {
+                        assertEquals("« $form » appears $n times in « ${ex.said} »", 1, n)
+                    } else {
+                        // another wording of the same command must not be inside the sentence either
+                        assertTrue("« $form » also appears in « ${ex.said} »", n == 0 || marked.contains(form, ignoreCase = true))
+                    }
+                }
+            }
+        }
+    }
+
+    @Test
     fun colonExampleIsTheRuleOfTheIssue() {
         val colon = HowToExamples.firstScreen(quebec).first()
         assertEquals("il a dit deux-points bonjour", colon.said)
