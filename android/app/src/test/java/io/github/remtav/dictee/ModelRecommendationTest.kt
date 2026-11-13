@@ -33,7 +33,8 @@ class ModelRecommendationTest {
     @Test fun englishAloneRecommendsWhisperAndOffersParakeet() {
         val rec = ModelRecommendations.recommend(english)
         assertEquals(ModelCatalog.whisperTurbo, rec.model)
-        assertTrue(rec.reason, rec.reason.contains("Parakeet"))
+        // Issue #37: the lighter model is mentioned by its effect, never by its name.
+        assertTrue(rec.reason, rec.reason.contains("plus léger"))
         assertEquals(listOf(ModelCatalog.whisperTurbo, ModelCatalog.parakeet), ModelCatalog.offered(english))
     }
 
@@ -91,6 +92,8 @@ class ModelRecommendationTest {
             assertTrue(combo.toString(), reason.isNotBlank())
             assertFalse(reason, reason.contains("Parakeet est meilleur"))
             assertFalse(reason, reason.contains("59 mots"))
+            // Issue #37: no model name in the normal path.
+            for (word in io.github.remtav.dictee.stt.ModelPlainNames.technicalWords) assertFalse(reason, reason.contains(word))
         }
         val qc = ModelRecommendations.recommend(setOf(DictationLanguage.FRENCH_QUEBEC)).reason
         assertTrue(qc, qc.contains("français québécois"))
