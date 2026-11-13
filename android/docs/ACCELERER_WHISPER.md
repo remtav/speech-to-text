@@ -451,6 +451,257 @@ Remarque (demande de l'utilisateur) : turbo garde **la même architecture d'enco
 rapide. Ce qui distingue large-v3 de turbo, et ce qu'on peut encore en tirer pour la vitesse, est une piste séparée
 (issue #33), non traitée ici.
 
+### 7.3 Turbo plus rapide sans réentraînement : trois pistes (2026-11-13, issue #40)
+
+Demande : un modèle de qualité égale ou à peine inférieure à turbo, **plus rapide**, **sans réentraînement**, la taille
+ne comptant pas. Les poids de turbo int8 (`csukuangfj/sherpa-onnx-whisper-turbo`) restent tels quels ; seuls le graphe,
+la marge de fin ou la stratégie de décodage changent. Critères de l'issue, par variante : temps total sur les 172 extraits
+**au moins 10 % sous** turbo int8, WER **≤ turbo + 2 points**, **aucune sortie cassée** sur les 7 clips. Rien n'est
+publié et l'application n'est pas modifiée. Outils : `android/tools/whisper-turbo-rapide/` (README).
+
+**Conclusion.**
+
+| Variante | Critères (hôte) | 172 extraits : temps face à turbo int8, même exécution | WER (turbo dans la même exécution) | Suite |
+| --- | --- | --- | --- | --- |
+| **Marge 300 + reprise à 1 000 si répétition** (piste 2.1) | **remplis** | −22,8 % (exécution C172) ; −24,5 % (M172) | 14,8 % (14,5 %) | Changement d'app décrit plus bas ; vitesse de la marge 300 à mesurer sur le téléphone |
+| **Cache 256 + marge 300 + reprise** (combinaison 1.2 + 2.1) | **remplis** | **−29,0 %** (C172) | 14,8 % (14,5 %) | Publication du modèle à décider ; mesure sur le téléphone |
+| Marge 600 seule (réglage existant) | remplis, avec réserve | −20,6 % (M172) | 15,5 % (14,5 %) ; 1 phrase répétée sur 172, aucune sur les 7 clips | **Essayable tout de suite** : Réglages > « Silence ajouté pour Whisper » = 600 |
+| Cache du décodeur 256 positions seul (piste 1.2) | non (vitesse) | −4,5 % (C172), sorties identiques | 14,5 % (14,5 %) | Utile seulement en combinaison |
+| Attention de l'encodeur en int8 (piste 1.1, 5 variantes) | non | 7 clips : +0 à +72 % (plus lent) | — | Abandonnée sur x86-64 |
+| `MultiHeadAttention` fusionnée (piste 1.3) | non | profil : +1 % sur l'encodeur | — | Abandonnée |
+| Fusion du silence dans l'encodeur (piste 2.2) | non (WER) | −15 à −24 % seule, mais WER 30,5 à 30,9 % ; avec reprise −6,7 % / 15,8 % (réplique, F172) | (13,7 % réplique) | Abandonnée |
+| NPU Qualcomm (piste 3) | non mesurable ici | annoncé 0,81 s par fenêtre de 30 s + 9,7 ms par jeton sur le 8 Gen 2 | — | Étude écrite plus bas |
+
+Ce qui est mesuré et ce qui est estimé. **[mesuré hôte]** : tous les temps et WER de cette section, x86-64 4 cœurs
+(Intel Xeon 2,1 GHz), machine partagée, 4 threads, langue `fr` forcée ; chaque chiffre cite son exécution (tableau
+« Exécutions »). **[estimé]** : tout ce qui concerne le téléphone, et la piste 3. Rien n'a été mesuré sur arm64.
+
+#### Exécutions
+
+Protocole de #25 : sherpa-onnx 2.0.1 Python (onnxruntime 1.28.2 embarqué), décodeur int8, turbo int8 remesuré **dans la
+même exécution, en alternance clip par clip** ; temps d'un clip = meilleur de N passages ; WER par
+`android/tools/whisper-turbo-rapide/wer.py` (normalisation de `banc_lite.py` : 1 673 mots sur les 172 extraits, 73 sur
+les 7 clips). Les exécutions « réplique » utilisent `replique.py` (onnxruntime 1.28.0 Python, même graphe et même
+décodage que sherpa ; vérifié sur les 7 clips : mêmes temps à ±5 %, 5 phrases sur 7 identiques à sherpa, les 2 autres à
+un mot près, effet d'arrondi des caractéristiques), seule façon de passer l'entrée `n_frames` de la piste 2.2.
+
+| Exécution | Moteur | Clips × passages | Variantes, en alternance | Charge de la machine |
+| --- | --- | --- | --- | --- |
+| E0-7, E0-172 | sherpa + réplique | 7 × 1, 172 × 1 | turbo (sherpa, puis réplique instrumentée) | ≈ 2,3 à 4 |
+| M7, M172 | sherpa | 7 × 2, 172 × 1 | marge 1 000 (turbo), 300, 400, 600 | M172 : partagée avec des essais à 1 thread |
+| P1-7 | sherpa | 7 × 2 | turbo, cache 256, `av_dyn`, `av_fixe`, `av_ligne`, `qk_tenseur`, `qk_tete` | 2,5 à 3,8 |
+| PROF | onnxruntime 1.28.0 | encodeur seul, 1 500 images, 3 passes | turbo, `av_dyn`, `av_fixe`, `qk_tenseur`, MHA | seule tâche |
+| F7, F172 | réplique | 7 × 2, 172 × 1 | turbo 1 000, marge 300, fusions (N, G) | seule tâche |
+| C7, C172 | sherpa | 7 × 2, 172 × 1 | turbo 1 000, marge 300, cache 256 à 1 000, cache 256 à 300 | seule tâche |
+
+Le temps de turbo varie d'une exécution à l'autre (172 extraits : 267 à 369 s) : seules les comparaisons dans une même
+ligne valent.
+
+#### Étape 0 : partage encodeur / décodeur de turbo int8
+
+| Jeu (exécution) | sherpa | Caractéristiques | Encodeur | Décodeur | Jetons | Temps par étape du décodeur |
+| --- | --- | --- | --- | --- | --- | --- |
+| 7 clips, 37 s d'audio (E0-7) | 11,40 s | 0,38 s (3 %) | 6,51 s (59 %) | 4,23 s (38 %) | 118 | 33,8 ms |
+| 172 extraits, 1 031 s d'audio (E0-172) | 288,5 s | 10,7 s (4 %) | 162,7 s (59 %) | 104,4 s (38 %) | 2 989 | 33,0 ms |
+
+Pourcentages sur le temps de la réplique (277,8 s pour 288,5 s mesurées par sherpa dans la même exécution). Une étape du
+décodeur = l'invite de 4 jetons ou un jeton produit. Lecture : l'encodeur domine (≈ 3/5), mais le décodeur n'est pas
+négligeable (≈ 2/5 ; 17 jetons par extrait en moyenne). Ordre retenu pour la piste 1 : l'attention de l'encodeur d'abord,
+puis le cache du décodeur. Profil de l'encodeur (PROF, 1 500 images, 4 threads, 845 à 906 ms par passe) : `QKᵀ` 13 %,
+`AV` 11 %, softmax 8 %, soit **32 %** de l'encodeur (la section 7.2 donnait ≈ 40 % à 1 600 trames sur onnxruntime 1.32),
+les multiplications à poids int8 (`DynamicQuantizeMatMul`, `MatMulIntegerToFloat`) ≈ 40 %, les normalisations 13 %.
+
+#### Piste 2.1 : marge courte avec reprise
+
+Stratégie simulée (`reprise.py`) : décoder à la marge courte ; si le détecteur signale une répétition, redécoder à
+1 000 ; temps = les deux décodages, mesurés dans la même exécution ; texte = celui à 1 000. Détecteur fixé avant de lire
+les 172 extraits : jetons au plafond de sherpa (6 par seconde), texte = X + X, bloc d'au moins 3 mots répété aussitôt,
+fin qui reprend le début sans ponctuation finale.
+
+| Marge (exécution) | Seule : temps / WER | Reprises | Avec reprise : temps / WER |
+| --- | --- | --- | --- |
+| 1 000, turbo (M172) | 369,1 s / **14,5 %** | — | — |
+| 300 (M172) | −30,8 % / 22,0 % | 13 (8 % : plafond 11, X + X 2) | **−24,5 % / 14,8 %** |
+| 400 (M172) | −26,5 % / 19,1 % | 7 (4 %) | −22,6 % / 15,5 % |
+| 600 (M172) | −20,6 % / 15,5 % | 1 (X + X) | −20,1 % / 14,8 % |
+| 300 (C172, machine seule, turbo 273,1 s) | −29,4 % / 22,0 % | 13 | **−22,8 % / 14,8 %** |
+| 300 (F172, réplique, turbo 267,5 s, 13,7 %) | −30,1 % / 23,7 % | 17 (10 %) | −21,9 % / 15,4 % |
+| 7 clips, 300 (M7 / C7) | −30,2 % / 15,1 % ; −30,1 % / 15,1 % | 1 (`frqc5`, plafond) | −15,1 % / 6,8 % ; −15,6 % / 6,8 % (turbo 9,6 %) |
+
+Sur les 7 clips, la seule sortie cassée à 300 et 400 est `frqc5` (« … rebelles. La sorcière décide de rentrer au »,
+29 jetons sur 29) : elle est reprise, donc la stratégie n'a **aucune sortie cassée**. À 600, aucune répétition sur les
+7 clips ; sur les 172, une phrase doublée (« La géologie se caractérise… » deux fois).
+
+**Les répétitions sont-elles le seul défaut de la marge courte ?** Presque. Sur les 159 extraits non repris à 300 (M172),
+les sorties font 237 erreurs contre 232 pour les mêmes extraits à 1 000 (+5 erreurs, +0,3 point), 24 extraits moins bons
+et 17 meilleurs, longueurs à ±2 mots : de petites variations de mots, pas de troncature. Aucune répétition non détectée
+(colonne « répétition manquée » de `reprise.py` : 0 à 300, 400 et 600). La reprise « oracle » (reprendre exactement
+quand la sortie diffère de 1 000) coûterait plus que turbo (+12 %) : il ne faut reprendre que sur répétition.
+
+Changement d'app à faire si l'on retient cette stratégie (non fait ici) : dans `SherpaEngine`, pour Whisper, décoder avec
+`tailPaddings` = 300 ; passer le texte au détecteur (à placer dans `text/`, mêmes 4 règles que `repetition()` de
+`reprise.py`, avec le nombre de jetons et la durée du segment) ; s'il se déclenche, redécoder le même segment avec
+`tailPaddings` = 1 000. Le modèle n'a pas à être chargé deux fois : `OfflineRecognizer.setConfig` de l'API Kotlin
+remplace la configuration Whisper du modèle chargé, et la marge est relue à chaque décodage
+(`OfflineRecognizerWhisperImpl::SetConfig` et `DecodeStream`, v2.0.1) [vérifié dans le code source ; non essayé dans
+l'app]. Le réglage « Silence ajouté pour Whisper » deviendrait la marge de reprise, ou un choix « automatique ».
+
+#### Piste 1 : réexporter turbo pour la vitesse (mêmes poids)
+
+1. **Attention de l'encodeur en int8** (`attention_int8.py`, chirurgie du graphe int8 : `MatMulInteger` + mise à
+   l'échelle de la sortie). Toutes les variantes transcrivent correctement les 7 clips, mais **aucune n'est plus
+   rapide** sur onnxruntime x86-64 :
+
+   | Variante (P1-7, 7 clips × 2) | Temps (turbo 10,09 s) | WER 7 clips (turbo 9,6 %) | Profil PROF : nœud remplacé (fp32 dans turbo) |
+   | --- | --- | --- | --- |
+   | `AV`, A et V dynamiques par tenseur (`--av dyn`) | 10,56 s, +4,7 % | 6,8 % | `AV` 164 ms (101 ms) |
+   | `AV`, A à échelle fixe 1/255 (`--av fixe`) | 10,26 s, +1,7 % | 6,8 %, `frqc2` « ses... » (sortie tronquée) | `AV` 136 ms (101 ms) dont `QuantizeLinear` 38 ms |
+   | `AV`, A par ligne (`--av ligne`) | 12,77 s, +26,6 % | 9,6 % | — |
+   | `QKᵀ` par tenseur (`--qk tenseur`) | 10,09 s, +0,1 % | 6,8 % | `QKᵀ` 120 ms (114 ms) |
+   | `QKᵀ` par tête (`--qk tete`) | 17,32 s, +71,7 % | 11,0 % | — |
+
+   Le profil confirme que le temps des nœuds ne baisse pas : le `MatMulInteger` à deux entrées dynamiques et batché par
+   tête (20 × 1 500 × 1 500) n'est pas plus rapide que le `MatMul` fp32 d'onnxruntime, et la quantification d'un tenseur
+   de 45 millions de valeurs à chaque bloc ajoute son propre coût. Sur arm64 (produit scalaire int8 des cœurs
+   Cortex-X3/A715), le rapport pourrait différer [supposé] ; non retenu puisque les critères échouent sur l'hôte.
+2. **Cache du décodeur de 256 positions** (`cache_court.py`). Vérifié d'abord : sherpa-onnx 2.0.1 lit `n_text_ctx` dans
+   les métadonnées de l'**encodeur** et crée le cache à cette taille (`offline-whisper-model.cc`,
+   `GetInitialSelfKVCache`) ; le décodeur exporté ne lit et n'écrit le cache que par tranches `[: offset + n]`. Pas de
+   réexport : formes des 4 entrées et sorties de cache du décodeur 448 → 256 et métadonnée `n_text_ctx` = 256. Copie par
+   jeton 10,5 Mo au lieu de 18,4 Mo ; plafond de sortie 128 jetons au lieu de 224 (21 s d'audio à 6 jetons par seconde ;
+   l'app coupe à 20 s). Résultat : **sorties identiques** à turbo sur les 7 clips et les 172 extraits (même calcul),
+   −5,4 % (P1-7), −7,0 % (C7), **−4,5 %** (C172). Seul, il ne remplit pas le critère de vitesse. Fichiers produits :
+   `turbo-encoder.int8.onnx` 674 716 297 octets (`a490d498…5f77`, mêmes octets que l'original sauf la métadonnée),
+   `turbo-decoder.int8.onnx` 360 984 582 octets (`f7dddb97…26e4`), `turbo-tokens.txt` inchangé.
+3. **Graphe optimisé hors ligne.** L'optimisation ORT_ENABLE_ALL qu'onnxruntime appliquerait hors ligne est déjà faite au
+   chargement par sherpa-onnx (`session.cc`) : aucun gain d'exécution attendu, non mesuré. Essayé à la place : la fusion
+   du cœur de l'attention en `com.microsoft.MultiHeadAttention` (`fusion_attention.py`) ; profil PROF : 307 ms pour ce
+   nœud contre 274 ms pour `QKᵀ` + softmax + `AV` séparés, encodeur 855 ms contre 845 ms : **abandonné**.
+
+#### Piste 2.2 : fusion du silence dans l'encodeur (expérimental)
+
+`fusion_silence.py` : après le bloc N, les positions de silence (au-delà de ceil(n_frames / 2)) sont remplacées par leur
+moyenne par groupes de G ; les blocs suivants traitent donc beaucoup moins de positions. Chirurgie du graphe int8 (mêmes
+poids), entrée `n_frames` ajoutée : mesuré avec la réplique, hors sherpa.
+
+| Variante | 7 clips (F7) : temps / encodeur / WER (turbo 9,76 s, 8,2 %) | Sortie cassée sur 7 clips | 172 extraits (F172) : temps / WER seule ; avec reprise |
+| --- | --- | --- | --- |
+| N = 4, G = 4 | −27,1 % / −48,9 % / 20,5 % | `frqc5` répétée | — |
+| N = 4, G = 8 | −27,3 % / −53,2 % / 31,5 % | `frqc5`, `frqc6` répétées | — |
+| N = 8, G = 4 | −22,2 % / −40,5 % / 21,9 % | `frqc5` répétée | — |
+| N = 8, G = 8 | −25,8 % / −46,8 % / 12,3 % | `frqc5` répétée | −23,8 % / 30,5 % ; −6,7 % / 15,8 % |
+| N = 16, G = 4 | −11,8 % / −25,2 % / 17,8 % | `frqc5` répétée | — |
+| N = 16, G = 8 | −21,6 % / −32,4 % / 9,6 % | aucune | −15,2 % / 30,9 % ; +1,9 % / 16,4 % |
+| (marge 300 dans la même exécution) | −29,7 % / −54,0 % / 16,4 % | `frqc5` répétée | −30,1 % / 23,7 % ; −21,9 % / 15,4 % |
+
+Turbo dans F172 : 267,5 s, WER 13,7 %. La fusion fait perdre au modèle la longueur du silence qui l'aide à placer la fin
+de texte : mêmes répétitions qu'une marge courte, en plus nombreuses (19 % de reprises) et sans gain de vitesse sur la
+marge 300. **Abandonnée** ; la compatibilité sherpa-onnx n'a pas été examinée (la qualité ne tient pas).
+
+#### Combinaison des pistes 1 et 2.1 (C7, C172)
+
+| Variante | 7 clips : temps (turbo 10,47 s) / WER (9,6 %) | 172 extraits : temps (turbo 273,1 s) / WER (14,5 %) |
+| --- | --- | --- |
+| Cache 256, marge 1 000 | −7,0 % / 9,6 % | −4,5 % / 14,5 % |
+| Marge 300 + reprise (turbo) | −15,6 % / 6,8 % | −22,8 % / 14,8 % |
+| **Cache 256 + marge 300 + reprise sur cache 256 à 1 000** | **−23,4 % / 6,8 %** | **−29,0 % / 14,8 %** |
+
+Les gains se cumulent à peu près (la marge réduit surtout l'encodeur, le cache le décodeur). 13 reprises sur 172 ; sur
+les 7 clips, seule `frqc5` est reprise, aucune sortie cassée.
+
+#### Piste 3 : NPU Qualcomm (QNN), étude écrite (aucune mesure)
+
+Rien n'a pu être mesuré ici (pas de téléphone, pas de SDK Qualcomm). Sources lues le 2026-11-13.
+
+1. **Snapdragon 8 Gen 2 (S23 Ultra, SM8550, Hexagon v73) et Qualcomm AI Hub.** La fiche actuelle
+   [`qualcomm/Whisper-Large-V3-Turbo`](https://huggingface.co/qualcomm/Whisper-Large-V3-Turbo) ne publie plus de
+   fichiers ni de mesures pour le 8 Gen 2 : appareils listés 8 Elite Gen 5, 8 Elite, 8 Gen 3, 8 Gen 1 (Voice AI
+   seulement), X Elite, X2 Elite et des puces industrielles [vérifié]. Le 8 Gen 2 **y figurait** : la révision v0.38.0
+   ([commit `6f0deac`](https://huggingface.co/qualcomm/Whisper-Large-V3-Turbo/commit/6f0deac9b5a8a52ce2c4de0db564f438e11e4413))
+   retire les lignes « Samsung Galaxy S23, Snapdragon 8 Gen 2 » : encodeur **810,6 ms**, décodeur **9,7 ms par jeton**,
+   `QNN_CONTEXT_BINARY`, NPU, poids et activations en **float** (fp16), et supprime les fichiers précompilés
+   correspondants (encodeur `.bin` 1,46 Go, décodeur `.bin` 452 Mo) [vérifié dans le diff]. La page d'AI Hub
+   (aihub.qualcomm.com, modèle `whisper_large_v3_turbo`) liste encore le Galaxy S23 parmi les appareils cibles et le
+   paquet `qai-hub-models` fournit `python -m qai_hub_models.models.whisper_large_v3_turbo.export` [d'après un résultat
+   de recherche, page non ouverte] : une compilation pour le 8 Gen 2 par AI Hub (compte Qualcomm gratuit, compilation
+   dans le nuage) paraît possible, mais n'a pas été essayée.
+2. **sherpa-onnx et Whisper sur QNN.** sherpa-onnx 2.0.1 contient un moteur Whisper pour QNN
+   (`sherpa-onnx/csrc/qnn/offline-whisper-model-qnn.cc`, compilé seulement avec l'option CMake
+   `SHERPA_ONNX_ENABLE_QNN`, `QNN_SDK_ROOT` requis) [vérifié dans le code v2.0.1]. Ce moteur **ne lit pas** les
+   fichiers ONNX du catalogue : il charge des binaires de contexte QNN (`--provider=qnn`, `--qnn-backend-lib=libQnnHtp.so`,
+   `--qnn-context-binary=encoder.bin,decoder.bin`, `qnn-config.cc`) ou des bibliothèques de modèle (`libmodel.so`), **propres à une puce** (« a model for SM8850 won't run on
+   SA8259 ») [vérifié, documentation QNN de sherpa-onnx]. Entrée de taille fixe : l'audio est complété de zéros
+   jusqu'à `num_frames_`, la longueur figée dans le graphe compilé (fenêtre fixe, « QNN does not support dynamic input shapes ») : la marge de fin et la longueur
+   variable de l'export CPU disparaissent, chaque segment paie la fenêtre complète. La chaîne d'export de sherpa-onnx
+   (`.github/workflows/export-whisper-qnn.yaml`, v2.0.1) produit tiny, base, small, medium et des distillations
+   anglaises pour toutes les puces de SM8450 à SM8850, **pas turbo** ; le script d'export
+   (`scripts/whisper/rknn/export_onnx.py`, partagé avec QNN) accepte pourtant `turbo`. Conversion : `qnn-onnx-converter`
+   (activations 16 bits, biais 32 bits), `scripts/qnn/generate_config.py --soc SM8550` (SM8550 = soc_id 43, Hexagon
+   v73), `qnn-model-lib-generator`, `qnn-context-binary-generator`, SDK QAIRT 2.40.0.251030 [vérifié, workflow].
+   Build Android : `SHERPA_ONNX_ENABLE_QNN=ON SHERPA_ONNX_ENABLE_BINARY=ON ./build-android-arm64-v8a.sh` ; sur le
+   téléphone, il faut aussi `libQnnHtp.so`, `libQnnHtpPrepare.so`, `libQnnSystem.so`, `libQnnHtpV73Stub.so` et
+   `libQnnHtpV73Skel.so` (la documentation montre V81 pour SM8850 ; V73 pour SM8550 par la table des puces)
+   [vérifié pour la liste, déduit pour V73]. **Licence de redistribution** de ces bibliothèques dans un APK : non
+   trouvée ; la documentation de sherpa-onnx renvoie aux fichiers `LICENSE.pdf` et `QNN_NOTICE.txt` du SDK, qu'il
+   faut lire avant toute publication [non vérifié]. L'AAR du catalogue (`sherpa-onnx-2.0.1.aar`, CPU) ne contient rien de
+   cela.
+3. **Fenêtre fixe de 30 s : latences et tailles annoncées.** Turbo, 8 Gen 2 (ancienne fiche) : encodeur 810,6 ms par
+   fenêtre de 30 s, 9,7 ms par jeton ; fichiers 1,46 Go + 452 Mo (fp16). 8 Gen 3 (fiche actuelle) : 398 à 404 ms et
+   7,8 à 8,0 ms par jeton ; 8 Elite : 305 à 312 ms et 6,7 ms par jeton [vérifié]. Repère hôte (même rapport, x86-64,
+   pas un téléphone) : encodeur CPU int8 ≈ 0,9 s pour 1 500 images (15 s), 33 ms par jeton du décodeur (étape 0).
+   Estimation pour une phrase de 5 s (20 jetons) sur le S23 [estimé] : NPU ≈ 0,81 + 20 × 0,0097 ≈ **1,0 s**, quelle que
+   soit la longueur jusqu'à 30 s ; le CPU du téléphone n'a pas été mesuré dans ce rapport (à relever avec la procédure
+   de la section 10).
+4. **Conclusion et étapes.** Faisable mais lourd, et sans garantie pour turbo sur le 8 Gen 2 (Qualcomm a retiré ses
+   fichiers pour cette puce, pour une raison non publiée). Étapes, effort estimé 3 à 6 jours de travail outillé hors
+   session cloud :
+   1. sur un PC Linux x86-64 avec le SDK QAIRT (téléchargement soumis à compte Qualcomm) : exporter turbo par le
+      script de sherpa-onnx (`--model turbo`), convertir, générer les binaires de contexte pour SM8550, vérifier la
+      qualité sur l'hôte (simulateur HTP x86) ;
+   2. construire sherpa-onnx pour Android avec `SHERPA_ONNX_ENABLE_QNN` et l'API Kotlin, ajouter les bibliothèques
+      QNN au projet (après lecture de leur licence) ;
+   3. ajouter un chemin « QNN » dans `SherpaEngine` (config `qnn` au lieu des fichiers ONNX), un modèle par puce dans
+      `ModelCatalog`, et un repli CPU ;
+   4. **ce que l'utilisateur doit faire lui-même** : d'abord, avant tout ce travail, mesurer sur son S23 le CPU actuel
+      (section 10) pour connaître l'écart réel ; si possible, essayer une application de démonstration QNN existante
+      (APK QNN de sherpa-onnx, modèle SM8550, par exemple SenseVoice) pour vérifier que le NPU répond sur son
+      téléphone ; puis, si l'écart CPU/NPU annoncé (≈ 1 s par phrase) le justifie, lancer les étapes 1 à 3.
+
+#### À vérifier sur le téléphone (variantes qui remplissent les critères sur l'hôte)
+
+Aucune mesure arm64 n'a été faite. Le partage encodeur / décodeur, l'effet de la marge et celui du cache peuvent être
+différents sur le Snapdragon 8 Gen 2 (bande passante mémoire plus faible : le cache court pourrait y gagner davantage
+[supposé]). Préparation commune : celle de la section 10 (téléphone branché, économiseur éteint, une exécution de chauffe
+jetée, trois exécutions notées, une minute de pause entre elles), Whisper large-v3-turbo installé, « Threads de calcul »
+à la valeur retenue à l'étape 2 de la section 10, accélération CPU.
+
+1. **Marge 600 seule** (aucun changement de code, essayable tout de suite).
+   - Écran : Réglages > Performance > « Silence ajouté pour Whisper » = 1 000, puis 600 ; pour chaque valeur, Réglages >
+     « Comparer les modèles », Whisper large-v3-turbo seul, tous les extraits de référence cochés plus les trois
+     enregistrements de la section 10 ((a) « friperie » seul, (b) une phrase de ~5 s, (c) ~15 s).
+   - Relever, par valeur : la somme des temps de décodage de Whisper sur les extraits (rapport « Copier »), le temps de
+     (a), (b), (c), et **le texte** de chaque extrait (répétition, phrase doublée, mot manquant).
+   - Retenir 600 si la somme baisse d'au moins 10 % et qu'aucun texte n'est doublé ou tronqué sur 5 essais (critère déjà
+     posé en section 10, étape 5).
+2. **Marge 300 avec reprise** (la reprise demande le changement d'app décrit plus haut ; la vitesse de la marge 300 se
+   mesure dès maintenant).
+   - Même écran, « Silence ajouté pour Whisper » = 300, mêmes extraits et enregistrements.
+   - Relever : la somme des temps à 300 (T300) et à 1 000 (T1000) dans des exécutions faites l'une après l'autre ; le
+     nombre d'extraits dont le texte à 300 est doublé ou s'arrête au milieu d'une phrase répétée (R sur N extraits).
+   - Estimation du temps avec reprise : T300 + T1000 × R / N (formule de `reprise.py`). La stratégie vaut la peine si ce
+     total est au moins 10 % sous T1000. Sur l'hôte : R / N ≈ 8 %, total −23 à −25 %.
+3. **Cache 256 + marge 300 + reprise** (demande de publier le modèle modifié, décision de l'utilisateur, puis le
+   changement d'app de la piste 2.1).
+   - Fichiers à copier : produits par `python cache_court.py turbo-encoder.int8.onnx turbo-decoder.int8.onnx
+     ctx256/turbo-encoder.int8.onnx ctx256/turbo-decoder.int8.onnx 256` à partir des fichiers de
+     `csukuangfj/sherpa-onnx-whisper-turbo` ; sommes ci-dessus (piste 1.2) ; `turbo-tokens.txt` inchangé.
+   - L'application n'installe un modèle que depuis une URL du catalogue avec ses sommes SHA-256 (`ModelStore`) : pour
+     l'essayer, publier les trois fichiers (dépôt Hugging Face de test) et ajouter, sur une branche, une entrée cachée de
+     `ModelCatalog` qui les pointe ; rien de cela n'est fait ici.
+   - Mesure : « Comparer les modèles » avec Whisper large-v3-turbo et cette entrée, marge 1 000 puis 300, mêmes extraits ;
+     relever les sommes des temps (le cache seul, à 1 000, doit donner **exactement les mêmes textes** que turbo : sinon,
+     la version de sherpa-onnx de l'app ne lit pas `n_text_ctx` comme la 2.0.1, et la variante est à rejeter).
+
 ## 8. Autres moteurs
 
 Évaluation honnête, sans implémentation.
