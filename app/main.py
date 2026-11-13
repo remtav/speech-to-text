@@ -32,6 +32,8 @@ ROOT = Path(__file__).resolve().parent.parent
 TEMPLATES_DIR = ROOT / "templates"
 STATIC_DIR = ROOT / "static"
 UPLOAD_CHUNK = 1024 * 1024
+MAX_PROMPT_CHARS = 1000  # Whisper reads at most the last 224 tokens of it
+MAX_POLISH_CHARS = 100_000  # far above what the polish step accepts; only bounds memory
 
 log = logging.getLogger("app")
 
@@ -342,9 +344,14 @@ def create_app(settings=None, backend=None, polish_client=None):
     # --------------------------------------------------- transcription
 
     async def submit_transcription(request, file, diarize, num_speakers, min_speakers, max_speakers,
-                                   language, quick=False, polish=None):
+                                   language, quick=False, polish=None, prompt=None):
         params = {"quick": quick, "language": _validate_language(language),
                   "polish": settings.polish_default if polish is None else bool(polish)}
+        prompt = (prompt or "").strip()
+        if prompt:
+            if len(prompt) > MAX_PROMPT_CHARS:
+                raise HTTPException(status_code=400, detail=f"prompt too long (limit {MAX_PROMPT_CHARS} characters)")
+            params["prompt"] = prompt
         if not quick:
             diarize = settings.diarize_default if diarize is None else diarize
             _validate_speaker_hints(num_speakers, min_speakers, max_speakers)
@@ -388,6 +395,28 @@ def create_app(settings=None, backend=None, polish_client=None):
         _raise_for_job(job)
         return job.result
 
+    # ---------------------------------------------------------- polish
+
+    @app.post("/polish", status_code=202)
+    async def create_polish_job(request: Request, body: dict = Body(...)):
+        """Queue the LLM polish of a text (no audio) and return immediately; poll GET /jobs/{id}.
+
+        Body: ``{"text": "...", "language": "fr"}`` (``language`` optional, "auto" = unknown). The job's
+        result has the raw ``text``, ``polished_text`` when the polish was applied, and the ``polish``
+        status, as for a transcription. The text is never logged and is dropped when the job ends.
+        """
+        text = body.get("text")
+        if not isinstance(text, str) or not text.strip():
+            raise HTTPException(status_code=400, detail="text must be a non-empty string")
+        language = body.get("language")
+        if language is not None and not isinstance(language, str):
+            raise HTTPException(status_code=400, detail="language must be a string")
+        if len(text) > MAX_POLISH_CHARS:
+            raise HTTPException(status_code=413, detail=f"Text too long (limit {MAX_POLISH_CHARS} characters)")
+        job = request.app.state.jobs.submit("polish", {"language": _validate_language(language)},
+                                            owner=_owner(request), text=text)
+        return job.to_dict()
+
     # ------------------------------------------------------------ jobs
 
     @app.post("/jobs", status_code=202)
@@ -401,10 +430,15 @@ def create_app(settings=None, backend=None, polish_client=None):
         language: Optional[str] = Form(None),
         quick: bool = Form(False),
         polish: Optional[bool] = Form(None),
+        prompt: Optional[str] = Form(None),
     ):
-        """Queue a transcription and return immediately; poll GET /jobs/{id} for progress and result."""
+        """Queue a transcription and return immediately; poll GET /jobs/{id} for progress and result.
+
+        ``prompt`` (optional): text given to Whisper as context (``initial_prompt``), e.g. the end of the
+        previous block of a long dictation. It is never logged.
+        """
         job = await submit_transcription(request, file, diarize, num_speakers, min_speakers, max_speakers,
-                                         language, quick, polish)
+                                         language, quick, polish, prompt)
         return job.to_dict()
 
     @app.get("/jobs")

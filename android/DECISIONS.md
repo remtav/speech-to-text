@@ -3766,6 +3766,14 @@ de doute) :
   `POLISH_LOG` (qui contient des transcriptions) est ignoré quand `DICTEE_TOKENS` est défini.
 - Politique de confidentialité : `docs/CONFIDENTIALITE.md` (il n'y en avait pas).
 
+## Issue #26 : Whisper turbo en 4 bits (MatMulNBits), essai hôte
+
+- Faisabilité confirmée sur l'hôte (sherpa-onnx 2.0.1, ONNX Runtime 1.28.2, Python et JAR Linux). arm64 non mesuré.
+- Mesures hôte (172 extraits québécois) : encodeur + décodeur int4 = WER 15,4 % contre 14,4 % et **2,1 fois plus lent** ; décodeur int4 seul = 14,8 %,
+  vitesse égale, **pas plus petit** (embedding fp32 de 265 Mo). Encodeur int4 : 433 Mo (b32) ou 373 Mo (b128) contre 675 Mo.
+- Décision proposée : garder l'int8, aucune entrée de catalogue, aucun changement de comportement. À réévaluer après mesure sur téléphone.
+- Tableaux, provenance des chiffres et procédure téléphone : `android/docs/WHISPER_INT4.md`. Outils : `quantifier_int4.py`, `bench_int4.py`.
+
 ## Issue #49 : filtre de répétition pour Whisper, marge de fin courte (300)
 
 Décisions de l'utilisateur (2026-11-13), appliquées telles quelles : choix « Automatique » dans « Silence ajouté pour
