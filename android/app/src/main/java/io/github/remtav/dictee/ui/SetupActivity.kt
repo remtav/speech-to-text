@@ -53,6 +53,12 @@ class SetupActivity : AppCompatActivity() {
     private lateinit var participationBox: LinearLayout
     /** Whether the participation card is drawn now; null before the first draw. It is redrawn only when this changes. */
     private var participationShown: Boolean? = null
+    /**
+     * Issue #55, point 6: whether this opening of the screen may jump to a missing keyboard step. Only a fresh
+     * opening (not a rotation, not a return from the settings or from a system dialog): a jump on every resume
+     * scrolled away from the card the person had just touched.
+     */
+    private var jumpOnOpen = false
     /** The step the screen was last drawn for: the models are redrawn when it changes (their filled button follows it). */
     private var drawnStep: SetupStep? = null
     // A download that ends can complete the setup: `maybeOpenHowTo` checks it.
@@ -64,6 +70,7 @@ class SetupActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         app = DicteeApp.from(this)
+        jumpOnOpen = savedInstanceState == null
         val col = scrollingColumn()
         scroll = col.parent as ScrollView
         col.title(getString(R.string.app_name))
@@ -118,10 +125,11 @@ class SetupActivity : AppCompatActivity() {
         renderSteps()
         renderModels()
         renderParticipation()
-        // Issue #55, point 6: back here with a keyboard step missing, that step is the first thing on screen.
-        if (SetupProgress.jumpToKeyboardSteps(app.settings.setupSeen, isKeyboardEnabled(), isKeyboardChosen())) {
+        // Issue #55, point 6: reopened with a keyboard step missing, that step is the first thing on screen.
+        if (jumpOnOpen && SetupProgress.jumpToKeyboardSteps(app.settings.setupSeen, isKeyboardEnabled(), isKeyboardChosen())) {
             scroll.post { scroll.scrollTo(0, topWithin(scroll.getChildAt(0), stepsBox)) }
         }
+        jumpOnOpen = false
     }
 
     override fun onPause() {
@@ -130,7 +138,8 @@ class SetupActivity : AppCompatActivity() {
     }
 
     override fun onStop() {
-        app.settings.setupSeen = true
+        // A rotation is not a visit: the first visit must still start on the welcome text.
+        if (!isChangingConfigurations) app.settings.setupSeen = true
         super.onStop()
     }
 
@@ -150,6 +159,8 @@ class SetupActivity : AppCompatActivity() {
 
         val enabled = isKeyboardEnabled()
         val chosen = enabled && isKeyboardChosen()
+        // Chosen once, another keyboard active now: done, said apart (a voice keyboard is often used in turns).
+        val chosenElsewhere = chosen && !isKeyboardCurrent()
         val mic = isMicGranted()
         val next = currentStep()
         stepsBox.removeAllViews()
@@ -167,6 +178,7 @@ class SetupActivity : AppCompatActivity() {
             done = chosen, available = enabled, filled = next == SetupStep.CHOOSE_KEYBOARD,
             buttonText = getString(R.string.setup_pick_ime),
             tagPrefix = STEP_CHOOSE,
+            doneText = if (chosenElsewhere) getString(R.string.setup_step_done_other_keyboard) else null,
         ) { getSystemService(InputMethodManager::class.java).showInputMethodPicker() }
         step(
             title = getString(R.string.setup_step_mic),
@@ -190,7 +202,7 @@ class SetupActivity : AppCompatActivity() {
      */
     private fun step(
         title: String, text: String, done: Boolean, available: Boolean, filled: Boolean,
-        buttonText: String, tagPrefix: String, onClick: () -> Unit,
+        buttonText: String, tagPrefix: String, doneText: String? = null, onClick: () -> Unit,
     ) {
         val card = stepsBox.card()
         card.tag = "${tagPrefix}_card"
@@ -198,7 +210,7 @@ class SetupActivity : AppCompatActivity() {
         card.body(text, small = true)
         card.value(
             when {
-                done -> getString(R.string.setup_step_done)
+                done -> doneText ?: getString(R.string.setup_step_done)
                 !available -> getString(R.string.setup_step_after_previous)
                 else -> getString(R.string.setup_step_todo)
             },
@@ -218,7 +230,12 @@ class SetupActivity : AppCompatActivity() {
         val card = serverBox.card()
         card.tag = SERVER_STATUS_TAG
         card.heading(getString(R.string.setup_server_in_use)).setPadding(0, 0, 0, dp(6))
-        card.body(getString(R.string.setup_server_in_use_text, app.settings.remoteConfig().normalizedBase()), small = true)
+        val localModel = ModelCatalog.listed(app.settings.languages).any { app.isInstalled(it) }
+        card.body(
+            getString(R.string.setup_server_in_use_text, app.settings.remoteConfig().normalizedBase()) + " " +
+                getString(if (localModel) R.string.setup_server_fallback else R.string.setup_server_no_fallback),
+            small = true,
+        )
         card.button(getString(R.string.setup_server_open_setting), outlined = true) {
             startActivity(
                 Intent(this, SettingsActivity::class.java).putExtra(SettingsActivity.EXTRA_SCROLL_TO_SERVER_MODE, true),
@@ -268,8 +285,22 @@ class SetupActivity : AppCompatActivity() {
     private fun isKeyboardEnabled(): Boolean = TestHooks.keyboardEnabled
         ?: getSystemService(InputMethodManager::class.java).enabledInputMethodList.any { it.packageName == packageName }
 
-    private fun isKeyboardChosen(): Boolean = TestHooks.keyboardChosen
+    /** Kalmia Blabla is the input method in use right now. */
+    private fun isKeyboardCurrent(): Boolean = TestHooks.keyboardChosen
         ?: (Settings.Secure.getString(contentResolver, Settings.Secure.DEFAULT_INPUT_METHOD) ?: "").startsWith("$packageName/")
+
+    /**
+     * Step 2 done (decision for issue #55, 2026-11-13): Kalmia Blabla is the current keyboard **or** has been seen
+     * as the current keyboard once. A person who keeps their usual keyboard and switches to Kalmia only to dictate
+     * has done the step. The first time it is seen current, that is remembered.
+     */
+    private fun isKeyboardChosen(): Boolean {
+        if (isKeyboardCurrent()) {
+            if (!app.settings.keyboardChosenOnce) app.settings.keyboardChosenOnce = true
+            return true
+        }
+        return app.settings.keyboardChosenOnce
+    }
 
     private fun isMicGranted(): Boolean = TestHooks.micGranted
         ?: (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED)

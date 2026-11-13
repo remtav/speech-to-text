@@ -58,7 +58,8 @@ object TestHooks {
     /** Forces the network state seen by the engine choice (issue #23); null = ask the system. */
     @Volatile var networkAvailable: Boolean? = null
     /**
-     * Force what the installation screen reads from the system (issue #55): keyboard enabled, keyboard chosen,
+     * Force what the installation screen reads from the system (issue #55): keyboard enabled, keyboard current
+     * ([keyboardChosen]: the current input method right now; "chosen once" is a preference),
      * microphone allowed. null = ask the system. Lets a test draw the three states without touching the
      * emulator's input methods or revoking a permission (which kills the process).
      */

@@ -256,8 +256,10 @@ Test rapide (issue #36 recentrée sur le téléphone) et « Modèles et performa
      (le même pour tous les claviers), puis revenir ;
    - **2. Choisir Kalmia Blabla** : « Choisir Kalmia Blabla » ouvre le sélecteur de
      clavier ; toucher « Kalmia Blabla ». Ce bouton reste inactif tant que l'étape 1
-     n'est pas faite. Si l'une des deux étapes manque quand on revient dans
-     l'application, l'écran s'ouvre sur elle ;
+     n'est pas faite. L'étape reste faite une fois Kalmia Blabla choisi, même si l'on
+     revient ensuite à son clavier habituel (« Fait, un autre clavier est actif en ce
+     moment »). Si l'une des deux étapes manque quand on rouvre l'application, l'écran
+     s'ouvre sur elle ;
    - **3. Autoriser le micro** (un clavier ne peut pas demander la permission lui-même) ;
    - cocher vos langues (étape « 4. Vos langues ») ;
    - **5. Modèle** : l'application choisit le modèle pour vos langues, décrit par son effet
@@ -447,6 +449,8 @@ HTTPS ou un VPN (WireGuard, Tailscale).
   téléphone ». Choisir « serveur » sous ce texte vaut consentement. Sans adresse, en
   mode « téléphone », tant qu'aucun mode n'est choisi ou sans réseau, tout reste sur
   le téléphone. Voir la [politique de confidentialité](docs/CONFIDENTIALITE.md).
+- **Comparer les modèles** n'inclut le serveur que s'il est utilisé (adresse et mode
+  « serveur ») : une adresse seule n'envoie pas l'audio de la comparaison.
 - **Visible tant qu'il sert.** Avec une adresse et le mode « serveur », l'écran
   principal affiche « Transcription : serveur distant » et un bouton « Voir le
   réglage » ; l'accueil et « Comment dicter » disent alors que les dictées vont au
@@ -459,7 +463,8 @@ HTTPS ou un VPN (WireGuard, Tailscale).
   dans le clavier. Le bouton **Annuler** le fait tout de suite.
 - Choisir un modèle du téléphone (écran principal ou bouton du clavier) en mode
   « serveur » passe en mode « téléphone ». Choisir « Serveur distant » dans le menu
-  du clavier (il n'y figure qu'une fois l'adresse saisie) sans le mode « serveur »
+  du clavier (il y figure dès qu'une adresse est configurée, saisie dans la section
+  avancée ou compilée avec `-PdefaultServerUrl`) sans le mode « serveur »
   ouvre les Réglages sur ce choix, section dépliée : seul ce texte enregistre le mode.
 - Adresse par défaut à la compilation : `./gradlew assembleRelease
   -PdefaultServerUrl=https://dictee.example.ca` (vide par défaut ; jamais de jeton dans

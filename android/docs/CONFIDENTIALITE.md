@@ -4,7 +4,8 @@ Kalmia Blabla est un clavier vocal. Cette page dit ce qui arrive à votre voix e
 
 ## Sur le téléphone
 
-Votre voix est transcrite **sur le téléphone**, par le modèle que vous avez
+Sauf si vous avez configuré et choisi un serveur dans les réglages avancés (voir la section suivante),
+votre voix est transcrite **sur le téléphone**, par le modèle que vous avez
 téléchargé. Ni l'audio ni le texte ne quittent l'appareil. L'application n'a ni compte, ni publicité,
 ni télémétrie.
 

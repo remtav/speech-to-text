@@ -276,6 +276,7 @@ class ScreenshotTest : ImeTestBase() {
                     TestHooks.keyboardChosen = state.second
                     TestHooks.micGranted = false
                     app.settings.setupSeen = false // starts on the welcome text
+                    app.settings.keyboardChosenOnce = false // each state from scratch
                     ActivityScenario.launch(SetupActivity::class.java).use { s ->
                         s.scrollToTag(SetupActivity.STEPS_TAG, above = 8)
                         shot("setup-steps-$name-$suffix", s)
