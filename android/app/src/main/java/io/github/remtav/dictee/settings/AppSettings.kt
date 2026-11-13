@@ -124,6 +124,11 @@ class AppSettings(context: Context, private val defaultServerUrl: String = io.gi
         get() = prefs.getBoolean("howto_shown", false)
         set(v) = prefs.edit().putBoolean("howto_shown", v).apply()
 
+    /** The installation screen has been left once (issue #55): coming back, it starts on a missing keyboard step. */
+    var setupSeen: Boolean
+        get() = prefs.getBoolean("setup_seen", false)
+        set(v) = prefs.edit().putBoolean("setup_seen", v).apply()
+
     var voiceCommands: Boolean
         get() = prefs.getBoolean("voice_commands", true)
         set(v) = prefs.edit().putBoolean("voice_commands", v).apply()
@@ -177,7 +182,7 @@ class AppSettings(context: Context, private val defaultServerUrl: String = io.gi
         set(v) = prefs.edit().putString("remote_url", v.trim()).apply()
 
     /**
-     * Server or phone (issue #23), chosen at installation (#36) or in the settings; recording [TranscriptionMode.SERVER]
+     * Server or phone (issue #23), chosen only in the advanced settings (issue #57); recording [TranscriptionMode.SERVER]
      * is the consent to send the audio. [TranscriptionMode.PHONE] is « Toujours transcrire sur le téléphone ».
      * Not chosen yet: everything stays on the phone.
      */
@@ -193,6 +198,12 @@ class AppSettings(context: Context, private val defaultServerUrl: String = io.gi
     /** Where the next dictation goes: server or phone (see [EngineChoice]). */
     fun route(networkAvailable: Boolean = true): EngineRoute =
         EngineChoice.route(remoteConfig().isConfigured, transcriptionMode, networkAvailable)
+
+    /**
+     * Issue #57: dictations go to a server the person configured in the advanced settings (an address **and**
+     * the "server" mode), whatever the network. The screens then say so instead of « sent to no one ».
+     */
+    val serverInUse: Boolean get() = route(networkAvailable = true) == EngineRoute.SERVER
 
     var remoteApi: RemoteApi
         get() = RemoteApi.fromName(prefs.getString("remote_api", null))

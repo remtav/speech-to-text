@@ -46,6 +46,8 @@ class SettingsActivity : AppCompatActivity() {
     private lateinit var experimentalBox: LinearLayout
     /** « Avancé » section (issue #49): generic, other advanced settings are added to it (#37). */
     private lateinit var advancedBox: LinearLayout
+    /** « Serveur distant, pour essais (développeurs) », folded inside « Avancé » (issue #57). */
+    private lateinit var serverSection: Collapsible
     /** Redraws the server-language choice; set once that section exists. */
     private var refreshRemoteLanguage: () -> Unit = {}
     private val refresh: () -> Unit = { renderLlm(); renderExperimental() }
@@ -119,7 +121,6 @@ class SettingsActivity : AppCompatActivity() {
         col.radio(Acceleration.entries.map { it.label }, s.acceleration.ordinal) { s.acceleration = Acceleration.entries[it] }
         col.body(getString(R.string.settings_acceleration_help), small = true)
 
-        buildRemoteSection(col)
 
         col.heading(getString(R.string.settings_cleanup))
         col.body(getString(R.string.settings_cleanup_help), small = true)
@@ -131,20 +132,25 @@ class SettingsActivity : AppCompatActivity() {
         llmBox = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         col.addView(llmBox)
 
-        // Issue #49: generic « Avancé » section, last on the screen; #37 adds the model and server choices to it.
+        // Issue #49: generic « Avancé » section, last on the screen; the server is folded in it (issue #57).
         advancedBox = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; tag = ADVANCED_TAG }
         col.addView(advancedBox)
         advancedBox.heading(getString(R.string.settings_advanced))
         advancedBox.body(getString(R.string.settings_advanced_help), small = true)
         buildWhisperAdvanced(advancedBox)
+        // Issue #57: the remote server, a developer setting, folded at opening, last in « Avancé ».
+        serverSection = advancedBox.collapsible(getString(R.string.settings_server_section), SERVER_SECTION_TAG, SERVER_CONTENT_TAG)
+        buildRemoteSection(serverSection.content)
 
-        // Opened from the "Comment dicter" screen: show the vocabulary straight away.
+        // Opened from the server line of the main screen: unfold the server settings and show the mode.
         if (intent.getBooleanExtra(EXTRA_SCROLL_TO_SERVER_MODE, false)) {
+            serverSection.expand(true)
             col.post {
                 val heading = col.findViewWithTag<View>(SERVER_MODE_TAG)
-                (col.parent as? ScrollView)?.scrollTo(0, heading?.top ?: 0)
+                (col.parent as? ScrollView)?.scrollTo(0, heading?.let { topWithin(col, it) } ?: 0)
             }
         }
+        // Opened from the "Comment dicter" screen: show the vocabulary straight away.
         if (intent.getBooleanExtra(EXTRA_SCROLL_TO_VOCABULARY, false)) {
             col.post {
                 val heading = col.findViewWithTag<View>(VOCABULARY_TAG)
@@ -220,7 +226,7 @@ class SettingsActivity : AppCompatActivity() {
 
     private fun buildRemoteSection(col: LinearLayout) {
         val s = app.settings
-        col.heading(getString(R.string.settings_remote))
+        col.body(getString(R.string.settings_server_section_help), small = true)
         col.body(getString(R.string.settings_remote_help), small = true)
         fun field(hintText: String, value: String, type: Int) = EditText(this).apply {
             hint = hintText
@@ -250,8 +256,8 @@ class SettingsActivity : AppCompatActivity() {
         refreshRemoteLanguage = { remoteLanguageGroup.checkSilently(remoteLanguageIndex(), onRemoteLanguage) }
         col.switch(getString(R.string.settings_remote_polish), s.remotePolish) { s.remotePolish = it }
         col.body(getString(R.string.settings_remote_polish_help), small = true)
-        // Issue #23: the mode (server / phone), also chosen at installation (#36). Choosing "server" here, under
-        // a text that says what happens to the audio, is the consent; not chosen yet = phone.
+        // Issue #23: the mode (server / phone). Choosing "server" here, under a text that says what happens to the
+        // audio, is the consent, and this is the only place where it can be chosen (issue #57); not chosen yet = phone.
         col.heading(getString(R.string.settings_server_use)).tag = SERVER_MODE_TAG
         col.body(getString(R.string.settings_server_mode_help), small = true)
         val modeGroup = RadioGroup(this)
@@ -533,6 +539,9 @@ class SettingsActivity : AppCompatActivity() {
         const val ADVANCED_TAG = "settings_advanced"
         const val WHISPER_TAIL_TAG = "settings_whisper_tail"
         const val WHISPER_REPETITION_TAG = "settings_whisper_repetition"
+        /** Header and content of the folded server section inside « Avancé » (issue #57), for tests. */
+        const val SERVER_SECTION_TAG = "settings_server_section"
+        const val SERVER_CONTENT_TAG = "settings_server_content"
         /** Tag of an experimental model's card, for tests. */
         fun experimentalCardTag(spec: io.github.remtav.dictee.stt.ModelSpec) = "experimental_card_${spec.id}"
     }
