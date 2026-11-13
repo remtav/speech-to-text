@@ -6,6 +6,7 @@ import io.github.remtav.dictee.text.CommandLanguage
 import io.github.remtav.dictee.text.CommandTable
 import io.github.remtav.dictee.ui.HowToExamples
 import io.github.remtav.dictee.ui.SetupProgress
+import io.github.remtav.dictee.ui.SetupStep
 import io.github.remtav.dictee.ui.SizeFormat
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -115,14 +116,42 @@ class HowToExamplesTest {
 
 class SetupProgressTest {
     @Test
-    fun setupIsCompleteOnlyWithKeyboardMicrophoneAndModel() {
-        for (keyboard in listOf(false, true)) for (mic in listOf(false, true)) for (model in listOf(false, true)) {
+    fun setupIsCompleteOnlyWithKeyboardEnabledAndChosenMicrophoneAndModel() {
+        val b = listOf(false, true)
+        for (enabled in b) for (chosen in b) for (mic in b) for (model in b) {
             assertEquals(
-                "keyboard=$keyboard mic=$mic model=$model",
-                keyboard && mic && model,
-                SetupProgress.isComplete(keyboard, mic, model),
+                "enabled=$enabled chosen=$chosen mic=$mic model=$model",
+                enabled && chosen && mic && model,
+                SetupProgress.isComplete(enabled, chosen, mic, model),
             )
         }
+    }
+
+    /** Issue #55, point 5: a keyboard enabled but not chosen does not dictate anywhere. */
+    @Test
+    fun enabledButNotChosenIsNotComplete() {
+        assertFalse(SetupProgress.isComplete(keyboardEnabled = true, keyboardChosen = false, micGranted = true, modelReady = true))
+        assertEquals(SetupStep.CHOOSE_KEYBOARD, SetupProgress.nextStep(true, false, true, true))
+    }
+
+    @Test
+    fun theNextStepFollowsTheScreenOrder() {
+        assertEquals(SetupStep.ENABLE_KEYBOARD, SetupProgress.nextStep(false, false, false, false))
+        // "Chosen" without "enabled" is an inconsistent reading: enabling comes first.
+        assertEquals(SetupStep.ENABLE_KEYBOARD, SetupProgress.nextStep(false, true, true, true))
+        assertEquals(SetupStep.CHOOSE_KEYBOARD, SetupProgress.nextStep(true, false, false, false))
+        assertEquals(SetupStep.ALLOW_MIC, SetupProgress.nextStep(true, true, false, false))
+        assertEquals(SetupStep.GET_MODEL, SetupProgress.nextStep(true, true, true, false))
+        assertEquals(SetupStep.DONE, SetupProgress.nextStep(true, true, true, true))
+    }
+
+    /** Issue #55, point 6: back on the screen with a keyboard step missing, the steps come first; never the first time. */
+    @Test
+    fun theScreenJumpsToAMissingKeyboardStepOnlyAfterAFirstVisit() {
+        assertFalse("first visit", SetupProgress.jumpToKeyboardSteps(seenBefore = false, keyboardEnabled = false, keyboardChosen = false))
+        assertTrue(SetupProgress.jumpToKeyboardSteps(seenBefore = true, keyboardEnabled = false, keyboardChosen = false))
+        assertTrue(SetupProgress.jumpToKeyboardSteps(seenBefore = true, keyboardEnabled = true, keyboardChosen = false))
+        assertFalse(SetupProgress.jumpToKeyboardSteps(seenBefore = true, keyboardEnabled = true, keyboardChosen = true))
     }
 
     @Test

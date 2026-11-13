@@ -49,7 +49,8 @@ class HowToActivity : AppCompatActivity() {
         val col = column
 
         col.title(getString(R.string.howto_title)).tag = TITLE_TAG
-        col.body(getString(R.string.howto_privacy)).tag = PRIVACY_TAG
+        // Issue #57: true in both cases; the server exists only once set up in the advanced settings.
+        col.body(getString(if (s.serverInUse) R.string.howto_privacy_server else R.string.howto_privacy)).tag = PRIVACY_TAG
 
         col.heading(getString(R.string.howto_examples))
         col.body(getString(R.string.howto_examples_help), small = true)

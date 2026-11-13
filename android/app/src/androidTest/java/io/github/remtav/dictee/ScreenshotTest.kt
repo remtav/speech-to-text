@@ -79,6 +79,8 @@ class ScreenshotTest : ImeTestBase() {
      */
     private fun shot(name: String, screen: ActivityScenario<*>? = null) {
         awaitPortrait(screen)
+        // The emulator's launcher sometimes stops answering and its dialog covered the captures: close it first.
+        dismissNotRespondingDialogs()
         instrumentation.waitForIdleSync()
         Thread.sleep(700) // animations, ripple, level meter
         val f = File(dir, "$name.png")
@@ -262,6 +264,54 @@ class ScreenshotTest : ImeTestBase() {
             }
             // Not configured: the screen as first opened, nothing is sent anywhere.
             ActivityScenario.launch(DiagnosticActivity::class.java).use { shot("diagnostic-$suffix", it) }
+        }
+    }
+
+    /**
+     * Issue #55: the installation screen in its three keyboard states (nothing done, enabled, enabled and chosen),
+     * forced through [TestHooks]; issue #57: no server on it. The microphone is shown as not allowed yet.
+     */
+    @Test
+    fun setupSteps() {
+        app.settings.howToShown = true
+        val states = listOf("none" to (false to false), "enabled" to (true to false), "chosen" to (true to true))
+        try {
+            for (mode in listOf(ThemeMode.LIGHT, ThemeMode.DARK)) {
+                val suffix = mode.name.lowercase()
+                setTheme(mode)
+                for ((name, state) in states) {
+                    TestHooks.keyboardEnabled = state.first
+                    TestHooks.keyboardChosen = state.second
+                    TestHooks.micGranted = false
+                    app.settings.setupSeen = false // starts on the welcome text
+                    app.settings.keyboardChosenOnce = false // each state from scratch
+                    ActivityScenario.launch(SetupActivity::class.java).use { s ->
+                        s.scrollToTag(SetupActivity.STEPS_TAG, above = 8)
+                        shot("setup-steps-$name-$suffix", s)
+                    }
+                }
+            }
+        } finally {
+            TestHooks.keyboardEnabled = null
+            TestHooks.keyboardChosen = null
+            TestHooks.micGranted = null
+        }
+    }
+
+    /** Issue #57: « Avancé » with the server section folded, then unfolded. No address: nothing is sent. */
+    @Test
+    fun advancedSettings() {
+        for (mode in listOf(ThemeMode.LIGHT, ThemeMode.DARK)) {
+            val suffix = mode.name.lowercase()
+            setTheme(mode)
+            ActivityScenario.launch(SettingsActivity::class.java).use { s ->
+                s.scrollToTag(SettingsActivity.ADVANCED_TAG, above = 8)
+                shot("settings-advanced-$suffix", s)
+                s.onActivity { a -> a.window.decorView.findViewWithTag<View>(SettingsActivity.SERVER_SECTION_TAG).performClick() }
+                instrumentation.waitForIdleSync()
+                s.scrollToTag(SettingsActivity.SERVER_SECTION_TAG, above = 8)
+                shot("settings-server-$suffix", s)
+            }
         }
     }
 }

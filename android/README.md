@@ -11,7 +11,8 @@ dictée vocale. Il est développé au Québec. La transcription tourne
 [sherpa-onnx](https://github.com/k2-fsa/sherpa-onnx) : par défaut, ni l'audio ni
 le texte ne quittent l'appareil, et le réseau ne sert qu'à télécharger les
 modèles. Deux exceptions, toutes deux de votre seul choix : le « Serveur distant »
-(un serveur que vous choisissez et hébergez vous-même, voir plus bas), et le
+(un réglage avancé pour développeurs, qui sert à un serveur que vous hébergez
+vous-même, voir plus bas), et le
 partage volontaire d'une lecture du test de lecture, par un courriel que vous
 envoyez vous-même depuis votre messagerie (voir « Test de lecture en français
 québécois ») ; l'application elle-même n'envoie rien.
@@ -29,7 +30,7 @@ bascule vers celui-ci pour dicter.
 | **Aucun compte, aucune collecte** | L'application ne demande aucun compte et n'a ni publicité ni télémétrie. Rien n'est envoyé par défaut. Le partage d'une lecture du test est un courriel que vous envoyez vous-même, après un consentement explicite. |
 | **Pensée pour le français québécois** | « Français (Québec) » est présélectionné ; le modèle recommandé a été mesuré sur des voix « Français du Canada » (voir « Vos langues et le modèle recommandé »). |
 | **Transparente et vérifiable** | Code source public dans ce dépôt (sans fichier de licence pour l'instant : chacun peut le lire, mais ce n'est pas encore un logiciel libre au sens juridique) ; chaque modèle est nommé avec son éditeur et sa licence ; chaque fichier téléchargé est vérifié par somme de contrôle SHA-256. |
-| **Sous votre contrôle** | Vous choisissez le modèle, les langues et, si vous le voulez, un serveur personnel. |
+| **Sous votre contrôle** | Vous choisissez le modèle et les langues. Un serveur personnel reste possible, pour les essais, dans les réglages avancés. |
 | **Développée au Québec** | Affirmation de l'auteur. |
 
 **Origine des modèles.** Les modèles ne sont pas québécois : Parakeet vient de
@@ -53,7 +54,8 @@ portent un lien vers une source officielle, lue le 2026-11-12.
   avez téléchargé et que vous choisissez.** Aucun compte n'est demandé, et le
   code qui le fait est dans ce dépôt, où chacun peut le lire. Un serveur
   n'intervient que si une adresse de « Serveur distant » est configurée **et**
-  que vous choisissez le mode « serveur » (à l'installation ou dans les Réglages).
+  que vous choisissez le mode « serveur », deux réglages que vous ne trouvez que
+  dans Réglages → Avancé → « Serveur distant, pour essais (développeurs) ».
 - **Chez Google, l'endroit du traitement dépend de la fonction.** Sur la page
   d'aide de Gboard
   [« Utiliser les fonctionnalités avancées de saisie vocale »](https://support.google.com/gboard/answer/11197787?hl=fr),
@@ -206,12 +208,26 @@ Chaque écran existe en clair (`-light`) et en sombre (`-dark`).
 | ![Clavier prêt, clair](docs/screenshots/keyboard-idle-light.png) | ![À l'écoute, clair](docs/screenshots/keyboard-listening-light.png) | ![Texte inséré, clair](docs/screenshots/keyboard-text-light.png) |
 | ![Clavier prêt, sombre](docs/screenshots/keyboard-idle-dark.png) | ![À l'écoute, sombre](docs/screenshots/keyboard-listening-dark.png) | ![Texte inséré, sombre](docs/screenshots/keyboard-text-dark.png) |
 
+Les étapes du clavier (issue #55) : rien de fait, clavier activé, clavier activé et choisi.
+
+| Rien de fait | Activé | Activé et choisi |
+|---|---|---|
+| ![Étapes, rien de fait, clair](docs/screenshots/setup-steps-none-light.png) | ![Étapes, activé, clair](docs/screenshots/setup-steps-enabled-light.png) | ![Étapes, choisi, clair](docs/screenshots/setup-steps-chosen-light.png) |
+| ![Étapes, rien de fait, sombre](docs/screenshots/setup-steps-none-dark.png) | ![Étapes, activé, sombre](docs/screenshots/setup-steps-enabled-dark.png) | ![Étapes, choisi, sombre](docs/screenshots/setup-steps-chosen-dark.png) |
+
 Configuration (accueil et étapes ; « Vos langues » ; modèle recommandé avec son badge) :
 
 | Accueil | Vos langues | Modèles |
 |---|---|---|
 | ![Configuration, clair](docs/screenshots/setup-light.png) | ![Vos langues, clair](docs/screenshots/setup-languages-light.png) | ![Modèles, clair](docs/screenshots/setup-models-light.png) |
 | ![Configuration, sombre](docs/screenshots/setup-dark.png) | ![Vos langues, sombre](docs/screenshots/setup-languages-dark.png) | ![Modèles, sombre](docs/screenshots/setup-models-dark.png) |
+
+« Avancé », avec le serveur replié puis déplié (issue #57) :
+
+| Avancé | Serveur distant, pour essais |
+|---|---|
+| ![Avancé, clair](docs/screenshots/settings-advanced-light.png) | ![Serveur distant, clair](docs/screenshots/settings-server-light.png) |
+| ![Avancé, sombre](docs/screenshots/settings-advanced-dark.png) | ![Serveur distant, sombre](docs/screenshots/settings-server-dark.png) |
 
 | Réglages | Comparaison des modèles | Diagnostic serveur |
 |---|---|---|
@@ -225,9 +241,18 @@ Configuration (accueil et étapes ; « Vos langues » ; modèle recommandé avec
    Les releases sont signées avec la clé privée du projet : une nouvelle
    version s'installe par-dessus l'ancienne, et un APK signé par quelqu'un
    d'autre est refusé comme mise à jour.
-2. Ouvrir **Kalmia Blabla** :
-   - « Activer » le clavier « Kalmia Blabla (voix) » dans les réglages Android ;
-   - « Autoriser le micro » (un clavier ne peut pas demander la permission lui-même) ;
+2. Ouvrir **Kalmia Blabla** (issue #55 : une étape par carte, un seul bouton plein à
+   la fois, celui de l'étape à faire ; une coche « Fait » quand c'est fait) :
+   - **1. Activer Kalmia Blabla** : « Activer le clavier » ouvre la liste des claviers
+     d'Android ; cocher « Kalmia Blabla (voix) » et accepter l'avertissement du système
+     (le même pour tous les claviers), puis revenir ;
+   - **2. Choisir Kalmia Blabla** : « Choisir Kalmia Blabla » ouvre le sélecteur de
+     clavier ; toucher « Kalmia Blabla ». Ce bouton reste inactif tant que l'étape 1
+     n'est pas faite. L'étape reste faite une fois Kalmia Blabla choisi, même si l'on
+     revient ensuite à son clavier habituel (« Fait, un autre clavier est actif en ce
+     moment »). Si l'une des deux étapes manque quand on rouvre l'application, l'écran
+     s'ouvre sur elle ;
+   - **3. Autoriser le micro** (un clavier ne peut pas demander la permission lui-même) ;
    - cocher vos langues (étape « Vos langues ») : le modèle recommandé est mis en avant ;
    - télécharger au moins un modèle (Wi-Fi conseillé, 0,7 à 1 Go chacun).
 3. Dans n'importe quelle application, basculer vers le clavier Kalmia Blabla
@@ -368,10 +393,13 @@ référence (ou votre enregistrement) avec chaque modèle installé et affiche
 texte, temps de chargement, facteur temps réel, mémoire en pointe et WER ;
 « Partager » exporte les résultats.
 
-### Serveur distant (mode « serveur »)
+### Serveur distant (mode « serveur »), réglage pour développeurs
 
-Sur le téléphone, Whisper transcrit lentement ; un serveur avec GPU répond bien plus
-vite (issue #23). Dans les Réglages, section « Serveur distant », saisir l'adresse
+Depuis l'issue #57, Kalmia Blabla transcrit sur le téléphone ; le serveur ne sert plus
+qu'aux essais et au débogage. Il n'apparaît ni à l'installation ni au premier niveau des
+Réglages : il est dans **Réglages → Avancé → « Serveur distant, pour essais
+(développeurs) »**, section repliée à l'ouverture. Un serveur avec GPU répond plus vite
+que Whisper sur le téléphone (issue #23). Dans cette section, saisir l'adresse
 (par exemple `https://dictee.example.ca` pour le serveur speech-to-text de ce dépôt,
 déployé selon [`docs/DEPLOIEMENT_SERVEUR.md`](../docs/DEPLOIEMENT_SERVEUR.md), ou
 l'adresse d'un serveur compatible avec l'API OpenAI `/v1/audio/transcriptions`) et le
@@ -379,23 +407,34 @@ l'adresse d'un serveur compatible avec l'API OpenAI `/v1/audio/transcriptions`) 
 `Authorization: Bearer`), puis tester la connexion. En dehors du réseau local, utilisez
 HTTPS ou un VPN (WireGuard, Tailscale).
 
-- **Mode serveur ou téléphone.** Le choix se fait à l'installation (#36) ou dans les
-  Réglages (« Envoi au serveur ») : « Sur le serveur configuré » (l'audio y est
+- **Mode serveur ou téléphone.** Le choix se fait seulement dans cette section
+  (« Envoi au serveur ») : « Sur le serveur configuré » (l'audio y est
   envoyé, puis supprimé dès la transcription) ou « Toujours transcrire sur le
   téléphone ». Choisir « serveur » sous ce texte vaut consentement. Sans adresse, en
   mode « téléphone », tant qu'aucun mode n'est choisi ou sans réseau, tout reste sur
   le téléphone. Voir la [politique de confidentialité](docs/CONFIDENTIALITE.md).
+- **Comparer les modèles** n'inclut le serveur que s'il est utilisé (adresse et mode
+  « serveur ») : une adresse seule n'envoie pas l'audio de la comparaison.
+- **Visible tant qu'il sert.** Avec une adresse et le mode « serveur », l'écran
+  principal affiche « Transcription : serveur distant » et un bouton « Voir le
+  réglage » ; l'accueil et « Comment dicter » disent alors que les dictées vont au
+  serveur, au lieu de « n'est envoyée à personne ». Une adresse et un mode « serveur »
+  enregistrés avant la mise à jour restent actifs.
 - **Repli sur le téléphone.** Le modèle choisi sur l'écran principal (Whisper turbo par
   défaut) sert de repli : si le serveur est injoignable ou ne répond pas dans le délai
   (8 s par défaut, plus un quart de la durée de la dictée ; réglage « Délai avant repli
   sur le téléphone »), la dictée est transcrite sur le téléphone, avec un court message
   dans le clavier. Le bouton **Annuler** le fait tout de suite.
 - Choisir un modèle du téléphone (écran principal ou bouton du clavier) en mode
-  « serveur » passe en mode « téléphone ». Choisir « Serveur distant » sans le mode
-  « serveur » ouvre les Réglages sur ce choix : seul ce texte enregistre le mode.
+  « serveur » passe en mode « téléphone ». Choisir « Serveur distant » dans le menu
+  du clavier (il y figure dès qu'une adresse est configurée, saisie dans la section
+  avancée ou compilée avec `-PdefaultServerUrl`) sans le mode « serveur »
+  ouvre les Réglages sur ce choix, section dépliée : seul ce texte enregistre le mode.
 - Adresse par défaut à la compilation : `./gradlew assembleRelease
   -PdefaultServerUrl=https://dictee.example.ca` (vide par défaut ; jamais de jeton dans
-  l'APK). Une adresse saisie dans les Réglages la remplace.
+  l'APK). Une adresse saisie dans les Réglages la remplace. Réservé aux builds d'essai :
+  la release publique est compilée sans adresse. Même avec une adresse compilée, rien
+  ne part tant que le mode « serveur » n'est pas choisi dans la section avancée.
 
 **Dictée transcrite au fil de l'eau, polie à la fin** (issues #13 et #35). Avec
 le serveur, rien ne s'affiche pendant la dictée, mais le clavier n'attend plus la
