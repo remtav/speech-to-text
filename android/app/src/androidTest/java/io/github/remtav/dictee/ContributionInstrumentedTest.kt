@@ -160,11 +160,8 @@ class ContributionInstrumentedTest : ImeTestBase() {
         }
     }
 
-    private fun appFiles(): Set<String> =
-        listOfNotNull(
-            context.filesDir, context.cacheDir, context.codeCacheDir, context.noBackupFilesDir,
-            context.getExternalFilesDir(null), context.getDatabasePath("x").parentFile,
-        ).flatMap { root -> root.walkTopDown().filter(File::isFile).map(File::getPath).toList() }.toSet()
+    /** Every file the app owns, minus the known library marker files (see [AppFiles]). */
+    private fun appFiles(): Set<String> = AppFiles.list(context)
 
     private fun archives(): List<File> = archiveDir.listFiles()?.filter { it.isFile }.orEmpty()
 

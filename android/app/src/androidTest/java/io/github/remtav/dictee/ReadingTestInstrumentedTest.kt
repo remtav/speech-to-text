@@ -37,7 +37,6 @@ import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
-import java.io.File
 import java.util.concurrent.atomic.AtomicInteger
 
 /**
@@ -90,12 +89,8 @@ class ReadingTestInstrumentedTest : ImeTestBase() {
         return ScriptedReadingModels(material, transcript).also { TestHooks.engineFactory = it }
     }
 
-    /** Every file the app owns (private, cache, external, no-backup, databases), to check that nothing is created. */
-    private fun appFiles(): Set<String> =
-        listOfNotNull(
-            context.filesDir, context.cacheDir, context.codeCacheDir, context.noBackupFilesDir,
-            context.getExternalFilesDir(null), context.getDatabasePath("x").parentFile,
-        ).flatMap { root -> root.walkTopDown().filter(File::isFile).map(File::getPath).toList() }.toSet()
+    /** Every file the app owns, minus the known library marker files (see [AppFiles]). */
+    private fun appFiles(): Set<String> = AppFiles.list(context)
 
     // ---- the card ----
 

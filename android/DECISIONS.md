@@ -3672,6 +3672,20 @@ ni police en dur ».
 7. **Politique** (`docs/CONTRIBUTION.md`) : une phrase dit que l'archive n'est incluse ni dans une sauvegarde ni dans
    un transfert vers un nouveau téléphone (vrai depuis le point 1).
 
+### Échec de CI : `files/profileInstalled` (tests instrumentés, API 34)
+
+- **Diagnostic.** `theArchiveGoesWithRedoAndWithTheScreen` échouait seul (57 sur 58) : « files left:
+  `files/profileInstalled` ». Ce fichier n'est pas écrit par l'application (aucune occurrence dans le code) : c'est le
+  marqueur d'`androidx.profileinstaller` 1.3.1 (`ProfileVerifier`, dépendance transitive ; constante vérifiée dans le
+  `.class`), écrit de façon asynchrone après le premier lancement d'une activité. Course entre ce marqueur et la
+  photo « avant » : il apparaît ou non selon le moment. Il ne contient que l'état de l'installation du profil.
+- **Correction.** Une seule fonction partagée, `AppFiles.list` (`androidTest/.../AppFiles.kt`), remplace les deux
+  copies de `appFiles()` (`ContributionInstrumentedTest`, `ReadingTestInstrumentedTest`). Elle exclut une liste
+  **nominative** (`files/profileInstalled` seulement), sans motif. Ce que les tests prouvent n'est pas affaibli :
+  tout autre fichier créé ou resté (`files/contribution/`, `.zip`, `.part`, `.wav`, `contribution.json`, `cache/`)
+  fait toujours échouer. Aucune autre exclusion n'a été ajoutée sans être vérifiée.
+- **Non vérifié ici** : pas d'émulateur ; la CI de la PR #19 le dira.
+
 ### Laissé ouvert, avec la raison
 
 - **Équivalence « je suis » ↔ « chu »** appliquée partout, y compris au « je suis allé » du paragraphe 1 : un modèle
