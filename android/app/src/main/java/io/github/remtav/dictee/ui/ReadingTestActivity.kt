@@ -8,6 +8,7 @@ import android.text.InputType
 import android.text.TextWatcher
 import android.view.ViewGroup
 import android.view.WindowManager
+import android.view.inputmethod.EditorInfo
 import android.widget.CheckBox
 import android.widget.EditText
 import android.widget.LinearLayout
@@ -368,6 +369,8 @@ class ReadingTestActivity : AppCompatActivity() {
                 tag = TAG_SHARE_REGION
                 hint = getString(R.string.contrib_share_region_hint)
                 inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_CAP_WORDS
+                // Review 4.R: the keyboard in use (Gboard or another) is asked not to learn what is typed here.
+                imeOptions = EditorInfo.IME_FLAG_NO_PERSONALIZED_LEARNING
                 isSingleLine = true
                 filters = arrayOf(InputFilter.LengthFilter(ContributionContent.REGION_MAX_CHARS))
                 setText(offer.region)

@@ -3592,3 +3592,108 @@ l'écoute ». S'arrête quand l'écran passe en arrière-plan, au refus et à la
 5. Réécoute sur un vrai téléphone (volume, enchaînement des paragraphes).
 6. Choix prudents à confirmer : transcription du seul modèle recommandé, date au jour, région limitée à 60 caractères,
    balayage à 24 h.
+
+## Issue #15, lot 4 — revue indépendante (4.R)
+
+Revue du diff `origin/main...HEAD` (branche `ccr-a285fc62-j2yeex`, PR #19), vie privée d'abord, sans le compte rendu des
+agents 4.1 à 4.3. Le style Kalmia ayant été retiré (thème Material générique), la règle vérifiée est « aucune couleur
+ni police en dur ».
+
+### Fait / reste à faire
+
+- [x] Lecture de l'issue (lot 4, décisions, positionnement, hors portée, « Mode d'exécution »).
+- [x] Chemins d'écriture et de sortie tracés (carte → déclaration → test → score → partage).
+- [x] Archive réelle ouverte (produite par un test JVM temporaire, non gardé) : en-têtes zip et WAV, `contribution.json`.
+- [x] `Intent`, `FileProvider`, chemins, manifeste, sauvegardes.
+- [x] Textes (`contrib_*`, `CONTRIBUTION.md`, README) confrontés au code.
+- [x] Corrections + tests ; commit 1 (`8092cc6`), commit 2 (champ région, catalogue, politique, cette section).
+- [x] Vérification complète `testDebugUnitTest assembleDebug assembleDebugAndroidTest lintDebug`.
+- [ ] Tests instrumentés : n'ont jamais tourné localement ; résultat de la CI de la PR #19 à lire (voir plus bas).
+
+### Ce qui a été vérifié et tient
+
+- **Rien sans consentement.** « Non » à la déclaration → phase `DECLINED`, `mayRecord` faux, `store` refusé : le micro
+  n'est jamais ouvert (`ReadingTestModel.toggleRecording` sort avant `newAudioSource`). L'audio ne vit qu'en mémoire
+  (`ReadingSession.audio`), effacé par `clear()`. `ContributionArchive.write` est `internal`, appelé une seule fois,
+  par `ShareOffer.createArchive`, qui sort avant toute écriture sans offre (score complet du modèle recommandé
+  au-dessus de 20 %, déclaration « oui ») **et** sans case cochée. La case n'a pas d'identifiant de vue : elle n'est
+  pas restaurée par l'état sauvegardé d'Android, seulement redessinée depuis `ShareOffer.consent`, qui vit dans le
+  `ViewModel` (rotation : même écran, même consentement ; processus tué : nouvelle session, pas de résultat, plus
+  d'offre, et l'archive orpheline est effacée à l'ouverture du test). « Refaire le test », « Supprimer le fichier »,
+  « Ne pas partager » remettent la case à faux ; un nouveau résultat crée une nouvelle offre non cochée. Double appui
+  sur « Préparer » : l'archive précédente est effacée avant la nouvelle, jamais deux. L'archive ne peut contenir que
+  l'audio du résultat en cours (`ParagraphResult.audio`), jamais une dictée ou un test précédent. Écriture dans un
+  `.part` renommé à la fin, effacé en cas d'erreur ; aucun fichier temporaire ni cache ; aucun `Log` dans ces paquets.
+- **Contenu de l'archive** (ouverte réellement) : `contribution.json` puis `paragraphe-N.wav`, rien d'autre ; DOS
+  date 1980-01-02 00:00 sur chaque entrée, aucun champ « extra » (en-têtes locaux et répertoire central), aucun
+  commentaire, système créateur MS-DOS (ni droits Unix, ni uid/gid) ; WAV d'en-tête 44 octets, sans bloc `LIST`.
+  Clés JSON = `ArchiveField`, la même liste que l'écran (une seule source). Téléphone = `Build.MANUFACTURER` +
+  `Build.MODEL`, aucun nom d'appareil choisi par l'utilisateur, aucun identifiant. Nom du fichier : version du texte
+  et jour, déjà dans les métadonnées.
+- **Envoi** : `ACTION_SEND` avec `EXTRA_EMAIL` = `Contribution.RECEIVING_ADDRESS` seul, pas de CC/BCC, sélecteur
+  `mailto:`, `FLAG_GRANT_READ_URI_PERMISSION` seul (ni écriture, ni persistant, ni préfixe), `ClipData` pour la
+  permission ; `FileProvider` non exporté, `grantUriPermissions`, un seul `files-path` `contribution/` ; pas
+  d'application de courriel → message `contrib_share_no_email_app`.
+- **Réseau** : aucun code réseau, aucune bibliothèque, aucune permission ajoutée ; le test n'utilise que
+  `ModelCatalog.all` (sans le serveur) et `DefaultEngineFactory`, qui charge depuis le disque et ne télécharge rien.
+  Le garde instrumenté (compteurs `TrafficStats` de l'UID + `StrictMode` sockets) dit ses limites (compteurs non pris
+  en charge → StrictMode seul ; StrictMode ne voit pas le natif, les compteurs si) : honnête.
+- **Score** : seuil en entiers, strictement au-dessus de 20 %, texte complet exigé (`GlobalScore.complete`) ; pile à
+  20 % → rien (testé). Positions surlignées : tokens pris sur le texte d'origine (espaces insécables et guillemets
+  sont des séparateurs), nombres et équivalences gardent la plage de leur source.
+- **Thème** : surlignage = fond `colorTertiaryContainer` + texte `colorOnTertiaryContainer` + soulignement (pas la
+  couleur seule) ; aucune couleur ni police en dur dans le diff.
+
+### Failles trouvées et corrigées
+
+1. **Transfert vers un nouveau téléphone** (`AndroidManifest.xml`, `res/xml/data_extraction_rules.xml`) :
+   `allowBackup="false"` arrête la sauvegarde infonuagique, mais, pour une application qui cible Android 12 ou plus
+   (`targetSdk` 35), pas le transfert d'appareil à appareil. Une archive présente à ce moment serait partie vers le
+   nouvel appareil sans geste de la personne. Les règles d'extraction excluent `files/contribution/` des deux
+   (`ReadingPrivacyTest.theArchiveIsInNoBackupNorDeviceTransfer`). Le reste des données de l'application (réglages,
+   modèles) n'a pas été touché : hors du lot.
+2. **Recherche du modèle par `ModelCatalog.byId`** (`ui/ReadingTestModel.kt`, transcripteur et `labelOf`) : `byId`
+   connaît aussi le serveur de l'utilisateur. La liste des modèles du test ne le contient pas, mais un identifiant
+   erroné aurait suffi à envoyer la voix au serveur. Recherche limitée à `ModelCatalog.all` ; `ModelCatalog.byId`
+   ajouté aux jetons interdits de `ReadingPrivacyTest`, qui vérifie aussi que `ModelCatalog.all` n'a aucun serveur.
+3. **Date affichée ≠ date écrite** (`ui/ReadingTestModel.kt`, `ui/ReadingTestActivity.kt`) : la liste « ce qui
+   partirait » et l'archive prenaient chacune `deviceFacts()` à leur moment ; passé minuit entre les deux, l'archive
+   portait un autre jour que celui montré avant le consentement. Les faits sont pris une fois avec l'offre
+   (`shareFacts`) et servent aux deux.
+4. **Région** (`reading/ContributionArchive.kt`, `normalizeRegion`) : les séparateurs de ligne et de paragraphe
+   (U+2028, U+2029) passaient tels quels (le `\s` de Java ne les reconnaît pas) ; la coupe à 60 caractères pouvait
+   couper une paire de substitution (moitié écrite « ? » en UTF-8). Corrigé, avec un test d'injection JSON.
+5. **Apprentissage du clavier** (`ui/ReadingTestActivity.kt`) : le champ région demande au clavier en usage de ne pas
+   apprendre la saisie (`IME_FLAG_NO_PERSONALIZED_LEARNING`).
+6. **Fragilité instrumentée** (`ContributionInstrumentedTest`) : le moniteur qui bloque le courriel et le sélecteur
+   n'était retiré qu'en fin de test ; une assertion en échec entre les deux l'aurait laissé en place et aurait bloqué
+   **tous** les démarrages d'activité des tests suivants (échecs en cascade trompeurs). Retiré dans `@After`, avec un
+   drapeau (`Instrumentation.removeMonitor` lève une exception si aucun moniteur n'a jamais été ajouté).
+7. **Politique** (`docs/CONTRIBUTION.md`) : une phrase dit que l'archive n'est incluse ni dans une sauvegarde ni dans
+   un transfert vers un nouveau téléphone (vrai depuis le point 1).
+
+### Laissé ouvert, avec la raison
+
+- **Équivalence « je suis » ↔ « chu »** appliquée partout, y compris au « je suis allé » du paragraphe 1 : un modèle
+  qui écrirait « chu allé » pour un « je suis » prononcé n'est pas pénalisé. Gardé : c'est le même mot, l'équivalence
+  est symétrique et ne masque pas un mot différent ; le dénominateur perd un mot (2 → 1), effet négligeable sur 220.
+- **Fermeture de l'écran avant l'envoi** : l'archive est effacée quand l'écran se ferme ; une messagerie qui lirait la
+  pièce jointe tard la trouverait absente. Choix prudent (rien ne traîne), annoncé à l'écran ; à vérifier sur un
+  téléphone (A_VERIFIER, point 19).
+- **Processus tué en arrière-plan** (pendant que la messagerie est ouverte) : l'archive reste jusqu'à l'ouverture
+  suivante du test ou au démarrage après 24 h. Annoncé dans `CONTRIBUTION.md` et le README.
+- **Écriture du zip sur le fil principal** (environ 5 Mo pour un texte complet) : bref, sans effet sur la vie privée.
+
+### Critères d'acceptation du lot 4
+
+| Critère | État |
+| --- | --- |
+| Compilation et CI vertes | Local : vert (commande ci-dessous). CI : voir le rapport de revue (tests instrumentés en cours au moment de la revue). |
+| Tests unitaires : normalisation, score, partage de part et d'autre de 20 % (pile à 20 %) | Rempli (`ReadingNormalizerTest`, `ReadingScoreTest`, `ReadingSessionTest`). |
+| Instrumenté : « non » → aucun test, aucun enregistrement, aucun fichier | Écrit (`ReadingTestInstrumentedTest`), dépend de la CI. |
+| Instrumenté : sans consentement, aucune archive ; avec, contenu exact et intention correcte ; aucune requête réseau | Écrit (`ContributionInstrumentedTest`), dépend de la CI ; contenu exact aussi prouvé sur la JVM. |
+| Consentement affiché et `CONTRIBUTION.md` : même durée, même destinataire (test sur les chaînes) | Rempli (`ContributionConsistencyTest`). |
+| Un seul modèle comme plusieurs | Rempli en JVM (`ReadingSessionTest`) ; instrumenté dépend de la CI. |
+| Texte, consentement, vrai courriel | Humain (A_VERIFIER, points 16 à 20). |
+
+Vérification locale : `./gradlew testDebugUnitTest assembleDebug assembleDebugAndroidTest lintDebug --console=plain -q`.

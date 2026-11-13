@@ -77,7 +77,8 @@ l'application que vous choisissez (votre messagerie, ou une autre par « Partage
 autrement »), avec une permission de lecture limitée à ce fichier. Elle est supprimée de votre
 téléphone par le bouton « Supprimer le fichier », par « Ne pas partager », par « Refaire le test »
 et quand vous fermez l'écran du test ; si l'application a été arrêtée de force entre-temps, à
-l'ouverture suivante du test, ou au démarrage de l'application si elle a plus d'un jour. La copie
+l'ouverture suivante du test, ou au démarrage de l'application si elle a plus d'un jour. Elle n'est
+jamais incluse dans une sauvegarde de l'application ni dans un transfert vers un nouveau téléphone. La copie
 que votre messagerie garde dans ses messages envoyés relève de votre messagerie.
 
 **Ce que le courriel révèle de lui-même** : comme tout courriel, il montre au destinataire l'adresse
