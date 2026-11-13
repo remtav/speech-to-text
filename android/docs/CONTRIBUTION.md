@@ -1,6 +1,6 @@
 # Contribuer au test de lecture en français québécois : politique de contribution
 
-Kalmia Blabla · version 1 du 2026-11-13 · texte de lecture `lecture-qc-1`
+Kalmia Blabla · version 2 du 2026-11-13 (format de l'archive décrit tel qu'implémenté) · texte de lecture `lecture-qc-1`
 
 > **À lire avant tout.** Ceci n'est pas un avis juridique. Cette page est une première version
 > rédigée pendant le développement (issue #15, étape 4.1). **Le responsable du projet doit la valider
@@ -38,18 +38,47 @@ n'est automatique.
 
 ## Ce qui est partagé, si vous l'acceptez
 
-Un seul fichier, joint au courriel que vous envoyez, contenant :
+Avant votre consentement, l'écran affiche chacun de ces éléments avec sa valeur : c'est la même
+description qui sert à écrire le fichier, l'écran et le fichier ne peuvent donc pas différer.
 
-- l'enregistrement de votre lecture (audio WAV, 16 kHz) ;
-- le texte lu et son numéro de version (par exemple `lecture-qc-1`) ;
-- la transcription obtenue et le score ;
-- le nom du modèle de transcription, la version de l'application et le modèle de votre téléphone ;
-- votre réponse « je parle un français québécois » ;
-- la date du test ;
-- votre région, seulement si vous choisissez de l'indiquer.
+Un seul fichier, une archive zip nommée `kalmia-blabla-<version du texte>-<date>.zip` (par exemple
+`kalmia-blabla-lecture-qc-1-2026-11-13.zip`), jointe au courriel que vous envoyez. Elle contient :
+
+- **l'enregistrement de votre lecture** : un fichier audio WAV par paragraphe lu
+  (`paragraphe-1.wav`, `paragraphe-2.wav`…), PCM 16 bits, mono, 16 kHz ;
+- **un fichier de renseignements lisible**, `contribution.json`, qui contient exactement ceci, et
+  rien d'autre :
+  - `audio` : le format et la liste des fichiers WAV, avec leur durée ;
+  - `version_du_texte` : le numéro de version du texte lu (par exemple `lecture-qc-1`) ;
+  - `texte_lu` : le texte des paragraphes lus ;
+  - `transcription` : la transcription obtenue par le **modèle recommandé** pour vos langues,
+    paragraphe par paragraphe ;
+  - `score` : le taux de ressemblance, le nombre d'erreurs et de mots, au total et par paragraphe,
+    pour ce même modèle ;
+  - `modele` : l'identifiant et le nom de ce modèle de transcription ;
+  - `version_de_l_application` ;
+  - `modele_du_telephone` : le fabricant et le modèle (par exemple « Google Pixel 7 ») ;
+  - `declaration` : « je parle un français québécois » ;
+  - `date` : le jour du test (année, mois, jour), **sans l'heure** ;
+  - `region` : votre région, seulement si vous l'écrivez (60 caractères au plus) ; sinon, vide.
+
+Si plusieurs modèles sont installés, seuls la transcription et le score du modèle recommandé sont
+inclus : les résultats des autres modèles restent sur votre téléphone. Les fichiers de l'archive
+portent tous la même date fictive (2 janvier 1980) : l'archive ne contient pas l'heure du test.
 
 **Ce qui n'est pas partagé** : aucun nom, aucun numéro de téléphone, aucun identifiant de l'appareil
-ou de compte, aucune autre dictée, aucun autre fichier.
+(ni identifiant Android, ni numéro de série, ni identifiant d'installation) ou de compte,
+aucune autre dictée, aucun mot de votre vocabulaire personnel, aucun réglage, aucun autre fichier.
+
+**Sur votre téléphone.** Rien n'est écrit tant que vous n'avez pas coché la case de consentement
+(non cochée au départ) **et** touché « Préparer le courriel ». L'archive est alors écrite dans
+l'espace privé de l'application, inaccessible aux autres applications ; elle n'est remise qu'à
+l'application que vous choisissez (votre messagerie, ou une autre par « Partager le fichier
+autrement »), avec une permission de lecture limitée à ce fichier. Elle est supprimée de votre
+téléphone par le bouton « Supprimer le fichier », par « Ne pas partager », par « Refaire le test »
+et quand vous fermez l'écran du test ; si l'application a été arrêtée de force entre-temps, à
+l'ouverture suivante du test, ou au démarrage de l'application si elle a plus d'un jour. La copie
+que votre messagerie garde dans ses messages envoyés relève de votre messagerie.
 
 **Ce que le courriel révèle de lui-même** : comme tout courriel, il montre au destinataire l'adresse
 qui l'envoie, et souvent le nom associé dans votre messagerie. Ce n'est pas l'application qui
@@ -68,8 +97,11 @@ de votre part.
 ## Qui le reçoit
 
 Le responsable du projet Kalmia Blabla, à l'adresse **remi@kalmia.ca**. L'application elle-même ne
-se connecte à aucun serveur pour ce partage : elle prépare le fichier et ouvre votre messagerie.
-Vous pouvez aussi annuler à ce moment-là, ou partager le fichier autrement.
+se connecte à aucun serveur pour ce partage : elle prépare le fichier et ouvre votre messagerie avec
+le destinataire, un objet (« Kalmia Blabla : test de lecture » et la version du texte), un court
+message qui rappelle le contenu du fichier et l'adresse de cette politique, et le fichier joint.
+C'est vous qui appuyez sur « Envoyer ». Vous pouvez aussi annuler à ce moment-là, ou partager le
+fichier autrement.
 
 Qui d'autre a accès à cette boîte de courriel : **à préciser** (voir « Ce qui reste à valider »).
 

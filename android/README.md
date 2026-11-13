@@ -10,8 +10,11 @@ dictée vocale. Il est développé au Québec. La transcription tourne
 **entièrement sur le téléphone** avec
 [sherpa-onnx](https://github.com/k2-fsa/sherpa-onnx) : par défaut, ni l'audio ni
 le texte ne quittent l'appareil, et le réseau ne sert qu'à télécharger les
-modèles. La seule exception est un choix de votre part : le « Serveur distant »
-(un serveur que vous choisissez et hébergez vous-même, voir plus bas).
+modèles. Deux exceptions, toutes deux de votre seul choix : le « Serveur distant »
+(un serveur que vous choisissez et hébergez vous-même, voir plus bas), et le
+partage volontaire d'une lecture du test de lecture, par un courriel que vous
+envoyez vous-même depuis votre messagerie (voir « Test de lecture en français
+québécois ») ; l'application elle-même n'envoie rien.
 Spécification : issue #10 ; positionnement et marque : issue #15. Choix de
 développement : [`DECISIONS.md`](DECISIONS.md).
 
@@ -23,7 +26,7 @@ bascule vers celui-ci pour dicter.
 | Plus-value | Ce qui la rend vraie |
 |---|---|
 | **La voix reste sur le téléphone** | La transcription est faite par un modèle exécuté sur l'appareil ; le réseau ne sert qu'à télécharger les modèles. Fonctionne hors ligne une fois un modèle installé. |
-| **Aucun compte, aucune collecte** | L'application ne demande aucun compte et n'a ni publicité ni télémétrie. Rien n'est envoyé par défaut. |
+| **Aucun compte, aucune collecte** | L'application ne demande aucun compte et n'a ni publicité ni télémétrie. Rien n'est envoyé par défaut. Le partage d'une lecture du test est un courriel que vous envoyez vous-même, après un consentement explicite. |
 | **Pensée pour le français québécois** | « Français (Québec) » est présélectionné ; le modèle recommandé a été mesuré sur des voix « Français du Canada » (voir « Vos langues et le modèle recommandé »). |
 | **Transparente et vérifiable** | Code source public dans ce dépôt (sans fichier de licence pour l'instant : chacun peut le lire, mais ce n'est pas encore un logiciel libre au sens juridique) ; chaque modèle est nommé avec son éditeur et sa licence ; chaque fichier téléchargé est vérifié par somme de contrôle SHA-256. |
 | **Sous votre contrôle** | Vous choisissez le modèle, les langues et, si vous le voulez, un serveur personnel. |
@@ -142,11 +145,42 @@ Le test se déroule ainsi :
    soulignés** dans le texte. Si un autre modèle installé vous comprend nettement
    mieux, l'écran le dit et propose de le choisir.
 
-L'enregistrement reste en mémoire et disparaît quand l'écran se ferme : le test
-n'écrit aucun fichier, ne fait aucune requête réseau et n'ajoute aucune
-permission (le micro est déjà demandé). Le partage d'une lecture, facultatif, viendra
-à l'étape suivante du lot. Textes, seuils et choix : `DECISIONS.md` (« Issue #15,
-lot 4 ») et `docs/CONTRIBUTION.md`.
+5. **Partage, seulement si la dictée vous a mal compris** : si le taux d'erreur
+   dépasse 20 % avec le modèle recommandé pour vos langues, sur le texte complet,
+   l'écran du score propose de partager votre lecture. Sous ce seuil, rien n'est
+   proposé. La proposition montre **exactement ce qui partirait**, élément par
+   élément et avec ses valeurs : l'audio (un fichier WAV 16 kHz par paragraphe),
+   le texte lu et sa version, la transcription et le score du modèle recommandé
+   (pas ceux des autres modèles), le nom du modèle, la version de l'application,
+   le modèle du téléphone, la déclaration « je parle un français québécois », la
+   date (le jour seulement) et, si vous l'écrivez, votre région. Aucun
+   identifiant, aucune autre dictée, aucun réglage. On peut réécouter, refaire le
+   test ou refuser.
+6. **Consentement, puis fichier** : rien n'est créé tant que la case « J'ai lu ce
+   qui précède et j'accepte de partager ma lecture » (non cochée au départ) n'est
+   pas cochée **et** que « Préparer le courriel » n'est pas touché. Le fichier (une
+   archive zip : `contribution.json` et les WAV) est alors écrit dans l'espace privé
+   de l'application.
+7. **Envoi par vous** : « Envoyer par courriel » ouvre votre messagerie avec le
+   destinataire (`remi@kalmia.ca`), un objet, un court message et le fichier joint ;
+   c'est vous qui appuyez sur « Envoyer », ou qui annulez. « Partager le fichier
+   autrement » ouvre le sélecteur de partage du système. Le courriel montre au
+   destinataire votre adresse de courriel.
+8. **Suppression** : le fichier est supprimé par « Supprimer le fichier », par
+   « Ne pas partager », par « Refaire le test » et quand l'écran du test se ferme ;
+   un fichier laissé par une application arrêtée de force est supprimé à
+   l'ouverture suivante du test, ou au démarrage de l'application s'il a plus
+   d'un jour. Ce qui a été envoyé, lui, est conservé par le destinataire (deux ans
+   au plus) selon la politique.
+
+Pendant le test, l'enregistrement reste en mémoire et disparaît quand l'écran se
+ferme : aucun fichier n'est écrit sans le consentement de l'étape 6. Ni le test
+ni le partage ne font de requête réseau, et aucune permission n'a été ajoutée
+(le micro est déjà demandé ; l'archive est remise à la messagerie par un
+`FileProvider` limité au dossier des archives, avec une permission de lecture
+pour la seule application choisie). Politique de contribution :
+[`docs/CONTRIBUTION.md`](docs/CONTRIBUTION.md) ; textes, seuils et choix :
+`DECISIONS.md` (« Issue #15, lot 4 »).
 
 ## Apparence
 

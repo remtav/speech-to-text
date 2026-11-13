@@ -3421,8 +3421,156 @@ consentement. `ReadingPrivacyTest` interdit dans le code du test les écritures 
 
 ## Issue #15, lot 4 — étape 4.3 : consentement, archive locale, envoi par courriel
 
-État au 2026-11-13 (en cours). **Fait** : description unique de l'archive (`reading/ContributionArchive.kt`),
-proposition de partage dans l'écran du test, `FileProvider` limité au dossier des archives, intention de courriel,
-réécoute, tests JVM (`ContributionArchiveTest`, `ReadingPrivacyTest` adapté, `ContributionConsistencyTest`).
-**Reste à faire** : test instrumenté de l'export, captures `reading-share-*.png`, README, `CONTRIBUTION.md`, détail des
-décisions ci-dessous.
+État au 2026-11-13. **Fait** : proposition de partage dans l'écran du score, liste « ce qui partirait » générée depuis
+la description unique de l'archive, réécoute, région facultative, consentement (case + bouton), archive zip dans le
+stockage privé, `FileProvider` limité au dossier des archives, intention de courriel et sélecteur du système,
+suppression (bouton, refus, « Refaire le test », fermeture, balayages), tests JVM et instrumentés, captures
+`reading-share-*.png`, README, `docs/CONTRIBUTION.md`. **Reste à faire (autres étapes)** : revue (4.R). **Non vérifié
+ici** : aucun émulateur dans ce conteneur ; les tests instrumentés sont compilés et relus, pas exécutés (la CI de la PR
+les exécute) ; l'envoi réel d'un courriel avec pièce jointe est à faire par un humain.
+
+C'est la **seule exception** à « rien ne quitte le téléphone » : volontaire (trois gestes, jamais d'envoi automatique),
+visible (liste exacte avant consentement), limitée au texte de test (aucune autre dictée, aucun réglage).
+
+### Parcours
+
+1. **Seuil** : la proposition n'existe que si `ReadingResult.offerSharing` (WER > 20 % avec le modèle recommandé, texte
+   complet, règle de 4.1) ; sous le seuil, l'emplacement `reading_share_slot` n'est même pas créé. `ShareOffer.offered`
+   exige en plus la déclaration *oui* et un score du modèle recommandé (défensif).
+2. **Proposition** (carte dans l'emplacement de 4.2) : titre, raison (ressemblance et modèle), puis **« Ce qui partirait,
+   et seulement ça »** : une ligne par élément de l'archive, libellé et **valeur réelle** (texte lu et transcription en
+   entier, score, nom du modèle, version, téléphone, déclaration, date, région ou « non indiquée »). Puis réécoute,
+   destinataire, finalité, « le courriel révèle votre adresse », conservation, voix identifiable, retrait, « c'est vous
+   qui envoyez », politique (chaînes de 4.1, inchangées sauf la liste à puces `contrib_share_sent`, retirée : une liste
+   écrite à la main pouvait diverger de l'archive).
+3. **Région** : champ libre facultatif, une ligne, 60 caractères au plus (`InputFilter` et `normalizeRegion` : espaces
+   réduits, caractères de contrôle et de format retirés, vide → `null`). La ligne « Région » de la liste suit la saisie.
+4. **Consentement** : case `contrib_share_consent` **non cochée par défaut**, puis bouton « Préparer le courriel »,
+   désactivé tant que la case n'est pas cochée. Sans les deux, **aucun fichier, pas même le dossier**. Décocher redésactive
+   le bouton. Après suppression du fichier, la case est décochée : recréer un fichier redemande le geste.
+5. **Fichier prêt** : nom et taille, rappel de l'emplacement et de la suppression ; « Envoyer par courriel », « Partager le
+   fichier autrement », « Supprimer le fichier ». La région et la case disparaissent (le fichier est fait ; pour changer,
+   supprimer puis recommencer).
+6. « **Ne pas partager** » à tout moment : supprime le fichier s'il existe, ferme la proposition (« aucun fichier n'est
+   conservé et rien n'est envoyé »). « Refaire le test » reste dans le pied de page.
+
+### Archive : format et contenu exact
+
+- **Une seule description** : `reading/ArchiveField` (11 éléments, dans l'ordre du fichier) et `ContributionContent.from`,
+  qui produit à la fois la liste affichée (avant consentement, via `ShareOffer.preview`) et ce qu'écrit
+  `ContributionArchive.write`. Chaque élément a son libellé `contrib_field_<nom>` (test qui l'exige) ; l'écran parcourt
+  `content.fields`, l'archive aussi.
+- **Fichier** : `files/contribution/kalmia-blabla-<version>-<AAAA-MM-JJ>.zip`, une seule archive à la fois (une nouvelle
+  remplace l'ancienne), écrite dans un `.part` puis renommée.
+- **Contenu** : `contribution.json` puis `paragraphe-N.wav` (un par paragraphe lu, N à partir de 1).
+  - **WAV** : un fichier par paragraphe plutôt qu'un seul : chaque fichier correspond à une transcription et à un score
+    du JSON, et reste sous 20 s. PCM 16 bits, mono, 16 kHz (`WavReader.encode`, rééchantillonné si besoin).
+  - **JSON** lisible (indentation, clés en français, ordre fixe), écrit par un petit écrivain déterministe (`Json`),
+    pas `org.json` dont l'ordre des clés n'est pas garanti. Clés : `audio` (format et fichiers avec durée au dixième),
+    `version_du_texte`, `texte_lu`, `transcription`, `score` (ressemblance, erreurs, mots, par paragraphe), `modele`
+    (id et nom), `version_de_l_application` (`versionName`), `modele_du_telephone` (`Build.MANUFACTURER` + `Build.MODEL`),
+    `declaration` (« je parle un français québécois »), `date`, `region` (toujours présente, `null` si non indiquée :
+    l'ensemble des clés ne varie pas).
+- **Transcription : modèle recommandé seulement.** C'est sur lui que porte le seuil, et le consentement de 4.1 annonce
+  « la transcription obtenue et le score » au singulier. Choix prudent : les résultats des autres modèles restent sur le
+  téléphone, et l'écran le dit (`contrib_share_only_recommended`, quand plusieurs modèles ont été notés).
+- **Précision de la date** : le jour (`LocalDate`), sans heure ni fuseau : assez pour retrouver une contribution à la
+  demande de la personne (la politique lui demande « la date du test »), pas plus. Les entrées du zip portent toutes la
+  même date fictive (2 janvier 1980, `ENTRY_TIME`) : sinon le zip trahirait l'heure à deux secondes près. Pas de
+  commentaire ni de champ supplémentaire dans le zip.
+- **Aucun identifiant** : ni Android ID, ni identifiant d'installation, ni compte, ni numéro de série, ni version
+  d'Android (non annoncée), ni autre dictée, vocabulaire ou réglage. Le test JVM parcourt tout le JSON et refuse toute clé
+  hors d'une liste fermée.
+
+### Cycle de vie de l'archive
+
+| Événement | Effet |
+| --- | --- |
+| Case cochée + « Préparer le courriel » | création (seul chemin : `ShareOffer.createArchive`, appelé par `ReadingTestModel.prepareArchive`) |
+| « Supprimer le fichier » | suppression du fichier et du dossier ; case décochée |
+| « Ne pas partager » | suppression, proposition fermée |
+| « Refaire le test » | suppression avec les enregistrements |
+| Écran fermé pour de bon (`ViewModel.onCleared` : « Fermer », retour, tâche supprimée) | suppression, envoyé ou non |
+| Nouvel écran de test (nouveau `ReadingTestModel`) | balayage : toute archive restante est supprimée |
+| Démarrage de l'application | balayage des archives de plus de 24 h (`ContributionArchive.MAX_AGE_MILLIS`) |
+
+Raisons : l'archive ne doit pas traîner. Pendant que la messagerie est ouverte, l'écran du test reste dans la pile (il
+n'est pas fini) : l'archive reste lisible le temps d'envoyer. Au démarrage de l'application, on ne supprime **que** ce
+qui a plus d'un jour : le même processus démarre aussi pour le clavier, y compris pendant qu'on écrit le courriel dans la
+messagerie ; tout supprimer à ce moment couperait la pièce jointe d'un envoi en cours. Limite : une messagerie qui lirait
+la pièce jointe seulement après la fermeture de l'écran du test la trouverait supprimée (les messageries courantes la
+copient à l'ouverture du brouillon ; à vérifier sur le téléphone).
+
+### Envoi par courriel
+
+- `ContributionShare.emailIntent` : `ACTION_SEND`, type `application/zip`, `EXTRA_EMAIL` = `Contribution.RECEIVING_ADDRESS`,
+  objet `contrib_email_subject` (avec la version du texte), corps `contrib_email_body` (nom du fichier, liste des éléments
+  générée depuis `ArchiveField`, adresse de la politique), `EXTRA_STREAM` et `ClipData` = l'URI du `FileProvider`,
+  `FLAG_GRANT_READ_URI_PERMISSION` seulement (ni écriture, ni permission persistante), et un **sélecteur `mailto:`** qui
+  limite le choix aux applications de courriel. Démarrée directement : sans messagerie, `ActivityNotFoundException` →
+  message `contrib_share_no_email_app`, le fichier reste supprimable et partageable autrement.
+- `otherIntent` : la même intention sans sélecteur, dans `Intent.createChooser` (sélecteur du système, qui transmet la
+  permission de lecture à l'application choisie).
+- `FileProvider` (`androidx.core`, déjà en dépendance) : `${applicationId}.contribution`, non exporté,
+  `grantUriPermissions`, chemins `res/xml/contribution_paths.xml` = **seulement** `files/contribution/`.
+- L'application ne sait pas si le courriel est parti : après l'ouverture de la messagerie, l'écran dit seulement que rien
+  n'est parti tant que la personne n'a pas appuyé sur « Envoyer », et propose de supprimer le fichier ensuite.
+
+### Réécoute
+
+`ui/ReadingPlayer` : `AudioTrack` en flux, depuis la mémoire, paragraphe après paragraphe ; « Réécouter » / « Arrêter
+l'écoute ». S'arrête quand l'écran passe en arrière-plan, au refus et à la fermeture. Aucun fichier.
+
+### Aucune requête réseau : comment c'est garanti, et la limite
+
+- **Code** : `ReadingPrivacyTest` (JVM) interdit dans tout le code du test et du partage (`reading/`, écran, modèle,
+  surlignage, lecteur, `ContributionShare`) `java.net`, `Socket`, `HttpURLConnection`, `openStream`, `openConnection`,
+  `WebView`, `DownloadManager`, le serveur distant, etc. Il épingle chaque capacité permise à **un seul fichier** :
+  l'écriture disque à `ContributionArchive.kt`, le dossier privé, le `FileProvider` et les intentions de partage à
+  `ContributionShare.kt` ; il vérifie que `ContributionArchive.write` (interne) n'est appelé qu'une fois, dans
+  `ShareOffer.createArchive`, après le test du consentement, que `createArchive` n'est appelé que par
+  `ReadingTestModel.prepareArchive`, que la case n'est réglée que par le geste de la personne, et que le manifeste n'a
+  ni permission ajoutée ni autre fournisseur que celui-ci, limité à son dossier. Ce garde est plus fort qu'en 4.2 :
+  « aucune écriture » devient « une seule écriture, derrière le consentement ».
+- **Exécution** (`ContributionInstrumentedTest`, chaque test) : compteurs `TrafficStats.getUidTxBytes/RxBytes` de l'UID
+  de l'application avant et après (écart exigé : 0 octet) **et** `StrictMode` (`detectUntaggedSockets`,
+  `detectCleartextNetwork`, avec un écouteur qui collecte les violations ; aucune tolérée). Les intentions vers d'autres
+  applications sont interceptées par un `ActivityMonitor` et jamais démarrées.
+- **Limites** : sur un appareil où les compteurs par UID ne sont pas pris en charge (`UNSUPPORTED`), seul `StrictMode`
+  reste (le test l'écrit dans le journal) ; `StrictMode` ne voit que les sockets ouverts depuis Java, pas depuis du code
+  natif (les compteurs, côté noyau, les voient) ; un garde sur les sources ne prouve pas l'absence de tout appel
+  possible. Ce qui envoie vraiment, la messagerie de la personne, n'est jamais démarré par le test. La permission
+  `INTERNET` existe toujours (téléchargement des modèles) ; aucune n'a été ajoutée.
+
+### Tests ajoutés ou adaptés
+
+- JVM : `ContributionArchiveTest` (10 : contenu = liste annoncée, dans les deux sens et dans l'ordre ; région absente =
+  élément `null` ; aucune clé hors liste fermée, aucun identifiant, aucune heure, dates des entrées fixes, pas de champ
+  supplémentaire ; WAV valides 16 kHz mono 16 bits même enregistrés à 48 kHz ; pas d'archive ni de dossier sans
+  consentement ; rien sous le seuil ni sans déclaration ; suppression et remplacement ; balayage à 24 h ; région ; JSON
+  échappé et déterministe), `ReadingPrivacyTest` (7, réécrit comme décrit plus haut), `ContributionConsistencyTest`
+  (la liste à puces est remplacée par les libellés `contrib_field_*` ; un libellé par élément de l'archive ; adresse et
+  durée toujours vérifiées).
+- Instrumentés (compilés, non exécutés ici) : `ContributionInstrumentedTest` : sous le seuil rien n'est proposé ni écrit ;
+  au-dessus, la liste affichée = les éléments de l'archive, case non cochée, bouton désactivé, saisie de région, cocher
+  puis décocher, « Ne pas partager » → **aucun fichier** (répertoires de l'application comparés) ; avec consentement →
+  l'archive contient **exactement** les éléments affichés (clés du JSON = étiquettes de la liste, dans l'ordre), valeurs
+  (version, date, version de l'application, téléphone, déclaration, région, modèle, transcription du modèle recommandé
+  seulement), WAV 16 kHz ; intention de courriel (destinataire, type, sélecteur `mailto:`, objet, corps, URI du
+  fournisseur, lecture seule, contenu servi identique au fichier) ; sélecteur du système ; suppression depuis l'écran ;
+  suppression par « Refaire le test » et à la fermeture ; balayage d'une archive restante à l'ouverture ; **aucune
+  requête réseau** dans chaque test. Le test « emplacement vide » de 4.2 est remplacé par ceux-ci ; « non » → rien
+  (4.2) est gardé. `ScreenshotTest.readingShare` → `reading-share-light.png`, `reading-share-dark.png`.
+
+### À valider par un humain
+
+1. **Recevoir un vrai courriel** de contribution sur un téléphone : pièce jointe présente, lisible, objet et corps ;
+   avec Gmail et une autre messagerie ; comportement du sélecteur `mailto:` (certaines messageries pourraient ignorer
+   la pièce jointe).
+2. Que la pièce jointe survive au retour dans l'application et à la fermeture de l'écran après l'envoi (messagerie qui
+   copierait tard).
+3. Rendu de la proposition (`reading-share-*.png`) : longueur de la liste (texte et transcription en entier), lisibilité.
+4. Wording des nouvelles chaînes (`contrib_field_*`, `contrib_value_*`, `contrib_share_*` ajoutées, `contrib_email_*`).
+5. Réécoute sur un vrai téléphone (volume, enchaînement des paragraphes).
+6. Choix prudents à confirmer : transcription du seul modèle recommandé, date au jour, région limitée à 60 caractères,
+   balayage à 24 h.
