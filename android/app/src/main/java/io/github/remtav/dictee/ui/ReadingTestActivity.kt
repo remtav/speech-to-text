@@ -6,6 +6,7 @@ import android.text.Editable
 import android.text.InputFilter
 import android.text.InputType
 import android.text.TextWatcher
+import android.view.View
 import android.view.ViewGroup
 import android.view.WindowManager
 import android.view.inputmethod.EditorInfo
@@ -15,6 +16,7 @@ import android.widget.LinearLayout
 import android.widget.ProgressBar
 import android.widget.RadioButton
 import android.widget.RadioGroup
+import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
@@ -88,13 +90,33 @@ class ReadingTestActivity : AppCompatActivity() {
     override fun onStart() {
         super.onStart()
         model.onChange = { render() }
+        model.onProgress = { updateProgressText() }
         render()
     }
 
     override fun onStop() {
         model.onChange = null
+        model.onProgress = null
         model.stopRecording()
         super.onStop()
+    }
+
+    /** Updates the two progress texts in place, without rebuilding the screen (issue #20). */
+    private fun updateProgressText() {
+        val phase = model.session.phase
+        if (phase == ReadingPhase.READING && model.recording) {
+            (column.findViewWithTag<View>(TAG_RECORD_STATE) as? TextView)?.text =
+                getString(R.string.reading_recording, model.recordingSeconds, ParagraphRecorder.MAX_SECONDS)
+        } else if (phase == ReadingPhase.SCORING) {
+            (column.findViewWithTag<View>(TAG_SCORING_PROGRESS) as? TextView)?.text = scoringText()
+        }
+    }
+
+    private fun scoringText(): String {
+        val p = model.progress ?: return ""
+        return getString(
+            R.string.reading_scoring_progress, p.model.label, p.modelIndex + 1, p.modelCount, p.paragraph + 1, p.paragraphCount,
+        )
     }
 
     private fun render() {
@@ -191,12 +213,7 @@ class ReadingTestActivity : AppCompatActivity() {
     private fun renderScoring() {
         column.title(getString(R.string.reading_scoring_title))
         column.addView(ProgressBar(this).apply { isIndeterminate = true })
-        val p = model.progress
-        column.value(
-            if (p == null) "" else getString(
-                R.string.reading_scoring_progress, p.model.label, p.modelIndex + 1, p.modelCount, p.paragraph + 1, p.paragraphCount,
-            ),
-        ).tag = TAG_SCORING_PROGRESS
+        column.value(scoringText()).tag = TAG_SCORING_PROGRESS
         column.body(getString(R.string.reading_scoring_note), small = true)
         column.button(getString(R.string.reading_scoring_cancel), outlined = true) { model.cancelScoring() }
     }
