@@ -306,12 +306,42 @@ sensiblement plus rapide que le turbo sur des mots ou des phrases courtes** : el
 | Modèle | Existence (URL) | Taille int8 | Vitesse relative documentée | Qualité en français | Verdict |
 | --- | --- | --- | --- | --- | --- |
 | Whisper small | `csukuangfj/sherpa-onnx-whisper-small` (https://huggingface.co/csukuangfj/sherpa-onnx-whisper-small) | 112,4 + 262,2 Mo = **375 Mo** | README OpenAI : ~4× (GPU, anglais) contre ~8× pour turbo ; **mesuré hôte : 1,3× plus rapide que turbo sur 1 s, 1,1× sur 5 s** (4 threads, langue forcée) | **Mesuré hôte** : WER 16,0 % (12/75) contre 9,3 % pour turbo sur les 7 clips français ; sur le mot de 1 s : « du reste à main-ra » | **À écarter** : gain faible, qualité nettement moindre ; ne règle pas « friperie » |
-| Whisper medium | `csukuangfj/sherpa-onnx-whisper-medium` | 374,2 + 571,1 Mo = 945 Mo | README OpenAI : ~2× (turbo ~8×) | non mesurée | **À écarter** : aussi lourd que turbo, plus lent selon la source |
+| Whisper medium | `csukuangfj/sherpa-onnx-whisper-medium` | 374,2 + 571,1 Mo = 945 Mo | README OpenAI : ~2× (turbo ~8×) ; **mesuré hôte (2026-11-13) : 4,5× plus lent que turbo** (38,2 s contre 8,6 s sur les 6 clips québécois, 4 threads) | **Mesuré hôte** : WER 12,1 % (7/58) contre 10,3 % pour turbo et 8,6 % pour le turbo québécois | **À écarter** : plus lent et pas meilleur (section 7.1) |
 | Whisper tiny / base | `csukuangfj/sherpa-onnx-whisper-tiny`, `-base` | 103 Mo, 160 Mo | ~10×, ~7× | non mesurée ; qualité en dessous de small | **À écarter** |
 | distil-large-v3 et v3.5 | `csukuangfj/sherpa-onnx-whisper-distil-large-v3` (et `-v3.5`) | 668,1 + 314,9 Mo | « 6,3× plus rapide que large-v3 » (fiche, GPU) | **anglais seulement** (« English series ») | **À écarter** : pas de français |
 | distil-large-v3-fr | `eustlb/distil-large-v3-fr` (https://huggingface.co/eustlb/distil-large-v3-fr) | non convertie ; transformers (F16) et GGML | « 5,9× plus rapide que large-v3 » (A100, 128 jetons) ; **pas de comparaison avec turbo** ; encodeur copié de large-v3, décodeur à 2 couches | Fiche : WER Common Voice 17 : 12,7 % contre 11,0 % pour large-v3 ; Fleurs : 8,0 % contre 5,6 % (le turbo n'est pas comparé) | **À écarter pour la vitesse** (même encodeur) ; piste de qualité si une conversion sherpa existe |
 | Distillation française, décodeur à 16 couches | `pantinor/sherpa-onnx-whisper-large-v3-french-distil` (https://huggingface.co/pantinor/sherpa-onnx-whisper-large-v3-french-distil), export sherpa-onnx v2.0.1 | 714,1 + 639,8 Mo = **1,35 Go** | README de l'auteur : RTF 0,94 sous charge contre 0,43 pour turbo au repos (**comparaison non équitable**, dit l'auteur lui-même) | README de l'auteur : WER Fleurs fr 6,54 % contre 8,59 % pour turbo int8 (40 clips, auto-déclaré) | **Plus lent** (décodeur 4× plus profond) ; piste de qualité seulement ; licence ambiguë (Apache-2.0 en en-tête, MIT dans le texte) |
 | Turbo, autres quantifications | `ggerganov/whisper.cpp` : `ggml-large-v3-turbo-q5_0.bin` 574 Mo, `-q8_0` 874 Mo | — | Pour whisper.cpp, pas pour sherpa-onnx | — | Voir section 8 |
+
+### 7.1 Whisper medium mesuré (2026-11-13)
+
+Demande de l'utilisateur : essayer un Whisper « un niveau sous large-v3-turbo ». Par le nom, c'est medium (769 M
+paramètres). Mesure hôte [mesuré hôte] avec sherpa-onnx 2.0.1 en Python (même version que l'AAR), modèles int8, 4 threads,
+langue forcée, `tailPaddings` = 1 000 (défaut de l'app), meilleur de 3 passages par clip, machine au repos (charge 0,1).
+Script : `android/tools/whisper-mesure-python/bench.py` (`python bench.py DOSSIER_MODELES app/src/main/assets/reference 4`,
+avec les sous-dossiers `turbo/`, `qc/` et `medium/`).
+
+| Modèle | 6 clips québécois (31,1 s d'audio) : temps / WER | 2 clips anglais (23,3 s) : temps / WER | fr1 (6,0 s) : temps / WER |
+| --- | --- | --- | --- |
+| Whisper large-v3-turbo | 8,6 s / 10,3 % (6/58) | 5,9 s / 4,5 % | 1,8 s / 6,7 % |
+| Whisper turbo québécois (ele-sage) | 9,2 s / **8,6 %** (5/58) | — (français seulement) | 1,8 s / 0 % |
+| Whisper medium | **38,2 s** / 12,1 % (7/58) | 37,1 s / 0 % | 11,3 s / 6,7 % |
+
+Pourquoi medium est plus lent alors qu'il est plus petit [mesuré hôte, métadonnées des fichiers ONNX] :
+
+- **L'encodeur est bien plus rapide** : 0,51 s contre 0,84 s pour 1 500 images (24 couches de largeur 1 024 contre 32 de
+  1 280).
+- **Le décodeur annule ce gain, et au-delà** : turbo n'a que 4 couches de décodeur, medium en a 24. Dans l'export
+  sherpa-onnx, le cache du décodeur a une taille fixe (couches × 448 positions × largeur) et il est passé en entrée et
+  rendu en sortie **à chaque jeton** : ≈ 88 Mo par jeton pour medium contre ≈ 18 Mo pour turbo. Sur un téléphone, où la
+  bande passante mémoire est plus faible, l'écart devrait être au moins aussi grand [supposé].
+- C'est précisément ce que « turbo » a changé : turbo **est** déjà le Whisper allégé (décodeur réduit de 32 à 4
+  couches). Les tailles inférieures (medium, small) ont un décodeur plus profond que turbo.
+
+Conclusion : **medium est écarté** (plus lent et pas meilleur en français québécois) et n'est pas ajouté au catalogue.
+Small reste écarté (tableau ci-dessus : 1,1 à 1,3× plus rapide, WER 16 %). Pour réduire la latence, les leviers restent
+la marge de fin (section 1), les threads (section 4) et surtout **le serveur distant** (issue #23). Le modèle à garder en
+local pour le français québécois est le turbo québécois.
 
 Autres tailles de cette famille à ne pas oublier : aucun export sherpa-onnx « turbo » plus petit que l'int8 actuel
 n'existe publiquement [vérifié par la liste des dépôts `csukuangfj/sherpa-onnx-whisper-*`].
