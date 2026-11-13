@@ -212,7 +212,7 @@ textes n'ont pas changé.
 - **Changé pour tous** : avec un modèle Whisper, plus de texte provisoire
   pendant qu'on parle (il retardait le résultat final). Vérifier dans le
   clavier que le texte arrive plus tôt après la pause.
-- **À essayer** : Réglages > Performance > « Silence ajouté pour Whisper ».
+- **À essayer** : Réglages > Avancé > « Silence ajouté pour Whisper » (depuis l'issue #49, avec le choix « Automatique »).
   Valeur par défaut 1 000 (inchangée). Dans « Comparer les modèles », faire
   une exécution à jeter puis une par valeur (1 000, 600, 300), avec
   « friperie » seul, une phrase de 5 s et une dictée de 15 s ; regarder le

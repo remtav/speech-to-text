@@ -9,9 +9,23 @@ data class Transcription(
     val language: String = "",
     val decodeMillis: Long = 0,
     val audioSeconds: Float = 0f,
+    /** What the Whisper repetition filter did with this segment (issue #49); [RepetitionOutcome.NONE] outside automatic mode. */
+    val repetition: RepetitionOutcome = RepetitionOutcome.NONE,
 ) {
     val realTimeFactor: Float
         get() = if (audioSeconds > 0f) decodeMillis / 1000f / audioSeconds else 0f
+}
+
+/** Result of the Whisper repetition filter on one segment (issue #49). */
+enum class RepetitionOutcome {
+    /** No repetition found, or filter off. */
+    NONE,
+    /** Repetition found and decoded again at [WhisperTuning.REDECODE_TAIL_PADDINGS]. */
+    REDECODED,
+    /** Repetition found and the repeated text cut. */
+    CUT,
+    /** Repetition found (token ceiling) but nothing to cut: text left as it is. */
+    DETECTED,
 }
 
 /**
@@ -57,6 +71,11 @@ data class EngineOptions(
      * carry the default, so changing the setting never reloads them. See [WhisperTuning].
      */
     val whisperTailPaddings: Int = WhisperTuning.DEFAULT_TAIL_PADDINGS,
+    /**
+     * Whisper only, « Automatique » padding (issue #49): what to do when the repetition filter fires;
+     * null = no filter (fixed padding, the behaviour before #49).
+     */
+    val whisperRepetitionFix: RepetitionFix? = null,
 ) {
     companion object {
         fun defaultThreads(): Int = Runtime.getRuntime().availableProcessors().coerceIn(1, 4)

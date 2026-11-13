@@ -15,9 +15,33 @@ object WhisperTuning {
     /** A stored value outside [TAIL_PADDING_CHOICES] reads as the default. */
     fun sanitizeTailPaddings(value: Int): Int = if (value in TAIL_PADDING_CHOICES) value else DEFAULT_TAIL_PADDINGS
 
-    /** The value handed to the engine of [spec]: the setting for Whisper, the default (so no reload) otherwise. */
-    fun tailPaddingsFor(spec: ModelSpec, setting: Int): Int =
-        if (spec.family == ModelFamily.WHISPER) sanitizeTailPaddings(setting) else DEFAULT_TAIL_PADDINGS
+    /**
+     * The value handed to the engine of [spec]: the setting for Whisper ([AUTO_TAIL_PADDINGS] in automatic
+     * mode), the default (so no reload) otherwise.
+     */
+    fun tailPaddingsFor(spec: ModelSpec, setting: Int, auto: Boolean = false): Int = when {
+        spec.family != ModelFamily.WHISPER -> DEFAULT_TAIL_PADDINGS
+        auto -> AUTO_TAIL_PADDINGS
+        else -> sanitizeTailPaddings(setting)
+    }
+
+    /**
+     * « Automatique » choice of « Silence ajouté pour Whisper » (issue #49): a short padding of 300 frames
+     * plus the repetition filter ([io.github.remtav.dictee.text.WhisperRepetition]).
+     */
+    const val AUTO_TAIL_PADDINGS = 300
+
+    /** Padding of the second decode when [RepetitionFix.REDECODE] fires: the default, the reference quality. */
+    const val REDECODE_TAIL_PADDINGS = DEFAULT_TAIL_PADDINGS
+
+    /** The correction handed to the engine of [spec]: only for Whisper in automatic mode, null (no filter) otherwise. */
+    fun repetitionFixFor(spec: ModelSpec, auto: Boolean, fix: RepetitionFix): RepetitionFix? =
+        if (spec.family == ModelFamily.WHISPER && auto) fix else null
+
+    /** How the Whisper padding is described in the « Copier » report of the comparison screen. */
+    fun describe(tailPaddings: Int, fix: RepetitionFix?): String =
+        if (fix == null) "silence ajouté Whisper $tailPaddings"
+        else "silence ajouté Whisper automatique ($tailPaddings + correction des répétitions : ${fix.reportLabel})"
 
     /**
      * Whether provisional (underlined) decodes may run. Never with the server (one HTTP request
@@ -26,4 +50,22 @@ object WhisperTuning {
      */
     fun provisionalAllowed(spec: ModelSpec, setting: Boolean): Boolean =
         setting && spec.family != ModelFamily.REMOTE && spec.family != ModelFamily.WHISPER
+}
+
+/**
+ * What [io.github.remtav.dictee.stt.SherpaEngine] does with a Whisper segment in which
+ * [io.github.remtav.dictee.text.WhisperRepetition] finds a repetition (issue #49, « Correction des
+ * répétitions (Whisper) »). Both are kept so the user can compare them on the phone.
+ */
+enum class RepetitionFix(val reportLabel: String) {
+    /** Decode the segment again with the default padding (1 000): best measured quality, costs a second decode. */
+    REDECODE("redécoder à 1 000"),
+    /** Keep the first occurrence and drop the repeated text: no second decode. */
+    CUT("couper le texte répété");
+
+    companion object {
+        /** Proposed by default: the better quality on the host bench (issue #49). */
+        val DEFAULT = REDECODE
+        fun fromName(name: String?): RepetitionFix = entries.firstOrNull { it.name == name } ?: DEFAULT
+    }
 }
