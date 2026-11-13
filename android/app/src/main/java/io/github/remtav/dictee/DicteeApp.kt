@@ -27,6 +27,7 @@ import io.github.remtav.dictee.stt.ModelCatalog
 import io.github.remtav.dictee.stt.ModelFamily
 import io.github.remtav.dictee.stt.ModelMigration
 import io.github.remtav.dictee.stt.ModelSpec
+import io.github.remtav.dictee.stt.ModelPlainNames
 import io.github.remtav.dictee.stt.SttEngineFactory
 import io.github.remtav.dictee.stt.RemoteEngine
 import io.github.remtav.dictee.stt.RemoteLog
@@ -65,6 +66,8 @@ object TestHooks {
     @Volatile var keyboardEnabled: Boolean? = null
     @Volatile var keyboardChosen: Boolean? = null
     @Volatile var micGranted: Boolean? = null
+    /** The quick test's transcription budget in seconds (issue #36), shortened by a test; null = 30 s. */
+    @Volatile var quickTestBudgetSeconds: Double? = null
 }
 
 class DicteeApp : Application() {
@@ -202,7 +205,8 @@ class DicteeApp : Application() {
     fun newSession(): Pair<DictationSession?, String?> {
         val spec = dictationSpec()
         if (benchmarkRunning) return null to "Comparaison des modèles en cours"
-        if (!isInstalled(spec)) return null to "Modèle ${spec.shortName} non installé : ouvrez les réglages"
+        // Issue #37: named by its effect (« le modèle plus précis »), never « Whisper ».
+        if (!isInstalled(spec)) return null to "${ModelPlainNames.inSentence(spec).replaceFirstChar { it.uppercase() }} n'est pas installé : ouvrez Kalmia Blabla"
         engines.factory = engineFactory()
         val options = engineOptions(spec)
         engines.load(spec, options)

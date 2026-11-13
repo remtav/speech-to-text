@@ -190,13 +190,16 @@ class ReadingTestModel(private val app: DicteeApp, val session: ReadingSession) 
 
     /** Display name of a model of the test. */
     fun labelOf(modelId: String): String =
-        session.models.firstOrNull { it.id == modelId }?.label ?: onDevice(modelId)?.displayName ?: modelId
+        session.models.firstOrNull { it.id == modelId }?.label
+            ?: onDevice(modelId)?.let { io.github.remtav.dictee.stt.ModelPlainNames.of(it) } ?: modelId
 
     /** The sharing offer of the current result, or null when nothing is offered (below the threshold). */
     fun shareOffer(): ShareOffer? {
         val result = session.result ?: return null
         if (offer?.result !== result) {
-            offer = ShareOffer(result, session.declaration, session.material.text.paragraphs, labelOf(result.recommendedModelId))
+            // The archive keeps the technical name (with the id): it is read by the people who improve the models.
+            val technical = onDevice(result.recommendedModelId)?.displayName ?: result.recommendedModelId
+            offer = ShareOffer(result, session.declaration, session.material.text.paragraphs, technical)
             shareFacts = ContributionShare.deviceFacts()
             resetShareState()
         }
