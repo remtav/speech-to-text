@@ -61,6 +61,14 @@
             android:visibility="gone" />
 
         <ImageButton
+            android:id="@+id/toggle_view"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="@string/cd_to_keyboard"
+            android:src="@drawable/ic_text_fields" />
+
+        <ImageButton
             android:id="@+id/help"
             android:layout_width="48dp"
             android:layout_height="48dp"
@@ -77,75 +85,147 @@
             android:src="@drawable/ic_tune" />
     </LinearLayout>
 
-    <io.github.remtav.dictee.ime.LevelMeterView
-        android:id="@+id/level"
-        android:layout_width="match_parent"
-        android:layout_height="6dp"
-        android:layout_marginStart="24dp"
-        android:layout_marginTop="6dp"
-        android:layout_marginEnd="24dp" />
-
-    <com.google.android.material.button.MaterialButton
-        android:id="@+id/mic"
-        style="@style/Widget.Dictee.Button.Mic"
-        android:layout_width="96dp"
-        android:layout_height="96dp"
-        android:layout_gravity="center_horizontal"
-        android:layout_marginTop="8dp"
-        android:layout_marginBottom="8dp"
-        android:contentDescription="@string/cd_start"
-        app:icon="@drawable/ic_mic" />
-
     <LinearLayout
+        android:id="@+id/dictation_group"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="horizontal">
+        android:orientation="vertical">
+
+        <io.github.remtav.dictee.ime.LevelMeterView
+            android:id="@+id/level"
+            android:layout_width="match_parent"
+            android:layout_height="6dp"
+            android:layout_marginStart="24dp"
+            android:layout_marginTop="6dp"
+            android:layout_marginEnd="24dp" />
 
         <com.google.android.material.button.MaterialButton
-            android:id="@+id/key_switch"
-            style="@style/KeyButton"
-            android:contentDescription="@string/cd_switch"
-            app:icon="@drawable/ic_keyboard" />
+            android:id="@+id/mic"
+            style="@style/Widget.Dictee.Button.Mic"
+            android:layout_width="96dp"
+            android:layout_height="96dp"
+            android:layout_gravity="center_horizontal"
+            android:layout_marginTop="8dp"
+            android:layout_marginBottom="8dp"
+            android:contentDescription="@string/cd_start"
+            app:icon="@drawable/ic_mic" />
 
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/key_comma"
-            style="@style/KeyButton"
-            android:text="," />
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal">
 
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/key_period"
-            style="@style/KeyButton"
-            android:text="." />
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/key_switch"
+                style="@style/KeyButton"
+                android:contentDescription="@string/cd_switch"
+                app:icon="@drawable/ic_keyboard" />
 
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/key_space"
-            style="@style/KeyButton"
-            android:layout_weight="2.4"
-            android:contentDescription="@string/cd_space"
-            app:icon="@drawable/ic_space" />
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/key_comma"
+                style="@style/KeyButton"
+                android:text="," />
 
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/key_question"
-            style="@style/KeyButton"
-            android:text="\?" />
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/key_period"
+                style="@style/KeyButton"
+                android:text="." />
 
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/key_exclaim"
-            style="@style/KeyButton"
-            android:text="!" />
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/key_space"
+                style="@style/KeyButton"
+                android:layout_weight="2.4"
+                android:contentDescription="@string/cd_space"
+                app:icon="@drawable/ic_space" />
 
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/key_backspace"
-            style="@style/KeyButton"
-            android:layout_weight="1.3"
-            android:contentDescription="@string/cd_backspace"
-            app:icon="@drawable/ic_backspace" />
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/key_question"
+                style="@style/KeyButton"
+                android:text="\?" />
 
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/key_enter"
-            style="@style/KeyButton"
-            android:layout_weight="1.3"
-            android:contentDescription="@string/cd_enter"
-            app:icon="@drawable/ic_enter" />
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/key_exclaim"
+                style="@style/KeyButton"
+                android:text="!" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/key_backspace"
+                style="@style/KeyButton"
+                android:layout_weight="1.3"
+                android:contentDescription="@string/cd_backspace"
+                app:icon="@drawable/ic_backspace" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/key_enter"
+                style="@style/KeyButton"
+                android:layout_weight="1.3"
+                android:contentDescription="@string/cd_enter"
+                app:icon="@drawable/ic_enter" />
+        </LinearLayout>
+    </LinearLayout>
+
+    <LinearLayout
+        android:id="@+id/text_group"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:visibility="gone">
+
+        <io.github.remtav.dictee.ime.LetterKeyboardView
+            android:id="@+id/letters"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal">
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/kb_switch"
+                style="@style/KeyButton"
+                android:contentDescription="@string/cd_switch"
+                app:icon="@drawable/ic_keyboard" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/kb_symbols"
+                style="@style/KeyButton"
+                android:contentDescription="@string/cd_symbols"
+                android:text="123" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/kb_comma"
+                style="@style/KeyButton"
+                android:contentDescription="@string/cd_comma"
+                android:text="," />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/mic_small"
+                style="@style/KeyButton"
+                android:layout_weight="1.4"
+                android:contentDescription="@string/cd_start"
+                app:icon="@drawable/ic_mic" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/kb_space"
+                style="@style/KeyButton"
+                android:layout_weight="2"
+                android:contentDescription="@string/cd_space"
+                app:icon="@drawable/ic_space" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/kb_period"
+                style="@style/KeyButton"
+                android:contentDescription="@string/cd_period"
+                android:text="." />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/kb_enter"
+                style="@style/KeyButton"
+                android:layout_weight="1.3"
+                android:contentDescription="@string/cd_enter"
+                app:icon="@drawable/ic_enter" />
+        </LinearLayout>
     </LinearLayout>
 </LinearLayout>

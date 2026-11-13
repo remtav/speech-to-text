@@ -2,6 +2,7 @@ package io.github.remtav.dictee.settings
 
 import android.content.Context
 import android.content.SharedPreferences
+import io.github.remtav.dictee.ime.LayoutKind
 import io.github.remtav.dictee.reading.Declaration
 import io.github.remtav.dictee.reading.Participation
 import io.github.remtav.dictee.stt.Acceleration
@@ -118,6 +119,16 @@ class AppSettings(context: Context) {
     var theme: ThemeMode
         get() = ThemeMode.fromName(prefs.getString("theme", null))
         set(v) = prefs.edit().putString("theme", v.name).apply()
+
+    /** Letter arrangement of the text keyboard (issue #21): QWERTY unless the user picked AZERTY. */
+    var keyboardLayout: LayoutKind
+        get() = LayoutKind.fromName(prefs.getString("keyboard_layout", null))
+        set(v) = prefs.edit().putString("keyboard_layout", v.name).apply()
+
+    /** The keyboard shows the text keys rather than the microphone (last view used, kept between fields). */
+    var textKeyboardShown: Boolean
+        get() = prefs.getBoolean("text_keyboard_shown", false)
+        set(v) = prefs.edit().putBoolean("text_keyboard_shown", v).apply()
 
     var haptics: Boolean
         get() = prefs.getBoolean("haptics", true)

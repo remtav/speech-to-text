@@ -174,6 +174,9 @@ android {
             // without it those tests are skipped.
             (project.findProperty("modelsDir") as String? ?: System.getenv("DICTEE_MODELS_DIR"))
                 ?.let { test.systemProperty("dictee.modelsDir", it) }
+            // Larger Québec set (issue #24): without -PquebecSetDir the test is skipped.
+            (project.findProperty("quebecSetDir") as String?)?.let { test.systemProperty("dictee.quebecSetDir", it) }
+            (project.findProperty("quebecSetModels") as String?)?.let { test.systemProperty("dictee.quebecSetModels", it) }
             // Polishing evaluation (issue #15, step 3.1): where the scorer writes its report, and
             // the synthetic-audio directory used only to regenerate the `tts+…` rows of the set.
             test.systemProperty("dictee.polishReportDir", layout.buildDirectory.dir("reports/polissage").get().asFile.absolutePath)

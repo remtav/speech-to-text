@@ -12,6 +12,17 @@
     <string name="cd_switch">Clavier précédent</string>
     <string name="cd_space">Espace</string>
     <string name="cd_backspace">Effacer</string>
+    <string name="cd_shift">Majuscule</string>
+    <string name="cd_shift_once">Majuscule activée pour une lettre</string>
+    <string name="cd_shift_locked">Majuscules verrouillées</string>
+    <string name="cd_symbols">Chiffres et symboles</string>
+    <string name="cd_letters">Lettres</string>
+    <string name="cd_to_keyboard">Clavier pour corriger le texte</string>
+    <string name="cd_to_dictation">Revenir à la dictée</string>
+    <string name="cd_comma">Virgule</string>
+    <string name="cd_period">Point</string>
+    <string name="settings_layout">Disposition du clavier de correction</string>
+    <string name="settings_layout_help">Lettres du clavier texte, ouvert par le bouton « A » : QWERTY par défaut. Appui long sur une lettre : accents.</string>
     <string name="cd_enter">Entrée</string>
 
     <string name="status_idle">Appuyez sur le micro pour dicter</string>

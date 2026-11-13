@@ -18,6 +18,7 @@ import io.github.remtav.dictee.R
 import io.github.remtav.dictee.cleanup.LlmCatalog
 import io.github.remtav.dictee.reading.Declaration
 import io.github.remtav.dictee.settings.CleanupMode
+import io.github.remtav.dictee.ime.LayoutKind
 import io.github.remtav.dictee.settings.ThemeMode
 import io.github.remtav.dictee.stt.Acceleration
 import io.github.remtav.dictee.stt.ModelCatalog
@@ -98,6 +99,9 @@ class SettingsActivity : AppCompatActivity() {
             app.applyTheme()
         }
         col.switch(getString(R.string.settings_haptics), s.haptics) { s.haptics = it }
+        col.body(getString(R.string.settings_layout), small = false)
+        col.radio(LayoutKind.entries.map { it.label }, s.keyboardLayout.ordinal) { s.keyboardLayout = LayoutKind.entries[it] }
+        col.body(getString(R.string.settings_layout_help), small = true)
 
         col.heading(getString(R.string.settings_performance))
         col.slider(getString(R.string.settings_keep_loaded), 0f, 30f, 1f, s.keepLoadedMinutes.toFloat(), { "${it.toInt()} min" }) {
