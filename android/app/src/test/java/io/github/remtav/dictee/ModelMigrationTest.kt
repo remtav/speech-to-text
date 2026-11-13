@@ -51,8 +51,11 @@ class ModelMigrationTest {
         assertNull(ModelMigration.plan("gone", qc, installed()))
     }
 
-    @Test fun parakeetLeavesOnceAnotherLanguageIsAddedToEnglish() {
-        assertNotNull(ModelMigration.plan(ModelCatalog.parakeet.id, english + DictationLanguage.SPANISH, installed()))
+    @Test fun parakeetLeavesOnceAnUncoveredOrHeavyLanguageIsAddedToEnglish() {
+        assertNotNull(ModelMigration.plan(ModelCatalog.parakeet.id, english + DictationLanguage.MANDARIN, installed()))
+        assertNotNull(ModelMigration.plan(ModelCatalog.parakeet.id, english + DictationLanguage.FRENCH_QUEBEC, installed()))
+        // Issue #36: English with Spanish is a "light model" combination, Parakeet stays.
+        assertNull(ModelMigration.plan(ModelCatalog.parakeet.id, english + DictationLanguage.SPANISH, installed()))
     }
 
     @Test fun serverFallbackIsNeverHidden() {
