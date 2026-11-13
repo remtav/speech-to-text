@@ -18,6 +18,7 @@ import androidx.test.uiautomator.By
 import androidx.test.uiautomator.Until
 import io.github.remtav.dictee.stt.DictationLanguage
 import io.github.remtav.dictee.stt.ModelRecommendations
+import io.github.remtav.dictee.stt.TranscriptionMode
 import io.github.remtav.dictee.text.CommandTable
 import io.github.remtav.dictee.ui.HowToActivity
 import io.github.remtav.dictee.ui.HowToExamples
@@ -283,7 +284,9 @@ class HowToInstrumentedTest : ImeTestBase() {
     fun theScreenCarriesTheReminderTheVocabularyLinkAndATryFieldButNoModelSection() {
         app.settings.languages = setOf(DictationLanguage.FRENCH_QUEBEC)
         ActivityScenario.launch(HowToActivity::class.java).use { s ->
+            // No server in use: on the phone, and not a word about a server.
             val privacy = s.textsTagged(HowToActivity.PRIVACY_TAG).single()
+            assertEquals(context.getString(R.string.howto_privacy), privacy)
             assertTrue(privacy.contains("sur votre téléphone"))
             assertFalse("no mention of a server", privacy.contains("serveur", ignoreCase = true))
             assertFalse(s.allText().contains("Votre modèle"))
@@ -296,6 +299,43 @@ class HowToInstrumentedTest : ImeTestBase() {
             s.onActivity { assertTrue("a field that brings the keyboard up", field.isFocusableInTouchMode && field.isEnabled) }
             // voice commands are on: no warning
             assertTrue(s.viewsTagged(HowToActivity.COMMANDS_OFF_TAG).isEmpty())
+        }
+    }
+
+    /** Issue #57: with a server set up and chosen in the advanced settings, the line says so (never "sent to no one"). */
+    @Test
+    fun theReminderSaysSoWhenAServerIsInUse() {
+        app.settings.remoteUrl = "https://dictee.example.ca"
+        // an address alone changes nothing
+        ActivityScenario.launch(HowToActivity::class.java).use { s ->
+            assertEquals(context.getString(R.string.howto_privacy), s.textsTagged(HowToActivity.PRIVACY_TAG).single())
+        }
+        app.settings.transcriptionMode = TranscriptionMode.SERVER
+        ActivityScenario.launch(HowToActivity::class.java).use { s ->
+            val privacy = s.textsTagged(HowToActivity.PRIVACY_TAG).single()
+            assertEquals(context.getString(R.string.howto_privacy_server), privacy)
+            assertTrue(privacy.contains("serveur distant"))
+            assertFalse("never the phone-only claim", privacy.contains("n'est envoyée à personne"))
+        }
+    }
+
+    /** « C'est prêt » follows the setup screen's own rule: nothing with the keyboard not chosen, the card when everything is done. */
+    @Test
+    fun theReadyCardFollowsTheSetupRule() {
+        TestHooks.assumeInstalled = true
+        TestHooks.keyboardEnabled = true
+        TestHooks.keyboardChosen = false
+        try {
+            ActivityScenario.launch(SetupActivity::class.java).use { setup ->
+                assertTrue("enabled but not chosen: not ready", setup.viewsTagged(READY_CARD_TAG).isEmpty())
+            }
+            TestHooks.keyboardChosen = true
+            ActivityScenario.launch(SetupActivity::class.java).use { setup ->
+                assertEquals("enabled and chosen: ready", 1, setup.viewsTagged(READY_CARD_TAG).size)
+            }
+        } finally {
+            TestHooks.keyboardEnabled = null
+            TestHooks.keyboardChosen = null
         }
     }
 

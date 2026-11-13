@@ -11,6 +11,7 @@ import android.view.inputmethod.InputMethodManager
 import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.RadioButton
+import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
@@ -19,6 +20,7 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import io.github.remtav.dictee.DicteeApp
 import io.github.remtav.dictee.R
+import io.github.remtav.dictee.TestHooks
 import io.github.remtav.dictee.stt.DictationLanguage
 import io.github.remtav.dictee.stt.ModelCatalog
 import io.github.remtav.dictee.stt.ModelFamily
@@ -31,13 +33,19 @@ import io.github.remtav.dictee.stt.ModelSpec
 import io.github.remtav.dictee.stt.asDownloadable
 
 /**
- * Launcher screen: enable the keyboard, grant the microphone (an IME cannot
- * ask for it itself), and manage the models (download, delete, choose).
+ * Launcher screen: enable and choose the keyboard (two steps, issue #55), grant the microphone (an IME cannot
+ * ask for it itself), choose the languages and get a model. Everything happens on the phone (issue #57): the
+ * remote server is a developer setting, in « Avancé » of the settings, and this screen only mentions it when the
+ * person set it up there and dictations really go to it.
+ *
+ * One filled button at most (issue #55): the button of [SetupProgress.nextStep]; every other button is outlined.
  */
 class SetupActivity : AppCompatActivity() {
     private lateinit var app: DicteeApp
-    private lateinit var keyboardStatus: TextView
-    private lateinit var micStatus: TextView
+    private lateinit var scroll: ScrollView
+    private lateinit var intro: TextView
+    private lateinit var serverBox: LinearLayout
+    private lateinit var stepsBox: LinearLayout
     private lateinit var modelsBox: LinearLayout
     private lateinit var languagesBox: LinearLayout
     private lateinit var participationBox: LinearLayout
@@ -46,8 +54,16 @@ class SetupActivity : AppCompatActivity() {
     private var readyShown: Boolean? = null
     /** Whether the participation card is drawn now; null before the first draw. It is redrawn only when this changes. */
     private var participationShown: Boolean? = null
-    // A download that ends can complete the setup: `renderReady` checks it.
-    private val refresh: () -> Unit = { renderModels(); renderReady(); renderParticipation() }
+    /**
+     * Issue #55, point 6: whether this opening of the screen may jump to a missing keyboard step. Only a fresh
+     * opening (not a rotation, not a return from the settings or from a system dialog): a jump on every resume
+     * scrolled away from the card the person had just touched.
+     */
+    private var jumpOnOpen = false
+    /** The step the screen was last drawn for: the models are redrawn when it changes (their filled button follows it). */
+    private var drawnStep: SetupStep? = null
+    // A download that ends can complete the setup: `renderSteps` redraws the steps and « C'est prêt ».
+    private val refresh: () -> Unit = { renderModels(); renderSteps() }
 
     private val askMic = registerForActivityResult(ActivityResultContracts.RequestPermission()) { renderSteps() }
     private val askNotifications = registerForActivityResult(ActivityResultContracts.RequestPermission()) { }
@@ -55,27 +71,24 @@ class SetupActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         app = DicteeApp.from(this)
+        jumpOnOpen = savedInstanceState == null
         val col = scrollingColumn()
+        scroll = col.parent as ScrollView
         col.title(getString(R.string.app_name))
-        col.body(getString(R.string.setup_intro))
+        intro = col.body()
+        intro.tag = INTRO_TAG
+        // Only when the person configured a server in the advanced settings and chose it (issue #57, point 4).
+        serverBox = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        col.addView(serverBox)
+
+        // Issue #55: the two keyboard steps and the microphone, first, one card each.
+        stepsBox = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; tag = STEPS_TAG }
+        col.addView(stepsBox)
+
+        // Below the steps (issue #55, point 4); the tutorial itself is issue #56.
         col.button(getString(R.string.setup_howto), outlined = true) {
             startActivity(Intent(this@SetupActivity, HowToActivity::class.java))
         }.tag = HOWTO_BUTTON_TAG
-
-        col.heading(getString(R.string.setup_step_keyboard))
-        keyboardStatus = col.body()
-        col.row().apply {
-            button(getString(R.string.setup_open_ime_settings)) {
-                startActivity(Intent(Settings.ACTION_INPUT_METHOD_SETTINGS))
-            }.spaced()
-            button(getString(R.string.setup_pick_ime), outlined = true) {
-                getSystemService(InputMethodManager::class.java).showInputMethodPicker()
-            }
-        }
-
-        col.heading(getString(R.string.setup_step_mic))
-        micStatus = col.body()
-        col.button(getString(R.string.setup_grant_mic)) { askMic.launch(Manifest.permission.RECORD_AUDIO) }
 
         col.heading(getString(R.string.setup_step_languages))
         col.body(getString(R.string.setup_languages_help), small = true)
@@ -93,7 +106,9 @@ class SetupActivity : AppCompatActivity() {
 
         col.heading(getString(R.string.setup_more))
         col.row().apply {
-            button(getString(R.string.setup_compare)) { startActivity(Intent(this@SetupActivity, CompareActivity::class.java)) }.spaced()
+            button(getString(R.string.setup_compare), outlined = true) {
+                startActivity(Intent(this@SetupActivity, CompareActivity::class.java))
+            }.spaced()
             button(getString(R.string.setup_settings), outlined = true) {
                 startActivity(Intent(this@SetupActivity, SettingsActivity::class.java))
             }
@@ -114,11 +129,16 @@ class SetupActivity : AppCompatActivity() {
     override fun onResume() {
         super.onResume()
         Downloads.addListener(refresh)
-        renderSteps()
-        // Redrawn on each resume: the languages may have been changed in the settings.
+        // Redrawn on each resume: the languages, or the server, may have been changed in the settings.
         languagesBox.renderLanguageChoices(app.settings) { renderModels(); renderParticipation() }
+        renderSteps()
         renderModels()
         renderParticipation()
+        // Issue #55, point 6: reopened with a keyboard step missing, that step is the first thing on screen.
+        if (jumpOnOpen && SetupProgress.jumpToKeyboardSteps(app.settings.setupSeen, isKeyboardEnabled(), isKeyboardChosen())) {
+            scroll.post { scroll.scrollTo(0, topWithin(scroll.getChildAt(0), stepsBox)) }
+        }
+        jumpOnOpen = false
     }
 
     override fun onPause() {
@@ -126,30 +146,116 @@ class SetupActivity : AppCompatActivity() {
         super.onPause()
     }
 
+    override fun onStop() {
+        // A rotation is not a visit: the first visit must still start on the welcome text.
+        if (!isChangingConfigurations) app.settings.setupSeen = true
+        super.onStop()
+    }
+
     override fun onWindowFocusChanged(hasFocus: Boolean) {
         super.onWindowFocusChanged(hasFocus)
         if (hasFocus) renderSteps() // back from the IME picker
     }
 
+    private fun currentStep(): SetupStep =
+        SetupProgress.nextStep(isKeyboardEnabled(), isKeyboardChosen(), isMicGranted(), isModelReady())
+
+    /** Redraws the welcome text, the server line and the steps; called on resume, on focus and when a download ends. */
     private fun renderSteps() {
-        // Called again on resume, on focus and when a download ends.
-        val imm = getSystemService(InputMethodManager::class.java)
-        val enabled = imm.enabledInputMethodList.any { it.packageName == packageName }
-        val current = Settings.Secure.getString(contentResolver, Settings.Secure.DEFAULT_INPUT_METHOD) ?: ""
-        keyboardStatus.text = when {
-            current.startsWith("$packageName/") -> getString(R.string.setup_keyboard_current)
-            enabled -> getString(R.string.setup_keyboard_enabled)
-            else -> getString(R.string.setup_keyboard_disabled)
-        }
-        val mic = ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
-        micStatus.text = getString(if (mic) R.string.setup_mic_ok else R.string.setup_mic_missing)
+        val serverInUse = app.settings.serverInUse
+        intro.text = getString(if (serverInUse) R.string.setup_intro_server else R.string.setup_intro)
+        renderServer(serverInUse)
+
+        val enabled = isKeyboardEnabled()
+        val chosen = enabled && isKeyboardChosen()
+        // Chosen once, another keyboard active now: done, said apart (a voice keyboard is often used in turns).
+        val chosenElsewhere = chosen && !isKeyboardCurrent()
+        val mic = isMicGranted()
+        val next = currentStep()
+        stepsBox.removeAllViews()
+        step(
+            title = getString(R.string.setup_step_enable_title),
+            text = getString(R.string.setup_step_enable_text) + " " +
+                getString(if (serverInUse) R.string.setup_step_enable_warning_server else R.string.setup_step_enable_warning),
+            done = enabled, available = true, filled = next == SetupStep.ENABLE_KEYBOARD,
+            buttonText = getString(R.string.setup_open_ime_settings),
+            tagPrefix = STEP_ENABLE,
+        ) { startActivity(Intent(Settings.ACTION_INPUT_METHOD_SETTINGS)) }
+        step(
+            title = getString(R.string.setup_step_choose_title),
+            text = getString(R.string.setup_step_choose_text),
+            done = chosen, available = enabled, filled = next == SetupStep.CHOOSE_KEYBOARD,
+            buttonText = getString(R.string.setup_pick_ime),
+            tagPrefix = STEP_CHOOSE,
+            doneText = if (chosenElsewhere) getString(R.string.setup_step_done_other_keyboard) else null,
+        ) { getSystemService(InputMethodManager::class.java).showInputMethodPicker() }
+        step(
+            title = getString(R.string.setup_step_mic),
+            text = getString(R.string.setup_mic_missing),
+            done = mic, available = true, filled = next == SetupStep.ALLOW_MIC,
+            buttonText = getString(R.string.setup_grant_mic),
+            tagPrefix = STEP_MIC,
+        ) { askMic.launch(Manifest.permission.RECORD_AUDIO) }
+
+        // The download button of the recommended model is filled only when the model is the next step.
+        if (drawnStep != null && (drawnStep == SetupStep.GET_MODEL) != (next == SetupStep.GET_MODEL)) renderModels()
+        drawnStep = next
         renderReady()
         renderParticipation()
     }
 
     /**
-     * Draws or removes the « C'est prêt » card (issue #56): once the setup is complete, with an invitation to
-     * "Comment dicter", which no longer opens by itself. Touches nothing when it is already as it should be.
+     * One step card (issue #55): number and title, what it does and what Android shows, its state, and its button.
+     * A step that cannot be done yet ([available] false) is dimmed and its button inactive; a done step keeps its
+     * button (outlined), to redo it.
+     */
+    private fun step(
+        title: String, text: String, done: Boolean, available: Boolean, filled: Boolean,
+        buttonText: String, tagPrefix: String, doneText: String? = null, onClick: () -> Unit,
+    ) {
+        val card = stepsBox.card()
+        card.tag = "${tagPrefix}_card"
+        card.heading(title).setPadding(0, 0, 0, dp(6))
+        card.body(text, small = true)
+        card.value(
+            when {
+                done -> doneText ?: getString(R.string.setup_step_done)
+                !available -> getString(R.string.setup_step_after_previous)
+                else -> getString(R.string.setup_step_todo)
+            },
+        ).tag = "${tagPrefix}_state"
+        card.button(buttonText, outlined = !filled) { onClick() }.apply {
+            tag = "${tagPrefix}_button"
+            isEnabled = available
+        }
+        // Dimmed while it waits for the previous step: the theme's disabled look for the button, a lighter text.
+        card.alpha = if (available) 1f else DIMMED_ALPHA
+    }
+
+    /** The line « Transcription : serveur distant » with a link to the setting (issue #57, point 4); nothing otherwise. */
+    private fun renderServer(serverInUse: Boolean) {
+        serverBox.removeAllViews()
+        if (!serverInUse) return
+        val card = serverBox.card()
+        card.tag = SERVER_STATUS_TAG
+        card.heading(getString(R.string.setup_server_in_use)).setPadding(0, 0, 0, dp(6))
+        val localModel = ModelCatalog.listed(app.settings.languages).any { app.isInstalled(it) }
+        card.body(
+            getString(R.string.setup_server_in_use_text, app.settings.remoteConfig().normalizedBase()) + " " +
+                getString(if (localModel) R.string.setup_server_fallback else R.string.setup_server_no_fallback),
+            small = true,
+        )
+        card.button(getString(R.string.setup_server_open_setting), outlined = true) {
+            startActivity(
+                Intent(this, SettingsActivity::class.java).putExtra(SettingsActivity.EXTRA_SCROLL_TO_SERVER_MODE, true),
+            )
+        }.tag = SERVER_SETTING_BUTTON_TAG
+    }
+
+    /**
+     * Draws or removes the « C'est prêt » card (issue #56): once the setup is complete ([setupComplete], the same
+     * rule as the steps), with an invitation to "Comment dicter", which never opens by itself. Touches nothing when
+     * it is already as it should be, and never scrolls.
      */
     private fun renderReady() {
         val show = setupComplete()
@@ -172,21 +278,42 @@ class SetupActivity : AppCompatActivity() {
                     app.settings.participationCardDismissed = true
                     renderParticipation()
                 },
+                filled = false,
             )
         }
     }
 
-    private fun setupComplete(): Boolean {
-        // Only a model the keyboard can use counts (a hidden model's files may still be on the phone).
-        val modelReady = (ModelCatalog.listed(app.settings.languages) + ModelCatalog.remote).any { app.isInstalled(it) }
-        return SetupProgress.isComplete(isKeyboardEnabled(), isMicGranted(), modelReady)
+    /**
+     * Only a model the keyboard can use counts (a hidden model's files may still be on the phone); a configured
+     * server counts only when dictations really go to it.
+     */
+    private fun isModelReady(): Boolean =
+        ModelCatalog.listed(app.settings.languages).any { app.isInstalled(it) } || app.settings.serverInUse
+
+    private fun setupComplete(): Boolean = currentStep() == SetupStep.DONE
+
+    private fun isKeyboardEnabled(): Boolean = TestHooks.keyboardEnabled
+        ?: getSystemService(InputMethodManager::class.java).enabledInputMethodList.any { it.packageName == packageName }
+
+    /** Kalmia Blabla is the input method in use right now. */
+    private fun isKeyboardCurrent(): Boolean = TestHooks.keyboardChosen
+        ?: (Settings.Secure.getString(contentResolver, Settings.Secure.DEFAULT_INPUT_METHOD) ?: "").startsWith("$packageName/")
+
+    /**
+     * Step 2 done (decision for issue #55, 2026-11-13): Kalmia Blabla is the current keyboard **or** has been seen
+     * as the current keyboard once. A person who keeps their usual keyboard and switches to Kalmia only to dictate
+     * has done the step. The first time it is seen current, that is remembered.
+     */
+    private fun isKeyboardChosen(): Boolean {
+        if (isKeyboardCurrent()) {
+            if (!app.settings.keyboardChosenOnce) app.settings.keyboardChosenOnce = true
+            return true
+        }
+        return app.settings.keyboardChosenOnce
     }
 
-    private fun isKeyboardEnabled() =
-        getSystemService(InputMethodManager::class.java).enabledInputMethodList.any { it.packageName == packageName }
-
-    private fun isMicGranted() =
-        ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
+    private fun isMicGranted(): Boolean = TestHooks.micGranted
+        ?: (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED)
 
     private fun renderModels() {
         modelsBox.removeAllViews()
@@ -194,8 +321,8 @@ class SetupActivity : AppCompatActivity() {
         val recommendation = ModelRecommendations.recommend(chosen)
         renderRetiredNotice()
         // Issue #22: only the models offered for the chosen languages (experimental ones are in the settings).
-        for (spec in ModelCatalog.offered(chosen)) renderModel(spec, chosen, recommendation)
-        renderRemote()
+        val modelIsNext = currentStep() == SetupStep.GET_MODEL
+        for (spec in ModelCatalog.offered(chosen)) renderModel(spec, chosen, recommendation, modelIsNext && spec == recommendation.model)
     }
 
     /**
@@ -214,7 +341,7 @@ class SetupActivity : AppCompatActivity() {
         if (missing) card.body(getString(R.string.model_notice_download, replacement.displayName), small = true)
         val deletable = retired.visibility == ModelVisibility.HIDDEN && app.store.isInstalled(retired)
         if (missing) {
-            card.button(getString(R.string.model_notice_download_button, replacement.displayName)) {
+            card.button(getString(R.string.model_notice_download_button, replacement.displayName), outlined = true) {
                 startDownload(replacement)
             }.tag = RETIRED_DOWNLOAD_TAG
         }
@@ -235,44 +362,10 @@ class SetupActivity : AppCompatActivity() {
         }.tag = RETIRED_OK_TAG
     }
 
-    /**
-     * The user's server (issue #23): used once its address is set and the "server" mode is chosen (#36, or the
-     * settings, whose text says what happens to the audio). Picking a phone model above means « Toujours
-     * transcrire sur le téléphone ».
-     */
-    private fun renderRemote() {
-        val spec = ModelCatalog.remote
-        val card = modelsBox.card()
-        val config = app.settings.remoteConfig()
-        card.addView(RadioButton(this).apply {
-            text = spec.displayName
-            isChecked = app.shownSpec().id == spec.id
-            isEnabled = config.isConfigured
-            setOnClickListener {
-                // The mode is recorded only under its text: never by this radio.
-                if (app.settings.transcriptionMode != TranscriptionMode.SERVER) {
-                    startActivity(
-                        Intent(this@SetupActivity, SettingsActivity::class.java)
-                            .putExtra(SettingsActivity.EXTRA_SCROLL_TO_SERVER_MODE, true),
-                    )
-                }
-                renderModels()
-            }
-        })
-        card.body(spec.description, small = true)
-        card.body(
-            if (config.isConfigured) getString(R.string.setup_remote_configured, config.normalizedBase())
-            else getString(R.string.setup_remote_not_configured),
-            small = true,
-        )
-        card.row().apply {
-            button(getString(R.string.setup_remote_configure), outlined = true) {
-                startActivity(Intent(this@SetupActivity, SettingsActivity::class.java))
-            }
-        }
-    }
-
-    private fun renderModel(spec: ModelSpec, chosen: Set<DictationLanguage>, recommendation: ModelRecommendation) {
+    /** [filledDownload]: this card's « Télécharger » is the screen's one filled button (the model is the next step). */
+    private fun renderModel(
+        spec: ModelSpec, chosen: Set<DictationLanguage>, recommendation: ModelRecommendation, filledDownload: Boolean,
+    ) {
         val card = modelsBox.card()
         card.tag = modelCardTag(spec)
         val installed = app.store.isInstalled(spec)
@@ -319,7 +412,7 @@ class SetupActivity : AppCompatActivity() {
             when {
                 Downloads.isBusy(spec.id) -> button(getString(R.string.cancel), outlined = true) { Downloads.cancel(spec.id) }
                 installed -> button(getString(R.string.delete), outlined = true) { confirmDelete(spec) }
-                else -> button(getString(R.string.download)) { startDownload(spec) }
+                else -> button(getString(R.string.download), outlined = !filledDownload) { startDownload(spec) }
             }
         }
     }
@@ -358,5 +451,15 @@ class SetupActivity : AppCompatActivity() {
         const val RETIRED_DOWNLOAD_TAG = "retired_model_download"
         const val RETIRED_DELETE_TAG = "retired_model_delete"
         const val RETIRED_OK_TAG = "retired_model_ok"
+        const val INTRO_TAG = "setup_intro"
+        const val STEPS_TAG = "setup_steps"
+        /** Prefixes of the step cards: `<prefix>_card`, `<prefix>_state`, `<prefix>_button` (issue #55). */
+        const val STEP_ENABLE = "setup_step_enable"
+        const val STEP_CHOOSE = "setup_step_choose"
+        const val STEP_MIC = "setup_step_mic"
+        const val SERVER_STATUS_TAG = "setup_server_status"
+        const val SERVER_SETTING_BUTTON_TAG = "setup_server_setting"
+        /** Opacity of a step that waits for the previous one. */
+        const val DIMMED_ALPHA = 0.5f
     }
 }

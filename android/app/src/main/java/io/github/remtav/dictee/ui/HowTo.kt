@@ -15,16 +15,40 @@ import io.github.remtav.dictee.text.CommandTable
  * so that the JVM tests cover it.
  */
 
-/** When the setup screen says "C'est prêt" and invites to the tutorial (which never opens by itself: issue #56). */
+/**
+ * The steps of the installation screen (issue #55), in the order they are done. [DONE]: nothing left to do.
+ * Only the button of [SetupProgress.nextStep] is a filled button on the screen.
+ */
+enum class SetupStep { ENABLE_KEYBOARD, CHOOSE_KEYBOARD, ALLOW_MIC, GET_MODEL, DONE }
+
+/** Where the first setup stands (the tutorial never opens by itself: issue #56; the setup screen says « C'est prêt » instead). */
 object SetupProgress {
     /**
-     * "End of the setup": the keyboard is enabled (not necessarily selected: the user may
-     * switch to it at any time), the microphone is allowed, and a model is ready to use
-     * (a downloaded one, or the user's own server once configured). Only then does the
-     * phone really dictate.
+     * "End of the setup" (issue #55, point 5): the keyboard is enabled **and** chosen (the current input
+     * method), the microphone is allowed, and a model is ready to use. Only then does the phone really
+     * dictate, so only then does the screen say « C'est prêt ». A keyboard cannot be chosen without being enabled:
+     * "chosen" alone (an inconsistent reading of the system settings) does not count.
      */
-    fun isComplete(keyboardEnabled: Boolean, micGranted: Boolean, modelReady: Boolean): Boolean =
-        keyboardEnabled && micGranted && modelReady
+    fun isComplete(keyboardEnabled: Boolean, keyboardChosen: Boolean, micGranted: Boolean, modelReady: Boolean): Boolean =
+        nextStep(keyboardEnabled, keyboardChosen, micGranted, modelReady) == SetupStep.DONE
+
+    /** The next thing to do, in the screen's order: enable, choose, microphone, model. */
+    fun nextStep(keyboardEnabled: Boolean, keyboardChosen: Boolean, micGranted: Boolean, modelReady: Boolean): SetupStep = when {
+        !keyboardEnabled -> SetupStep.ENABLE_KEYBOARD
+        !keyboardChosen -> SetupStep.CHOOSE_KEYBOARD
+        !micGranted -> SetupStep.ALLOW_MIC
+        !modelReady -> SetupStep.GET_MODEL
+        else -> SetupStep.DONE
+    }
+
+    /**
+     * Issue #55, point 6: back on the screen after a first visit, with one of the two keyboard steps missing,
+     * the screen starts on the steps rather than on the welcome text. Never on the very first visit: the
+     * welcome text is read first.
+     */
+    fun jumpToKeyboardSteps(seenBefore: Boolean, keyboardEnabled: Boolean, keyboardChosen: Boolean): Boolean =
+        seenBefore && !(keyboardEnabled && keyboardChosen)
+
 }
 
 /**

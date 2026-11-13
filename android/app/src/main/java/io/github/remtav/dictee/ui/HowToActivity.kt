@@ -85,7 +85,8 @@ class HowToActivity : AppCompatActivity() {
         })
 
         renderAllCommands(col, chosen)
-        col.body(getString(R.string.howto_privacy), small = true).tag = PRIVACY_TAG
+        // Issue #57: true in both cases; the server exists only once set up in the advanced settings.
+        col.body(getString(if (app.settings.serverInUse) R.string.howto_privacy_server else R.string.howto_privacy), small = true).tag = PRIVACY_TAG
     }
 
     /** "Toutes les commandes": a button that opens or closes the full list, closed at first. */

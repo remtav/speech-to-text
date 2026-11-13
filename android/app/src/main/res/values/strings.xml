@@ -60,21 +60,34 @@
     <string name="download_running">Téléchargement des modèles…</string>
     <string name="download_channel">Téléchargements</string>
 
-    <string name="setup_intro">Un clavier vocal conçu au Québec, pour le français d\'ici.\nVotre voix est transcrite sur votre téléphone : elle n\'est envoyée à personne, sauf si vous choisissez vous-même un serveur distant. Le réseau sert à télécharger les modèles.\nPas de compte, pas de publicité, pas de télémétrie.\nLe code source est public : chacun peut le lire et le vérifier. Les modèles de transcription, eux, viennent d\'éditeurs étrangers, nommés plus bas.</string>
-    <string name="setup_step_keyboard">1. Activer le clavier</string>
-    <string name="setup_open_ime_settings">Activer</string>
-    <string name="setup_pick_ime">Choisir le clavier</string>
-    <string name="setup_keyboard_current">✓ Activé et sélectionné</string>
-    <string name="setup_keyboard_enabled">✓ Activé. Basculez vers « Kalmia Blabla » depuis votre clavier habituel pour dicter.</string>
-    <string name="setup_keyboard_disabled">Pas encore activé : ouvrez les réglages des claviers et cochez « Kalmia Blabla (voix) ».</string>
-    <string name="setup_step_mic">2. Autoriser le micro</string>
+    <string name="setup_intro">Un clavier vocal conçu au Québec, pour le français d\'ici.\nVotre voix est transcrite sur votre téléphone : elle n\'est envoyée à personne. Le réseau sert à télécharger les modèles.\nPas de compte, pas de publicité, pas de télémétrie.\nLe code source est public : chacun peut le lire et le vérifier. Les modèles de transcription, eux, viennent d\'éditeurs étrangers, nommés plus bas.</string>
+    <string name="setup_open_ime_settings">Activer le clavier</string>
+    <string name="setup_pick_ime">Choisir Kalmia Blabla</string>
+    <!-- Issue #55: the two keyboard steps, then the microphone. -->
+    <string name="setup_intro_server">Un clavier vocal conçu au Québec, pour le français d\'ici.\nVous avez configuré un serveur distant dans les réglages avancés : vos dictées y sont envoyées pour être transcrites (voir ci-dessous).\nPas de compte, pas de publicité, pas de télémétrie.\nLe code source est public : chacun peut le lire et le vérifier. Les modèles de transcription, eux, viennent d\'éditeurs étrangers, nommés plus bas.</string>
+    <string name="setup_step_enable_title">1. Activer Kalmia Blabla</string>
+    <string name="setup_step_enable_text">Android ouvre la liste des claviers. Cochez « Kalmia Blabla (voix) », puis revenez ici.</string>
+    <string name="setup_step_enable_warning">Android affiche alors un avertissement, le même pour tous les claviers : votre voix, elle, reste sur votre téléphone.</string>
+    <string name="setup_step_enable_warning_server">Android affiche alors un avertissement, le même pour tous les claviers.</string>
+    <string name="setup_step_choose_title">2. Choisir Kalmia Blabla</string>
+    <string name="setup_step_choose_text">Android demande quel clavier utiliser. Touchez « Kalmia Blabla ».</string>
+    <string name="setup_step_done">✓ Fait</string>
+    <string name="setup_step_done_other_keyboard">✓ Fait (un autre clavier est actif en ce moment)</string>
+    <string name="setup_step_todo">À faire</string>
+    <string name="setup_step_after_previous">À faire après l\'étape précédente</string>
+    <!-- Issue #57: shown only when dictations go to a server configured in the advanced settings. -->
+    <string name="setup_server_in_use">Transcription : serveur distant</string>
+    <string name="setup_server_in_use_text">Vos dictées sont envoyées pour être transcrites au serveur que vous avez configuré dans les réglages avancés (%1$s).</string>
+    <string name="setup_server_fallback">Le modèle du téléphone sert de repli.</string>
+    <string name="setup_server_no_fallback">Aucun modèle n\'est installé sur le téléphone : si le serveur ne répond pas, la dictée est perdue.</string>
+    <string name="setup_server_open_setting">Voir le réglage</string>
+    <string name="setup_step_mic">3. Autoriser le micro</string>
     <string name="setup_grant_mic">Autoriser le micro</string>
-    <string name="setup_mic_ok">✓ Micro autorisé</string>
     <string name="setup_mic_missing">Le clavier ne peut pas demander le micro lui-même : autorisez-le ici.</string>
-    <string name="setup_step_languages">3. Vos langues</string>
-    <string name="setup_languages_help">Cochez les langues que vous dictez. Elles servent à recommander un modèle et à régler la langue des moteurs : une seule langue, Whisper et le serveur la reçoivent ; plusieurs, la langue est détectée automatiquement. Au moins une langue reste cochée.</string>
+    <string name="setup_step_languages">4. Vos langues</string>
+    <string name="setup_languages_help">Cochez les langues que vous dictez. Elles servent à recommander un modèle et à régler la langue de la transcription : avec une seule langue, elle est imposée ; avec plusieurs, elle est détectée automatiquement. Au moins une langue reste cochée.</string>
     <string name="languages_keep_one">Au moins une langue doit rester cochée.</string>
-    <string name="setup_models">4. Modèles</string>
+    <string name="setup_models">5. Modèles</string>
     <string name="model_recommended_badge">Recommandé pour vos langues</string>
     <string name="model_license_runs_local">Licence %1$s · s\'exécute sur votre téléphone</string>
     <string name="model_warning_uncovered">Attention : ce modèle ne couvre pas %1$s. Il reste téléchargeable.</string>
@@ -135,8 +148,12 @@
     <string name="settings_cleanup_help">Retire les hésitations et les autocorrections après chaque segment. Le texte du LLM n\'est gardé que si un garde-fou vérifie que chaque mot restant est identique à la lettre près, dans le même ordre, et que seuls des hésitations, des répétitions ou une autocorrection (« lundi, non, mardi ») ont été retirés ; sinon le texte nettoyé par les règles simples est gardé. Le nettoyage ne corrige donc jamais un mot mal entendu par le modèle de transcription. « Désactivé » : aucun traitement après la transcription.</string>
     <string name="settings_llm_note">Le LLM tourne sur l\'appareil (MediaPipe, arm64 uniquement). S\'il est indisponible, le nettoyage par règles est utilisé.</string>
 
-    <string name="settings_remote">Serveur distant</string>
-    <string name="settings_remote_help">Le téléphone transcrit lentement avec Whisper : un serveur avec GPU répond bien plus vite. Avec une adresse ici et le choix « Sur le serveur » (à l\'installation ou ci-dessous), vos dictées y sont transcrites. Toute la dictée est alors envoyée au serveur en une fois à la fin, puis le texte transcrit est inséré (poli par son LLM si « Polissage par le serveur » est actif). Le serveur de ce dépôt supprime l\'audio dès la transcription et ne journalise ni l\'audio ni le texte. Sans adresse, ou sans ce choix, tout reste sur le téléphone. Pour installer votre serveur : docs/DEPLOIEMENT_SERVEUR.md dans le dépôt.</string>
+    <!-- Issue #57: the server is a developer setting, folded inside « Avancé ». -->
+    <string name="settings_server_section">Serveur distant, pour essais (développeurs)</string>
+    <string name="settings_server_section_help">Pour développer et déboguer. Kalmia Blabla transcrit votre voix sur votre téléphone ; ces réglages ne servent qu\'à qui héberge son propre serveur de transcription.</string>
+    <string name="collapsible_open">déplié</string>
+    <string name="collapsible_closed">replié</string>
+    <string name="settings_remote_help">Avec une adresse ici et le choix « Sur le serveur configuré » ci-dessous, vos dictées y sont transcrites au lieu du téléphone : l\'audio est envoyé au serveur par blocs pendant la dictée, puis le texte transcrit est inséré (poli par son LLM si « Polissage par le serveur » est actif). Le serveur de ce dépôt supprime l\'audio dès la transcription et ne journalise ni l\'audio ni le texte. Sans adresse, ou sans ce choix, tout reste sur le téléphone. Pour installer votre serveur : docs/DEPLOIEMENT_SERVEUR.md dans le dépôt.</string>
     <string name="settings_remote_polish">Polissage par le serveur</string>
     <string name="settings_remote_polish_help">Le serveur repasse sur la dictée entière avec un LLM : il corrige la ponctuation et retire les hésitations. Mais un LLM peut parfois remplacer un mot bien transcrit par un autre. Si vous voyez des mots changés, coupez ce réglage : le texte brut de la transcription est alors inséré tel quel.</string>
     <string name="settings_remote_api">Type d\'API</string>
@@ -145,12 +162,12 @@
     <string name="settings_remote_language">Langue envoyée au serveur (par défaut : selon vos langues, « français » ou « anglais » seulement)</string>
     <string name="settings_remote_lang_auto">Détection automatique</string>
     <string name="settings_server_use">Envoi au serveur</string>
-    <string name="settings_server_mode_help">Où vos dictées sont transcrites. Ce choix se fait aussi à l\'installation.</string>
+    <string name="settings_server_mode_help">Où vos dictées sont transcrites. Tant que « Sur le serveur configuré » n\'est pas choisi ici, rien n\'est envoyé.</string>
     <string name="settings_mode_server">Sur le serveur configuré : l\'audio de vos dictées y est envoyé, puis supprimé dès la transcription</string>
     <string name="settings_mode_phone">Toujours transcrire sur le téléphone : rien n\'est envoyé</string>
     <string name="settings_mode_unset">Pas encore choisi : vos dictées restent sur le téléphone.</string>
     <string name="settings_mode_no_address">Sans adresse de serveur ci-dessus, vos dictées restent sur le téléphone, quel que soit ce choix.</string>
-    <string name="msg_server_mode_in_settings">Choisissez « Sur le serveur » dans les Réglages pour l\'utiliser</string>
+    <string name="msg_server_mode_in_settings">Choisissez « Sur le serveur configuré » dans les réglages avancés pour l\'utiliser</string>
     <string name="settings_server_timeout">Délai avant repli sur le téléphone</string>
     <string name="settings_server_timeout_help">Si le serveur est injoignable ou ne répond pas dans ce délai après la fin de la dictée (plus un quart de sa durée), elle est transcrite sur le téléphone avec %1$s. Le bouton « Annuler » le fait tout de suite.</string>
     <string name="settings_remote_test">Tester la connexion</string>
@@ -173,9 +190,6 @@
     <string name="settings_remote_failed">Échec : %1$s</string>
     <string name="settings_remote_invalid">Adresse invalide : elle doit commencer par http:// ou https://</string>
     <string name="settings_remote_insecure">⚠ HTTP non chiffré vers une adresse publique : l\'audio traverserait Internet en clair. Utilisez HTTPS ou un VPN (WireGuard, Tailscale).</string>
-    <string name="setup_remote_configured">Configuré : %1$s</string>
-    <string name="setup_remote_not_configured">Non configuré.</string>
-    <string name="setup_remote_configure">Configurer</string>
     <string name="compare_title">Comparer les modèles</string>
     <string name="compare_intro">Transcrit le même audio avec chaque modèle installé, l\'un après l\'autre, et mesure le temps de chargement, le facteur temps réel (RTF = temps de calcul / durée audio) et la mémoire en pointe du processus.</string>
     <string name="compare_audio">Audio</string>
@@ -197,7 +211,8 @@
     <string name="setup_howto">Comment dicter</string>
     <string name="howto_title">Comment dicter</string>
     <string name="howto_rule">Dites le nom du signe au milieu de votre phrase : il s\'écrit tout seul.</string>
-    <string name="howto_privacy">Par défaut, tout se passe sur votre téléphone : votre voix y est transcrite et n\'est envoyée à personne. Un réglage avancé peut changer cela.</string>
+    <string name="howto_privacy_server">Vos dictées sont envoyées au serveur distant que vous avez configuré dans les réglages avancés, pour y être transcrites.</string>
+    <string name="howto_privacy">Tout se passe sur votre téléphone : votre voix y est transcrite et n\'est envoyée à personne.</string>
     <string name="howto_say">Dites :</string>
     <string name="howto_say_in">Dites (%1$s) :</string>
     <string name="howto_get">Vous obtenez :</string>
