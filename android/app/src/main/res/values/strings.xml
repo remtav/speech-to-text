@@ -151,8 +151,8 @@
     <string name="settings_cf_id_hint">Cloudflare Access Client ID</string>
     <string name="settings_cf_secret_hint">Cloudflare Access Client Secret</string>
     <string name="diag_title">Diagnostic serveur</string>
-    <string name="diag_help">Envoie les enregistrements de référence de l\'application (et leur enchaînement, environ 30 s) comme de vraies dictées, deux fois chacun : par blocs, joués en temps réel comme au clavier, puis en une seule requête (dictée entière). Pour chaque essai : l\'attente après l\'arrêt, le nombre de blocs, le texte brut et le texte poli. Les essais longs durent environ 2 et 5 minutes chacun (une quinzaine de minutes en tout). Aucune donnée personnelle, aucun secret dans le rapport.</string>
-    <string name="diag_run_long">Essais longs (2 et 5 min)</string>
+    <string name="diag_help">Envoie les enregistrements de référence de l\'application (et leur enchaînement) comme de vraies dictées, deux fois chacun : par blocs, joués en temps réel comme au clavier, puis en une seule requête (dictée entière). Pour chaque essai : l\'attente après l\'arrêt, le nombre de blocs, le texte brut et le texte poli. « Essais 30 s, 2 min, 5 min » enchaîne les enregistrements sur ces durées (une quinzaine de minutes en tout). Aucune donnée personnelle, aucun secret dans le rapport.</string>
+    <string name="diag_run_long">Essais 30 s, 2 min, 5 min</string>
     <string name="diag_run">Lancer</string>
     <string name="diag_export">Exporter le rapport</string>
     <string name="diag_running">Essai %1$d sur %2$d…</string>

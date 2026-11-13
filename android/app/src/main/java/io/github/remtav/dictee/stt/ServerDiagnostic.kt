@@ -21,7 +21,7 @@ class ServerDiagnostic(
     companion object {
         const val MODE_BLOCKS = "par blocs"
         const val MODE_WHOLE = "entière"
-        val LONG_TARGETS = listOf("2 min" to 120f, "5 min" to 290f)
+        val LONG_TARGETS = listOf("30 s" to 30f, "2 min" to 120f, "5 min" to 290f)
     }
 
     data class Trial(
@@ -61,8 +61,8 @@ class ServerDiagnostic(
     }
 
     /**
-     * Long trials for the checkpoint of issue #35: the clips chained (1 s of silence between them) and repeated
-     * up to about 2 and 5 minutes (just under the 5 min limit of a dictation).
+     * The trials of the checkpoint of issue #35: the clips chained (1 s of silence between them), repeated as
+     * needed and cut at 30 s, 2 min and 4 min 50 s (just under the 5 min limit of a dictation).
      */
     fun longPlan(samples: List<BenchSample>, targets: List<Pair<String, Float>> = LONG_TARGETS): List<BenchSample> {
         if (samples.isEmpty()) return emptyList()

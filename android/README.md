@@ -450,11 +450,11 @@ Le secret reste dans les préférences privées de l'application, s'affiche
 masqué, et n'apparaît ni dans les journaux ni dans les rapports.
 
 **Diagnostic serveur** (Réglages → Serveur distant) : envoie les enregistrements
-de référence de l'application, puis leur enchaînement (environ 30 s), comme de
+de référence de l'application, puis leur enchaînement, comme de
 vraies dictées, deux fois chacun : par blocs, joués en temps réel avec la
 détection de la voix du clavier, puis en une seule requête (dictée entière).
-« Essais longs » fait de même avec l'enchaînement répété sur environ 2 et
-5 minutes. Pour chaque essai, l'écran affiche l'attente entre la fin de la dictée
+« Essais 30 s, 2 min, 5 min » fait de même avec les enregistrements enchaînés
+sur ces trois durées (point de contrôle de #35). Pour chaque essai, l'écran affiche l'attente entre la fin de la dictée
 et le résultat, le nombre de blocs, le statut du polissage, et le texte brut et le
 texte poli côte à côte. « Exporter le rapport » le partage en texte, sans aucun
 secret.

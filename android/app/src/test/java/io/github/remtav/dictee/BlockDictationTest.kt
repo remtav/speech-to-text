@@ -633,17 +633,18 @@ class BlockDictationTest {
         assertFalse(report.contains("bearer-token-xyz"))
     }
 
-    @Test fun diagnosticLongTrialsLastAboutTwoAndFiveMinutes() {
+    @Test fun diagnosticCheckpointTrialsLast30sTwoAndFiveMinutes() {
         val diag = io.github.remtav.dictee.stt.ServerDiagnostic(config())
         val clips = listOf(
             io.github.remtav.dictee.stt.BenchSample("a", "fr", io.github.remtav.dictee.audio.PcmAudio(part(), 16000), "a"),
             io.github.remtav.dictee.stt.BenchSample("b", "en", io.github.remtav.dictee.audio.PcmAudio(part(seed = 2), 16000), "b"),
         )
         val long = diag.longPlan(clips)
-        assertEquals(listOf("2 min", "5 min"), long.map { it.name })
-        assertEquals(120f, long[0].audio.samples.size / 16000f, 0.01f)
+        assertEquals(listOf("30 s", "2 min", "5 min"), long.map { it.name })
+        assertEquals(30f, long[0].audio.samples.size / 16000f, 0.01f)
+        assertEquals(120f, long[1].audio.samples.size / 16000f, 0.01f)
         // Under the 5 min limit of a dictation, lead and tail of the playback included.
-        assertTrue(long[1].audio.samples.size / 16000f + 1.5f < 300f)
+        assertTrue(long[2].audio.samples.size / 16000f + 1.5f < 300f)
     }
 
     private fun joined(ps: List<FloatArray>): FloatArray {

@@ -3882,8 +3882,9 @@ pendant la dictée ». Le contrat du serveur est celui de la PR #46 (`POST /poli
 - **Diagnostic serveur** : chaque essai est fait deux fois sur le même audio : par blocs (joué en temps réel à
   travers le vrai `DictationController` et le VAD Silero du clavier, sans repli local), puis en dictée entière
   (une requête, comme #13). Pour chacun : attente après l'arrêt, nombre de blocs, statut du polissage, texte brut
-  et poli. Bouton « Essais longs » : l'enchaînement des enregistrements de référence répété sur 2 min et
-  4 min 50 s (sous la limite de 5 min, marges de lecture comprises).
+  et poli. Bouton « Essais 30 s, 2 min, 5 min » : les enregistrements de référence enchaînés (1 s de silence
+  entre eux), répétés au besoin et coupés à 30 s, 2 min et 4 min 50 s (sous la limite de 5 min, marges de
+  lecture comprises) : les trois durées du point de contrôle.
 
 ### Tests
 
