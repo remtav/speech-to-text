@@ -44,3 +44,20 @@ sont tels quels ; `WHISPER_QC` de `ModelCatalog.kt` pointe sur `…/resolve/main
 Si la conversion est refaite et republiée, reporter les nouvelles sommes dans le catalogue.
 
 Vérifier : `./gradlew testDebugUnitTest` puis, hôte, `-PmodelsDir=… --tests '*ModelAccuracyHostTest*'`.
+
+## Lite-Whisper large-v3-turbo-acc (2026-11-13, à l'essai)
+
+Demande de l'utilisateur : un Whisper « juste un peu plus petit » que large-v3-turbo.
+[`efficient-speech/lite-whisper-large-v3-turbo-acc`](https://huggingface.co/efficient-speech/lite-whisper-large-v3-turbo-acc)
+(Apache-2.0, article arXiv 2502.20583) est large-v3-turbo dont les couches linéaires de l'**encodeur** sont factorisées
+en deux matrices de rang réduit : encodeur de 635 M à 421 M paramètres, décodeur inchangé (172 M). WER annoncé en
+anglais (ESB) : 10,2 % contre 10,1 % pour turbo. **Aucune mesure en français** à ce jour : la compression a été calibrée
+et évaluée en anglais ; l'utilisateur fait son propre banc d'essai sur des extraits québécois (voir aussi l'issue #24).
+
+`bash convertir_lite.sh /chemin/de/travail` : comme `convertir.sh`, avec `exporter_lite.py`, qui remplace dans le modèle
+`openai-whisper` les couches factorisées par un module équivalent (mêmes calculs que `modeling_lite_whisper.py`, lu mais
+non exécuté) avant de lancer le script d'export de sherpa-onnx. Les noms de fichiers produits sont ceux de turbo.
+
+Publication prévue par l'utilisateur : `https://huggingface.co/remiavelo/sherpa-onnx-lite-whisper-large-v3-turbo-acc-int8`
+(les trois fichiers de `sortie/`). Reporter ensuite les tailles et SHA-256 de `SHA256SUMS` dans le catalogue de l'app.
+État au 2026-11-13 : `hf_vers_openai.py` vérifié sur ce modèle (758 tenseurs) ; l'export ONNX n'a pas été mené à terme.
