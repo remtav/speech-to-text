@@ -72,3 +72,8 @@ Cette variante est publiée à titre expérimental (2026-11-13, à la demande de
 `work/turbo-encoder.onnx` de `convertir_lite.sh`), `mels_calibration.py`, `../whisper-mesure-python/banc_lite.py`. La
 version publiée se refait avec `python quantifier_lite.py turbo-encoder.onnx turbo-encoder.int8.onnx --w2 fp32`
 (798 Mo, sortie correcte ; sommes différentes, la conversion n'étant pas reproductible au bit près).
+
+## Int4 (issue #26, essai)
+
+`quantifier_int4.py` : `MatMulNBits` 4 bits par blocs sur l'export fp32 (`python quantifier_int4.py ENC_FP32.onnx SORTIE.onnx [--bloc 32|128]`).
+Résultats, procédure téléphone : `android/docs/WHISPER_INT4.md`. Mesure : `../whisper-mesure-python/bench_int4.py`.

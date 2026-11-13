@@ -382,4 +382,44 @@ class ReadingTestInstrumentedTest : ImeTestBase() {
         assertTrue(view.context.theme.resolveAttribute(attr, tv, true))
         return tv.data
     }
+
+    // ---- issue #20: « Arrêter » answers every tap ----
+
+    @Test
+    fun stopButtonStopsTheRecordingAtEveryTapAndTheSecondCounterStillShows() {
+        useModels(ModelCatalog.whisperTurbo.id) // Parakeet is not offered with Québec French (#22, #36)
+        app.settings.quebecDeclaration = Declaration.YES
+        // A clip paced in real time, longer than the test waits: only « Arrêter » can end the recording.
+        TestHooks.audioSourceFactory = AudioSourceFactory {
+            micOpened.incrementAndGet()
+            PcmAudioSource(
+                listOf(PcmAudio(FloatArray(15 * 16000) { 0.05f }, 16000)),
+                realTime = true, leadSeconds = 0f, tailSeconds = 0f,
+            )
+        }
+        val stopLabel = context.getString(R.string.reading_stop)
+        ActivityScenario.launch(ReadingTestActivity::class.java).use { s ->
+            val d = driver(s)
+            d.awaitTag(ReadingTestActivity.TAG_ACCEPT_START)
+            d.click(ReadingTestActivity.TAG_ACCEPT_START)
+            d.awaitTag(ReadingTestActivity.TAG_RECORD)
+            repeat(20) { i ->
+                d.click(ReadingTestActivity.TAG_RECORD)
+                d.await("recording $i started") { d.text(ReadingTestActivity.TAG_RECORD) == stopLabel }
+                if (i == 0) {
+                    // The counter reaches 2 s without the screen being rebuilt.
+                    d.await("counter at 2 s", 6_000) {
+                        d.text(ReadingTestActivity.TAG_RECORD_STATE) ==
+                            context.getString(R.string.reading_recording, 2, io.github.remtav.dictee.reading.ParagraphRecorder.MAX_SECONDS)
+                    }
+                } else {
+                    android.os.SystemClock.sleep(1_000)
+                }
+                val tapped = android.os.SystemClock.uptimeMillis()
+                d.click(ReadingTestActivity.TAG_RECORD)
+                d.await("recording $i stopped", 300) { d.text(ReadingTestActivity.TAG_RECORD) != stopLabel }
+                assertTrue("tap $i took too long", android.os.SystemClock.uptimeMillis() - tapped < 600)
+            }
+        }
+    }
 }
