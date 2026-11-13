@@ -6,6 +6,7 @@ import android.content.Intent
 import android.net.Uri
 import android.os.Build
 import androidx.core.content.FileProvider
+import androidx.core.net.toUri
 import io.github.remtav.dictee.BuildConfig
 import io.github.remtav.dictee.R
 import io.github.remtav.dictee.reading.ArchiveField
@@ -83,7 +84,7 @@ object ContributionShare {
      */
     fun emailIntent(context: Context, archive: File, textVersion: String, modelLabel: String): Intent =
         send(context, archive, textVersion, modelLabel).apply {
-            selector = Intent(Intent.ACTION_SENDTO, Uri.parse("mailto:"))
+            selector = Intent(Intent.ACTION_SENDTO, "mailto:".toUri())
         }
 
     /** « Partager le fichier autrement »: the system share sheet, same attachment and fields, any app. */

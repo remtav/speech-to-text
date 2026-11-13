@@ -357,28 +357,7 @@ class ReadingTestInstrumentedTest : ImeTestBase() {
         }
     }
 
-    @Test
-    fun theSharingSlotExistsButIsEmptyWhenTheRecommendedModelIsFarOff() {
-        val parakeet = ModelCatalog.parakeet.id
-        // Parakeet (recommended for Québec French) hears nothing: far above the 20 % threshold.
-        useModels(parakeet) { _, _, _ -> "" }
-        ActivityScenario.launch(ReadingTestActivity::class.java).use { s ->
-            val d = driver(s)
-            d.awaitTag(ReadingTestActivity.TAG_DECLARE_YES)
-            d.click(ReadingTestActivity.TAG_DECLARE_YES)
-            d.awaitTag(ReadingTestActivity.TAG_ACCEPT_START)
-            d.click(ReadingTestActivity.TAG_ACCEPT_START)
-            d.awaitTag(ReadingTestActivity.TAG_PARAGRAPH)
-            d.readAllParagraphs(redoLabel)
-            d.click(ReadingTestActivity.TAG_SCORE)
-            d.awaitTag(ReadingTestActivity.globalTag(parakeet), 60_000)
-            assertEquals(context.getString(R.string.reading_result_global, 0), d.text(ReadingTestActivity.globalTag(parakeet)))
-            // Step 4.3 plugs the offer in here; in step 4.2 the slot is empty and nothing is created.
-            d.awaitTag(ReadingTestActivity.TAG_SHARE_SLOT)
-            val children = d.onViews { v -> (v.first { it.tag == ReadingTestActivity.TAG_SHARE_SLOT } as android.view.ViewGroup).childCount }
-            assertEquals(0, children)
-        }
-    }
+    // The sharing offer above the threshold (step 4.3) is tested in ContributionInstrumentedTest.
 
     @Test
     fun stoppingAfterOneParagraphScoresOnlyWhatWasRead() {

@@ -181,6 +181,50 @@ class ScreenshotTest : ImeTestBase() {
         }
     }
 
+    /**
+     * The sharing offer of the reading test (issue #15, step 4.3): the recommended model (Parakeet) loses
+     * every fourth word, above the 20 % line, so the result proposes to share; the capture shows the start
+     * of the offer (« what would leave »). Nothing is created (no consent) and nothing is sent.
+     */
+    @Test
+    fun readingShare() {
+        val material = io.github.remtav.dictee.reading.ReadingMaterial.load { path ->
+            context.assets.open(path).bufferedReader().use { it.readText() }
+        }
+        try {
+            for (mode in listOf(ThemeMode.LIGHT, ThemeMode.DARK)) {
+                val suffix = mode.name.lowercase()
+                setTheme(mode)
+                app.settings.languages = setOf(io.github.remtav.dictee.stt.DictationLanguage.FRENCH_QUEBEC)
+                app.settings.quebecDeclaration = io.github.remtav.dictee.reading.Declaration.YES
+                app.settings.activeModelId = ModelCatalog.parakeet.id
+                TestHooks.installedModelIds = setOf(ModelCatalog.parakeet.id)
+                TestHooks.engineFactory = ScriptedReadingModels(material) { _, _, text ->
+                    ScriptedReadingModels.dropEveryFourthWord(text)
+                }
+                TestHooks.audioSourceFactory = io.github.remtav.dictee.audio.AudioSourceFactory {
+                    io.github.remtav.dictee.audio.PcmAudioSource(
+                        listOf(io.github.remtav.dictee.audio.PcmAudio(FloatArray(3 * 16000) { 0.05f }, 16000)),
+                        realTime = false, leadSeconds = 0f, tailSeconds = 0f,
+                    )
+                }
+                ActivityScenario.launch(ReadingTestActivity::class.java).use { s ->
+                    val d = ReadingDriver(instrumentation, s, material)
+                    d.awaitTag(ReadingTestActivity.TAG_ACCEPT_START)
+                    d.click(ReadingTestActivity.TAG_ACCEPT_START)
+                    d.awaitTag(ReadingTestActivity.TAG_PARAGRAPH)
+                    d.readAllParagraphs(context.getString(R.string.reading_redo))
+                    d.click(ReadingTestActivity.TAG_SCORE)
+                    d.awaitTag(ReadingTestActivity.TAG_SHARE_LIST, 90_000)
+                    s.scrollToTag(ReadingTestActivity.TAG_SHARE_SLOT, above = 8)
+                    shot("reading-share-$suffix", s)
+                }
+            }
+        } finally {
+            TestHooks.installedModelIds = null
+        }
+    }
+
     @Test
     fun appScreens() {
         // The setup screen opens "Comment dicter" by itself once the keyboard, the microphone and a model
