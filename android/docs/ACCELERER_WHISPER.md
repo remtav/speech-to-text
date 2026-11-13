@@ -352,6 +352,105 @@ architecture) : tous les leviers de ce rapport lui sont applicables, et la proc�
 l'identique avec lui. Si l'on choisit un modèle plus petit pour la vitesse, on perd ce qui motive l'usage de Whisper
 (les mots québécois isolés) : le compromis vitesse/qualité est réel et se joue entre les deux enquêtes.
 
+### 7.2 Lite-Whisper large-v3-turbo-acc : quantification de l'encodeur (2026-11-13, issue #25)
+
+[`efficient-speech/lite-whisper-large-v3-turbo-acc`](https://huggingface.co/efficient-speech/lite-whisper-large-v3-turbo-acc)
+(Apache-2.0, arXiv 2502.20583) : large-v3-turbo dont 139 couches linéaires de l'encodeur sont factorisées
+(`x @ W1 @ W2 + b`, rang 16 à 1 024), encodeur de 635 M à 421 M paramètres, décodeur inchangé. Objectif de l'issue : un
+encodeur int8 **< 675 Mo** et **plus rapide** que turbo int8 sur les 7 clips, avec au plus 1 phrase sur 7 différente de
+turbo et un WER ≤ turbo + 2 points sur le jeu de 172 extraits québécois (#24).
+
+**Conclusion : aucune quantification CPU satisfaisante.** La version expérimentale publiée (encodeur de 799 Mo, `W2` en
+fp32) reste telle quelle ; rien n'est republié. La meilleure variante trouvée (rotation, ci-dessous) est correcte,
+plus petite (461 à 530 Mo) et à peine plus rapide que turbo (−2 % sur 172 extraits), mais son WER est de 19,5 % contre
+14,5 % pour turbo. **Même sans quantification, Lite fp32 fait déjà 16,5 %** (+2,0 points) : la compression, calibrée en
+anglais, coûte en français québécois, et la quantification ajoute 2 à 3 points.
+
+Protocole [mesuré hôte] : sherpa-onnx 2.0.1 Python (onnxruntime 1.28.2, celui de l'AAR), x86-64 4 cœurs, 4 threads,
+langue `fr` forcée, `tailPaddings` 1 000, décodeur int8 de la conversion Lite, turbo int8
+(`csukuangfj/sherpa-onnx-whisper-turbo`) remesuré **dans la même exécution, en alternance clip par clip**. Temps = somme
+sur les clips du meilleur de N passages (7 clips : N = 1 ou 2 ; 172 extraits : N = 1). La machine est plus lente que
+celle des mesures de l'issue (turbo : 12,2 à 14,5 s au lieu de 9,9 s selon la charge) : seules les comparaisons dans
+une même exécution valent. « Phrases différentes » : transcription normalisée (casse, ponctuation) différente de turbo.
+Outils : `android/tools/whisper-hf-vers-sherpa/quantifier_lite.py` (toutes les variantes ci-dessous, à partir de
+l'encodeur fp32 produit par `convertir_lite.sh`), `mels_calibration.py`, `android/tools/whisper-mesure-python/banc_lite.py`.
+
+#### Reproduction (étape 1)
+
+| Encodeur | Taille | 7 clips : temps (turbo dans la même exécution) | Sortie |
+| --- | --- | --- | --- |
+| Lite int8 par tenseur (`convertir_lite.sh` tel quel) | 460 Mo | 16,2 s (12,97 s) | « ... » |
+| Version publiée (`W2` en fp32) | 799 Mo | 15,4 s (12,97 s), **+18 %** | correcte, 2 phrases différentes |
+| Même variante refaite par `quantifier_lite.py --w2 fp32` | 798 Mo | 16,4 s (13,35 s) | correcte, 2 phrases différentes |
+
+#### Pistes de l'issue, dans l'ordre
+
+| Piste | Variante | Taille | 7 clips : temps (turbo) | Sortie |
+| --- | --- | --- | --- | --- |
+| 1 | Recombiner les couches où `r × (in + out) ≥ 0,6 × in × out` (**53** couches sur 139 ; 86 restent factorisées), `W2` restantes en fp32 | **628 Mo** | 14,5 s (13,35 s), +9 % | correcte, 2 phrases différentes |
+| 1 | Idem, `W2` en int8 dynamique | 496 Mo | 17,7 s | « ... » |
+| 2 | `MatMulNBits` int8, blocs de 32, calcul fp32 (`accuracy_level` 0), sur les `W2` | 503 Mo | 15,6 s (14,5 s), +8 % | correcte, 2 phrases différentes |
+| 2 | Idem, `accuracy_level` 4 (activations int8 par bloc) | 503 Mo | 16,0 s | dégradée (WER 52 %) |
+| 2 | `MatMulNBits` int8, blocs de 128 ; int4, blocs de 32 (calcul fp32 ou int8) | 480 à 507 Mo | 19,9 à 20,8 s | « ... » |
+| 3 | int8 statique (échelle d'activation fixe) des `W2`, calibration sur 20 extraits du jeu #24 (min/max ou pourcentile 99,99) | 496 Mo | 17,0 à 17,3 s | « ... » |
+| 3 | Tout l'encodeur en int8 statique (pourcentile 99,99) | 496 Mo | 18,4 s | « ... » |
+| 3 | Statique sauf les `W2` (fp32) | 628 Mo | 14,0 s (12,46 s), +12 % | correcte, 2 phrases différentes |
+| 4 | `W2` en fp16 (Cast avant et après) | 540 Mo | 13,1 s (12,51 s), +5 % | correcte, 2 phrases différentes |
+
+`MatMulNBits` est bien exécuté par l'onnxruntime de sherpa-onnx 2.0.1 (1.28.2, Python et AAR arm64 : opérateur présent
+dans `libonnxruntime.so`) ; la piste 2 n'a donc pas été abandonnée d'office.
+
+#### Cause de l'échec de l'int8 et rotation (complément de la piste 3)
+
+Diagnostic sur les vrais `h` d'un extrait : l'erreur relative de `h @ W2` en int8 par tenseur est de 4 % en médiane et
+jusqu'à 9 % par couche (contre ~1 % d'habitude), et elle vient **surtout des poids** : les colonnes de `W2` ont des
+valeurs extrêmes isolées (max/écart-type médian 11, jusqu'à 35), de même que `h` (15, jusqu'à 67). Cumulée sur 86 à 139
+couches, cette erreur détruit le modèle. Cela explique que seuls les blocs fins (32) de la piste 2 tiennent.
+
+Correctif sans calibration ni coût à l'exécution : une **rotation orthogonale de l'espace de rang**, `W1 → W1 Q` et
+`W2 → Qᵀ W2` (Q aléatoire r×r, graine fixe), qui laisse le produit inchangé en fp32 mais répartit les valeurs extrêmes
+(max/écart-type ramené à 6,5 pour `W2` et 4,6 pour `h` ; erreur médiane 1,8 %). Avec elle, toutes les `W2` passent en int8
+dynamique (`--rotation --w2 dyn8 --par-colonne w2,w1,plein`, échelle des poids par colonne) :
+
+| Variante (rotation, tout en int8 dynamique) | Taille | 7 clips : temps (turbo dans la même exécution) | 7 clips : WER (turbo 9,6 %) |
+| --- | --- | --- | --- |
+| Recombinaison au seuil 0,4 (72 couches) | 530 Mo | 12,09 s (12,20 s) | 13,7 %, 2 phrases différentes |
+| Recombinaison au seuil 0,6 (53 couches) | 498 Mo | 11,73 s (12,20 s) | 11,0 %, 2 phrases différentes |
+| Recombinaison au seuil 0,8 (26 couches) | 468 Mo | 11,99 s (12,20 s) | 9,6 %, 2 phrases différentes |
+| Sans recombinaison | 461 Mo | 12,09 s (12,20 s) | 13,7 %, 3 phrases différentes |
+| Seuil 0,6, sans rotation (témoin) | 498 Mo | 16,2 s | « ... » |
+
+#### Jeu québécois de 172 extraits (#24) : 1 673 mots, même exécution, 1 passage
+
+| Encodeur | Taille | Temps | WER | Phrases différentes de turbo |
+| --- | --- | --- | --- | --- |
+| **Turbo int8 (référence)** | 675 Mo | 330,0 s | **14,5 %** (243) | — |
+| Lite fp32 (non quantifié) | 1,74 Go | 596,7 s | 16,5 % (276) | 77 |
+| Lite, version publiée (`W2` fp32) | 799 Mo | 386,4 s (+17 %) | 18,6 % (311) | 82 |
+| Lite, rotation, seuil 0,6 | 498 Mo | 324,1 s (−2 %) | 19,5 % (327) | 94 |
+| Lite, rotation, seuil 0,8 | 468 Mo | 323,1 s (−2 %) | 19,5 % (327) | 89 |
+| Lite, rotation, sans recombinaison | 461 Mo | 324,6 s (−2 %) | 19,9 % (333) | 87 |
+
+Bilan des critères : taille **remplie** (461 à 530 Mo) ; vitesse **à peine** (−2 % sur 172 extraits, −1 à −4 % sur
+7 clips, dans le bruit de mesure) ; transcriptions **non remplies** (2 phrases sur 7 différentes, comme Lite fp32 et la
+version publiée ; WER +5 points sur le jeu #24, la limite étant +2). Le critère « au plus 1 phrase sur 7 » n'est
+atteignable par aucune quantification : Lite fp32 lui-même diffère de turbo sur 77 des 172 extraits.
+
+#### Pourquoi Lite ne peut pas être beaucoup plus rapide sur CPU
+
+Profil de l'encodeur turbo int8 (onnxruntime 1.32, 1 600 trames, 4 threads, 900 ms) [mesuré hôte] : environ **40 %** du
+temps est l'attention (produits `QKᵀ` et `AV` en fp32 sur ~1 500 trames, softmax), que LiteASR ne touche pas ; les
+multiplications à poids n'en font qu'environ 40 %, et Lite n'en retire qu'un tiers des paramètres. Le décodeur, inchangé,
+représente encore à peu près la moitié du temps d'un clip court. Le gain maximal de Lite sur le temps total est donc de
+l'ordre de 5 à 7 %, avant même le surcoût des deux petites MatMul quantifiées par couche factorisée. LiteASR vise le GPU
+en fp16, où les petites MatMul sont bon marché.
+
+Remarque (demande de l'utilisateur) : turbo garde **la même architecture d'encodeur** que large-v3 (32 couches, largeur
+1 280 ; poids réajustés par l'affinage : les tenseurs d'encodeur des deux dépôts `openai/whisper-large-v3*` diffèrent
+[vérifié par requêtes partielles sur les `model.safetensors`]) ; c'est le décodeur réduit de 32 à 4 couches qui le rend
+rapide. Ce qui distingue large-v3 de turbo, et ce qu'on peut encore en tirer pour la vitesse, est une piste séparée
+(issue à part), non traitée ici.
+
 ## 8. Autres moteurs
 
 Évaluation honnête, sans implémentation.

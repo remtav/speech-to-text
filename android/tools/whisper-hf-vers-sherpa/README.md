@@ -51,18 +51,24 @@ Demande de l'utilisateur : un Whisper « juste un peu plus petit » que large-v3
 [`efficient-speech/lite-whisper-large-v3-turbo-acc`](https://huggingface.co/efficient-speech/lite-whisper-large-v3-turbo-acc)
 (Apache-2.0, article arXiv 2502.20583) est large-v3-turbo dont les couches linéaires de l'**encodeur** sont factorisées
 en deux matrices de rang réduit : encodeur de 635 M à 421 M paramètres, décodeur inchangé (172 M). WER annoncé en
-anglais (ESB) : 10,2 % contre 10,1 % pour turbo. **Aucune mesure en français** à ce jour : la compression a été calibrée
-et évaluée en anglais ; l'utilisateur fait son propre banc d'essai sur des extraits québécois (voir aussi l'issue #24).
+anglais (ESB) : 10,2 % contre 10,1 % pour turbo. La compression a été calibrée et évaluée en anglais : sur les 172
+extraits québécois de l'issue #24, Lite fp32 fait 16,5 % de WER contre 14,5 % pour turbo int8 (issue #25).
 
 `bash convertir_lite.sh /chemin/de/travail` : comme `convertir.sh`, avec `exporter_lite.py`, qui remplace dans le modèle
 `openai-whisper` les couches factorisées par un module équivalent (mêmes calculs que `modeling_lite_whisper.py`, lu mais
 non exécuté) avant de lancer le script d'export de sherpa-onnx. Les noms de fichiers produits sont ceux de turbo.
 
-**Attention : en l'état, `convertir_lite.sh` produit un encodeur int8 cassé** (sortie « ... »). L'export fp32 et le
-décodeur int8 sont corrects ; c'est la quantification int8 de l'encodeur (multiplications qui partent de la
-représentation réduite) qui casse le modèle. La seule variante correcte trouvée (ces multiplications laissées en fp32)
-est plus grosse et plus lente que turbo. Essais, mesures et pistes : issue #25.
+L'int8 par tenseur de toutes les MatMul de l'encodeur casse le modèle (sortie « ... ») : depuis l'issue #25,
+`convertir_lite.sh` laisse en fp32 les multiplications qui partent de la représentation réduite (`h @ W2`), comme la
+version publiée. Cette variante est plus grosse (799 Mo) et plus lente (+17 %) que turbo.
 
 Cette variante est publiée à titre expérimental (2026-11-13, à la demande de l'utilisateur) :
 `https://huggingface.co/remiavelo/sherpa-onnx-lite-whisper-large-v3-turbo-acc-int8` (encodeur 799 004 644 octets,
-`ccefad7d…`). Elle n'est pas encore reproduite par `convertir_lite.sh` (voir #25) ; intégration dans l'app : #22.
+`ccefad7d…`). Intégration dans l'app : #22.
+
+**Issue #25 (2026-11-13) : aucune quantification CPU satisfaisante**, la version publiée reste telle quelle. Essais
+(recombinaison des couches, `MatMulNBits`, int8 statique, fp16, rotation de l'espace de rang) et mesures :
+`android/docs/ACCELERER_WHISPER.md`, section 7.2. Outils : `quantifier_lite.py` (variantes à partir de l'encodeur fp32
+`work/turbo-encoder.onnx` de `convertir_lite.sh`), `mels_calibration.py`, `../whisper-mesure-python/banc_lite.py`. La
+version publiée se refait avec `python quantifier_lite.py turbo-encoder.onnx turbo-encoder.int8.onnx --w2 fp32`
+(798 Mo, sortie correcte ; sommes différentes, la conversion n'étant pas reproductible au bit près).
