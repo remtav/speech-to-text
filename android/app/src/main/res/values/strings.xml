@@ -104,7 +104,7 @@
     <string name="settings_commands_help">Ponctuation : « deux-points », « point-virgule », « point d\'interrogation », « point d\'exclamation », « ouvrir / fermer les guillemets », « ouvrir / fermer la parenthèse ». Mise en forme : « nouvelle ligne », « nouveau paragraphe ». Effacement, dit seul : « efface la dernière phrase », « efface le dernier mot ». Les commandes suivent vos langues de dictée (français, anglais) ; dans une phrase ordinaire (« j\'ai marqué deux points »), les mots restent du texte.</string>
     <string name="settings_pause">Pause qui termine un segment</string>
     <string name="settings_vocabulary">Vocabulaire personnalisé</string>
-    <string name="settings_vocabulary_help">Un mot par ligne pour le favoriser (noms propres, jargon). « mal entendu -> correct » pour corriger après transcription. Qwen3-ASR reçoit aussi les mots favoris pendant la reconnaissance.</string>
+    <string name="settings_vocabulary_help">Un mot par ligne pour le favoriser (noms propres, jargon). « mal entendu -> correct » pour corriger après transcription.</string>
     <string name="settings_feedback">Apparence et retour</string>
     <string name="settings_haptics">Retour haptique</string>
     <string name="settings_performance">Performance</string>

@@ -17,6 +17,7 @@ import io.github.remtav.dictee.reading.ParagraphRecorder
 import io.github.remtav.dictee.reading.ReadingProgress
 import io.github.remtav.dictee.reading.ReadingSession
 import io.github.remtav.dictee.reading.ReadingTranscriber
+import io.github.remtav.dictee.reading.SecondTicker
 import io.github.remtav.dictee.reading.ShareOffer
 import io.github.remtav.dictee.stt.ModelCatalog
 import java.io.File
@@ -40,6 +41,13 @@ class ReadingTestModel(private val app: DicteeApp, val session: ReadingSession) 
 
     /** Set by the started screen; called on the main thread. */
     var onChange: (() -> Unit)? = null
+
+    /**
+     * Called on the main thread at each new whole second of the recording, and at each step of the scoring:
+     * the screen only updates one text, it never rebuilds (issue #20: a rebuild between the press and the
+     * release of « Arrêter » destroyed the button and the tap was lost).
+     */
+    var onProgress: ((Int) -> Unit)? = null
 
     var recording = false
         private set
@@ -113,6 +121,7 @@ class ReadingTestModel(private val app: DicteeApp, val session: ReadingSession) 
         recordingSeconds = 0
         notice = null
         changed()
+        val ticker = SecondTicker { sec -> recordingSeconds = sec; onProgress?.invoke(sec) }
         thread(name = "reading-record") {
             var recorded: PcmAudio? = null
             var error: String? = null
@@ -120,7 +129,7 @@ class ReadingTestModel(private val app: DicteeApp, val session: ReadingSession) 
                 recorded = ParagraphRecorder.record(
                     app.newAudioSource(),
                     shouldStop = { stopRequested || cleared },
-                    onProgress = { s -> main.post { recordingSeconds = s.toInt(); changed() } },
+                    onProgress = { s -> main.post { if (recording) ticker.update(s) } },
                 )
             } catch (e: AudioSourceException) {
                 error = e.message ?: "?"
@@ -265,7 +274,7 @@ class ReadingTestModel(private val app: DicteeApp, val session: ReadingSession) 
             try {
                 session.score(
                     transcriber(),
-                    progress = { p -> main.post { progress = p; changed() } },
+                    progress = { p -> main.post { progress = p; onProgress?.invoke(-1) } },
                     cancelled = { cancelRequested || cleared },
                 )
             } catch (e: Throwable) {
