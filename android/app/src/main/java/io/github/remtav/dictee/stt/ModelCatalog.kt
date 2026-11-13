@@ -13,6 +13,19 @@ package io.github.remtav.dictee.stt
  */
 enum class ModelFamily { NEMO_TRANSDUCER, QWEN3_ASR, WHISPER, REMOTE }
 
+/**
+ * Where a model is shown (issue #22). Hiding never deletes: a hidden entry stays in
+ * [ModelCatalog.all] so its files can still be found (and removed) and the host tests keep it.
+ */
+enum class ModelVisibility {
+    /** Offered on every screen, subject to the chosen languages ([ModelCatalog.offered]). */
+    VISIBLE,
+    /** Never recommended; listed in the settings, the keyboard's picker and the comparison, marked "expérimental". */
+    EXPERIMENTAL,
+    /** Shown nowhere. */
+    HIDDEN,
+}
+
 data class ModelFile(
     /** Path relative to the model directory. */
     val path: String,
@@ -32,15 +45,16 @@ data class ModelSpec(
     val files: List<ModelFile>,
     /** Short practical note shown on the model's card (empty: none). Not a warning. */
     val note: String = "",
+    val visibility: ModelVisibility = ModelVisibility.VISIBLE,
 ) {
     val totalBytes: Long get() = files.sumOf { it.size }
 }
 
 object ModelCatalog {
-    /** Shown on Whisper's card and in its recommendation (DECISIONS.md, issue #15, « friperie »). */
+    /** Shown on Whisper's card (DECISIONS.md, issue #15, « friperie »; no longer « dernier recours » since issue #22). */
     const val WHISPER_NOTE =
-        "Observé sur un téléphone : comprend bien des mots que les autres modèles ratent, mais plus lent. " +
-            "À garder en dernier recours, quand les autres modèles comprennent mal un mot."
+        "Observé sur un téléphone : comprend bien des mots que les autres modèles ratent, " +
+            "mais la transcription prend plus de temps."
     private const val PARAKEET =
         "https://huggingface.co/csukuangfj/sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8/resolve/main"
     private const val WHISPER =
@@ -56,6 +70,12 @@ object ModelCatalog {
     const val WHISPER_QC_NOTE =
         "Même taille et même coût de calcul que Whisper large-v3-turbo, donc plus lent sur le téléphone " +
             "(observation de l'utilisateur sur Whisper turbo, pas une mesure sur appareil)."
+    /**
+     * Lite-Whisper large-v3-turbo-acc (LiteASR, compressed encoder), converted to sherpa-onnx and
+     * published on the user's Hugging Face account as an experiment (issues #22, #25).
+     */
+    private const val LITE_WHISPER =
+        "https://huggingface.co/remiavelo/sherpa-onnx-lite-whisper-large-v3-turbo-acc-int8/resolve/main"
     private const val QWEN3 =
         "https://huggingface.co/csukuangfj2/sherpa-onnx-qwen3-asr-0.6B-int8-2026-03-25/resolve/main"
 
@@ -87,6 +107,8 @@ object ModelCatalog {
         family = ModelFamily.QWEN3_ASR,
         description = "Encodeur audio + décodeur LLM, 52 langues. Accepte un vocabulaire favori.",
         license = "Apache-2.0",
+        // Issue #22: hidden (not deleted), Whisper turbo did better in the user's tests.
+        visibility = ModelVisibility.HIDDEN,
         files = listOf(
             ModelFile("conv_frontend.onnx", "$QWEN3/conv_frontend.onnx",
                 "d22dc4423e0940e49884e903d2ea2f7e5567c14fc1aed97e4e26d6b8f208ef9e", 44148281),
@@ -141,6 +163,8 @@ object ModelCatalog {
             "et 6 pour Whisper turbo : un indice, pas une preuve. Français seulement.",
         license = "MIT",
         note = WHISPER_QC_NOTE,
+        // Issue #22: in the user's tests this fine-tune did worse than the base Whisper turbo. Hidden, not deleted.
+        visibility = ModelVisibility.HIDDEN,
         files = listOf(
             ModelFile("turbo-encoder.int8.onnx", "$WHISPER_QC/turbo-encoder.int8.onnx",
                 "3f774a722b473fb85fca92e24591afffec5159c53564089fed4dc191fe6fabfc", 674348342),
@@ -151,9 +175,59 @@ object ModelCatalog {
         ),
     )
 
-    /** Downloadable on-device models. */
+    /**
+     * `efficient-speech/lite-whisper-large-v3-turbo-acc` (Apache-2.0): Whisper large-v3-turbo with a
+     * low-rank compressed encoder. Same file names and 128 mels as [whisperTurbo], so the same engine
+     * branch loads it. Experimental (issue #22): on the host, bigger and ~25 % slower than turbo.
+     */
+    val liteWhisperTurbo = ModelSpec(
+        id = "lite-whisper-large-v3-turbo-acc-int8",
+        displayName = "Lite-Whisper large-v3-turbo (expérimental)",
+        shortName = "Lite-Whisper",
+        publisher = "efficient-speech (LiteASR), d'après OpenAI",
+        family = ModelFamily.WHISPER,
+        description = "Whisper large-v3-turbo dont l'encodeur est compressé (LiteASR). " +
+            "Expérimental : sur un ordinateur de test, plus gros et un peu plus lent que Whisper turbo, " +
+            "qualité semblable. À comparer sur votre téléphone.",
+        license = "Apache-2.0",
+        visibility = ModelVisibility.EXPERIMENTAL,
+        files = listOf(
+            ModelFile("turbo-encoder.int8.onnx", "$LITE_WHISPER/turbo-encoder.int8.onnx",
+                "ccefad7d2aa1a07569b3894390cd3cb21be06e0f0381b1adbb3c9e3ac9f1ce17", 799004644),
+            ModelFile("turbo-decoder.int8.onnx", "$LITE_WHISPER/turbo-decoder.int8.onnx",
+                "f7e5ca5fa2eb712b87b9626d46d512d6f1037b4761aadfdc0de2687c98e6df8d", 360961539),
+            ModelFile("turbo-tokens.txt", "$LITE_WHISPER/turbo-tokens.txt",
+                "b34b360dbb493e781e479794586d661700670d65564001f23024971d1f2fa126", 816730),
+        ),
+    )
+
+    /**
+     * Every downloadable on-device model, hidden ones included (their files may still be on the
+     * phone). Screens list [offered] and [experimental] instead.
+     */
     val all: List<ModelSpec> =
-        listOf(parakeet, qwen3, whisperTurbo, whisperQuebec)
+        listOf(whisperTurbo, parakeet, qwen3, whisperQuebec, liteWhisperTurbo)
+
+    /** Experimental models: never recommended, listed apart with the mention "expérimental". */
+    val experimental: List<ModelSpec> = all.filter { it.visibility == ModelVisibility.EXPERIMENTAL }
+
+    /**
+     * The models offered for [languages] (issue #22): visible, covering every chosen language,
+     * and Parakeet only when the languages are English alone. In catalogue order.
+     */
+    fun offered(languages: Set<DictationLanguage>): List<ModelSpec> =
+        all.filter { spec ->
+            spec.visibility == ModelVisibility.VISIBLE &&
+                ModelRecommendations.uncovered(spec, languages).isEmpty() &&
+                (spec != parakeet || languages == setOf(DictationLanguage.ENGLISH))
+        }
+
+    /** What the keyboard's picker, the settings and the comparison list: [offered] then [experimental]. */
+    fun listed(languages: Set<DictationLanguage>): List<ModelSpec> = offered(languages) + experimental
+
+    /** Can [spec] stay the active (or fallback) model with [languages]? The server always can. */
+    fun suits(spec: ModelSpec, languages: Set<DictationLanguage>): Boolean =
+        spec.family == ModelFamily.REMOTE || spec in listed(languages)
 
     /**
      * A server the user runs (opt-in): nothing to download, "installed" once its
@@ -173,7 +247,8 @@ object ModelCatalog {
     /** Everything the keyboard can dictate with. */
     val selectable: List<ModelSpec> = all + remote
 
-    val default: ModelSpec = parakeet
+    /** Issue #22: Whisper turbo did best in the user's tests, Quebec French included. */
+    val default: ModelSpec = whisperTurbo
 
     fun byId(id: String?): ModelSpec? = selectable.firstOrNull { it.id == id }
 }

@@ -34,8 +34,11 @@ private fun sha(b: ByteArray) = MessageDigest.getInstance("SHA-256").digest(b).j
 
 class CatalogTest {
     @Test fun catalogIsWellFormed() {
-        assertEquals(4, ModelCatalog.all.size)
-        assertEquals("parakeet-tdt-0.6b-v3-int8", ModelCatalog.default.id)
+        // Issue #22: five on-device models (hidden ones kept) plus the server makes six selectable.
+        assertEquals(5, ModelCatalog.all.size)
+        assertEquals(6, ModelCatalog.selectable.size)
+        assertEquals("whisper-large-v3-turbo-int8", ModelCatalog.default.id)
+        assertEquals(ModelCatalog.selectable.size, ModelCatalog.selectable.map { it.id }.toSet().size)
         assertEquals(ModelCatalog.all.size, ModelCatalog.all.map { it.id }.toSet().size)
         val items: List<Downloadable> = ModelCatalog.all.map { object : Downloadable {
             override val id = it.id; override val files = it.files } } + LlmCatalog.all
@@ -53,13 +56,38 @@ class CatalogTest {
         assertTrue(ModelCatalog.whisperTurbo.totalBytes in 900_000_000L..1_200_000_000L)
     }
 
+    /** Issue #22: Lite-Whisper large-v3-turbo-acc, experimental, with the published files (checked 2026-11-13). */
+    @Test fun liteWhisperIsExperimentalAndPointsAtThePublishedFiles() {
+        val m = ModelCatalog.liteWhisperTurbo
+        assertEquals("lite-whisper-large-v3-turbo-acc-int8", m.id)
+        assertEquals("Lite-Whisper large-v3-turbo (expérimental)", m.displayName)
+        assertEquals(io.github.remtav.dictee.stt.ModelVisibility.EXPERIMENTAL, m.visibility)
+        assertTrue(m in ModelCatalog.all)
+        val base = "https://huggingface.co/remiavelo/sherpa-onnx-lite-whisper-large-v3-turbo-acc-int8/resolve/main"
+        assertEquals(
+            listOf(
+                Triple("$base/turbo-encoder.int8.onnx", "ccefad7d2aa1a07569b3894390cd3cb21be06e0f0381b1adbb3c9e3ac9f1ce17", 799_004_644L),
+                Triple("$base/turbo-decoder.int8.onnx", "f7e5ca5fa2eb712b87b9626d46d512d6f1037b4761aadfdc0de2687c98e6df8d", 360_961_539L),
+                Triple("$base/turbo-tokens.txt", "b34b360dbb493e781e479794586d661700670d65564001f23024971d1f2fa126", 816_730L),
+            ),
+            m.files.map { Triple(it.url, it.sha256, it.size) },
+        )
+        // Same engine branch and file names as Whisper turbo: no change in SherpaEngine.
+        assertEquals(ModelFamily.WHISPER, m.family)
+        assertEquals(ModelCatalog.whisperTurbo.files.map { it.path }, m.files.map { it.path })
+        assertEquals("Apache-2.0", m.license)
+        assertTrue(m.publisher.contains("efficient-speech"))
+        assertTrue(m.description.contains("Expérimental"))
+    }
+
     /**
-     * The Quebec French Whisper (issue #15, user request): offered, with the files published
+     * The Quebec French Whisper (issue #15, user request): hidden since issue #22 but kept, with the files published
      * on the user's Hugging Face account, with the exact sizes and checksums of the server.
      */
     @Test fun quebecWhisperIsListedAndPointsAtThePublishedFiles() {
         val m = ModelCatalog.whisperQuebec
         assertTrue(m in ModelCatalog.all)
+        assertEquals(io.github.remtav.dictee.stt.ModelVisibility.HIDDEN, m.visibility)
         assertTrue(m in ModelCatalog.selectable)
         val base = "https://huggingface.co/remiavelo/sherpa-onnx-whisper-large-v3-turbo-fr-quebecois-int8/resolve/main"
         assertEquals(

@@ -24,6 +24,7 @@ import io.github.remtav.dictee.stt.ModelCatalog
 import io.github.remtav.dictee.stt.RemoteApi
 import io.github.remtav.dictee.stt.RemoteEngine
 import io.github.remtav.dictee.stt.WhisperTuning
+import io.github.remtav.dictee.stt.asDownloadable
 import java.util.Locale
 
 /** Dictation preferences (lots 2 and 3). Every optional feature can be turned off. */
@@ -38,9 +39,10 @@ class SettingsActivity : AppCompatActivity() {
     private lateinit var remoteStatus: android.widget.TextView
     private lateinit var llmBox: LinearLayout
     private lateinit var participationBox: LinearLayout
+    private lateinit var experimentalBox: LinearLayout
     /** Redraws the server-language choice; set once that section exists. */
     private var refreshRemoteLanguage: () -> Unit = {}
-    private val refresh: () -> Unit = { renderLlm() }
+    private val refresh: () -> Unit = { renderLlm(); renderExperimental() }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -64,6 +66,11 @@ class SettingsActivity : AppCompatActivity() {
         participationBox = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         col.addView(participationBox)
         renderParticipation()
+
+        // Issue #22: experimental models are listed here (and in the comparison), never on the main screen.
+        experimentalBox = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        col.addView(experimentalBox)
+        renderExperimental()
 
         col.heading(getString(R.string.settings_dictation))
         col.switch(getString(R.string.settings_partials), s.partials) { s.partials = it }
@@ -135,6 +142,7 @@ class SettingsActivity : AppCompatActivity() {
         super.onResume()
         Downloads.addListener(refresh)
         renderLlm()
+        renderExperimental()
         // Back from the reading test, where the question may have been answered.
         renderParticipation()
     }
@@ -229,7 +237,7 @@ class SettingsActivity : AppCompatActivity() {
         col.body(getString(R.string.settings_remote_polish_help), small = true)
         col.body(getString(R.string.settings_remote_fallback), small = true)
         val fallbacks = listOf("" to getString(R.string.settings_remote_no_fallback)) +
-            ModelCatalog.all.map { it.id to it.displayName }
+            ModelCatalog.listed(s.languages).map { it.id to it.displayName }
         col.radio(fallbacks.map { it.second }, fallbacks.indexOfFirst { it.first == s.remoteFallbackId }.coerceAtLeast(0)) {
             s.remoteFallbackId = fallbacks[it].first
             if (::remoteStatus.isInitialized) updateRemoteWarning()
@@ -288,6 +296,53 @@ class SettingsActivity : AppCompatActivity() {
                     { getString(R.string.settings_remote_failed, it.message) },
                 ) + if (config.isInsecurePublic) "\n" + getString(R.string.settings_remote_insecure) else ""
                 remoteStatus.markError(r.isFailure || config.isInsecurePublic)
+            }
+        }
+    }
+
+    /** One card per experimental model: choose it, download it, delete it (issue #22). */
+    private fun renderExperimental() {
+        experimentalBox.removeAllViews()
+        if (ModelCatalog.experimental.isEmpty()) return
+        experimentalBox.heading(getString(R.string.settings_experimental))
+        experimentalBox.body(getString(R.string.settings_experimental_help), small = true)
+        for (spec in ModelCatalog.experimental) {
+            val card = experimentalBox.card()
+            card.tag = experimentalCardTag(spec)
+            val installed = app.store.isInstalled(spec)
+            card.addView(RadioButton(this).apply {
+                text = spec.displayName
+                isChecked = app.settings.activeModelId == spec.id
+                isEnabled = installed
+                setOnClickListener { app.settings.activeModelId = spec.id; renderExperimental() }
+            })
+            card.body("${spec.publisher} · ${spec.description}", small = true)
+            card.body(getString(R.string.model_license_runs_local, spec.license), small = true)
+            val st = Downloads.status[spec.id]
+            card.body(
+                when {
+                    Downloads.isBusy(spec.id) && st != null ->
+                        getString(R.string.setup_downloading, st.percent, size(st.downloaded), size(st.total))
+                    st?.error != null -> getString(R.string.setup_download_error, st.error)
+                    installed -> getString(R.string.setup_installed, size(app.store.installedBytes(spec.asDownloadable())))
+                    else -> getString(R.string.setup_not_installed, size(spec.totalBytes))
+                },
+                small = true,
+            ).apply { if (!Downloads.isBusy(spec.id) && st?.error != null) markError() }
+            card.row().apply {
+                when {
+                    Downloads.isBusy(spec.id) -> button(getString(R.string.cancel), outlined = true) { Downloads.cancel(spec.id) }
+                    installed -> button(getString(R.string.delete), outlined = true) {
+                        if (app.engines.current()?.spec?.id == spec.id) app.engines.release()
+                        app.store.delete(spec)
+                        if (app.settings.activeModelId == spec.id) app.settings.activeModelId = ModelCatalog.default.id
+                        renderExperimental()
+                    }
+                    else -> button(getString(R.string.download)) {
+                        Downloads.start(this@SettingsActivity, spec.asDownloadable(), getString(R.string.setup_downloading_label, spec.displayName))
+                        renderExperimental()
+                    }
+                }
             }
         }
     }
@@ -382,5 +437,7 @@ class SettingsActivity : AppCompatActivity() {
         const val PARTICIPATION_YES_TAG = "settings_participation_yes"
         const val PARTICIPATION_NO_TAG = "settings_participation_no"
         const val PARTICIPATION_EXCLUDED_TAG = "settings_participation_excluded"
+        /** Tag of an experimental model's card, for tests. */
+        fun experimentalCardTag(spec: io.github.remtav.dictee.stt.ModelSpec) = "experimental_card_${spec.id}"
     }
 }

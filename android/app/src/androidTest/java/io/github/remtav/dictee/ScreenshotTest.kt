@@ -137,8 +137,9 @@ class ScreenshotTest : ImeTestBase() {
     }
 
     /**
-     * The reading test with a result (issue #15, step 4.2): two scripted models, the active one (Qwen3-ASR)
-     * loses every fourth word and the other (Parakeet) hears everything, so the capture shows the model
+     * The reading test with a result (issue #15, step 4.2): two scripted models (English alone, so both
+     * Whisper turbo and Parakeet are offered, issue #22), the active one (Parakeet) loses every fourth word
+     * and the recommended one (Whisper turbo) hears everything, so the capture shows the model
      * chooser, the "another model understands you better" card and the misheard words highlighted
      * (colour and underline). The clip is the test's, never the microphone; nothing is downloaded or sent.
      */
@@ -147,16 +148,17 @@ class ScreenshotTest : ImeTestBase() {
         val material = io.github.remtav.dictee.reading.ReadingMaterial.load { path ->
             context.assets.open(path).bufferedReader().use { it.readText() }
         }
-        val qwen = ModelCatalog.qwen3.id
+        val worse = ModelCatalog.parakeet.id
         try {
             for (mode in listOf(ThemeMode.LIGHT, ThemeMode.DARK)) {
                 val suffix = mode.name.lowercase()
                 setTheme(mode)
                 app.settings.quebecDeclaration = io.github.remtav.dictee.reading.Declaration.YES
-                app.settings.activeModelId = qwen
-                TestHooks.installedModelIds = setOf(ModelCatalog.parakeet.id, qwen)
+                app.settings.languages = setOf(io.github.remtav.dictee.stt.DictationLanguage.ENGLISH)
+                app.settings.activeModelId = worse
+                TestHooks.installedModelIds = setOf(ModelCatalog.whisperTurbo.id, worse)
                 TestHooks.engineFactory = ScriptedReadingModels(material) { model, _, text ->
-                    if (model == qwen) ScriptedReadingModels.dropEveryFourthWord(text) else text
+                    if (model == worse) ScriptedReadingModels.dropEveryFourthWord(text) else text
                 }
                 TestHooks.audioSourceFactory = io.github.remtav.dictee.audio.AudioSourceFactory {
                     io.github.remtav.dictee.audio.PcmAudioSource(
@@ -182,7 +184,7 @@ class ScreenshotTest : ImeTestBase() {
     }
 
     /**
-     * The sharing offer of the reading test (issue #15, step 4.3): the recommended model (Parakeet) loses
+     * The sharing offer of the reading test (issue #15, step 4.3): the recommended model (Whisper turbo) loses
      * every fourth word, above the 20 % line, so the result proposes to share; the capture shows the start
      * of the offer (« what would leave »). Nothing is created (no consent) and nothing is sent.
      */
@@ -197,8 +199,8 @@ class ScreenshotTest : ImeTestBase() {
                 setTheme(mode)
                 app.settings.languages = setOf(io.github.remtav.dictee.stt.DictationLanguage.FRENCH_QUEBEC)
                 app.settings.quebecDeclaration = io.github.remtav.dictee.reading.Declaration.YES
-                app.settings.activeModelId = ModelCatalog.parakeet.id
-                TestHooks.installedModelIds = setOf(ModelCatalog.parakeet.id)
+                app.settings.activeModelId = ModelCatalog.whisperTurbo.id
+                TestHooks.installedModelIds = setOf(ModelCatalog.whisperTurbo.id)
                 TestHooks.engineFactory = ScriptedReadingModels(material) { _, _, text ->
                     ScriptedReadingModels.dropEveryFourthWord(text)
                 }
@@ -235,13 +237,13 @@ class ScreenshotTest : ImeTestBase() {
             setTheme(mode)
             // Setup: the top (welcome text, steps), then the "Vos langues" step
             // and the model card carrying the "Recommandé" badge (the screen is
-            // taller than the phone). Quebec French is preselected: Parakeet is
-            // the recommended model. No network, no model downloaded.
+            // taller than the phone). Quebec French is preselected: Whisper turbo is
+            // the recommended (and only offered) model. No network, no model downloaded.
             ActivityScenario.launch(SetupActivity::class.java).use { s ->
                 shot("setup-$suffix", s)
                 s.scrollToTag(languageTag(DictationLanguage.FRENCH_QUEBEC), above = 120)
                 shot("setup-languages-$suffix", s)
-                s.scrollToTag(SetupActivity.modelCardTag(ModelCatalog.parakeet), above = 24)
+                s.scrollToTag(SetupActivity.modelCardTag(ModelCatalog.whisperTurbo), above = 24)
                 shot("setup-models-$suffix", s)
             }
             // "Comment dicter": generated from the command table (Québec French is the default language).

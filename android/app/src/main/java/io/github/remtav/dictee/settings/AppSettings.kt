@@ -10,6 +10,7 @@ import io.github.remtav.dictee.stt.DictationLanguages
 import io.github.remtav.dictee.stt.EngineOptions
 import io.github.remtav.dictee.stt.ModelCatalog
 import io.github.remtav.dictee.stt.ModelFamily
+import io.github.remtav.dictee.stt.ModelMigration
 import io.github.remtav.dictee.stt.RemoteApi
 import io.github.remtav.dictee.stt.RemoteConfig
 import io.github.remtav.dictee.stt.ModelSpec
@@ -65,6 +66,14 @@ class AppSettings(context: Context) {
         get() = Participation(languages, quebecDeclaration, participationCardDismissed)
 
     val activeModel: ModelSpec get() = ModelCatalog.byId(activeModelId) ?: ModelCatalog.default
+
+    /**
+     * Id of a model the app moved the user off (issue #22, see [io.github.remtav.dictee.stt.ModelMigration]),
+     * whose notice is still to be read on the main screen; "" for none.
+     */
+    var retiredModelNotice: String
+        get() = prefs.getString("retired_model_notice", "") ?: ""
+        set(v) = prefs.edit().putString("retired_model_notice", v).apply()
 
     var acceleration: Acceleration
         get() = Acceleration.fromName(prefs.getString("acceleration", null))
@@ -162,9 +171,12 @@ class AppSettings(context: Context) {
         get() = prefs.getString("cf_access_secret", "") ?: ""
         set(v) = prefs.edit().putString("cf_access_secret", RemoteConfig.cleanHeaderValue(v)).apply()
 
-    /** Local model id used when the server cannot be reached; "" for none. */
+    /**
+     * Local model id used when the server cannot be reached; "" for none. Never a hidden model nor
+     * one that no longer suits the languages (issue #22): such a value reads as Whisper turbo.
+     */
     var remoteFallbackId: String
-        get() = prefs.getString("remote_fallback", ModelCatalog.default.id) ?: ""
+        get() = ModelMigration.fallbackId(prefs.getString("remote_fallback", ModelCatalog.default.id) ?: "", languages)
         set(v) = prefs.edit().putString("remote_fallback", v).apply()
 
     /** Server-side LLM polish of a whole dictation (issue #15). On by default; off = raw transcript. */

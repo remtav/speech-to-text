@@ -64,6 +64,15 @@
     <string name="model_warning_uncovered">Attention : ce modèle ne couvre pas %1$s. Il reste téléchargeable.</string>
     <string name="setup_models_note">Téléchargés depuis Hugging Face, vérifiés par somme de contrôle SHA-256. Un seul est chargé à la fois. Wi-Fi conseillé.</string>
     <string name="setup_default_suffix"> (par défaut)</string>
+    <string name="model_notice_title">Modèle remplacé</string>
+    <string name="model_notice_replaced">%1$s n\'est plus proposé pour vos langues : la dictée utilise maintenant %2$s.</string>
+    <string name="model_notice_download">%1$s n\'est pas encore téléchargé : téléchargez-le pour dicter.</string>
+    <string name="model_notice_download_button">Télécharger %1$s</string>
+    <string name="model_notice_delete_button">Supprimer les fichiers de %1$s (%2$s)</string>
+    <string name="model_notice_deleted">Fichiers de %1$s supprimés.</string>
+    <string name="model_notice_ok">J\'ai compris</string>
+    <string name="settings_experimental">Modèles expérimentaux</string>
+    <string name="settings_experimental_help">Jamais recommandés : à essayer et à comparer sur votre téléphone (« Comparer les modèles » sur l\'écran principal).</string>
     <string name="setup_downloading">Téléchargement : %1$d %% (%2$s / %3$s)</string>
     <string name="setup_downloading_label">Téléchargement de %1$s</string>
     <string name="setup_download_error">Échec : %1$s</string>

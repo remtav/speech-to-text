@@ -294,7 +294,7 @@ class OptionalFeaturesInstrumentedTest : ImeTestBase() {
         fresh.prefs.edit().clear().commit()
         assertEquals(Acceleration.CPU, fresh.acceleration)
         assertEquals(CleanupMode.OFF, fresh.cleanupMode)
-        assertEquals(ModelCatalog.parakeet, fresh.activeModel)
+        assertEquals(ModelCatalog.whisperTurbo, fresh.activeModel) // issue #22
     }
 
     @Test

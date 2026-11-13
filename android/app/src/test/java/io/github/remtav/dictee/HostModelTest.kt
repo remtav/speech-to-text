@@ -71,6 +71,8 @@ object Host {
         ModelCatalog.whisperTurbo.id to mapOf("en" to 0.12, "fr" to 0.15, "frqc" to 0.60),
         // Same ceilings as Whisper turbo (measured here: en 4.5 %, fr 0 %, frqc 8.5 %).
         ModelCatalog.whisperQuebec.id to mapOf("en" to 0.12, "fr" to 0.15, "frqc" to 0.60),
+        // Issue #22: same ceilings as Whisper turbo.
+        ModelCatalog.liteWhisperTurbo.id to mapOf("en" to 0.12, "fr" to 0.15, "frqc" to 0.60),
     )
 }
 
@@ -152,6 +154,8 @@ class ModelAccuracyHostTest {
 
     @Test fun whisperQuebec() = check(ModelCatalog.whisperQuebec)
 
+    @Test fun liteWhisperTurbo() = check(ModelCatalog.liteWhisperTurbo)
+
     /**
      * Independent review of lot 3: forcing the language on Qwen3-ASR ("language French" in its
      * prompt, sherpa-onnx 2.0.1 `OfflineStream.setOption`) became the default when one language
@@ -188,7 +192,7 @@ class ModelAccuracyHostTest {
     }
 }
 
-/** The whole dictation path with the default model: audio stream → Silero VAD → Parakeet → text. */
+/** The whole dictation path with Parakeet (the lightest model): audio stream → Silero VAD → Parakeet → text. */
 class EndToEndHostTest {
     @Test fun dictateReferenceClipsWithParakeet() {
         val spec = ModelCatalog.parakeet

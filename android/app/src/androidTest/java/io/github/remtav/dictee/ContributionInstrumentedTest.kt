@@ -62,8 +62,9 @@ class ContributionInstrumentedTest : ImeTestBase() {
     private val paragraphs get() = material.text.paragraphs
     private val redoLabel get() = context.getString(R.string.reading_redo)
     private val archiveDir get() = ContributionShare.archiveDir(context)
-    private val parakeet = ModelCatalog.parakeet.id
-    private val qwen = ModelCatalog.qwen3.id
+    /** The recommended model (issue #22: Whisper turbo) and another one, offered with English alone. */
+    private val recommended = ModelCatalog.whisperTurbo.id
+    private val other = ModelCatalog.parakeet.id
     private lateinit var network: NetworkGuard
 
     /**
@@ -80,8 +81,8 @@ class ContributionInstrumentedTest : ImeTestBase() {
     @Before
     fun prepare() {
         instrumentation.uiAutomation.grantRuntimePermission(context.packageName, Manifest.permission.RECORD_AUDIO)
-        app.settings.languages = setOf(DictationLanguage.FRENCH_QUEBEC) // Parakeet is the recommended model
-        app.settings.activeModelId = parakeet
+        app.settings.languages = setOf(DictationLanguage.FRENCH_QUEBEC) // Whisper turbo is the recommended model
+        app.settings.activeModelId = recommended
         app.settings.quebecDeclaration = Declaration.YES
         TestHooks.audioSourceFactory = AudioSourceFactory {
             PcmAudioSource(
@@ -201,8 +202,8 @@ class ContributionInstrumentedTest : ImeTestBase() {
 
     @Test
     fun belowTheThresholdNothingIsOffered() {
-        // Parakeet (recommended) misses one word in ten: about 90 %, above the 80 % line.
-        useModels(parakeet) { _, _, text -> dropEveryNth(text, 10) }
+        // Whisper turbo (recommended) misses one word in ten: about 90 %, above the 80 % line.
+        useModels(recommended) { _, _, text -> dropEveryNth(text, 10) }
         val before = appFiles()
         ActivityScenario.launch(ReadingTestActivity::class.java).use { s ->
             val d = ReadingDriver(instrumentation, s, material)
@@ -220,7 +221,7 @@ class ContributionInstrumentedTest : ImeTestBase() {
 
     @Test
     fun aboveTheThresholdTheListIsShownButWithoutConsentNoArchiveIsCreated() {
-        useModels(parakeet) { _, _, text -> ScriptedReadingModels.dropEveryFourthWord(text) }
+        useModels(recommended) { _, _, text -> ScriptedReadingModels.dropEveryFourthWord(text) }
         val before = appFiles()
         ActivityScenario.launch(ReadingTestActivity::class.java).use { s ->
             val d = ReadingDriver(instrumentation, s, material)
@@ -266,8 +267,10 @@ class ContributionInstrumentedTest : ImeTestBase() {
 
     @Test
     fun withConsentTheArchiveHoldsExactlyTheListedElementsAndTheMailIntentIsRight() {
-        // Parakeet (recommended) loses a quarter of the words; Qwen3-ASR hears everything (its results stay here).
-        useModels(parakeet, qwen) { model, _, text -> if (model == parakeet) ScriptedReadingModels.dropEveryFourthWord(text) else text }
+        // Whisper turbo (recommended) loses a quarter of the words; Parakeet hears everything (its results stay here).
+        // English alone, so that Parakeet is offered too (issue #22).
+        app.settings.languages = setOf(DictationLanguage.ENGLISH)
+        useModels(recommended, other) { model, _, text -> if (model == recommended) ScriptedReadingModels.dropEveryFourthWord(text) else text }
         ActivityScenario.launch(ReadingTestActivity::class.java).use { s ->
             val d = ReadingDriver(instrumentation, s, material)
             readAndScore(d)
@@ -298,12 +301,12 @@ class ContributionInstrumentedTest : ImeTestBase() {
                 assertEquals("${Build.MANUFACTURER} ${Build.MODEL}".trim(), json.getString("modele_du_telephone"))
                 assertEquals(ContributionContent.DECLARATION_TEXT, json.getString("declaration"))
                 assertEquals("Bas-Saint-Laurent", json.getString("region"))
-                assertEquals(parakeet, json.getJSONObject("modele").getString("id"))
+                assertEquals(recommended, json.getJSONObject("modele").getString("id"))
                 val tr = json.getJSONArray("transcription")
                 for (i in paragraphs.indices) {
                     assertEquals(ScriptedReadingModels.dropEveryFourthWord(paragraphs[i]), tr.getJSONObject(i).getString("texte"))
                 }
-                assertFalse("no other model's result", text.contains(qwen))
+                assertFalse("no other model's result", text.contains(other))
                 for (i in paragraphs.indices) {
                     val wav = zip.getInputStream(zip.getEntry("paragraphe-${i + 1}.wav")).readBytes()
                     val b = ByteBuffer.wrap(wav).order(ByteOrder.LITTLE_ENDIAN)
@@ -368,7 +371,7 @@ class ContributionInstrumentedTest : ImeTestBase() {
 
     @Test
     fun theArchiveGoesWithRedoAndWithTheScreen() {
-        useModels(parakeet) { _, _, text -> ScriptedReadingModels.dropEveryFourthWord(text) }
+        useModels(recommended) { _, _, text -> ScriptedReadingModels.dropEveryFourthWord(text) }
         val before = appFiles()
         ActivityScenario.launch(ReadingTestActivity::class.java).use { s ->
             val d = ReadingDriver(instrumentation, s, material)
@@ -402,7 +405,7 @@ class ContributionInstrumentedTest : ImeTestBase() {
         // An archive left by a killed process: the next reading test deletes it before anything else.
         archiveDir.mkdirs()
         File(archiveDir, "kalmia-blabla-lecture-qc-1-2026-01-01.zip").writeBytes(byteArrayOf(1, 2, 3))
-        useModels(parakeet) { _, _, text -> text }
+        useModels(recommended) { _, _, text -> text }
         ActivityScenario.launch(ReadingTestActivity::class.java).use { s ->
             ReadingDriver(instrumentation, s, material).awaitTag(ReadingTestActivity.TAG_ACCEPT_START)
             assertFalse(archiveDir.exists())

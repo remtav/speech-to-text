@@ -63,8 +63,8 @@ class ReadingTestInstrumentedTest : ImeTestBase() {
     fun prepare() {
         instrumentation.uiAutomation.grantRuntimePermission(context.packageName, Manifest.permission.RECORD_AUDIO)
         app.settings.languages = setOf(DictationLanguage.FRENCH_QUEBEC)
-        app.settings.activeModelId = ModelCatalog.parakeet.id
-        TestHooks.installedModelIds = setOf(ModelCatalog.parakeet.id)
+        app.settings.activeModelId = ModelCatalog.whisperTurbo.id
+        TestHooks.installedModelIds = setOf(ModelCatalog.whisperTurbo.id)
         // The microphone is replaced by a 3 s clip; every opening of the source is counted.
         TestHooks.audioSourceFactory = AudioSourceFactory {
             micOpened.incrementAndGet()
@@ -166,7 +166,7 @@ class ReadingTestInstrumentedTest : ImeTestBase() {
 
     @Test
     fun answeringNoThanksThePersonAndRecordsNothingNorCreatesAnyFile() {
-        val models = useModels(ModelCatalog.parakeet.id)
+        val models = useModels(ModelCatalog.whisperTurbo.id)
         val before = appFiles()
         ActivityScenario.launch(ReadingTestActivity::class.java).use { s ->
             val d = driver(s)
@@ -226,7 +226,7 @@ class ReadingTestInstrumentedTest : ImeTestBase() {
     @Test
     fun withOneModelTheTestShowsTheScoreAndHighlightsTheMisheardWords() {
         val target = paragraphs.indexOfFirst { it.contains("friperie") }
-        val models = useModels(ModelCatalog.parakeet.id) { _, i, text ->
+        val models = useModels(ModelCatalog.whisperTurbo.id) { _, i, text ->
             if (i == target) text.replace("friperie", "boutique") else text
         }
         ActivityScenario.launch(ReadingTestActivity::class.java).use { s ->
@@ -236,7 +236,7 @@ class ReadingTestInstrumentedTest : ImeTestBase() {
             d.awaitTag(ReadingTestActivity.TAG_ACCEPT_START)
             // The acceptance says that nothing leaves the phone and names the model that will be used.
             assertTrue(d.allText().contains("Rien ne quitte le téléphone"))
-            assertTrue(d.allText().contains(ModelCatalog.parakeet.displayName))
+            assertTrue(d.allText().contains(ModelCatalog.whisperTurbo.displayName))
             assertEquals("no recording before the acceptance", 0, micOpened.get())
             d.click(ReadingTestActivity.TAG_ACCEPT_START)
             d.awaitTag(ReadingTestActivity.TAG_PARAGRAPH)
@@ -250,12 +250,12 @@ class ReadingTestInstrumentedTest : ImeTestBase() {
                 },
                 paragraphs.size,
             )
-            val tag = ReadingTestActivity.globalTag(ModelCatalog.parakeet.id)
+            val tag = ReadingTestActivity.globalTag(ModelCatalog.whisperTurbo.id)
             d.awaitTag(tag, 60_000)
             assertEquals(context.getString(R.string.reading_result_global, global.similarityPercent), d.text(tag))
             assertTrue("one error in about 224 words", global.similarityPercent in 98..99)
             // One model: no model chooser, no better-model card, nothing to share (far above 80 %).
-            assertFalse(d.has(ReadingTestActivity.modelChoiceTag(ModelCatalog.parakeet.id)))
+            assertFalse(d.has(ReadingTestActivity.modelChoiceTag(ModelCatalog.whisperTurbo.id)))
             assertFalse(d.has(ReadingTestActivity.TAG_BETTER))
             assertFalse(d.has(ReadingTestActivity.TAG_SHARE_SLOT))
             // The misheard word is highlighted (theme colours AND underline) in its paragraph, and only there.
@@ -295,12 +295,14 @@ class ReadingTestInstrumentedTest : ImeTestBase() {
     @Test
     fun withSeveralModelsEachIsScoredAndABetterOneIsSuggested() {
         val parakeet = ModelCatalog.parakeet.id
-        val qwen = ModelCatalog.qwen3.id
         val whisper = ModelCatalog.whisperTurbo.id
-        // Active model: Qwen3-ASR, which loses every fourth word; Parakeet (recommended) and Whisper hear everything.
-        app.settings.activeModelId = qwen
-        useModels(parakeet, qwen, whisper) { model, _, text ->
-            if (model == qwen) ScriptedReadingModels.dropEveryFourthWord(text) else text
+        // Issue #22: English alone, so both Whisper turbo and Parakeet are offered (hidden models never are,
+        // even installed: Qwen3-ASR is installed here and must not be used).
+        // Active model: Parakeet, which loses every fourth word; Whisper turbo (recommended) hears everything.
+        app.settings.languages = setOf(DictationLanguage.ENGLISH)
+        app.settings.activeModelId = parakeet
+        useModels(parakeet, whisper, ModelCatalog.qwen3.id) { model, _, text ->
+            if (model == parakeet) ScriptedReadingModels.dropEveryFourthWord(text) else text
         }
         ActivityScenario.launch<ReadingTestActivity>(Intent(context, ReadingTestActivity::class.java)).use { s ->
             val d = driver(s)
@@ -308,47 +310,49 @@ class ReadingTestInstrumentedTest : ImeTestBase() {
             d.click(ReadingTestActivity.TAG_DECLARE_YES)
             d.awaitTag(ReadingTestActivity.TAG_ACCEPT_START)
             val used = d.allText()
-            for (id in listOf(parakeet, qwen, whisper)) assertTrue(used.contains(ModelCatalog.byId(id)!!.displayName))
+            for (id in listOf(parakeet, whisper)) assertTrue(used.contains(ModelCatalog.byId(id)!!.displayName))
+            assertFalse("hidden model not used", used.contains(ModelCatalog.qwen3.displayName))
             d.click(ReadingTestActivity.TAG_ACCEPT_START)
             d.awaitTag(ReadingTestActivity.TAG_PARAGRAPH)
             d.readAllParagraphs(redoLabel)
             d.click(ReadingTestActivity.TAG_SCORE)
 
-            d.awaitTag(ReadingTestActivity.globalTag(qwen), 90_000)
-            val qwenScores = paragraphs.indices.map { i ->
+            d.awaitTag(ReadingTestActivity.globalTag(parakeet), 90_000)
+            val worseScores = paragraphs.indices.map { i ->
                 ReadingScoring.scoreParagraph(material, i, ScriptedReadingModels.dropEveryFourthWord(paragraphs[i]))
             }
-            val qwenPercent = ReadingScoring.global(qwenScores, paragraphs.size).similarityPercent
-            assertTrue("a quarter of the words lost", qwenPercent < 80)
+            val worsePercent = ReadingScoring.global(worseScores, paragraphs.size).similarityPercent
+            assertTrue("a quarter of the words lost", worsePercent < 80)
             // One chooser line per model, with its global percent; the active model's detail is shown first.
-            for (id in listOf(parakeet, qwen, whisper)) assertTrue(d.has(ReadingTestActivity.modelChoiceTag(id)))
+            for (id in listOf(parakeet, whisper)) assertTrue(d.has(ReadingTestActivity.modelChoiceTag(id)))
+            assertFalse(d.has(ReadingTestActivity.modelChoiceTag(ModelCatalog.qwen3.id)))
             assertEquals(
-                context.getString(R.string.reading_result_model_line, ModelCatalog.qwen3.displayName, qwenPercent),
-                d.text(ReadingTestActivity.modelChoiceTag(qwen)),
+                context.getString(R.string.reading_result_model_line, ModelCatalog.parakeet.displayName, worsePercent),
+                d.text(ReadingTestActivity.modelChoiceTag(parakeet)),
             )
-            assertEquals(context.getString(R.string.reading_result_global, qwenPercent), d.text(ReadingTestActivity.globalTag(qwen)))
+            assertEquals(context.getString(R.string.reading_result_global, worsePercent), d.text(ReadingTestActivity.globalTag(parakeet)))
             val highlighted = { i: Int ->
                 d.onViews { v ->
                     val sp = (v.first { it.tag == ReadingTestActivity.paragraphTag(i) } as TextView).text as Spanned
                     sp.getSpans(0, sp.length, BackgroundColorSpan::class.java).size
                 }
             }
-            assertTrue("Qwen3-ASR's detail has misheard words", highlighted(0) > 0)
+            assertTrue("Parakeet's detail has misheard words", highlighted(0) > 0)
 
             // The recommended model hears everything: no sharing; a better model is suggested and can be chosen.
             assertFalse(d.has(ReadingTestActivity.TAG_SHARE_SLOT))
             d.awaitTag(ReadingTestActivity.TAG_BETTER)
             assertTrue(d.allText().contains(context.getString(R.string.reading_better_title)))
-            assertEquals(qwen, app.settings.activeModelId)
+            assertEquals(parakeet, app.settings.activeModelId)
             d.click(ReadingTestActivity.TAG_BETTER_CHOOSE)
             d.awaitTag(ReadingTestActivity.TAG_BETTER_CHOSEN)
             val suggested = app.settings.activeModelId
-            assertTrue("a model that heard everything is now active", suggested == parakeet || suggested == whisper)
+            assertEquals("the model that heard everything is now active", whisper, suggested)
             assertFalse(d.has(ReadingTestActivity.TAG_BETTER_CHOOSE))
 
-            // Another model's detail: Parakeet's paragraph has no highlight.
-            d.click(ReadingTestActivity.modelChoiceTag(parakeet))
-            d.await("Parakeet's detail") { highlighted(0) == 0 }
+            // Another model's detail: Whisper turbo's paragraph has no highlight.
+            d.click(ReadingTestActivity.modelChoiceTag(whisper))
+            d.await("Whisper turbo's detail") { highlighted(0) == 0 }
         }
     }
 
@@ -356,7 +360,7 @@ class ReadingTestInstrumentedTest : ImeTestBase() {
 
     @Test
     fun stoppingAfterOneParagraphScoresOnlyWhatWasRead() {
-        useModels(ModelCatalog.parakeet.id)
+        useModels(ModelCatalog.whisperTurbo.id)
         app.settings.quebecDeclaration = Declaration.YES
         ActivityScenario.launch(ReadingTestActivity::class.java).use { s ->
             val d = driver(s)
@@ -367,7 +371,7 @@ class ReadingTestInstrumentedTest : ImeTestBase() {
             d.click(ReadingTestActivity.TAG_RECORD)
             d.await("recorded") { d.text(ReadingTestActivity.TAG_RECORD) == redoLabel }
             d.click(ReadingTestActivity.TAG_SCORE)
-            d.awaitTag(ReadingTestActivity.globalTag(ModelCatalog.parakeet.id), 60_000)
+            d.awaitTag(ReadingTestActivity.globalTag(ModelCatalog.whisperTurbo.id), 60_000)
             assertTrue(d.allText().contains(context.getString(R.string.reading_result_partial, 1, paragraphs.size)))
             assertFalse(d.has(ReadingTestActivity.TAG_SHARE_SLOT))
         }

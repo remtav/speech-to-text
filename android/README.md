@@ -316,12 +316,20 @@ Limites connues :
 
 ## Modèles
 
-| Modèle | Éditeur | Taille (int8) |
-|---|---|---|
-| Parakeet TDT 0.6b v3 (défaut) | NVIDIA | 671 Mo |
-| Qwen3-ASR 0.6B | Alibaba (Qwen) | 987 Mo |
-| Whisper large-v3-turbo | OpenAI | 1,04 Go |
-| Whisper large-v3-turbo, français québécois | ele-sage (communauté), d'après OpenAI | 1,04 Go |
+| Modèle | Éditeur | Taille (int8) | Affichage (issue #22) |
+|---|---|---|---|
+| Whisper large-v3-turbo (défaut) | OpenAI | 1,04 Go | Toujours proposé et recommandé |
+| Parakeet TDT 0.6b v3 | NVIDIA | 671 Mo | Proposé seulement si la seule langue choisie est l'anglais |
+| Lite-Whisper large-v3-turbo (expérimental) | efficient-speech (LiteASR), d'après OpenAI | 1,16 Go | Réglages, clavier et « Comparer les modèles » ; jamais recommandé |
+| Qwen3-ASR 0.6B | Alibaba (Qwen) | 987 Mo | Caché (gardé dans le catalogue) |
+| Whisper large-v3-turbo, français québécois | ele-sage (communauté), d'après OpenAI | 1,04 Go | Caché (gardé dans le catalogue) |
+
+Depuis l'issue #22, Whisper large-v3-turbo est le modèle par défaut, français québécois compris : aux essais de
+l'utilisateur, il a fait mieux que les autres, et mieux que le Whisper affiné québécois. Si le modèle actif est caché
+ou ne convient plus aux langues (Parakeet avec le français québécois, par exemple), l'application passe à Whisper
+turbo au démarrage et le dit une fois sur l'écran principal (invitation à le télécharger s'il manque, bouton pour
+supprimer les fichiers d'un modèle caché : rien n'est supprimé sans clic). Le paragraphe ci-dessous sur Whisper
+« en dernier recours » date d'avant cette décision.
 
 Whisper : observé par l'utilisateur sur son téléphone, il comprend bien des
 mots d'ici que Parakeet et Qwen3-ASR ratent (un mot isolé deviné en anglais,
@@ -374,7 +382,7 @@ polissage… » avec un bouton **Annuler**.
 - Si le serveur est injoignable, en erreur, refuse l'accès ou ne répond pas à
   temps (60 s + la durée de la dictée, 6 min au plus), ou si vous appuyez sur
   Annuler, l'audio gardé sur le téléphone est transcrit par le modèle local de
-  repli (Parakeet par défaut) : aucune dictée n'est perdue. Après une panne,
+  repli (Whisper turbo par défaut) : aucune dictée n'est perdue. Après une panne,
   le serveur est réessayé au bout de 60 s.
 - Une dictée dure au plus 5 minutes : au-delà, l'enregistrement s'arrête et
   ce qui a été dit est envoyé.
