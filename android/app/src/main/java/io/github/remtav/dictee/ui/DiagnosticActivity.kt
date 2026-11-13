@@ -12,9 +12,12 @@ import io.github.remtav.dictee.stt.WaitControl
 import java.util.Locale
 
 /**
- * "Diagnostic serveur" (issue #13, checkpoint tool): reference dictations sent
- * to the configured server, with timings and the raw and polished texts side
- * by side. The report can be exported; it holds no secret.
+ * "Diagnostic serveur" (issues #13 and #35, checkpoint tool): reference
+ * dictations sent to the configured server, each one twice: by blocks while it
+ * plays in real time (as the keyboard does), then whole in one request. Per
+ * trial: the wait after the end of the dictation, the number of blocks, and the
+ * raw and polished texts side by side. The report can be exported; it holds no
+ * secret.
  */
 class DiagnosticActivity : AppCompatActivity() {
     private lateinit var status: TextView
@@ -30,7 +33,8 @@ class DiagnosticActivity : AppCompatActivity() {
         col.title(getString(R.string.diag_title))
         col.body(getString(R.string.diag_help), small = true)
         col.row().apply {
-            button(getString(R.string.diag_run)) { start() }.spaced()
+            button(getString(R.string.diag_run)) { start(long = false) }.spaced()
+            button(getString(R.string.diag_run_long), outlined = true) { start(long = true) }.spaced()
             button(getString(R.string.diag_export), outlined = true) { export() }.spaced()
         }
         status = col.body("", small = false)
@@ -46,7 +50,7 @@ class DiagnosticActivity : AppCompatActivity() {
 
     private fun diagnostic() = ServerDiagnostic(DicteeApp.from(this).settings.remoteConfig())
 
-    private fun start() {
+    private fun start(long: Boolean) {
         if (running) return
         val config = DicteeApp.from(this).settings.remoteConfig()
         if (!config.isConfigured) {
@@ -55,11 +59,21 @@ class DiagnosticActivity : AppCompatActivity() {
         }
         running = true
         val diag = diagnostic()
-        val plan = diag.plan(CompareActivity.loadReferences(this))
+        val references = CompareActivity.loadReferences(this)
+        val plan = if (long) diag.longPlan(references) else diag.plan(references)
+        val app = DicteeApp.from(this)
         kotlin.concurrent.thread(name = "server-diagnostic") {
             for ((i, sample) in plan.withIndex()) {
                 if (destroyed) break
                 runOnUiThread { status.text = getString(R.string.diag_running, i + 1, plan.size) }
+                // By blocks, played in real time with the keyboard's voice detection (issue #35)...
+                val vad = try { app.newVad() } catch (e: Throwable) { null }
+                if (vad != null) {
+                    val byBlocks = diag.runBlocks(sample, vad) { destroyed }
+                    if (destroyed) break
+                    runOnUiThread { trials += byBlocks; render(byBlocks, trials.size) }
+                }
+                // ...then whole, in one request (issue #13), on the same audio.
                 val c = WaitControl().also { control = it }
                 val trial = diag.run(sample, c)
                 if (c.cancelled || destroyed) break
@@ -71,12 +85,13 @@ class DiagnosticActivity : AppCompatActivity() {
 
     private fun render(t: ServerDiagnostic.Trial, n: Int) {
         val card = results.card()
-        card.body("Essai $n — ${t.name} (%.1f s)".format(Locale.ROOT, t.audioSeconds))
+        card.body("Essai $n — ${t.name} (%.1f s) — dictée ${t.mode}".format(Locale.ROOT, t.audioSeconds))
         if (t.error != null) {
             card.body("Échec : ${t.error}", small = true).markError()
             return
         }
-        card.value("Envoi ${t.uploadMillis} ms · total ${t.totalMillis} ms · ${t.transport} · polissage : ${t.polishStatus}")
+        val blocks = if (t.mode == ServerDiagnostic.MODE_BLOCKS) " · ${t.blocks} bloc(s)" else " · envoi ${t.uploadMillis} ms"
+        card.value("Attente après l'arrêt ${t.waitMillis} ms$blocks · ${t.transport} · polissage : ${t.polishStatus}")
         // Raw and polished side by side.
         val row = card.row()
         fun column(heading: String, text: String) = LinearLayout(this).apply {

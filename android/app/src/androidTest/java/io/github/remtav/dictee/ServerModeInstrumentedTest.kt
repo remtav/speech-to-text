@@ -90,7 +90,8 @@ class ServerModeInstrumentedTest : ImeTestBase() {
             launchFields()
             tapMic()
             waitFor("text from the server", 30_000) { field1() == serverText }
-            assertEquals(1, server.requests.count { it.method == "POST" })
+            // This fake server has no POST /polish (404): an older server, the dictation goes whole (issue #35).
+            assertEquals(1, server.requests.count { it.method == "POST" && it.path == "/jobs" })
             assertEquals(DictationResult.Source.SERVER_POLISHED, service.lastDictation?.source)
         }
     }

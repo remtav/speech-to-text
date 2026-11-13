@@ -3839,3 +3839,159 @@ nouvelle section « Avancé », **défaut inchangé à 1 000**. Choix faits pend
   l'app : Redécoder −21,3 % / 14,8 %, Couper −31,3 % / 15,1 % (16,3 % avant l'extension de la coupe aux reprises arrêtées au
   milieu d'un mot, le chiffre de l'issue). Mesures hôte seulement : la mesure sur le téléphone reste à faire (procédure
   dans la PR de #49).
+
+## Issue #35, lot 1 : transcription par blocs en mode serveur, polissage à la fin
+
+Revient sur deux décisions de #13 : « tout l'audio part en une seule requête à la fin » et « rien n'est envoyé
+pendant la dictée ». Le contrat du serveur est celui de la PR #46 (`POST /polish`, champ `prompt` de
+`POST /jobs`), suivi tel quel ; aucun changement côté serveur dans ce lot.
+
+### Découpage (`BlockCutter`, fil de capture)
+
+- Un bloc commence au début de la parole (moins les 0,6 s de marge habituelles), jamais avant la fin du bloc
+  précédent : aucun échantillon n'est envoyé deux fois, et le silence entre deux blocs n'est pas envoyé. Les
+  pauses à l'intérieur d'un bloc sont gardées (ponctuation, rythme).
+- Le bloc se ferme à la première pause confirmée par le VAD (un segment vient de se terminer) une fois 15 s
+  atteintes, et au plus tard à 30 s (fenêtre de Whisper), même au milieu d'une phrase. Dans ce dernier cas, la
+  phrase en cours est partagée entre les deux blocs, et chaque bloc garde sa part pour un repli local.
+- Chaque bloc garde ses segments VAD (coupés à ses bornes) : c'est ce que transcrit le modèle du téléphone s'il
+  faut se replier, comme pour la dictée entière (les modèles du téléphone ne prennent pas 30 s d'un coup).
+
+### Envoi (`BlockDictation`, fil de décodage)
+
+- Les blocs partent un par un, dans l'ordre (le serveur n'exécute qu'une tâche à la fois) : `POST /jobs` avec
+  `quick=true`, `polish=false`, `prompt` = les 200 derniers caractères du texte du bloc précédent (coupés sur un
+  mot ; le serveur en accepte 1000), puis `GET /jobs/{id}`. Les textes sont rangés par numéro de bloc.
+- **Langue** : si aucune n'est réglée, celle que le serveur a détectée sur le premier bloc est imposée aux
+  suivants et au polissage.
+- **Délais** : chaque bloc a le budget du réglage « délai avant repli » (8 s + un quart de la durée de l'audio,
+  #23). À l'arrêt, les blocs qui restent partagent un seul budget, compté depuis l'arrêt pour l'audio qui reste
+  (un serveur plus lent que le temps réel ne fait pas attendre un délai complet par bloc en retard). Au-delà,
+  ils passent au téléphone. Le polissage final a son propre budget, le même que la tâche de la dictée entière
+  (8 s + un quart de la durée de toute la dictée) ; s'il est dépassé, le texte brut est inséré.
+- **Dictée d'un seul bloc** (moins de 15 s environ) : une seule tâche, transcrite et polie ensemble
+  (`polish=true`), sans `POST /polish` séparé : pas d'aller-retour de plus pour les dictées courtes.
+- **Polissage** : à la fin, `POST /polish` avec tout le texte brut (textes du serveur et du téléphone, dans
+  l'ordre) et la langue, puis `GET /jobs/{id}`. Inséré : `polished_text` si `polish.applied`, sinon le texte
+  brut, avec le message « Texte non poli (raison) ». Tous les cas de la PR #46 (`error`, `timeout`,
+  `unsupported`, `safety_check:…`) sont un repli normal, pas une erreur.
+- **Plafond de 400 mots** de `app/polish.py` : une dictée de plus de 3 min environ revient brute
+  (`fallback_reason: "unsupported"`, message « texte trop long pour le polissage »). Pas de découpage côté
+  client : c'est le lot 2. À mesurer au point de contrôle.
+- Le polissage n'est pas demandé quand il ne peut pas servir : réglage coupé, API OpenAI, « Annuler », serveur en
+  échec depuis moins de 60 s, ou téléphone qui a pris le relais après l'arrêt (le texte brut est inséré tout
+  de suite plutôt que de refaire attendre l'utilisateur).
+
+### Repli et fiabilité
+
+- L'audio d'un bloc est gardé jusqu'à réception de son texte, puis libéré : la mémoire ne dépend plus de la
+  durée de la dictée (sauf pendant la détection de l'ancien serveur, voir plus bas).
+- **Bloc en échec** (réseau, 5xx, délai, réponse illisible, 401/403/302) : transcrit par le modèle du téléphone
+  aussitôt, pendant la dictée ; les textes déjà reçus sont gardés. Le serveur est ensuite évité 60 s, comme
+  pour la dictée entière (`FallbackEngine`) : sans cela, chaque bloc suivant coûterait un délai complet.
+  Passé ce délai, les blocs suivants retentent le serveur.
+- **429** (limite de débit, 30 requêtes par minute et par jeton) : un échec de bloc comme un autre, replié sur
+  le téléphone, mais le serveur est évité pendant la durée de `Retry-After` (60 s s'il n'y en a pas), pas
+  plus. Un bloc toutes les 15 à 30 s, plus la sonde et le polissage, reste loin de la limite.
+- **Annuler** (pendant l'attente finale) : la tâche serveur en cours est annulée, ce qui manque est transcrit
+  sur le téléphone, rien n'est poli ; les textes reçus sont gardés. Une annulation ne déclenche pas le délai
+  de 60 s.
+- **Champ changé, clavier fermé** (`cancel`) : toutes les requêtes en cours sont annulées (la tâche serveur aussi,
+  même si son id arrive après coup), aucun bloc en file n'est envoyé, rien n'est poli, rien n'est inséré.
+  Chaque requête a son propre `WaitControl` (`child()`), refermé à sa fin : une annulation n'envoie donc pas
+  de `cancel` pour les tâches déjà terminées.
+- **Bloc que ni le serveur ni le téléphone n'ont transcrit** (pas de modèle de repli, ou modèle du téléphone
+  en échec : non chargé, mémoire) : son audio est gardé et il est réessayé une fois à la fin (serveur, puis
+  téléphone), avant le polissage. S'il échoue encore, il est compté comme perdu, et **les autres blocs sont
+  quand même insérés**, avec le message d'erreur « N bloc(s) sur M non transcrit(s) ». Une erreur sans
+  insertion n'arrive que si aucun bloc n'a pu être transcrit.
+- Chaque appel au moteur passe par `EngineManager.use` (`LentBlockBackend`) : un moteur libéré ou remplacé
+  pendant la dictée n'est jamais utilisé.
+
+### Ancien serveur (sans `POST /polish`) : quand le détecter
+
+- **Au début de la dictée**, avant le premier bloc : une sonde `POST /polish` avec un texte vide. Le serveur de
+  la PR #46 la refuse (400) sans créer de tâche ; un ancien serveur répond 404 ou 405. La réponse arrive
+  pendant que l'utilisateur parle : elle ne coûte rien à l'attente finale.
+- Jusqu'à la réponse, le clavier garde à la fois l'audio complet et les blocs. 404/405 : la dictée continue en
+  mode « dictée entière » (une requête avec polissage à la fin, exactement comme avant) et les blocs en file
+  sont ignorés ; aucun bloc n'a donc été envoyé pour rien. Toute autre réponse : mode blocs, et l'audio complet
+  est libéré.
+- Pourquoi pas à la fin, au moment du polissage : il faudrait garder l'audio complet de toute dictée (5 min, au
+  moins 19 Mo) pour le renvoyer en entier, et le serveur aurait transcrit deux fois la même dictée ; ou bien
+  insérer les blocs sans polissage, ce qui ferait perdre le polissage aux anciens serveurs. Si la sonde n'a pas
+  pu conclure (serveur injoignable au début) et que `POST /polish` répond 404/405 à la fin, le texte brut des
+  blocs est inséré (« polissage absent du serveur ») : rien n'est perdu.
+- La sonde n'est faite que si le polissage est demandé (sinon `POST /jobs` sans polissage suffit, ancien serveur
+  compris), et une seule fois par moteur une fois la route vue. Elle compte dans la limite de débit.
+- Signalé dans la PR plutôt que changé au serveur : un champ dans `/health` (par exemple `"polish_route": true`)
+  éviterait cette sonde. Le contrat actuel ne l'a pas, et elle est conforme au contrat (400 documenté).
+
+### Questions ouvertes de l'issue, tranchées (choix le plus prudent)
+
+- **Limite de 5 min par dictée : gardée**, en mode blocs aussi. Elle venait de la taille du WAV unique, mais le
+  polissage ne traite de toute façon pas plus de 400 mots (environ 3 min), le repli « dictée entière » pour les
+  anciens serveurs garde encore tout l'audio, et le point de contrôle n'a pas encore mesuré les dictées longues.
+  À revoir après le point de contrôle et le lot 2.
+- **Mode « dictée entière » : seulement un repli** (serveur sans `POST /polish`), pas un réglage. Un réglage de
+  plus toucherait `AppSettings` et l'écran des Réglages, modifiés en parallèle (#49), et l'utilisateur n'a pas
+  d'élément pour choisir avant le point de contrôle. La comparaison des deux modes sur le même audio se fait
+  dans le « Diagnostic serveur ». Si le point de contrôle montre une qualité moindre par blocs, ajouter le
+  réglage à ce moment-là.
+
+### Interface
+
+- Pas de texte provisoire (inchangé, hors portée). L'attente commence à l'arrêt, même si des blocs sont encore
+  en file : « Transcription et polissage… (3 blocs sur 4) », avec Annuler. Le bouton disparaît dès que le
+  téléphone prend le relais.
+- Si des blocs ont été transcrits sur le téléphone : « N bloc(s) sur M transcrit(s) sur le téléphone (raison) ».
+- `DictationResult` porte `blocks`, `localBlocks` et `waitMillis` (de l'arrêt au résultat), écrits dans logcat
+  (`DicteeIme`) à chaque dictée.
+- **Diagnostic serveur** : chaque essai est fait deux fois sur le même audio : par blocs (joué en temps réel à
+  travers le vrai `DictationController` et le VAD Silero du clavier, sans repli local), puis en dictée entière
+  (une requête, comme #13). Pour chacun : attente après l'arrêt, nombre de blocs, statut du polissage, texte brut
+  et poli. Bouton « Essais 30 s, 2 min, 5 min » : les enregistrements de référence enchaînés (1 s de silence
+  entre eux), répétés au besoin et coupés à 30 s, 2 min et 4 min 50 s (sous la limite de 5 min, marges de
+  lecture comprises) : les trois durées du point de contrôle.
+
+### Tests
+
+- `BlockDictationTest` (JVM, faux serveur HTTP au contrat de la PR #46, source audio « à portes » qui ne
+  livre la partie k qu'une fois le bloc k-1 reçu par le serveur, ce qui prouve l'envoi pendant la dictée) :
+  N blocs → N requêtes dans l'ordre pendant la dictée, puis seulement le dernier bloc et le polissage à
+  l'arrêt, une seule insertion du texte poli ; `prompt`, langue détectée puis imposée, langue forcée ; ordre
+  gardé avec un bloc lent ; dictée d'un bloc ; bloc en 502 → téléphone, textes gardés ; 429 avec
+  `Retry-After` → téléphone puis serveur de nouveau ; polissage non appliqué (`unsupported`, `timeout`,
+  `error`, `safety_check`) et en erreur HTTP → texte brut ; ancien serveur (404 et 405) → dictée entière ;
+  serveur coupé au milieu → rien de perdu ; sans modèle local → second essai à la fin ; champ changé pendant la
+  dictée et pendant le polissage → tâche annulée, rien d'envoyé ensuite, rien d'inséré ; résultat gardé pour le
+  même champ ; Annuler pendant l'attente finale ; dictée sans parole ; polissage coupé ; API OpenAI ; durée
+  maximale ; diagnostic.
+- `BlockCutterTest` : regroupement jusqu'au minimum, coupe aux pauses, plafond, silence initial et longue pause
+  non envoyés, aucun échantillon dans deux blocs, rien de perdu à la coupe forcée.
+- Tests instrumentés mis à jour : `dictationOnARemoteServer` (une dictée d'un bloc : une tâche polie, plus la
+  sonde) et `serverChosenInTheSettingsIsRespected` (faux serveur sans `POST /polish` : dictée entière).
+
+### Revue indépendante (agent sans le contexte de conception) et corrections
+
+- **Un bloc perdu faisait perdre toute la dictée** : une exception du modèle du téléphone, ou l'échec du
+  second essai sans modèle local, remontait jusqu'au fil de décodage. Les textes déjà reçus n'étaient alors
+  pas insérés. Corrigé : chaque bloc est rattrapé à part (voir ci-dessus, `lostBlocks`). Tests :
+  `localModelFailingOnABlockKeepsItForTheEndAndTheOtherTexts`, `aBlockLostEverywhereDoesNotLoseTheOthers`,
+  `everyBlockLostIsAnErrorAndTheWaitEnds`.
+- **Indicateur d'attente resté allumé** si le fil de décodage s'arrêtait sur une erreur avant la fin de la
+  capture. Corrigé : la capture éteint l'attente qu'elle vient d'allumer si le décodage est déjà terminé
+  (`decodeEnded`).
+- **Audio en double dans le repli local** : le VAD Silero coupe une parole continue à 20 s sans nouveau début
+  de parole. La coupe forcée à 30 s ajoutait alors une seconde fois ces 20 s aux segments du bloc. Corrigé :
+  le début de l'énoncé en cours avance à la fin de chaque segment rendu par le VAD. Test
+  `vadCuttingLongSpeechWithoutPauseDoesNotDuplicateTheLocalFallbackAudio`, qui échoue sans la correction.
+- **Segment isolé de plus de 30 s** (le VAD n'a pas signalé le début de la parole) : découpé en blocs de 30 s
+  au plus.
+- Non corrigé, limites connues :
+  - un bloc déjà en cours d'envoi à l'arrêt garde son propre budget (8 s + un quart de sa durée, au plus
+    15,5 s avec le réglage par défaut) avant que le budget commun de fin s'applique aux suivants : l'attente
+    peut donc dépasser un peu le réglage ;
+  - si le serveur est en échec récent au début de la dictée, la sonde n'est pas faite. Un ancien serveur
+    reçoit alors des blocs (sans polissage), et le texte brut est inséré au lieu du texte poli. Rien n'est
+    perdu.
