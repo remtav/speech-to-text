@@ -79,6 +79,8 @@ class ScreenshotTest : ImeTestBase() {
      */
     private fun shot(name: String, screen: ActivityScenario<*>? = null) {
         awaitPortrait(screen)
+        // The emulator's launcher sometimes stops answering and its dialog covered the captures: close it first.
+        dismissNotRespondingDialogs()
         instrumentation.waitForIdleSync()
         Thread.sleep(700) // animations, ripple, level meter
         val f = File(dir, "$name.png")
