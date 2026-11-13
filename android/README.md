@@ -118,6 +118,36 @@ elle n'a pas été faite sur un téléphone. La recommandation le dit : « mesur
 sur six courts extraits (59 mots) : un indice, pas une preuve ». Vous pouvez refaire la mesure avec votre propre voix
 dans **Comparer les modèles**.
 
+## Test de lecture en français québécois
+
+Si « Français (Québec) » fait partie de vos langues, une carte « Aider à
+améliorer la dictée en français québécois » apparaît à la fin de la configuration
+(« Non merci » la masque sur l'écran principal ; elle reste dans les Réglages).
+Le test se déroule ainsi :
+
+1. **Une question d'abord** : « Parlez-vous un français québécois ? ». Répondre
+   *non* termine tout : un mot de remerciement, aucun test, aucun enregistrement,
+   aucun fichier, et la carte n'est plus proposée. La réponse reste sur le
+   téléphone et se corrige dans les Réglages (section « Test de lecture en
+   français québécois »).
+2. **Acceptation** : le test se fait sur le téléphone ; rien n'en sort.
+3. **Lecture** : un texte d'environ 220 mots, un paragraphe à la fois, en grands
+   caractères. Un bouton enregistre puis arrête (20 secondes au plus par
+   paragraphe) ; on peut refaire un paragraphe, revenir en arrière ou demander
+   le score avant la fin.
+4. **Score** : chaque paragraphe est transcrit par le ou les modèles installés
+   (un seul suffit ; le serveur distant n'est jamais utilisé), puis comparé au
+   texte. L'écran donne le taux de ressemblance (1 − taux d'erreur de mots) global
+   et par paragraphe, pour chaque modèle, avec les mots mal compris surlignés **et
+   soulignés** dans le texte. Si un autre modèle installé vous comprend nettement
+   mieux, l'écran le dit et propose de le choisir.
+
+L'enregistrement reste en mémoire et disparaît quand l'écran se ferme : le test
+n'écrit aucun fichier, ne fait aucune requête réseau et n'ajoute aucune
+permission (le micro est déjà demandé). Le partage d'une lecture, facultatif, viendra
+à l'étape suivante du lot. Textes, seuils et choix : `DECISIONS.md` (« Issue #15,
+lot 4 ») et `docs/CONTRIBUTION.md`.
+
 ## Apparence
 
 L'interface est un thème Material 3 générique : bleu, polices du système,

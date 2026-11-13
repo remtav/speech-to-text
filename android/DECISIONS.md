@@ -3276,3 +3276,145 @@ Portée tranchée par l'orchestrateur (prudente) :
   instrumentés n'utilisaient aucune ressource supprimée.
 - Les captures de `docs/screenshots/` montrent encore le thème Kalmia : elles sont régénérées par la CI
   (`ScreenshotTest`, mêmes noms de fichiers).
+
+## Issue #15, lot 4 — étape 4.2 : carte, déclaration, écran du test de lecture
+
+État au 2026-11-13. **Fait** : carte de participation (écran principal et Réglages), déclaration et exclusion,
+acceptation, écran de lecture paragraphe par paragraphe, transcription par le ou les modèles installés, score global et
+par paragraphe avec mots surlignés, suggestion de modèle, point d'extension pour 4.3, logique pure et tests JVM,
+test instrumenté avec moteurs scriptés, capture `reading-*.png`, section du README. **Reste à faire (autres
+étapes)** : consentement au partage, archive locale, courriel (4.3) ; revue (4.R). **Non vérifié ici** : aucun
+émulateur dans ce conteneur, donc les tests instrumentés sont compilés (`assembleDebugAndroidTest`) et relus, pas
+exécutés (la CI de la PR les exécute) ; le rendu à l'écran est à juger par un humain (liste plus bas).
+
+Thème : le style Kalmia ayant été retiré à la demande de l'utilisateur, l'écran emploie les helpers de `ui/Ui.kt` et les
+attributs du thème Material générique ; aucune couleur ni police en dur.
+
+### Parcours
+
+1. **Carte** (`ui/Ui.kt`, `participationCard`) : « Aider à améliorer la dictée en français québécois », deux phrases,
+   « Faire le test » et, sur l'écran principal seulement, « Non merci ». Décision (`reading/Participation.kt`, valeur
+   pure construite par `AppSettings.participation`) :
+   - langues : seulement avec « Français (Québec) » parmi les langues choisies ;
+   - écran principal : **à la fin de la configuration**, c'est-à-dire quand `SetupProgress.isComplete` (clavier activé,
+     micro autorisé, un modèle prêt), la carte n'étant ni fermée ni exclue. Avant, rien : la carte ne doit pas
+     couvrir les étapes de configuration. Elle n'est redessinée que si cet état change (les téléchargements
+     rappellent l'écran à chaque progression : un redessin avalerait les appuis) ;
+   - « Non merci » : `participationCardDismissed` (préférence) ; masque la carte de l'écran principal, ne change rien
+     d'autre, la carte reste dans les Réglages ;
+   - réponse « non » : plus de carte nulle part, plus de test.
+2. **Déclaration** (`ReadingSession`, phase `DECLARE`) : « Parlez-vous un français québécois ? » avant tout, y compris
+   avant l'acceptation. *Non* : phase `DECLINED` (remerciement, « Fermer »), réponse mémorisée (`AppSettings.quebecDeclaration`,
+   valeurs `UNANSWERED/YES/NO`), **aucun enregistrement** : `ReadingSession.store` refuse tout hors de la phase
+   `READING`, `accept()` et `beginScoring()` lèvent une erreur après « non ». Le micro n'est pas ouvert (le compteur du
+   test instrumenté le vérifie), aucun moteur n'est chargé, aucun fichier n'est créé. *Oui* : acceptation puis test.
+   Une personne qui a déjà répondu *oui* va directement à l'acceptation ; l'acceptation est redemandée à chaque test.
+3. **Réglages** : section « Test de lecture en français québécois » (après les langues) : la réponse en deux cases
+   (Oui / Non, aucune cochée tant qu'on n'a pas répondu) et la carte. Corriger *non* en *oui* fait revenir la carte
+   (Réglages et écran principal, sauf si elle y avait été fermée). La réponse reste visible même si
+   « Français (Québec) » est décoché, pour pouvoir être corrigée.
+4. **Lecture** (`ui/ReadingTestActivity`) : un paragraphe à la fois en style `TextAppearance.Dictee.Reading` (TitleLarge
+   du thème, interligne 1,4), un seul bouton Enregistrer / Arrêter / Refaire ce paragraphe, Précédent / Suivant (Suivant
+   seulement quand le paragraphe courant est enregistré), « Voir le score » dès qu'un paragraphe est lu. L'enregistrement
+   (`ParagraphRecorder`, 16 kHz, via `app.newAudioSource()` donc `MicAudioSource` ou, en test, un clip) s'arrête tout seul
+   à 20 s (la limite d'un segment) ou quand la source se termine ; moins de 0,5 s = « rien entendu », rien n'est gardé.
+   Un enregistrement en cours s'arrête quand l'écran quitte le premier plan (pas de micro en arrière-plan).
+   Pas de VAD : le paragraphe est transcrit tel quel, silences compris (les trois moteurs s'en accommodent).
+5. **Transcription** : tous les paragraphes lus, **à la fin** (« Voir le score »), **un modèle à la fois** (le modèle
+   est chargé une fois, au lieu de recharger ~1 Go à chaque paragraphe) avec les mêmes moteurs et options que la dictée
+   (`app.engines.use`, langue forcée avec une seule langue choisie). `benchmarkRunning` est levé pendant le calcul
+   (comme « Comparer les modèles »), le modèle est libéré à la fin. Annulable. Un modèle qui échoue est signalé et les
+   autres continuent. **Modèles utilisés : les modèles locaux installés** (`ModelCatalog.all` filtré par `isInstalled`) ;
+   **le serveur distant est exclu** : il enverrait la voix sur le réseau, ce qui contredit « rien ne quitte le
+   téléphone » (`ReadingPrivacyTest` le garde). Un seul modèle marche comme plusieurs ; aucun modèle installé : l'écran
+   d'acceptation le dit et le bouton est grisé.
+6. **Score** : ressemblance (1 − WER, `ReadingScoring`) globale et par paragraphe. Pourcentage affiché **arrondi vers le
+   bas, en entiers** (`similarityPercent`) : « 79 % » est donc toujours sous la ligne des 80 % du seuil de partage, et
+   20 % d'erreurs s'affiche « 80 % ». Avec plusieurs modèles : une ligne par modèle (« Parakeet : 87 % ») et le détail
+   d'un modèle à la fois (le modèle actif par défaut), car un texte entier par modèle ne tiendrait pas. Détail : le
+   texte du paragraphe avec les mots mal compris surlignés, la ligne « Entendu : … » et la liste des mots mal compris.
+   Un test arrêté tôt note ce qui a été lu et le dit ; il n'y a alors ni suggestion ni offre (texte incomplet, règle de
+   4.1).
+7. **Suggestion de modèle** : `ReadingThresholds.betterModel(scores, modèle actif)`, comparé au modèle **actif** au moment
+   du test (c'est lui que la personne utilise). Carte « Un autre modèle vous comprend mieux » et bouton « Choisir X »
+   qui change `activeModelId` ; le texte devient « X est maintenant votre modèle pour la dictée ».
+
+### Surlignage (accessibilité)
+
+Les mots mal compris portent `colorTertiaryContainer` en fond et `colorOnTertiaryContainer` en texte (paire déjà mesurée
+par `ThemeContrastTest`, libellé complété) **et un soulignement** : la couleur n'est jamais le seul signal. Jamais la
+couleur d'erreur (un mot mal compris n'est pas une faute de la personne). Une ligne « Mots mal compris : … » et une
+légende doublent le surlignage pour un lecteur d'écran. `ThemeContrastTest.readingHighlightUsesAMeasuredPair…`
+vérifie que `ReadingHighlight.kt` n'emploie que cette paire, le soulignement et pas `colorError`.
+
+### Structure de résultat et point d'extension pour 4.3
+
+`reading/ReadingResult.kt` (en mémoire, tenue par `ReadingSession.result`) :
+
+- `ReadingResult(textVersion, paragraphs: List<ParagraphResult>, globalScores: Map<modelId, GlobalScore>,
+  modelErrors: Map<modelId, String>, recommendedModelId, activeModelId, betterModelId: String?, offerSharing: Boolean,
+  region: String? = null)` ;
+- `ParagraphResult(index, audio: PcmAudio /* PCM 16 kHz mono */, transcriptions: Map<modelId, String>,
+  scores: Map<modelId, ParagraphScore>)` ; seuls les paragraphes lus y figurent ;
+- `offerSharing` = `ReadingThresholds.offerSharing(globalScores, recommendedModelId)` (WER strictement > 20 % avec le
+  modèle recommandé, texte complet).
+
+**Où 4.3 se branche** : `ReadingTestActivity.renderShareSlot(parent, result)`, appelée dans `renderResultFooter` ; elle ne
+crée qu'un conteneur vide (tag `reading_share_slot`) quand `result.offerSharing` est vrai, et rien sinon. 4.3 y met son
+point d'entrée (bouton vers l'écran de consentement) ; l'archive se construit depuis `ReadingTestModel.session.result`.
+La région (facultative) n'est pas saisie ici. Les chaînes `contrib_share_*` restent inutilisées.
+
+### Où vit l'audio, quand il disparaît
+
+**En mémoire seulement**, aucun fichier, même temporaire : `ReadingSession` garde un `PcmAudio` par paragraphe (au plus
+20 s × 16 kHz × 4 octets, soit 1,3 Mo par paragraphe, 11,5 Mo pour les neuf), et `ReadingResult` en reprend les
+références. Le tout est tenu par `ReadingTestModel` (un `ViewModel`), qui survit à une rotation ou à un changement de
+thème (sans lui, tourner le téléphone perdrait la lecture) et dont `onCleared()` appelle `session.clear()` quand l'écran
+est vraiment fermé (« Fermer », retour arrière, tâche supprimée). « Refaire le test » efface aussi tout. Si le processus
+est tué, la mémoire l'est avec lui. Aucune archive n'est créée à cette étape ; 4.3 décidera de ce qui est conservé après
+consentement. `ReadingPrivacyTest` interdit dans le code du test les écritures de fichier, `ACTION_SEND`, `java.net`,
+`FileProvider`, le serveur distant, etc., et vérifie que l'ensemble des permissions du manifeste n'a pas bougé.
+
+### Choix de conception
+
+- **Logique séparée de l'écran** (`reading/`, sans classe Android) : `Participation` (carte, exclusion, correction),
+  `ReadingSession` (phases `DECLARE → ACCEPT → READING → SCORING → RESULT`, `DECLINED`, protection de la vie privée dans
+  `store`/`accept`), `ParagraphRecorder` (boucle d'enregistrement sur une `AudioSource`), `ReadingTranscriber` (interface :
+  les tests passent un moteur scripté, l'application l'adosse à `EngineManager`). L'activité ne fait que dessiner.
+- **Une seule activité** pour question, remerciement, acceptation, lecture, calcul et résultat (phases d'une même
+  session) plutôt que cinq écrans : l'état est un seul objet, la rotation ne casse rien.
+- **Graine de test** : `TestHooks.installedModelIds` (debug/tests) rend « installés » exactement ces modèles du
+  catalogue, pour tester un modèle puis plusieurs ; sans effet hors test (null).
+- **Captures** : `reading-light.png` et `reading-dark.png` (résultat à deux modèles, carte de meilleur modèle,
+  surlignage) sont produites par `ScreenshotTest.readingTest` dans la CI ; elles ne sont pas encore dans
+  `docs/screenshots/` ni liées dans le README (pas de lien mort : la CI les générera avec les autres).
+- Chaînes : `settings_participation_*` et `reading_*` dans `strings.xml` ; les textes de la carte, de la déclaration
+  et de l'acceptation sont ceux de 4.1 (`contrib_*`), inchangés.
+
+### Tests ajoutés
+
+- JVM : `ParticipationTest` (9 : carte selon les langues, fin de configuration, fermeture, exclusion après « non »,
+  correction dans les Réglages), `ReadingSessionTest` (21 : phases, aucun enregistrement après « non » ni avant
+  l'acceptation, lecture et refaire, score avec un modèle et avec plusieurs, mots mal compris, pourcentage arrondi vers le
+  bas, partage de part et d'autre de 20 %, pas d'offre sans le modèle recommandé ni sur texte incomplet, suggestion de
+  modèle, modèle en échec, annulation, erreur imprévue, effacement), `ParagraphRecorderTest` (6), `ReadingPrivacyTest`
+  (3), `ThemeContrastTest` (surlignage).
+- Instrumentés (`ReadingTestInstrumentedTest`, `ReadingDriver`, compilés non exécutés ici) : carte absente sans
+  « Français (Québec) » (et présente avec, en témoin) ; fermeture de la carte ; la carte ouvre le test par la question ;
+  **« non » → aucun test proposé, micro jamais ouvert, aucun moteur chargé, aucun fichier créé** (comparaison des
+  répertoires `filesDir`, `cacheDir`, `codeCacheDir`, `noBackupFilesDir`, stockage externe, bases), carte retirée,
+  correction dans les Réglages, retour de la carte ; aucun modèle installé ; **un modèle** : score affiché égal au calcul,
+  mot surlignée avec les couleurs du thème et soulignée, rien d'autre surligné, pas de choix de modèle, enregistrements
+  supprimés à la fermeture ; **trois modèles** : une ligne par modèle, détail du modèle actif, suggestion et changement
+  de modèle ; emplacement de partage vide quand le modèle recommandé est loin ; arrêt anticipé.
+
+### À valider par un humain
+
+1. **Rendu à l'écran** (clair et sombre, `reading-*.png` de la CI) : taille et aération du texte à lire, lisibilité du
+   surlignage (fond tertiaire + soulignement) sur un vrai écran, longueur du détail.
+2. **Parcours sur un vrai téléphone** : micro réel, arrêt à 20 s, temps de calcul avec trois ou quatre modèles (chacun est
+   rechargé à tour de rôle : plusieurs dizaines de secondes par modèle sont probables), mémoire (un seul modèle chargé à la
+   fois, libéré à la fin).
+3. **Wording** des nouvelles chaînes (`reading_*`, `settings_participation_*`), notamment « Non merci » (ferme la carte)
+   par rapport à la réponse « Non » (exclut).
+4. Que la carte n'apparaisse **qu'à la fin de la configuration** (et pas dès le premier lancement) convient.
