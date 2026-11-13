@@ -604,7 +604,8 @@ class DicteeImeService : InputMethodService(), DictationListener, EngineManager.
         }
         val shown = app.shownSpec()
         installed.forEachIndexed { i, spec ->
-            menu.menu.add(0, i, i, spec.displayName).apply {
+            // Issue #37: models named by their effect in the keyboard.
+            menu.menu.add(0, i, i, io.github.remtav.dictee.stt.ModelPlainNames.of(spec)).apply {
                 isCheckable = true
                 isChecked = spec.id == shown.id
             }
@@ -678,7 +679,7 @@ class DicteeImeService : InputMethodService(), DictationListener, EngineManager.
         val mic = micButton ?: return
         val status = statusText ?: return
         val spec = app.shownSpec()
-        modelButton?.text = spec.shortName
+        modelButton?.text = io.github.remtav.dictee.stt.ModelPlainNames.short(spec)
         val state = controller.state
         val listening = state == DictationState.LISTENING
         mic.setIconResource(if (listening) R.drawable.ic_stop else R.drawable.ic_mic)
@@ -704,10 +705,10 @@ class DicteeImeService : InputMethodService(), DictationListener, EngineManager.
             ).let { if (blocksTotal > 1) getString(R.string.status_server_blocks, it.trimEnd('…'), blocksDone, blocksTotal) else it } to false
             lastMessage != null && !listening -> lastMessage!! to lastMessageIsError
             state == DictationState.FINISHING -> getString(R.string.status_finishing) to false
-            listening && es is EngineManager.State.Loading -> getString(R.string.status_listening_loading, es.spec.shortName) to false
+            listening && es is EngineManager.State.Loading -> getString(R.string.status_listening_loading, io.github.remtav.dictee.stt.ModelPlainNames.inSentence(es.spec)) to false
             listening && speaking -> getString(R.string.status_speaking) to false
             listening -> getString(R.string.status_listening) to false
-            es is EngineManager.State.Loading -> getString(R.string.status_loading, es.spec.shortName) to false
+            es is EngineManager.State.Loading -> getString(R.string.status_loading, io.github.remtav.dictee.stt.ModelPlainNames.inSentence(es.spec)) to false
             es is EngineManager.State.Failed -> es.message to true
             es is EngineManager.State.Ready && es.note != null -> es.note to false
             !app.isInstalled(spec) -> getString(R.string.msg_no_model) to true

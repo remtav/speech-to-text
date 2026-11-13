@@ -236,7 +236,7 @@ class ReadingTestInstrumentedTest : ImeTestBase() {
             d.awaitTag(ReadingTestActivity.TAG_ACCEPT_START)
             // The acceptance says that nothing leaves the phone and names the model that will be used.
             assertTrue(d.allText().contains("Rien ne quitte le téléphone"))
-            assertTrue(d.allText().contains(ModelCatalog.whisperTurbo.displayName))
+            assertTrue(d.allText().contains(io.github.remtav.dictee.stt.ModelPlainNames.of(ModelCatalog.whisperTurbo)))
             assertEquals("no recording before the acceptance", 0, micOpened.get())
             d.click(ReadingTestActivity.TAG_ACCEPT_START)
             d.awaitTag(ReadingTestActivity.TAG_PARAGRAPH)
@@ -310,7 +310,7 @@ class ReadingTestInstrumentedTest : ImeTestBase() {
             d.click(ReadingTestActivity.TAG_DECLARE_YES)
             d.awaitTag(ReadingTestActivity.TAG_ACCEPT_START)
             val used = d.allText()
-            for (id in listOf(parakeet, whisper)) assertTrue(used.contains(ModelCatalog.byId(id)!!.displayName))
+            for (id in listOf(parakeet, whisper)) assertTrue(used.contains(io.github.remtav.dictee.stt.ModelPlainNames.of(ModelCatalog.byId(id)!!)))
             assertFalse("hidden model not used", used.contains(ModelCatalog.qwen3.displayName))
             d.click(ReadingTestActivity.TAG_ACCEPT_START)
             d.awaitTag(ReadingTestActivity.TAG_PARAGRAPH)
@@ -327,7 +327,7 @@ class ReadingTestInstrumentedTest : ImeTestBase() {
             for (id in listOf(parakeet, whisper)) assertTrue(d.has(ReadingTestActivity.modelChoiceTag(id)))
             assertFalse(d.has(ReadingTestActivity.modelChoiceTag(ModelCatalog.qwen3.id)))
             assertEquals(
-                context.getString(R.string.reading_result_model_line, ModelCatalog.parakeet.displayName, worsePercent),
+                context.getString(R.string.reading_result_model_line, io.github.remtav.dictee.stt.ModelPlainNames.of(ModelCatalog.parakeet), worsePercent),
                 d.text(ReadingTestActivity.modelChoiceTag(parakeet)),
             )
             assertEquals(context.getString(R.string.reading_result_global, worsePercent), d.text(ReadingTestActivity.globalTag(parakeet)))

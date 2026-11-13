@@ -101,7 +101,14 @@ class SetupLanguageTest {
     fun firstLaunchShowsWelcomeAndOffersOnlyWhisperTurboForQuebecFrench() {
         ActivityScenario.launch(SetupActivity::class.java).use { s ->
             val text = s.text()
-            assertTrue("welcome text", text.contains("conçu au Québec"))
+            assertTrue("welcome text", text.contains("développé au Québec"))
+            // Issue #37: « code ouvert » in plain words, code public and dictations private; no model name.
+            assertTrue(text.contains("Code ouvert"))
+            assertTrue(text.contains("vos dictées, elles, restent privées"))
+            for (word in io.github.remtav.dictee.stt.ModelPlainNames.technicalWords) {
+                assertTrue("« $word » on the installation screen", !text.contains(word, ignoreCase = true))
+            }
+            assertTrue(text.contains("Plus précis"))
             assertTrue(text.contains("n'est envoyée à personne") || text.contains("n’est envoyée à personne"))
             assertTrue("no Google claim", !text.contains("Google"))
             assertTrue("old name gone", !text.contains("Dictée locale"))

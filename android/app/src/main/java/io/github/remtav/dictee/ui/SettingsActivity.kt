@@ -71,14 +71,14 @@ class SettingsActivity : AppCompatActivity() {
             }
         }
 
+        // Issue #36: the quick test can be done again from here (another language, a new model).
+        col.button(getString(R.string.quick_open), outlined = true) {
+            startActivity(android.content.Intent(this, QuickTestActivity::class.java))
+        }.tag = QUICK_TEST_TAG
+
         participationBox = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         col.addView(participationBox)
         renderParticipation()
-
-        // Issue #22: experimental models are listed here (and in the comparison), never on the main screen.
-        experimentalBox = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
-        col.addView(experimentalBox)
-        renderExperimental()
 
         col.heading(getString(R.string.settings_dictation))
         col.switch(getString(R.string.settings_partials), s.partials) { s.partials = it }
@@ -110,16 +110,6 @@ class SettingsActivity : AppCompatActivity() {
         col.radio(LayoutKind.entries.map { it.label }, s.keyboardLayout.ordinal) { s.keyboardLayout = LayoutKind.entries[it] }
         col.body(getString(R.string.settings_layout_help), small = true)
 
-        col.heading(getString(R.string.settings_performance))
-        col.slider(getString(R.string.settings_keep_loaded), 0f, 30f, 1f, s.keepLoadedMinutes.toFloat(), { "${it.toInt()} min" }) {
-            s.keepLoadedMinutes = it.toInt()
-        }
-        col.slider(getString(R.string.settings_threads), 1f, 8f, 1f, s.threads.toFloat(), { "${it.toInt()}" }) {
-            s.threads = it.toInt()
-        }
-        col.body(getString(R.string.settings_acceleration), small = false)
-        col.radio(Acceleration.entries.map { it.label }, s.acceleration.ordinal) { s.acceleration = Acceleration.entries[it] }
-        col.body(getString(R.string.settings_acceleration_help), small = true)
 
 
         col.heading(getString(R.string.settings_cleanup))
@@ -132,12 +122,15 @@ class SettingsActivity : AppCompatActivity() {
         llmBox = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         col.addView(llmBox)
 
-        // Issue #49: generic « Avancé » section, last on the screen; the server is folded in it (issue #57).
+        // Issue #49: generic « Avancé » section, last on the screen; the model choices (issue #37) and the server
+        // (issue #57) are folded in it.
         advancedBox = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; tag = ADVANCED_TAG }
         col.addView(advancedBox)
         advancedBox.heading(getString(R.string.settings_advanced))
         advancedBox.body(getString(R.string.settings_advanced_help), small = true)
         buildWhisperAdvanced(advancedBox)
+        // Issue #37: the technical model choices and the performance settings, folded, in one block.
+        buildModelsAdvanced(advancedBox.collapsible(getString(R.string.settings_models_section), MODELS_SECTION_TAG, MODELS_CONTENT_TAG).content)
         // Issue #57: the remote server, a developer setting, folded at opening, last in « Avancé ».
         serverSection = advancedBox.collapsible(getString(R.string.settings_server_section), SERVER_SECTION_TAG, SERVER_CONTENT_TAG)
         buildRemoteSection(serverSection.content)
@@ -335,6 +328,33 @@ class SettingsActivity : AppCompatActivity() {
         fixNote = box.body(getString(R.string.settings_whisper_repetition_inactive), small = true)
         box.body(getString(R.string.settings_whisper_repetition_help), small = true)
         renderFix()
+    }
+
+    /**
+     * « Modèles et performances » (issue #37): the technical names of the phone models, the comparison, the
+     * experimental models (issue #22) and the performance settings, moved here from the first level.
+     */
+    private fun buildModelsAdvanced(box: LinearLayout) {
+        val s = app.settings
+        box.body(getString(R.string.settings_models_names, ModelCatalog.whisperTurbo.displayName, ModelCatalog.whisperTurbo.publisher,
+            ModelCatalog.parakeet.displayName, ModelCatalog.parakeet.publisher), small = true)
+        box.button(getString(R.string.setup_compare), outlined = true) {
+            startActivity(android.content.Intent(this, CompareActivity::class.java))
+        }.tag = COMPARE_TAG
+        // Issue #22: experimental models are listed here (and in the comparison), never on the main screen.
+        experimentalBox = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        box.addView(experimentalBox)
+        renderExperimental()
+        box.heading(getString(R.string.settings_performance))
+        box.slider(getString(R.string.settings_keep_loaded), 0f, 30f, 1f, s.keepLoadedMinutes.toFloat(), { "${it.toInt()} min" }) {
+            s.keepLoadedMinutes = it.toInt()
+        }
+        box.slider(getString(R.string.settings_threads), 1f, 8f, 1f, s.threads.toFloat(), { "${it.toInt()}" }) {
+            s.threads = it.toInt()
+        }
+        box.body(getString(R.string.settings_acceleration), small = false)
+        box.radio(Acceleration.entries.map { it.label }, s.acceleration.ordinal) { s.acceleration = Acceleration.entries[it] }
+        box.body(getString(R.string.settings_acceleration_help), small = true)
     }
 
     private fun saveRemote() {
@@ -542,6 +562,11 @@ class SettingsActivity : AppCompatActivity() {
         /** Header and content of the folded server section inside « Avancé » (issue #57), for tests. */
         const val SERVER_SECTION_TAG = "settings_server_section"
         const val SERVER_CONTENT_TAG = "settings_server_content"
+        /** « Modèles et performances » inside « Avancé » (issue #37), the comparison button, the quick test button. */
+        const val MODELS_SECTION_TAG = "settings_models_section"
+        const val MODELS_CONTENT_TAG = "settings_models_content"
+        const val COMPARE_TAG = "settings_compare"
+        const val QUICK_TEST_TAG = "settings_quick_test"
         /** Tag of an experimental model's card, for tests. */
         fun experimentalCardTag(spec: io.github.remtav.dictee.stt.ModelSpec) = "experimental_card_${spec.id}"
     }
