@@ -97,11 +97,13 @@ class WhisperRepetitionHostTest {
         val cut = SherpaEngine(spec, dir, fr.copy(whisperTailPaddings = 300, whisperRepetitionFix = RepetitionFix.CUT))
         try {
             val outcomes = HashMap<RepetitionOutcome, Int>()
+            var extended = 0
             for ((name, a) in clips) {
                 val p = plain.transcribe(a)
                 val r = redecode.transcribe(a)
                 val c = cut.transcribe(a)
                 outcomes.merge(r.repetition, 1, Int::plus)
+                if (r.ceilingExtended) extended++
                 println("AUTO|$name|1000: ${p.text} (${p.decodeMillis} ms)|redécoder ${r.repetition}: ${r.text} (${r.decodeMillis} ms)|" +
                     "couper ${c.repetition}: ${c.text} (${c.decodeMillis} ms)")
                 if (r.repetition == RepetitionOutcome.REDECODED) assertEquals("$name: redecoded text is the 1000 text", p.text, r.text)
@@ -110,8 +112,11 @@ class WhisperRepetitionHostTest {
                 // Both options see the same first decode: they fire on the same clips.
                 assertEquals(name, r.repetition == RepetitionOutcome.NONE, c.repetition == RepetitionOutcome.NONE)
             }
-            // frqc5 runs into the token ceiling at 300 (#40): the filter must fire at least there.
-            assertTrue("the filter never fired on the bundled clips: $outcomes", (outcomes[RepetitionOutcome.REDECODED] ?: 0) > 0)
+            // frqc5 runs into the token ceiling at 300 (#40). Decoded again with silence added (SherpaEngine.decode),
+            // it now ends by itself, measured on the host with the Python package of the same sherpa-onnx; otherwise
+            // the filter fires. Either way something must have handled it.
+            assertTrue("neither the ceiling silence nor the filter fired on the bundled clips: $outcomes",
+                extended > 0 || (outcomes[RepetitionOutcome.REDECODED] ?: 0) > 0)
         } finally {
             plain.release(); redecode.release(); cut.release()
         }
