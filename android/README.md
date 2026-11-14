@@ -621,4 +621,10 @@ request construit un APK release non signé, et un push sur `main` ne publie auc
 release (avertissement dans le résumé du workflow).
 
 La CI (`.github/workflows/android.yml`) exécute ces trois suites et publie
-l'APK en release à chaque push sur `main`.
+l'APK en release à chaque push sur `main`. Pour publier sans nouveau commit :
+Actions → Android → Run workflow, avec la branche `main`. Chaque lancement
+publie une nouvelle version (`0.1.<numéro du run>`) ; depuis une autre branche,
+il construit et teste, sans rien publier. Une publication exige tous les jobs
+verts ; seule exception, un lancement manuel avec la case « skip_slow_tests »
+cochée saute les tests de modèles et l'émulateur et publie dès que le build
+(tests unitaires, signature) est vert, avec un avertissement dans le résumé.
