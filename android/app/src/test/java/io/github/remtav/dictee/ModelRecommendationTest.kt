@@ -9,7 +9,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** Issue #22: Whisper turbo is the default and the recommendation; Parakeet for English alone only. */
+/** Issues #22 and #72: Whisper turbo is the default, the recommendation and the only model offered. */
 class ModelRecommendationTest {
     private val langs = DictationLanguage.entries
     private val english = setOf(DictationLanguage.ENGLISH)
@@ -30,26 +30,41 @@ class ModelRecommendationTest {
         }
     }
 
-    @Test fun englishAloneRecommendsWhisperAndOffersParakeet() {
+    @Test fun englishAloneRecommendsWhisperInOneSentenceThatNamesNoSecondModel() {
         val rec = ModelRecommendations.recommend(english)
         assertEquals(ModelCatalog.whisperTurbo, rec.model)
-        // Issue #37: the lighter model is mentioned by its effect, never by its name.
-        assertTrue(rec.reason, rec.reason.contains("plus léger"))
-        assertEquals(listOf(ModelCatalog.whisperTurbo, ModelCatalog.parakeet), ModelCatalog.offered(english))
+        assertEquals("Whisper : le modèle qui comprend le mieux le français d'ici aux essais (1,04 Go).", rec.reason)
+        assertFalse(rec.reason, rec.reason.contains("léger"))
+        assertFalse(rec.reason, rec.reason.contains("test d'une minute"))
+        assertEquals(listOf(ModelCatalog.whisperTurbo), ModelCatalog.offered(english))
     }
 
-    @Test fun quebecFrenchOffersOnlyWhisperTurbo() {
-        for (combo in allCombinations().filter { DictationLanguage.FRENCH_QUEBEC in it }) {
+    /** Issue #72: Whisper alone, for every combination (the five kept languages, and all eleven still in the list). */
+    @Test fun offeredIsWhisperAloneForEveryCombination() {
+        val five = listOf(DictationLanguage.FRENCH_QUEBEC, DictationLanguage.FRENCH_FRANCE, DictationLanguage.ENGLISH,
+            DictationLanguage.SPANISH, DictationLanguage.PORTUGUESE)
+        val fiveCombos = (1 until (1 shl five.size)).map { m -> five.filterIndexed { i, _ -> m and (1 shl i) != 0 }.toSet() }
+        assertEquals(31, fiveCombos.size)
+        for (combo in fiveCombos + allCombinations()) {
             assertEquals(combo.toString(), listOf(ModelCatalog.whisperTurbo), ModelCatalog.offered(combo))
         }
     }
 
-    // Issue #36: widened from English alone to the languages of the "light phone model" row of the install table.
-    @Test fun parakeetIsOfferedOnlyWhenEveryLanguageIsLightAndQuebecIsAbsent() {
-        val light = setOf(DictationLanguage.FRENCH_FRANCE, DictationLanguage.ENGLISH,
-            DictationLanguage.SPANISH, DictationLanguage.PORTUGUESE)
-        for (combo in allCombinations()) {
-            assertEquals(combo.toString(), light.containsAll(combo), ModelCatalog.parakeet in ModelCatalog.offered(combo))
+    /** Issue #72: Parakeet is in « Avancé » only: listed there and in the comparison, never offered nor recommended. */
+    @Test fun parakeetIsAdvancedOnly() {
+        val p = ModelCatalog.parakeet
+        assertEquals(ModelVisibility.ADVANCED, p.visibility)
+        assertEquals(listOf(p), ModelCatalog.advanced)
+        assertEquals("Plus léger et plus rapide, mais comprend moins bien le français québécois.", p.note)
+        for (combo in allCombinations() + sequenceOf(emptySet())) {
+            assertFalse(combo.toString(), p in ModelCatalog.offered(combo))
+            assertTrue(combo.toString(), p in ModelCatalog.listed(combo))
+            assertTrue(combo.toString(), ModelRecommendations.recommend(combo).model != p)
+            // It may be chosen whatever the languages, Québec French included (no notice, see ModelMigrationTest).
+            assertTrue(combo.toString(), ModelCatalog.suits(p, combo))
+            // The keyboard's menu shows it only while it is the active model.
+            assertFalse(combo.toString(), p in ModelCatalog.forKeyboard(combo, ModelCatalog.whisperTurbo.id))
+            assertEquals(combo.toString(), listOf(ModelCatalog.whisperTurbo, p), ModelCatalog.forKeyboard(combo, p.id))
         }
     }
 
@@ -65,13 +80,16 @@ class ModelRecommendationTest {
         }
     }
 
-    @Test fun liteWhisperIsExperimentalNeverOfferedNorRecommended() {
+    /** Issue #72: Lite-Whisper is withdrawn: shown nowhere, but kept in the catalogue so its files can be deleted. */
+    @Test fun liteWhisperIsHiddenEverywhereButStaysInTheCatalogue() {
         val lite = ModelCatalog.liteWhisperTurbo
-        assertEquals(ModelVisibility.EXPERIMENTAL, lite.visibility)
-        assertEquals(listOf(lite), ModelCatalog.experimental)
+        assertEquals(ModelVisibility.HIDDEN, lite.visibility)
+        assertTrue(lite in ModelCatalog.all)
+        assertFalse(lite in ModelCatalog.advanced)
         for (combo in allCombinations()) {
             assertFalse(combo.toString(), lite in ModelCatalog.offered(combo))
-            assertTrue(combo.toString(), lite in ModelCatalog.listed(combo))
+            assertFalse(combo.toString(), lite in ModelCatalog.listed(combo))
+            assertFalse(combo.toString(), lite in ModelCatalog.forKeyboard(combo, lite.id))
             assertTrue(combo.toString(), ModelRecommendations.recommend(combo).model != lite)
         }
         // Same coverage as Whisper turbo.
@@ -92,11 +110,10 @@ class ModelRecommendationTest {
             assertTrue(combo.toString(), reason.isNotBlank())
             assertFalse(reason, reason.contains("Parakeet est meilleur"))
             assertFalse(reason, reason.contains("59 mots"))
-            // Issue #37: no model name in the normal path.
+            // Issue #72: « Whisper » is named; the other technical words stay out of the normal path.
+            assertTrue(reason, reason.startsWith("Whisper"))
             for (word in io.github.remtav.dictee.stt.ModelPlainNames.technicalWords) assertFalse(reason, reason.contains(word))
         }
-        val qc = ModelRecommendations.recommend(setOf(DictationLanguage.FRENCH_QUEBEC)).reason
-        assertTrue(qc, qc.contains("français québécois"))
     }
 
     @Test fun defaultModelIsWhisperTurbo() {
@@ -137,7 +154,6 @@ class ModelRecommendationTest {
     @Test fun whisperNoteIsAnObservationAndNoLongerALastResort() {
         assertTrue(ModelCatalog.whisperTurbo.note.startsWith("Observé"))
         assertFalse(ModelCatalog.whisperTurbo.note.contains("dernier recours"))
-        assertEquals("", ModelCatalog.parakeet.note)
     }
 
     @Test fun parakeetCoversExactlySixOfTheEleven() {

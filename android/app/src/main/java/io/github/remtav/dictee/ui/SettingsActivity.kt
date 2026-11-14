@@ -43,14 +43,14 @@ class SettingsActivity : AppCompatActivity() {
     private lateinit var remoteStatus: android.widget.TextView
     private lateinit var llmBox: LinearLayout
     private lateinit var participationBox: LinearLayout
-    private lateinit var experimentalBox: LinearLayout
-    /** « Avancé » section (issue #49): generic, other advanced settings are added to it (#37). */
     private lateinit var advancedBox: LinearLayout
+    /** « Avancé » section (issue #49): generic, other advanced settings are added to it (#37). */
+    private lateinit var otherModelsBox: LinearLayout
     /** « Serveur distant, pour essais (développeurs) », folded inside « Avancé » (issue #57). */
     private lateinit var serverSection: Collapsible
     /** Redraws the server-language choice; set once that section exists. */
     private var refreshRemoteLanguage: () -> Unit = {}
-    private val refresh: () -> Unit = { renderLlm(); renderExperimental() }
+    private val refresh: () -> Unit = { renderLlm(); renderAdvancedModels() }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -71,10 +71,12 @@ class SettingsActivity : AppCompatActivity() {
             }
         }
 
-        // Issue #36: the quick test can be done again from here (another language, a new model).
-        col.button(getString(R.string.quick_open), outlined = true) {
-            startActivity(android.content.Intent(this, QuickTestActivity::class.java))
-        }.tag = QUICK_TEST_TAG
+        // Issue #36: the quick test can be done again from here. Issue #72: hidden (QuickTestActivity.REACHABLE).
+        if (QuickTestActivity.REACHABLE) {
+            col.button(getString(R.string.quick_open), outlined = true) {
+                startActivity(android.content.Intent(this, QuickTestActivity::class.java))
+            }.tag = QUICK_TEST_TAG
+        }
 
         participationBox = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         col.addView(participationBox)
@@ -156,7 +158,7 @@ class SettingsActivity : AppCompatActivity() {
         super.onResume()
         Downloads.addListener(refresh)
         renderLlm()
-        renderExperimental()
+        renderAdvancedModels()
         // Back from the reading test, where the question may have been answered.
         renderParticipation()
     }
@@ -332,19 +334,18 @@ class SettingsActivity : AppCompatActivity() {
 
     /**
      * « Modèles et performances » (issue #37): the technical names of the phone models, the comparison, the
-     * experimental models (issue #22) and the performance settings, moved here from the first level.
+     * the « Avancé » models (issue #72) and the performance settings, moved here from the first level.
      */
     private fun buildModelsAdvanced(box: LinearLayout) {
         val s = app.settings
-        box.body(getString(R.string.settings_models_names, ModelCatalog.whisperTurbo.displayName, ModelCatalog.whisperTurbo.publisher,
-            ModelCatalog.parakeet.displayName, ModelCatalog.parakeet.publisher), small = true)
+        box.body(getString(R.string.settings_models_names, ModelCatalog.whisperTurbo.displayName, ModelCatalog.whisperTurbo.publisher), small = true)
         box.button(getString(R.string.setup_compare), outlined = true) {
             startActivity(android.content.Intent(this, CompareActivity::class.java))
         }.tag = COMPARE_TAG
-        // Issue #22: experimental models are listed here (and in the comparison), never on the main screen.
-        experimentalBox = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
-        box.addView(experimentalBox)
-        renderExperimental()
+        // Issue #72: Parakeet is listed here (and in the comparison), never on the main screen.
+        otherModelsBox = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        box.addView(otherModelsBox)
+        renderAdvancedModels()
         box.heading(getString(R.string.settings_performance))
         box.slider(getString(R.string.settings_keep_loaded), 0f, 30f, 1f, s.keepLoadedMinutes.toFloat(), { "${it.toInt()} min" }) {
             s.keepLoadedMinutes = it.toInt()
@@ -414,23 +415,24 @@ class SettingsActivity : AppCompatActivity() {
         }
     }
 
-    /** One card per experimental model: choose it, download it, delete it (issue #22). */
-    private fun renderExperimental() {
-        experimentalBox.removeAllViews()
-        if (ModelCatalog.experimental.isEmpty()) return
-        experimentalBox.heading(getString(R.string.settings_experimental))
-        experimentalBox.body(getString(R.string.settings_experimental_help), small = true)
-        for (spec in ModelCatalog.experimental) {
-            val card = experimentalBox.card()
-            card.tag = experimentalCardTag(spec)
+    /** One card per « Avancé » model (Parakeet, issue #72): choose it, download it, delete it. */
+    private fun renderAdvancedModels() {
+        otherModelsBox.removeAllViews()
+        if (ModelCatalog.advanced.isEmpty()) return
+        otherModelsBox.heading(getString(R.string.settings_advanced_models))
+        otherModelsBox.body(getString(R.string.settings_advanced_models_help), small = true)
+        for (spec in ModelCatalog.advanced) {
+            val card = otherModelsBox.card()
+            card.tag = advancedCardTag(spec)
             val installed = app.store.isInstalled(spec)
             card.addView(RadioButton(this).apply {
                 text = spec.displayName
                 isChecked = app.settings.activeModelId == spec.id
                 isEnabled = installed
-                setOnClickListener { app.settings.activeModelId = spec.id; renderExperimental() }
+                setOnClickListener { app.settings.activeModelId = spec.id; renderAdvancedModels() }
             })
             card.body("${spec.publisher} · ${spec.description}", small = true)
+            if (spec.note.isNotEmpty()) card.body(spec.note, small = true)
             card.body(getString(R.string.model_license_runs_local, spec.license), small = true)
             val st = Downloads.status[spec.id]
             card.body(
@@ -450,11 +452,11 @@ class SettingsActivity : AppCompatActivity() {
                         if (app.engines.current()?.spec?.id == spec.id) app.engines.release()
                         app.store.delete(spec)
                         if (app.settings.activeModelId == spec.id) app.settings.activeModelId = ModelCatalog.default.id
-                        renderExperimental()
+                        renderAdvancedModels()
                     }
                     else -> button(getString(R.string.download)) {
                         Downloads.start(this@SettingsActivity, spec.asDownloadable(), getString(R.string.setup_downloading_label, spec.displayName))
-                        renderExperimental()
+                        renderAdvancedModels()
                     }
                 }
             }
@@ -567,7 +569,7 @@ class SettingsActivity : AppCompatActivity() {
         const val MODELS_CONTENT_TAG = "settings_models_content"
         const val COMPARE_TAG = "settings_compare"
         const val QUICK_TEST_TAG = "settings_quick_test"
-        /** Tag of an experimental model's card, for tests. */
-        fun experimentalCardTag(spec: io.github.remtav.dictee.stt.ModelSpec) = "experimental_card_${spec.id}"
+        /** Tag of an « Avancé » model's card, for tests. */
+        fun advancedCardTag(spec: io.github.remtav.dictee.stt.ModelSpec) = "advanced_card_${spec.id}"
     }
 }

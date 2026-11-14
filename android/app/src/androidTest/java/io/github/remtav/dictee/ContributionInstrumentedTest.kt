@@ -267,8 +267,8 @@ class ContributionInstrumentedTest : ImeTestBase() {
 
     @Test
     fun withConsentTheArchiveHoldsExactlyTheListedElementsAndTheMailIntentIsRight() {
-        // Whisper turbo (recommended) loses a quarter of the words; Parakeet hears everything (its results stay here).
-        // English alone, so that Parakeet is offered too (issue #22).
+        // Whisper (recommended) loses a quarter of the words. Parakeet is installed but no longer offered (issue #72):
+        // it is never used, so no result of it can reach the archive.
         app.settings.languages = setOf(DictationLanguage.ENGLISH)
         useModels(recommended, other) { model, _, text -> if (model == recommended) ScriptedReadingModels.dropEveryFourthWord(text) else text }
         ActivityScenario.launch(ReadingTestActivity::class.java).use { s ->

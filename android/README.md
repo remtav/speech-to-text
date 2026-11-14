@@ -98,10 +98,9 @@ langue cochée. Le choix se modifie aussi dans les Réglages. Il sert à :
   Parakeet ne prend aucune langue (sherpa-onnx 2.0.1 n'a pas d'entrée pour
   elle) : il la devine, ce qui peut mal tourner sur un mot dicté seul.
 
-La table de recommandation (`stt/ModelRecommendation.kt`) se lit de haut en
-bas : Parakeet si toutes vos langues font partie de ses 25 langues
-européennes ; sinon Qwen3-ASR s'il les couvre toutes ; sinon Whisper. La
-couverture vient des fiches des modèles (détail et sources dans `DECISIONS.md`).
+Depuis l'issue #72, la recommandation (`stt/ModelRecommendation.kt`) est toujours
+Whisper, et c'est le seul modèle du téléphone proposé à l'installation. La
+couverture des langues vient des fiches des modèles (détail et sources dans `DECISIONS.md`).
 Bengali et ourdou ne sont couverts que par Whisper, et « couvert » ne veut pas
 dire « bien transcrit ».
 
@@ -123,7 +122,7 @@ encore écouté ces six extraits** ; les phrases viennent de Wikipédia et de
 romans, donc la mesure porte sur l'accent et non sur le vocabulaire d'ici ; et
 elle n'a pas été faite sur un téléphone. La recommandation le dit : « mesuré
 sur six courts extraits (59 mots) : un indice, pas une preuve ». Vous pouvez refaire la mesure avec votre propre voix
-avec le **test rapide** ou, plus en détail, dans **Comparer les modèles** (Réglages → Avancé).
+dans **Comparer les modèles** (Réglages → Avancé).
 
 ## Test de lecture en français québécois
 
@@ -230,12 +229,13 @@ Configuration (accueil et étapes ; « Vos langues » ; modèle recommandé avec
 | ![Avancé, clair](docs/screenshots/settings-advanced-light.png) | ![Serveur distant, clair](docs/screenshots/settings-server-light.png) |
 | ![Avancé, sombre](docs/screenshots/settings-advanced-dark.png) | ![Serveur distant, sombre](docs/screenshots/settings-server-dark.png) |
 
-Test rapide (issue #36 recentrée sur le téléphone) et « Modèles et performances » (issue #37) :
+« Modèles et performances » (issues #37 et #72) :
 
-| Lecture | Résultat | Modèles et performances |
-|---|---|---|
-| ![Test rapide, lecture, clair](docs/screenshots/quick-test-reading-light.png) | ![Test rapide, résultat, clair](docs/screenshots/quick-test-result-light.png) | ![Modèles et performances, clair](docs/screenshots/settings-models-light.png) |
-| ![Test rapide, lecture, sombre](docs/screenshots/quick-test-reading-dark.png) | ![Test rapide, résultat, sombre](docs/screenshots/quick-test-result-dark.png) | ![Modèles et performances, sombre](docs/screenshots/settings-models-dark.png) |
+| Clair | Sombre |
+|---|---|
+| ![Modèles et performances, clair](docs/screenshots/settings-models-light.png) | ![Modèles et performances, sombre](docs/screenshots/settings-models-dark.png) |
+
+(Le test rapide, masqué depuis l'issue #72, n'est plus capturé.)
 
 | Réglages | Comparaison des modèles | Diagnostic serveur |
 |---|---|---|
@@ -262,21 +262,20 @@ Test rapide (issue #36 recentrée sur le téléphone) et « Modèles et performa
      s'ouvre sur elle ;
    - **3. Autoriser le micro** (un clavier ne peut pas demander la permission lui-même) ;
    - cocher vos langues (étape « 4. Vos langues ») ;
-   - **5. Modèle** : l'application choisit le modèle pour vos langues, décrit par son effet
-     et jamais par son nom (issue #37) : « Plus précis » (1,04 Go), le choix par défaut et
-     le seul proposé avec le français québécois ou une langue autre que les cinq du test ;
-     et, pour le français de France, l'anglais, l'espagnol ou le portugais seuls, aussi
-     « Plus léger et plus rapide » (671 Mo). Le télécharger (Wi-Fi conseillé) ;
-   - facultatif : **« Faire le test (1 minute) »** (voir « Test rapide » plus bas).
+   - **5. Modèle** : une seule carte, **« Whisper »** (1,04 Go), quelles que soient vos
+     langues (issue #72, marche arrière sur #37 : le nom est dit, la variante « large-v3-turbo »
+     reste dans « Avancé »). Le télécharger (Wi-Fi conseillé).
 3. Dans n'importe quelle application, basculer vers le clavier Kalmia Blabla
    (icône clavier de la barre de navigation, ou touche micro de votre clavier
    habituel) et appuyer sur le micro. Appuyer de nouveau pour arrêter.
 
-## Test rapide (1 minute)
+## Test rapide (1 minute) — masqué
 
-Issue #36, recentrée sur le téléphone le 2026-11-13 (le serveur n'est plus une option du
-produit, issue #57). Facultatif, depuis l'étape « Modèle » de l'installation (une fois un
-modèle téléchargé) ou depuis les Réglages (« Vos langues »), pour le français (Québec ou
+**Masqué depuis l'issue #72** : avec un seul modèle du téléphone (Whisper), il n'a rien à comparer, et
+aucun écran ne l'ouvre plus (ni l'installation ni les Réglages ; `QuickTestActivity.REACHABLE`). Son code, ses
+chaînes et ses tests restent, pour comparer un jour Whisper local et Whisper distant (autre issue : il faudra un
+consentement, car il est conçu pour ne rien envoyer hors du téléphone, et de nouveaux verdicts). Ce qui suit décrit
+le test tel qu'il a été conçu (issue #36, recentrée sur le téléphone le 2026-11-13), pour le français (Québec ou
 France), l'anglais, l'espagnol et le portugais :
 
 1. Lire à voix haute un texte d'une quarantaine de mots dans la première de vos langues
@@ -399,14 +398,15 @@ Limites connues :
 | Modèle | Éditeur | Taille (int8) | Affichage (issue #22) |
 |---|---|---|---|
 | Whisper large-v3-turbo (défaut) | OpenAI | 1,04 Go | Toujours proposé et recommandé |
-| Parakeet TDT 0.6b v3 | NVIDIA | 671 Mo | Proposé seulement si la seule langue choisie est l'anglais |
-| Lite-Whisper large-v3-turbo (expérimental) | efficient-speech (LiteASR), d'après OpenAI | 1,16 Go | Réglages, clavier et « Comparer les modèles » ; jamais recommandé |
+| Parakeet TDT 0.6b v3 | NVIDIA | 671 Mo | « Avancé » et « Comparer les modèles » seulement, quelles que soient les langues (issue #72) ; au clavier, seulement s'il est le modèle actif ; jamais recommandé |
+| Lite-Whisper large-v3-turbo | efficient-speech (LiteASR), d'après OpenAI | 1,16 Go | Retiré (issue #72) : affiché nulle part, gardé dans le catalogue pour supprimer ses fichiers |
 | Qwen3-ASR 0.6B | Alibaba (Qwen) | 987 Mo | Caché (gardé dans le catalogue) |
 | Whisper large-v3-turbo, français québécois | ele-sage (communauté), d'après OpenAI | 1,04 Go | Caché (gardé dans le catalogue) |
 
 Depuis l'issue #22, Whisper large-v3-turbo est le modèle par défaut, français québécois compris : aux essais de
 l'utilisateur, il a fait mieux que les autres, et mieux que le Whisper affiné québécois. Si le modèle actif est caché
-ou ne convient plus aux langues (Parakeet avec le français québécois, par exemple), l'application passe à Whisper
+(Qwen3-ASR, Whisper québécois, Lite-Whisper depuis l'issue #72 ; Parakeet, lui, reste permis dans « Avancé » et n'est
+pas remplacé), l'application passe à Whisper
 turbo au démarrage et le dit une fois sur l'écran principal (invitation à le télécharger s'il manque, bouton pour
 supprimer les fichiers d'un modèle caché : rien n'est supprimé sans clic). Le paragraphe ci-dessous sur Whisper
 « en dernier recours » date d'avant cette décision.
@@ -428,12 +428,11 @@ conversion int8 (`android/tools/whisper-hf-vers-sherpa/`) est hébergée par l'a
 fichier par fichier, vérifiée par SHA-256. WER annoncé par son auteur : 6,65 % sur son jeu de validation. Mesuré ici :
 5 erreurs sur 59 mots (8,5 %) sur six courts extraits québécois, contre 4 pour Parakeet et 6 pour Whisper turbo :
 un indice, pas une preuve (ces extraits viennent de Common Voice, une des sources de son affinage : il a pu les entendre). Il a la même taille et le même coût de calcul que Whisper large-v3-turbo, donc il est plus
-lent sur le téléphone (observation de l'utilisateur sur Whisper turbo, pas une mesure sur appareil). Parakeet reste
-recommandé pour le français québécois ; ce modèle est seulement proposé.
+lent sur le téléphone (observation de l'utilisateur sur Whisper turbo, pas une mesure sur appareil). Ce modèle est caché depuis l'issue #22.
 
-Ces noms techniques ne figurent pas dans le parcours normal (issue #37) : l'écran principal,
-le clavier et le test rapide disent « Plus précis » (Whisper large-v3-turbo) et « Plus léger
-et plus rapide » (Parakeet). Les noms, la comparaison, les modèles expérimentaux et les
+Dans le parcours normal, le modèle du téléphone s'appelle **« Whisper »** (issue #72, marche arrière sur #37 qui
+l'appelait « Plus précis ») : l'écran principal, le clavier et le test de lecture le disent ainsi, sans la variante.
+Les noms techniques (« large-v3-turbo », Parakeet…), la comparaison, Parakeet et les
 réglages de performance (modèle gardé en mémoire, threads, accélération) sont dans
 **Réglages → Avancé → « Modèles et performances »**, section repliée.
 

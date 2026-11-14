@@ -32,32 +32,15 @@ class TranscriptionAdvisorTest {
         }
     }
 
-    @Test fun quebecFrenchAloneOrWithOthersHasOnlyTheBestModel() {
-        for (c in combos.filter { FRENCH_QUEBEC in it }) {
+    /** Issue #72: one phone model, whatever the languages: no light model, no second candidate. */
+    @Test fun thereIsNeverASecondPhoneModel() {
+        for (c in combos + listOf(emptySet())) {
             val choice = TranscriptionAdvisor.choice(c)
             assertNull(c.toString(), choice.light)
-            assertEquals(listOf(ModelCatalog.whisperTurbo), choice.candidates)
-        }
-    }
-
-    @Test fun theOtherFourLanguagesWithoutQuebecMayUseTheLightModel() {
-        val light = setOf(FRENCH_FRANCE, ENGLISH, SPANISH, PORTUGUESE)
-        for (c in combos.filter { light.containsAll(it) }) {
-            val choice = TranscriptionAdvisor.choice(c)
-            assertEquals(c.toString(), ModelCatalog.parakeet, choice.light)
-            assertEquals(listOf(ModelCatalog.whisperTurbo, ModelCatalog.parakeet), choice.candidates)
-            // The installation screen offers it too (one rule, two places).
-            assertTrue(c.toString(), ModelCatalog.parakeet in ModelCatalog.offered(c))
-        }
-    }
-
-    @Test fun anyOtherLanguageHasOnlyTheBestModel() {
-        for (c in combos.filter { FRENCH_QUEBEC !in it && !TranscriptionAdvisor.lightPhoneLanguages.containsAll(it) }) {
-            assertNull(c.toString(), TranscriptionAdvisor.choice(c).light)
+            assertEquals(c.toString(), listOf(ModelCatalog.whisperTurbo), choice.candidates)
+            assertEquals(c.toString(), listOf(ModelCatalog.whisperTurbo), ModelCatalog.offered(c))
             assertFalse(c.toString(), ModelCatalog.parakeet in ModelCatalog.offered(c))
         }
-        assertNull(TranscriptionAdvisor.choice(setOf(ENGLISH, MANDARIN)).light)
-        assertNull(TranscriptionAdvisor.choice(emptySet()).light)
     }
 
     @Test fun quickTestLanguageIsTheFirstChosenOfTheFive() {

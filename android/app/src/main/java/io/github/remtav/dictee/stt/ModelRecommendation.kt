@@ -82,24 +82,16 @@ object ModelRecommendations {
         DictationLanguage.entries.filter { it in chosen && !covers(model, it) }
 
     /**
-     * Issue #22: Whisper large-v3-turbo is always the recommended model. It did best in the user's
-     * tests, Quebec French included, and it covers all eleven languages. With French (France), English,
-     * Spanish or Portuguese only, Parakeet is offered as a lighter option ([ModelCatalog.offered],
-     * [TranscriptionAdvisor.lightPossible]); it is never the recommendation, the quick test may suggest it.
-     * Hidden and experimental models are never recommended.
+     * Issue #22: Whisper large-v3-turbo is always the recommended model. It did best in the user's tests,
+     * Quebec French included, and it covers every language of the list. Hidden and advanced models are
+     * never recommended.
      *
-     * Issue #37: the reason names no model (« Whisper », « Parakeet »…): it describes the effect.
+     * Issue #72: the model is named « Whisper » (a step back from #37), in one sentence that mentions no second model.
      */
-    fun recommend(chosen: Set<DictationLanguage>): ModelRecommendation {
-        val whisper = ModelCatalog.whisperTurbo
-        val reason = when {
-            TranscriptionAdvisor.lightPossible(chosen) ->
-                "Le plus précis aux essais (1,04 Go). Pour vos langues, un modèle plus léger (671 Mo) " +
-                    "et plus rapide est aussi proposé : le test d'une minute vous dit lequel vous convient."
-            DictationLanguage.FRENCH_QUEBEC in chosen ->
-                "Le plus précis aux essais, en français québécois aussi : c'est celui qu'il faut pour le français d'ici (1,04 Go)."
-            else -> "Le seul qui couvre toutes vos langues, et le plus précis aux essais (1,04 Go)."
-        }
-        return ModelRecommendation(whisper, reason)
-    }
+    @Suppress("UNUSED_PARAMETER")
+    fun recommend(chosen: Set<DictationLanguage>): ModelRecommendation =
+        ModelRecommendation(
+            ModelCatalog.whisperTurbo,
+            "Whisper : le modèle qui comprend le mieux le français d'ici aux essais (1,04 Go).",
+        )
 }

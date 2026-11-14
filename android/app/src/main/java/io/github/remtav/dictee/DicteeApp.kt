@@ -111,8 +111,8 @@ class DicteeApp : Application() {
     }
 
     /**
-     * Issue #22: an active model that is hidden or no longer suits the chosen languages (Parakeet
-     * with Quebec French, say) is replaced by Whisper turbo, and the main screen tells the user once
+     * Issue #22: an active model that is hidden or no longer suits the chosen languages
+     * is replaced by Whisper turbo (issue #72: that is what happens to Parakeet, now hidden), and the main screen tells the user once
      * (inviting to download Whisper turbo if it is missing, offering to delete the hidden model's
      * files: nothing is deleted without a click). Run at start-up and when the languages change.
      */
@@ -205,7 +205,7 @@ class DicteeApp : Application() {
     fun newSession(): Pair<DictationSession?, String?> {
         val spec = dictationSpec()
         if (benchmarkRunning) return null to "Comparaison des modèles en cours"
-        // Issue #37: named by its effect (« le modèle plus précis »), never « Whisper ».
+        // Issue #72: « Whisper n'est pas installé » (the model is named; the dictation does not start, it does not crash).
         if (!isInstalled(spec)) return null to "${ModelPlainNames.inSentence(spec).replaceFirstChar { it.uppercase() }} n'est pas installé : ouvrez Kalmia Blabla"
         engines.factory = engineFactory()
         val options = engineOptions(spec)

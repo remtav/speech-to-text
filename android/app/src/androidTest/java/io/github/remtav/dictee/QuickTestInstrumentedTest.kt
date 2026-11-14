@@ -268,22 +268,13 @@ class QuickTestInstrumentedTest {
         }
     }
 
-    /** The installation screen offers the test (outlined) once a model to test is on the phone, for the five languages only. */
+    /** Issue #72: the installation no longer offers the test, whatever the languages or the models on the phone. */
     @Test
-    fun theSetupScreenOffersTheTestForTheFiveLanguages() {
-        app.settings.languages = setOf(DictationLanguage.ENGLISH)
-        ActivityScenario.launch(SetupActivity::class.java).use { s ->
-            assertTrue(s.has(SetupActivity.QUICK_TEST_BUTTON_TAG))
-            s.onActivity { a ->
-                val b = a.window.decorView.findViewWithTag<View>(SetupActivity.QUICK_TEST_BUTTON_TAG)
-                assertEquals(true, b.getTag(R.id.button_outlined))
-            }
+    fun theSetupScreenNoLongerOffersTheTest() {
+        for (languages in listOf(setOf(DictationLanguage.ENGLISH), setOf(DictationLanguage.FRENCH_QUEBEC), setOf(DictationLanguage.MANDARIN))) {
+            app.settings.languages = languages
+            ActivityScenario.launch(SetupActivity::class.java).use { s -> assertFalse(s.has(SetupActivity.QUICK_TEST_BUTTON_TAG)) }
         }
-        app.settings.languages = setOf(DictationLanguage.MANDARIN)
-        ActivityScenario.launch(SetupActivity::class.java).use { s -> assertFalse(s.has(SetupActivity.QUICK_TEST_BUTTON_TAG)) }
-        app.settings.languages = setOf(DictationLanguage.FRENCH_QUEBEC)
-        TestHooks.installedModelIds = emptySet()
-        ActivityScenario.launch(SetupActivity::class.java).use { s -> assertFalse(s.has(SetupActivity.QUICK_TEST_BUTTON_TAG)) }
     }
 
     /** Review of #65: the light model (tried first) over the budget: the best one is not tried, the test ends anyway. */

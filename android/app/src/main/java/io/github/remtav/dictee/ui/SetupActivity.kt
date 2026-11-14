@@ -321,7 +321,8 @@ class SetupActivity : AppCompatActivity() {
         // Issue #22: only the models offered for the chosen languages (experimental ones are in the settings).
         val modelIsNext = currentStep() == SetupStep.GET_MODEL
         for (spec in ModelCatalog.offered(chosen)) renderModel(spec, chosen, recommendation, modelIsNext && spec == recommendation.model)
-        renderQuickTest(chosen)
+        // Issue #72: the quick test is hidden (see QuickTestActivity.REACHABLE); its code stays.
+        if (QuickTestActivity.REACHABLE) renderQuickTest(chosen)
     }
 
     /**
@@ -348,7 +349,6 @@ class SetupActivity : AppCompatActivity() {
         val card = modelsBox.card()
         card.tag = RETIRED_NOTICE_TAG
         card.heading(getString(R.string.model_notice_title))
-        // Issue #37: no model name here either.
         card.body(getString(R.string.model_notice_replaced, ModelPlainNames.inSentence(replacement)))
         val missing = !app.store.isInstalled(replacement) && !Downloads.isBusy(replacement.id)
         if (missing) card.body(getString(R.string.model_notice_download), small = true)
@@ -384,7 +384,7 @@ class SetupActivity : AppCompatActivity() {
         val installed = app.store.isInstalled(spec)
         val active = app.settings.activeModelId == spec.id && app.shownSpec().family != ModelFamily.REMOTE
         card.addView(RadioButton(this).apply {
-            // Issue #37: described by its effect, never by its name.
+            // Issue #72: « Whisper », nothing more technical (the variant is in « Avancé »).
             text = ModelPlainNames.of(spec)
             isChecked = active
             isEnabled = installed
@@ -405,7 +405,7 @@ class SetupActivity : AppCompatActivity() {
                 WARNING_TAG,
             )
         }
-        // The publisher, not the model's name (issue #37); the technical description is in « Avancé ».
+        // The publisher, not the technical description (issue #37); that one is in « Avancé ».
         card.body(getString(R.string.model_publisher, spec.publisher), small = true)
         if (spec.note.isNotEmpty()) card.body(spec.note, small = true).tag = modelNoteTag(spec)
         card.body(getString(R.string.model_license_runs_local, spec.license), small = true)
