@@ -64,13 +64,34 @@ class PlainWordsTest {
     }
 
     @Test
-    fun theTwoPhoneModelsAreNamedByTheirEffect() {
-        assertEquals("Plus précis", ModelPlainNames.of(ModelCatalog.whisperTurbo))
-        assertEquals("Plus léger et plus rapide", ModelPlainNames.of(ModelCatalog.parakeet))
-        for (spec in listOf(ModelCatalog.whisperTurbo, ModelCatalog.parakeet)) {
-            for (name in listOf(ModelPlainNames.of(spec), ModelPlainNames.inSentence(spec), ModelPlainNames.short(spec))) {
-                for (word in ModelPlainNames.technicalWords) assertFalse("$name contains $word", name.contains(word, ignoreCase = true))
-            }
+    fun thePhoneModelIsNamedWhisperAndNothingMoreTechnical() {
+        val whisper = ModelCatalog.whisperTurbo
+        assertEquals("Whisper", ModelPlainNames.of(whisper))
+        assertEquals("Whisper", ModelPlainNames.inSentence(whisper))
+        assertEquals("Whisper", ModelPlainNames.short(whisper))
+        for (name in listOf(ModelPlainNames.of(whisper), ModelPlainNames.inSentence(whisper), ModelPlainNames.short(whisper))) {
+            for (word in ModelPlainNames.technicalWords) assertFalse("$name contains $word", name.contains(word, ignoreCase = true))
+        }
+        // « Whisper » is the one technical word the normal path now says; the others stay forbidden.
+        assertFalse("Whisper" in ModelPlainNames.technicalWords)
+        for (word in listOf("Parakeet", "large-v3", "turbo", "int8", "quantification", "Qwen", "Hugging Face", "SHA-256")) {
+            assertTrue(word, word in ModelPlainNames.technicalWords)
+        }
+    }
+
+    /** Issue #72: no model is named « Plus précis », « Plus léger »… any more (the retired names). */
+    @Test
+    fun theRetiredNamesAreGoneFromPlainNamesAndFromTheNormalPathStrings() {
+        val retired = listOf("Plus précis", "modèle plus précis", "Précis")
+        val names = listOf(ModelCatalog.whisperTurbo, ModelCatalog.remote).flatMap {
+            listOf(ModelPlainNames.of(it), ModelPlainNames.inSentence(it), ModelPlainNames.short(it))
+        }
+        for (r in retired) for (n in names) assertFalse("$n : $r", n.contains(r))
+        val source = main.resolve("java/io/github/remtav/dictee/stt/ModelPlainNames.kt").readText()
+        for (r in retired) assertFalse("ModelPlainNames.kt : $r", source.substringAfter("object ModelPlainNames").contains("\"$r\""))
+        // The strings of the hidden quick test too: Whisper, not the old name (their verdicts are not rewritten).
+        for ((key, text) in strings) {
+            for (r in listOf("modèle plus précis", "Plus précis")) assertFalse("$key : $r", text.contains(r))
         }
     }
 

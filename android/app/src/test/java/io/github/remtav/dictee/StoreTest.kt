@@ -56,12 +56,12 @@ class CatalogTest {
         assertTrue(ModelCatalog.whisperTurbo.totalBytes in 900_000_000L..1_200_000_000L)
     }
 
-    /** Issue #22: Lite-Whisper large-v3-turbo-acc, experimental, with the published files (checked 2026-11-13). */
-    @Test fun liteWhisperIsExperimentalAndPointsAtThePublishedFiles() {
+    /** Issue #22: Lite-Whisper large-v3-turbo-acc, withdrawn (hidden) since #72, with the published files (checked 2026-11-13). */
+    @Test fun liteWhisperIsHiddenAndPointsAtThePublishedFiles() {
         val m = ModelCatalog.liteWhisperTurbo
         assertEquals("lite-whisper-large-v3-turbo-acc-int8", m.id)
-        assertEquals("Lite-Whisper large-v3-turbo (expérimental)", m.displayName)
-        assertEquals(io.github.remtav.dictee.stt.ModelVisibility.EXPERIMENTAL, m.visibility)
+        assertEquals("Lite-Whisper large-v3-turbo", m.displayName)
+        assertEquals(io.github.remtav.dictee.stt.ModelVisibility.HIDDEN, m.visibility)
         assertTrue(m in ModelCatalog.all)
         val base = "https://huggingface.co/remiavelo/sherpa-onnx-lite-whisper-large-v3-turbo-acc-int8/resolve/main"
         assertEquals(
@@ -77,7 +77,7 @@ class CatalogTest {
         assertEquals(ModelCatalog.whisperTurbo.files.map { it.path }, m.files.map { it.path })
         assertEquals("Apache-2.0", m.license)
         assertTrue(m.publisher.contains("efficient-speech"))
-        assertTrue(m.description.contains("Expérimental"))
+        assertTrue(m.description.contains("Retiré"))
     }
 
     /**

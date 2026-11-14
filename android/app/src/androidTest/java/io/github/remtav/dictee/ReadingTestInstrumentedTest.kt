@@ -35,6 +35,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
+import org.junit.Ignore
 import org.junit.Test
 import org.junit.runner.RunWith
 import java.util.concurrent.atomic.AtomicInteger
@@ -292,6 +293,7 @@ class ReadingTestInstrumentedTest : ImeTestBase() {
 
     // ---- several models ----
 
+    @Ignore("Issue #72: a single phone model is offered (Parakeet is in « Avancé » only), so there is no second model to compare: kept for the day a second model comes back")
     @Test
     fun withSeveralModelsEachIsScoredAndABetterOneIsSuggested() {
         val parakeet = ModelCatalog.parakeet.id
@@ -387,7 +389,7 @@ class ReadingTestInstrumentedTest : ImeTestBase() {
 
     @Test
     fun stopButtonStopsTheRecordingAtEveryTapAndTheSecondCounterStillShows() {
-        useModels(ModelCatalog.whisperTurbo.id) // Parakeet is not offered with Québec French (#22, #36)
+        useModels(ModelCatalog.whisperTurbo.id) // the only model offered (#72)
         app.settings.quebecDeclaration = Declaration.YES
         // A clip paced in real time, longer than the test waits: only « Arrêter » can end the recording.
         TestHooks.audioSourceFactory = AudioSourceFactory {

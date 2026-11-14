@@ -20,8 +20,11 @@ enum class ModelFamily { NEMO_TRANSDUCER, QWEN3_ASR, WHISPER, REMOTE }
 enum class ModelVisibility {
     /** Offered on every screen, subject to the chosen languages ([ModelCatalog.offered]). */
     VISIBLE,
-    /** Never recommended; listed in the settings, the keyboard's picker and the comparison, marked "expérimental". */
-    EXPERIMENTAL,
+    /**
+     * Issue #72: listed in « Avancé » (settings) and in the comparison, under its technical name; never offered at
+     * installation, never recommended, and in the keyboard's menu only while it is the active model.
+     */
+    ADVANCED,
     /** Shown nowhere. */
     HIDDEN,
 }
@@ -55,6 +58,8 @@ object ModelCatalog {
     const val WHISPER_NOTE =
         "Observé sur un téléphone : comprend bien des mots que les autres modèles ratent, " +
             "mais la transcription prend plus de temps."
+    /** Shown on Parakeet's card in « Avancé » (issue #72). */
+    const val PARAKEET_NOTE = "Plus léger et plus rapide, mais comprend moins bien le français québécois."
     private const val PARAKEET =
         "https://huggingface.co/csukuangfj/sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8/resolve/main"
     private const val WHISPER =
@@ -87,6 +92,9 @@ object ModelCatalog {
         family = ModelFamily.NEMO_TRANSDUCER,
         description = "Transducteur, 25 langues européennes. Rapide.",
         license = "CC-BY-4.0",
+        // Issue #72: out of the normal path (Whisper alone transcribes Quebec French well), kept in « Avancé ».
+        visibility = ModelVisibility.ADVANCED,
+        note = PARAKEET_NOTE,
         files = listOf(
             ModelFile("encoder.int8.onnx", "$PARAKEET/encoder.int8.onnx",
                 "1afbe69c1ffdabee94755f42e4daf1d93549131a3da11356bda84fcef0f2c479", 652282294),
@@ -178,19 +186,20 @@ object ModelCatalog {
     /**
      * `efficient-speech/lite-whisper-large-v3-turbo-acc` (Apache-2.0): Whisper large-v3-turbo with a
      * low-rank compressed encoder. Same file names and 128 mels as [whisperTurbo], so the same engine
-     * branch loads it. Experimental (issue #22): on the host, bigger and ~25 % slower than turbo.
+     * branch loads it. Issue #72: officially withdrawn, shown nowhere; the entry stays so that its files, if they
+     * are on a phone, can still be found and deleted.
      */
     val liteWhisperTurbo = ModelSpec(
         id = "lite-whisper-large-v3-turbo-acc-int8",
-        displayName = "Lite-Whisper large-v3-turbo (expérimental)",
+        displayName = "Lite-Whisper large-v3-turbo",
         shortName = "Lite-Whisper",
         publisher = "efficient-speech (LiteASR), d'après OpenAI",
         family = ModelFamily.WHISPER,
         description = "Whisper large-v3-turbo dont l'encodeur est compressé (LiteASR). " +
-            "Expérimental : sur un ordinateur de test, plus gros et un peu plus lent que Whisper turbo, " +
+            "Retiré (issue #72). Sur un ordinateur de test, plus gros et un peu plus lent que Whisper turbo, " +
             "qualité semblable. À comparer sur votre téléphone.",
         license = "Apache-2.0",
-        visibility = ModelVisibility.EXPERIMENTAL,
+        visibility = ModelVisibility.HIDDEN,
         files = listOf(
             ModelFile("turbo-encoder.int8.onnx", "$LITE_WHISPER/turbo-encoder.int8.onnx",
                 "ccefad7d2aa1a07569b3894390cd3cb21be06e0f0381b1adbb3c9e3ac9f1ce17", 799004644),
@@ -208,26 +217,33 @@ object ModelCatalog {
     val all: List<ModelSpec> =
         listOf(whisperTurbo, parakeet, qwen3, whisperQuebec, liteWhisperTurbo)
 
-    /** Experimental models: never recommended, listed apart with the mention "expérimental". */
-    val experimental: List<ModelSpec> = all.filter { it.visibility == ModelVisibility.EXPERIMENTAL }
+    /** Issue #72: the models of « Avancé » (Parakeet): never recommended, never at installation. */
+    val advanced: List<ModelSpec> = all.filter { it.visibility == ModelVisibility.ADVANCED }
 
     /**
-     * The models offered for [languages] (issue #22): visible, covering every chosen language,
-     * and Parakeet only when the languages are all among [TranscriptionAdvisor.lightPhoneLanguages]
-     * (French (France), English, Spanish, Portuguese, issue #36: the light phone model of the installation
-     * path; it was English alone). In catalogue order.
+     * The models offered for [languages] (issue #22): visible and covering every chosen language,
+     * in catalogue order. Since issue #72 that is Whisper alone (Parakeet is in « Avancé »).
      */
     fun offered(languages: Set<DictationLanguage>): List<ModelSpec> =
         all.filter { spec ->
             spec.visibility == ModelVisibility.VISIBLE &&
-                ModelRecommendations.uncovered(spec, languages).isEmpty() &&
-                (spec != parakeet || (languages.isNotEmpty() && TranscriptionAdvisor.lightPhoneLanguages.containsAll(languages)))
+                ModelRecommendations.uncovered(spec, languages).isEmpty()
         }
 
-    /** What the keyboard's picker, the settings and the comparison list: [offered] then [experimental]. */
-    fun listed(languages: Set<DictationLanguage>): List<ModelSpec> = offered(languages) + experimental
+    /** What « Avancé » and the comparison list: [offered] then [advanced]. */
+    fun listed(languages: Set<DictationLanguage>): List<ModelSpec> = offered(languages) + advanced
 
-    /** Can [spec] stay the active (or fallback) model with [languages]? The server always can. */
+    /**
+     * What the keyboard's menu lists (issue #72): [offered], plus an [advanced] model only while it is the active
+     * one ([activeId]), so that a person who chose Parakeet in « Avancé » can come back from the keyboard.
+     */
+    fun forKeyboard(languages: Set<DictationLanguage>, activeId: String): List<ModelSpec> =
+        offered(languages) + advanced.filter { it.id == activeId }
+
+    /**
+     * Can [spec] stay the active (or fallback) model with [languages]? The server always can; so can an
+     * [advanced] model, whatever the languages (issue #72: Parakeet may be chosen with Quebec French).
+     */
     fun suits(spec: ModelSpec, languages: Set<DictationLanguage>): Boolean =
         spec.family == ModelFamily.REMOTE || spec in listed(languages)
 

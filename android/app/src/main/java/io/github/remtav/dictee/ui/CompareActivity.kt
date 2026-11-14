@@ -134,7 +134,7 @@ class CompareActivity : AppCompatActivity() {
         if (busy) return
         val samples = references.filter { it.first.isChecked }.map { it.second }.toMutableList()
         recording?.let { samples += BenchSample("enregistrement", "?", it, null) }
-        // Issue #22: the models offered for the languages, the experimental ones, and the user's server only when
+        // Issue #22: the models offered for the languages, Parakeet (« Avancé »), and the user's server only when
         // dictations go to it (address and "server" mode, issue #57): an address alone sends nothing.
         val models = EngineChoice.comparedModels(ModelCatalog.listed(app.settings.languages), app.settings.serverInUse)
             .filter { app.isInstalled(it) }

@@ -249,7 +249,7 @@ internal fun LinearLayout.renderLanguageChoices(settings: AppSettings, onChange:
                     Toast.makeText(context, R.string.languages_keep_one, Toast.LENGTH_SHORT).show()
                 } else {
                     settings.languages = next
-                    // Issue #22: Parakeet stops being offered once a language other than English is chosen.
+                    // Issue #22: an active model that no longer suits the chosen languages is replaced.
                     io.github.remtav.dictee.DicteeApp.from(context).migrateModels()
                     onChange()
                 }

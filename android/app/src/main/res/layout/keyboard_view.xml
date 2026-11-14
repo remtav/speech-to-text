@@ -29,7 +29,7 @@
             android:paddingStart="12dp"
             android:paddingEnd="12dp"
             android:contentDescription="@string/cd_model"
-            android:text="Parakeet" />
+            android:text="Whisper" />
 
         <TextView
             android:id="@+id/status"

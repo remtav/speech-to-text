@@ -24,8 +24,14 @@ import java.util.Locale
 import kotlin.math.roundToInt
 
 /**
- * « Test rapide (1 minute) » (issue #36, recentred on the phone): optional, opened from the « Modèle » step of
- * the installation and from the settings. Draws [QuickTestModel]; models are named by their effect (issue #37).
+ * « Test rapide (1 minute) » (issue #36, recentred on the phone).
+ *
+ * **Since issue #72 it is a simple check of Whisper**, the only phone model: it reads a short text and says « Whisper
+ * vous a compris à X % ». It is opened from the settings only, no longer from the installation
+ * ([OFFERED_AT_SETUP] is false: with one model there is nothing to choose between). The two-model code stays
+ * ([QuickTestModel], [QuickTestAdvice], their verdict strings and tests, `reading/QuickReading.kt`) for the day a
+ * second model comes back, or to compare local Whisper and remote Whisper (a later issue: it will need a consent,
+ * since this test is built to send nothing off the phone, and new verdicts). Draws [QuickTestModel].
  */
 class QuickTestActivity : AppCompatActivity() {
     private lateinit var app: DicteeApp
@@ -232,6 +238,9 @@ class QuickTestActivity : AppCompatActivity() {
     private fun seconds(s: Double) = String.format(Locale.CANADA_FRENCH, "%.1f", s)
 
     companion object {
+        /** Issue #72: whether the installation offers the test (the settings always do). */
+        const val OFFERED_AT_SETUP = false
+
         const val TAG_TEXT = "quick_text"
         const val TAG_PRIVATE = "quick_private"
         const val TAG_STATE = "quick_state"
