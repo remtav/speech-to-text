@@ -14,7 +14,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.File
 
-/** Issue #15, step 2.3: selection of the examples of the "Comment dicter" screen, "end of setup", sizes. */
+/** Issue #15, step 2.3 and issue #56: examples of the "Comment dicter" screen (first screen and full list), "end of setup", sizes. */
 class HowToExamplesTest {
     private val quebec = setOf(DictationLanguage.FRENCH_QUEBEC)
     private val quebecAndEnglish = setOf(DictationLanguage.FRENCH_QUEBEC, DictationLanguage.ENGLISH)
@@ -40,7 +40,7 @@ class HowToExamplesTest {
     fun everyExampleComesFromTheActiveTable() {
         for (chosen in listOf(quebec, english, quebecAndEnglish, setOf(DictationLanguage.SPANISH), DictationLanguage.entries.toSet())) {
             val table = CommandTable.active(chosen)
-            for (ex in HowToExamples.featured(chosen)) {
+            for (ex in HowToExamples.all(chosen)) {
                 assertTrue(
                     "${ex.said} not in the table for $chosen",
                     table.any { it.language == ex.language && it.example == ex.example },
@@ -51,25 +51,96 @@ class HowToExamplesTest {
     }
 
     @Test
-    fun betweenFiveAndEightExamplesWhateverTheLanguages() {
+    fun firstScreenHasAtMostThreeExamplesWhateverTheLanguages() {
         for (chosen in listOf(quebec, english, quebecAndEnglish, setOf(DictationLanguage.SPANISH), DictationLanguage.entries.toSet())) {
-            val n = HowToExamples.featured(chosen).size
-            assertTrue("$chosen gives $n examples", n in 5..HowToExamples.MAX_FEATURED)
+            val n = HowToExamples.firstScreen(chosen).size
+            assertTrue("$chosen gives $n examples", n in 1..HowToExamples.MAX_FIRST_SCREEN)
         }
-        // more than eight in French: the first eight are shown, the rest stays in the list of all commands
-        assertTrue(HowToExamples.all(quebec).size > HowToExamples.MAX_FEATURED)
-        assertEquals(HowToExamples.all(quebec).take(HowToExamples.MAX_FEATURED), HowToExamples.featured(quebec))
+        // French alone: the three commands of the issue, in this order
+        assertEquals(
+            listOf(Command.COLON, Command.QUESTION_MARK, Command.NEW_LINE),
+            HowToExamples.firstScreen(quebec).map { it.entry.command },
+        )
     }
 
     @Test
-    fun frenchComesFirstAndSharesTheSlotsWithEnglish() {
-        val shown = HowToExamples.featured(quebecAndEnglish)
-        assertEquals(List(4) { CommandLanguage.FRENCH } + List(4) { CommandLanguage.ENGLISH }, shown.map { it.language })
-        // the signs of the issue's initial list come first, in French
-        assertTrue(Command.OPEN_QUOTE in shown.first().commands.map { it.command })
-        assertEquals(CommandLanguage.FRENCH, shown.first().language)
-        // English alone: English only
-        assertEquals(setOf(CommandLanguage.ENGLISH), HowToExamples.featured(english).map { it.language }.toSet())
+    fun firstScreenLanguagesShareTheSlotsAndFrenchComesFirst() {
+        val shown = HowToExamples.firstScreen(quebecAndEnglish)
+        assertEquals(listOf(CommandLanguage.FRENCH, CommandLanguage.FRENCH, CommandLanguage.ENGLISH), shown.map { it.language })
+        assertEquals(setOf(CommandLanguage.ENGLISH), HowToExamples.firstScreen(english).map { it.language }.toSet())
+        assertEquals(3, HowToExamples.firstScreen(english).size)
+        // Spanish only: no sign command in the table, only line breaks
+        val spanish = HowToExamples.firstScreen(setOf(DictationLanguage.SPANISH))
+        assertTrue(spanish.isNotEmpty() && spanish.none { it.entry.command.isSign })
+    }
+
+    @Test
+    fun firstScreenExamplesComeFromTheTableAndGiveWhatTheKeyboardProduces() {
+        for (chosen in listOf(quebec, english, quebecAndEnglish, setOf(DictationLanguage.FRENCH_FRANCE))) {
+            for (ex in HowToExamples.firstScreen(chosen)) {
+                val entry = CommandTable.active(chosen).single { it.language == ex.language && it.command == ex.entry.command }
+                assertEquals(entry.firstScreenExample.said, ex.said)
+                // the result is the pipeline's own, with the line break only drawn as a mark
+                val result = HowToExamples.render(entry.firstScreenExample, chosen)
+                assertEquals(result.replace(Regex("\\s*\\n+\\s*"), " "), ex.shown.replace(" ${HowToExamples.LINE_BREAK_MARK} ", " "))
+            }
+        }
+        // The table's own claim: a first-screen sentence gives the result written next to it (Québec typography).
+        for (entry in CommandTable.entries.filter { it.firstScreen != null }) {
+            assertEquals(entry.firstScreen!!.result, HowToExamples.render(entry.firstScreen!!, setOf(DictationLanguage.FRENCH_QUEBEC, DictationLanguage.ENGLISH)))
+        }
+    }
+
+    @Test
+    fun theCommandAndTheSignAreLocatedInEachFirstScreenExample() {
+        for (chosen in listOf(quebec, english, quebecAndEnglish, setOf(DictationLanguage.FRENCH_FRANCE))) {
+            for (ex in HowToExamples.firstScreen(chosen)) {
+                val label = "${ex.language} ${ex.entry.command} « ${ex.said} »"
+                val c = ex.commandRange
+                assertTrue("no command range for $label", c != null && !c.isEmpty())
+                assertTrue("$label: « ${ex.said.substring(c!!)} » is not a wording of the command", ex.entry.forms.any { it.text.equals(ex.said.substring(c), ignoreCase = true) })
+                val sign = ex.signRange
+                assertTrue("no sign range for $label", sign != null && !sign.isEmpty())
+                val mark = ex.shown.substring(sign!!)
+                if (ex.entry.command.isSign) assertEquals(label, ex.entry.produces, mark) else assertEquals(HowToExamples.LINE_BREAK_MARK, mark)
+                // each mark is a small part of the line, never the whole of it
+                assertTrue(c.count() < ex.said.length && sign.count() < ex.shown.length)
+            }
+        }
+    }
+
+    @Test
+    fun theCommandAppearsExactlyOnceInEachFirstScreenSentence() {
+        // The marked range comes from the first occurrence (indexOf): a sentence that repeated its command, or
+        // that contained another wording of it, would be marked in the wrong place without any other test seeing it.
+        for (chosen in listOf(quebec, english, quebecAndEnglish, setOf(DictationLanguage.FRENCH_FRANCE), setOf(DictationLanguage.SPANISH))) {
+            for (ex in HowToExamples.firstScreen(chosen)) {
+                for (form in ex.entry.forms.map { it.text }) {
+                    val n = Regex(Regex.escape(form), RegexOption.IGNORE_CASE).findAll(ex.said).count()
+                    val marked = ex.said.substring(ex.commandRange!!)
+                    if (form.equals(marked, ignoreCase = true)) {
+                        assertEquals("« $form » appears $n times in « ${ex.said} »", 1, n)
+                    } else {
+                        // another wording of the same command must not be inside the sentence either
+                        assertTrue("« $form » also appears in « ${ex.said} »", n == 0 || marked.contains(form, ignoreCase = true))
+                    }
+                }
+            }
+        }
+    }
+
+    @Test
+    fun colonExampleIsTheRuleOfTheIssue() {
+        val colon = HowToExamples.firstScreen(quebec).first()
+        assertEquals("il a dit deux-points bonjour", colon.said)
+        assertEquals("deux-points", colon.said.substring(colon.commandRange!!))
+        assertEquals("Il a dit\u00A0: bonjour", colon.shown)
+        assertEquals(":", colon.shown.substring(colon.signRange!!))
+        // France typography: a no-break space before the sign, the sign itself is still the marked part
+        val france = HowToExamples.firstScreen(setOf(DictationLanguage.FRENCH_FRANCE))
+        val question = france.single { it.entry.command == Command.QUESTION_MARK }
+        assertEquals("?", question.shown.substring(question.signRange!!))
+        assertEquals('\u00A0', question.shown[question.signRange!!.first - 1])
     }
 
     @Test
@@ -89,7 +160,7 @@ class HowToExamplesTest {
     @Test
     fun aLanguageWithoutPunctuationCommandsStillGetsExamples() {
         // Spanish only: no sign command (CommandTable.active), line breaks and deletions remain
-        val shown = HowToExamples.featured(setOf(DictationLanguage.SPANISH))
+        val shown = HowToExamples.all(setOf(DictationLanguage.SPANISH))
         assertTrue(shown.isNotEmpty())
         assertTrue(shown.flatMap { it.commands }.none { it.command.isSign })
     }
@@ -99,14 +170,20 @@ class HowToExamplesTest {
         val main = File(System.getProperty("dictee.assetsDir")!!).parentFile
         val sources = listOf(
             main.resolve("java/io/github/remtav/dictee/ui/HowToActivity.kt"),
+            main.resolve("java/io/github/remtav/dictee/ui/HowToStyle.kt"),
+            main.resolve("java/io/github/remtav/dictee/ui/SetupReady.kt"),
             main.resolve("res/values/strings.xml"),
         ).associateWith { f ->
             // Only the strings of this screen: the older help of the settings quotes some commands.
-            if (f.extension == "xml") f.readLines().filter { it.contains("name=\"howto_") || it.contains("name=\"setup_howto") }.joinToString("\n")
+            if (f.extension == "xml") f.readLines().filter { it.contains("name=\"howto_") || it.contains("name=\"setup_howto") || it.contains("name=\"setup_ready") }.joinToString("\n")
             else f.readText()
         }
         for (entry in CommandTable.entries) {
             for ((file, text) in sources) {
+                entry.firstScreen?.let { q ->
+                    assertFalse("${file.name} copies « ${q.said} »", text.contains(q.said))
+                    assertFalse("${file.name} copies « ${q.result} »", text.contains(q.result))
+                }
                 assertFalse("${file.name} copies « ${entry.example.said} »", text.contains(entry.example.said))
                 assertFalse("${file.name} copies « ${entry.example.result} »", text.contains(entry.example.result))
             }
@@ -152,14 +229,6 @@ class SetupProgressTest {
         assertTrue(SetupProgress.jumpToKeyboardSteps(seenBefore = true, keyboardEnabled = false, keyboardChosen = false))
         assertTrue(SetupProgress.jumpToKeyboardSteps(seenBefore = true, keyboardEnabled = true, keyboardChosen = false))
         assertFalse(SetupProgress.jumpToKeyboardSteps(seenBefore = true, keyboardEnabled = true, keyboardChosen = true))
-    }
-
-    @Test
-    fun theTutorialOpensOnlyOnceWhenComplete() {
-        assertTrue(SetupProgress.shouldOpenHowTo(complete = true, alreadyShown = false))
-        assertFalse("second time", SetupProgress.shouldOpenHowTo(complete = true, alreadyShown = true))
-        assertFalse("not complete", SetupProgress.shouldOpenHowTo(complete = false, alreadyShown = false))
-        assertFalse(SetupProgress.shouldOpenHowTo(complete = false, alreadyShown = true))
     }
 }
 

@@ -89,8 +89,17 @@ data class CommandEntry(
     val example: CommandExample,
     /** What the command produces, for the help ("« … »", "retour à la ligne"…). */
     val produces: String,
+    /**
+     * A shorter example for the first screen of "Comment dicter" (issue #56), when [example] teaches
+     * several commands at once. Same rule as [example]: dictated as one segment, it gives its result
+     * (checked by a unit test). Null: [example] is short enough.
+     */
+    val firstScreen: CommandExample? = null,
 ) {
     val primary: String get() = forms.first().text
+
+    /** The example the first screen shows. */
+    val firstScreenExample: CommandExample get() = firstScreen ?: example
 }
 
 /** Typography of dictated signs (DECISIONS.md, step 2.2). */
@@ -127,6 +136,7 @@ object CommandTable {
         "on se voit lundi ouvrir la parenthèse ou mardi fermer la parenthèse",
         "On se voit lundi (ou mardi)",
     )
+    private val colonFr = CommandExample("il a dit deux-points bonjour", "Il a dit\u00A0: bonjour")
     private val quoteEn = CommandExample("she said colon open quote hello close quote", "She said: “hello”")
     private val parenEn = CommandExample(
         "see you Monday open parenthesis or Tuesday close parenthesis",
@@ -155,7 +165,7 @@ object CommandTable {
             f("deux-points", A),
             // Without the hyphen it is also the number "deux points" (iPhone writes it so).
             f("deux points", A, strictness = Strictness.HOMOGRAPH),
-        ),
+        ).copy(firstScreen = colonFr),
         fr(
             Command.SEMICOLON, ";", CommandExample("du pain point-virgule du lait", "Du pain; du lait"),
             f("point-virgule", A),

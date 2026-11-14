@@ -51,6 +51,9 @@ class SetupActivity : AppCompatActivity() {
     private lateinit var modelsBox: LinearLayout
     private lateinit var languagesBox: LinearLayout
     private lateinit var participationBox: LinearLayout
+    private lateinit var readyBox: LinearLayout
+    /** Whether the « C'est prêt » card is drawn now; null before the first draw. */
+    private var readyShown: Boolean? = null
     /** Whether the participation card is drawn now; null before the first draw. It is redrawn only when this changes. */
     private var participationShown: Boolean? = null
     /**
@@ -61,7 +64,7 @@ class SetupActivity : AppCompatActivity() {
     private var jumpOnOpen = false
     /** The step the screen was last drawn for: the models are redrawn when it changes (their filled button follows it). */
     private var drawnStep: SetupStep? = null
-    // A download that ends can complete the setup: `maybeOpenHowTo` checks it.
+    // A download that ends can complete the setup: `renderSteps` redraws the steps and « C'est prêt ».
     private val refresh: () -> Unit = { renderModels(); renderSteps() }
 
     private val askMic = registerForActivityResult(ActivityResultContracts.RequestPermission()) { renderSteps() }
@@ -108,6 +111,10 @@ class SetupActivity : AppCompatActivity() {
         col.button(getString(R.string.setup_settings), outlined = true) {
             startActivity(Intent(this@SetupActivity, SettingsActivity::class.java))
         }
+
+        // « C'est prêt » (issue #56): drawn here, just above the try field, once the setup is complete.
+        readyBox = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        col.addView(readyBox)
 
         col.heading(getString(R.string.setup_try))
         col.addView(EditText(this).apply {
@@ -191,7 +198,7 @@ class SetupActivity : AppCompatActivity() {
         // The download button of the recommended model is filled only when the model is the next step.
         if (drawnStep != null && (drawnStep == SetupStep.GET_MODEL) != (next == SetupStep.GET_MODEL)) renderModels()
         drawnStep = next
-        maybeOpenHowTo()
+        renderReady()
         renderParticipation()
     }
 
@@ -243,6 +250,19 @@ class SetupActivity : AppCompatActivity() {
         }.tag = SERVER_SETTING_BUTTON_TAG
     }
 
+    /**
+     * Draws or removes the « C'est prêt » card (issue #56): once the setup is complete ([setupComplete], the same
+     * rule as the steps), with an invitation to "Comment dicter", which never opens by itself. Touches nothing when
+     * it is already as it should be, and never scrolls.
+     */
+    private fun renderReady() {
+        val show = setupComplete()
+        if (show == readyShown) return
+        readyShown = show
+        readyBox.removeAllViews()
+        if (show) readyBox.readyCard { startActivity(Intent(this, HowToActivity::class.java)) }
+    }
+
     /** Draws or removes the participation card; touching nothing when it is already as it should be (downloads call this often). */
     private fun renderParticipation() {
         val show = app.settings.participation.cardOnSetup(setupComplete())
@@ -269,18 +289,6 @@ class SetupActivity : AppCompatActivity() {
         ModelCatalog.listed(app.settings.languages).any { app.isInstalled(it) } || app.settings.serverInUse
 
     private fun setupComplete(): Boolean = currentStep() == SetupStep.DONE
-
-    /**
-     * Opens "Comment dicter" once, when the setup is complete (keyboard enabled and chosen, microphone
-     * allowed, a model ready: see [SetupProgress]). The screen marks itself as seen, but the flag
-     * is also set here before starting it, so a second call before it appears cannot open it twice.
-     */
-    private fun maybeOpenHowTo() {
-        if (SetupProgress.shouldOpenHowTo(setupComplete(), app.settings.howToShown)) {
-            app.settings.howToShown = true
-            startActivity(Intent(this, HowToActivity::class.java))
-        }
-    }
 
     private fun isKeyboardEnabled(): Boolean = TestHooks.keyboardEnabled
         ?: getSystemService(InputMethodManager::class.java).enabledInputMethodList.any { it.packageName == packageName }

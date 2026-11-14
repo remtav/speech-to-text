@@ -36,8 +36,6 @@ class SetupLanguageTest {
     @Before
     fun firstLaunch() {
         app.settings.prefs.edit().clear().commit()
-        // "Comment dicter" opens by itself once the setup is complete (HowToInstrumentedTest): not here.
-        app.settings.howToShown = true
     }
 
     @After
