@@ -50,6 +50,11 @@ class DictationSession(
     val maxWholeSeconds: Int = 300,
     /** False when no local model can take over: "Annuler" would only drop the dictation, so it is hidden. */
     val canFallBack: Boolean = true,
+    /**
+     * Local dictation (issue #53, « Regrouper les énoncés (Whisper) »): the VAD's utterances are grouped before being
+     * transcribed, see [LocalGrouping]. Null (the default): one transcription per utterance, as before.
+     */
+    val localGrouping: LocalGrouping? = null,
 )
 
 interface DictationListener {
@@ -255,6 +260,10 @@ class DictationController(
                 (s.maxBlockSeconds * RATE).toInt() - CHUNK,
                 { n -> ring.last(n) },
             ) { block -> enqueueBlock(block) }
+            // Issue #53: groups of utterances, each transcribed and inserted like one utterance today.
+            val grouper = if (wholeMode) null else s.localGrouping?.cutter({ n -> ring.last(n) }) { block ->
+                enqueueFinal(SpeechChunk(block.startSample, block.audio))
+            }
             var wholeLen = 0
             var firstSpeech = -1L
             val segments = ArrayList<FloatArray>()
@@ -298,14 +307,16 @@ class DictationController(
                     }
                     wasSpeech = speech
                     if (cutBlocks()) cutter?.onAudio(samples, n, totalSamples, onset)
+                    grouper?.onAudio(samples, n, totalSamples, onset)
 
                     var popped = false
                     while (true) {
                         val seg = s.vad.poll() ?: break
-                        acceptSegment(seg, segments, cutter)
+                        acceptSegment(seg, segments, cutter, grouper)
                         popped = true
                     }
                     if (cutBlocks()) cutter?.afterChunk(totalSamples, speech, popped)
+                    grouper?.afterChunk(totalSamples, speech, popped)
                     if (wholeMode && totalSamples + CHUNK > maxWhole) {
                         val info = MAX_DURATION_MESSAGE.format(s.maxWholeSeconds / 60)
                         post { listener.onInfo(info) }
@@ -342,8 +353,10 @@ class DictationController(
                     s.vad.flush()
                     while (true) {
                         val seg = s.vad.poll() ?: break
-                        acceptSegment(seg, segments, cutter)
+                        acceptSegment(seg, segments, cutter, grouper)
                     }
+                    // The group in progress when the user tapped stop (never after cancel: the session changed).
+                    grouper?.finish()?.let { enqueueFinal(SpeechChunk(it.startSample, it.audio)) }
                 } catch (_: Exception) {}
                 if (error != null) setState(DictationState.FINISHING, error)
                 else if (wholeMode && state == DictationState.LISTENING) setState(DictationState.FINISHING) // source ended by itself
@@ -389,9 +402,12 @@ class DictationController(
             post { listener.onSpeech(false); listener.onLevel(0f) }
         }
 
-        /** A VAD segment: kept for a whole dictation, given to the block cutter, or transcribed (local models). */
-        private fun acceptSegment(seg: SpeechChunk, segments: MutableList<FloatArray>, cutter: BlockCutter?) {
-            if (!wholeMode) return enqueueFinal(seg)
+        /**
+         * A VAD segment: kept for a whole dictation, given to the block cutter, or transcribed (local models), alone or
+         * in a group ([grouper], issue #53).
+         */
+        private fun acceptSegment(seg: SpeechChunk, segments: MutableList<FloatArray>, cutter: BlockCutter?, grouper: BlockCutter?) {
+            if (!wholeMode) return if (grouper != null) grouper.onSegment(seg) else enqueueFinal(seg)
             if (keepWhole()) segments += seg.samples
             if (cutBlocks()) cutter?.onSegment(seg)
         }
@@ -640,9 +656,9 @@ class DictationController(
 
     companion object {
         const val RATE = 16000
-        private const val CHUNK = 512 // 32 ms
+        internal const val CHUNK = 512 // 32 ms
         private const val RING_SECONDS = 25
-        private const val LOOKBACK = RATE * 6 / 10 // VAD reports speech ~0.25-0.5 s late
+        internal const val LOOKBACK = RATE * 6 / 10 // VAD reports speech ~0.25-0.5 s late
         private const val MIN_PARTIAL_SAMPLES = RATE * 8 / 10
         private const val LEVEL_INTERVAL_MS = 50L
         const val MAX_DURATION_MESSAGE = "Durée maximale atteinte (%d min) : envoi de la dictée"

@@ -13,6 +13,11 @@ import io.github.remtav.dictee.stt.AudioBlock
  * previous block: no audio is in two blocks, and silence between blocks is not sent. Each block keeps the VAD
  * segments inside it (clipped to the block) for a local fallback.
  *
+ * Also groups the utterances of a local Whisper dictation (issue #53, « Regrouper les énoncés »): there the text is
+ * inserted block by block, so [idleSamples] closes a block shorter than [minSamples] once the user has been silent that
+ * long after its last utterance, cut at the end of that utterance (the silence that follows is not decoded). 0 (the
+ * server's blocks) never closes on silence.
+ *
  * Capture thread only. Sample positions are absolute (samples since the start of the dictation), the
  * coordinates of [SpeechChunk.startSample].
  */
@@ -21,6 +26,7 @@ internal class BlockCutter(
     private val maxSamples: Int,
     /** The last n samples read (the controller's ring), to start a block a little before the speech onset. */
     private val history: (Int) -> FloatArray,
+    private val idleSamples: Int = 0,
     private val emit: (AudioBlock) -> Unit,
 ) {
     private var buf = FloatArray(0)
@@ -33,6 +39,10 @@ internal class BlockCutter(
     /** End of the last closed block: nothing before it goes into a later block. */
     private var lastCut = 0L
     private var index = 0
+    /** End of the last utterance the VAD returned in the open block, -1 when none since speech resumed. */
+    private var lastPopAbs = -1L
+    /** Length of the open block when that utterance ended: where a close on silence cuts it. */
+    private var lenAtPop = 0
 
     /** Blocks emitted so far. */
     val emitted: Int get() = index
@@ -77,7 +87,7 @@ internal class BlockCutter(
             var from = 0
             while (s.size - from > maxSamples) {
                 val piece = s.copyOfRange(from, from + maxSamples)
-                emit(AudioBlock(index++, piece, listOf(piece)))
+                emit(AudioBlock(index++, piece, listOf(piece), segStart + from))
                 from += maxSamples
                 lastCut = segStart + from
             }
@@ -105,19 +115,33 @@ internal class BlockCutter(
             }
         } else if (popped && !speech && len >= minSamples) {
             close(endAbs)
+        } else if (idleSamples > 0) {
+            if (speech) {
+                lastPopAbs = -1 // the user speaks again: the pause stays inside the block
+            } else if (popped) {
+                lastPopAbs = endAbs
+                lenAtPop = len
+            } else if (lastPopAbs >= 0 && endAbs - lastPopAbs >= idleSamples) {
+                // Silent since the last utterance: the block is closed where it ended. A later utterance that the
+                // VAD returns starting before `endAbs` is kept (lastCut is the cut, not the current position).
+                val cut = lenAtPop
+                emit(AudioBlock(index++, buf.copyOf(cut), segs.toList(), startAbs))
+                lastCut = startAbs + cut
+                reset()
+            }
         }
     }
 
     /** End of the dictation (after the VAD was flushed): the last block, or null when nothing is left. */
     fun finish(): AudioBlock? {
         if (!inBlock || len == 0) return null
-        val b = AudioBlock(index++, buf.copyOf(len), segs.toList())
+        val b = AudioBlock(index++, buf.copyOf(len), segs.toList(), startAbs)
         reset()
         return b
     }
 
     private fun close(endAbs: Long) {
-        emit(AudioBlock(index++, buf.copyOf(len), segs.toList()))
+        emit(AudioBlock(index++, buf.copyOf(len), segs.toList(), startAbs))
         lastCut = endAbs
         reset()
     }
@@ -126,6 +150,7 @@ internal class BlockCutter(
         segs.clear()
         len = 0
         inBlock = false
+        lastPopAbs = -1
     }
 
     private fun append(src: FloatArray, from: Int, n: Int) {

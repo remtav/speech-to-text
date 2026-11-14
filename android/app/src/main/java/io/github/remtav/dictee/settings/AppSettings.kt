@@ -130,6 +130,14 @@ class AppSettings(context: Context, private val defaultServerUrl: String = io.gi
         get() = RepetitionFix.fromName(prefs.getString("whisper_repetition_fix", null))
         set(v) = prefs.edit().putString("whisper_repetition_fix", v.name).apply()
 
+    /**
+     * « Regrouper les énoncés (Whisper) » (issue #53): 0 = off (default), else the minimum group length in seconds
+     * ([WhisperTuning.GROUP_CHOICES]). Not part of [EngineOptions]: changing it never reloads a model.
+     */
+    var whisperGroupSeconds: Int
+        get() = WhisperTuning.sanitizeGroupSeconds(prefs.getInt("whisper_group_seconds", 0))
+        set(v) = prefs.edit().putInt("whisper_group_seconds", WhisperTuning.sanitizeGroupSeconds(v)).apply()
+
     /** The installation screen has been left once (issue #55): coming back, it starts on a missing keyboard step. */
     var setupSeen: Boolean
         get() = prefs.getBoolean("setup_seen", false)
