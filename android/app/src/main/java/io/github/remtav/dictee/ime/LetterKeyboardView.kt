@@ -2,6 +2,9 @@ package io.github.remtav.dictee.ime
 
 import android.annotation.SuppressLint
 import android.content.Context
+import android.graphics.Canvas
+import android.graphics.Paint
+import android.graphics.Path
 import android.graphics.drawable.GradientDrawable
 import android.os.Handler
 import android.os.Looper
@@ -11,15 +14,20 @@ import android.util.TypedValue
 import android.view.Gravity
 import android.view.MotionEvent
 import android.view.View
+import android.view.ViewConfiguration
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.PopupWindow
 import android.widget.TextView
 import io.github.remtav.dictee.R
+import io.github.remtav.dictee.ime.words.GestureDecoder
+import kotlin.math.hypot
+import kotlin.math.max
 
 /**
  * The text keyboard's keys (letters or symbols page, Shift, Backspace), built from [KeyboardLayout]
  * with plain views. A long press on a letter opens a window of its accents above the key.
+ * Sliding the finger from letter to letter writes a whole word (issue #71), when a [decoder] is set.
  * The bottom row (keyboard switch, symbols, microphone, space, Enter) lives in the layout of the service.
  */
 class LetterKeyboardView @JvmOverloads constructor(
@@ -30,6 +38,9 @@ class LetterKeyboardView @JvmOverloads constructor(
     interface Listener {
         /** A character (letter, accent, symbol) was chosen. */
         fun onText(text: String)
+
+        /** The finger slid over a word: the words that fit, best first; [capital] when Shift was on. */
+        fun onSlide(candidates: List<String>, capital: Boolean) {}
     }
 
     var listener: Listener? = null
@@ -56,6 +67,16 @@ class LetterKeyboardView @JvmOverloads constructor(
 
     var shift: ShiftState = ShiftState.OFF
         private set
+
+    /**
+     * Finds the word of a slide. Built for the letter keys as they are laid out now (see [onGeometry]);
+     * null turns sliding off. The view forgets it when its keys change.
+     */
+    var decoder: GestureDecoder? = null
+
+    /** Called when the letter keys were laid out or moved: the rectangles a [GestureDecoder] needs. */
+    var onGeometry: ((List<GestureDecoder.Key>) -> Unit)? = null
+    private var lastGeometry: List<Int> = emptyList()
 
     private val handler = Handler(Looper.getMainLooper())
     private var popup: PopupWindow? = null
@@ -121,6 +142,9 @@ class LetterKeyboardView @JvmOverloads constructor(
 
     private fun rebuild() {
         dismissPopup()
+        cancelSlide()
+        decoder = null
+        lastGeometry = emptyList()
         removeAllViews()
         letterKeys.clear()
         shiftKey = null
@@ -352,6 +376,152 @@ class LetterKeyboardView @JvmOverloads constructor(
         popup?.dismiss()
         popup = null
         accentViews = emptyList()
+    }
+
+    // ------------------------------------------------------------------ slide
+
+    /** The letter keys with their rectangle in this view; empty on a symbols page or before layout. */
+    fun letterKeyRects(): List<GestureDecoder.Key> {
+        if (symbols || width == 0) return emptyList()
+        return letterKeys.filter { it.first.length == 1 && it.first[0].isLetter() }.map { (base, key) ->
+            val row = key.parent as View
+            GestureDecoder.Key(base[0], row.left + key.left, row.top + key.top, row.left + key.right, row.top + key.bottom)
+        }
+    }
+
+    override fun onLayout(changed: Boolean, l: Int, t: Int, r: Int, b: Int) {
+        super.onLayout(changed, l, t, r, b)
+        val rects = letterKeyRects()
+        val geometry = rects.flatMap { listOf(it.char.code, it.left, it.top, it.right, it.bottom) }
+        if (geometry != lastGeometry) {
+            lastGeometry = geometry
+            decoder = null
+            if (rects.isNotEmpty()) onGeometry?.invoke(rects)
+        }
+    }
+
+    private var slidePointer = -1
+    private var slideFrom: Pair<String, View>? = null
+    private var downX = 0f
+    private var downY = 0f
+    private var sliding = false
+    private var slideLength = 0.0
+    private var lastX = 0f
+    private var lastY = 0f
+    private val trail = Path()
+    private val trailPaint by lazy {
+        Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            style = Paint.Style.STROKE
+            strokeWidth = dp(6).toFloat()
+            strokeCap = Paint.Cap.ROUND
+            strokeJoin = Paint.Join.ROUND
+            color = color(androidx.appcompat.R.attr.colorPrimary)
+            alpha = 150
+        }
+    }
+
+    private fun letterAt(x: Float, y: Float): Pair<String, View>? = letterKeys.firstOrNull { (base, key) ->
+        val row = key.parent as View
+        base.length == 1 && base[0].isLetter() &&
+            x >= row.left + key.left && x < row.left + key.right && y >= row.top + key.top && y < row.top + key.bottom
+    }
+
+    /** How far the finger must leave where it came down before the touch is a slide and no longer a tap. */
+    private fun slideSlop(): Float = max(ViewConfiguration.get(context).scaledTouchSlop * 1.5f, dp(14).toFloat())
+
+    override fun onInterceptTouchEvent(e: MotionEvent): Boolean {
+        if (decoder == null || symbols) return false
+        when (e.actionMasked) {
+            MotionEvent.ACTION_DOWN -> {
+                slideFrom = letterAt(e.x, e.y)
+                slidePointer = if (slideFrom != null) e.getPointerId(0) else -1
+                downX = e.x
+                downY = e.y
+            }
+            // A second finger: fast typing with two thumbs, not a slide.
+            MotionEvent.ACTION_POINTER_DOWN -> slidePointer = -1
+            MotionEvent.ACTION_MOVE -> {
+                val i = if (slidePointer >= 0) e.findPointerIndex(slidePointer) else -1
+                // An open accents window owns the finger: sliding there chooses an accent.
+                if (i >= 0 && popup == null && hypot(e.getX(i) - downX, e.getY(i) - downY) > slideSlop()) {
+                    startSlide(e.getX(i), e.getY(i))
+                    return true
+                }
+            }
+            MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> slidePointer = -1
+        }
+        return false
+    }
+
+    private fun startSlide(x: Float, y: Float) {
+        val d = decoder ?: return
+        sliding = true
+        slideLength = 0.0
+        d.clearGesture()
+        trail.reset()
+        trail.moveTo(downX, downY)
+        lastX = downX
+        lastY = downY
+        d.addPoint(downX.toInt(), downY.toInt())
+        slideTo(x, y)
+    }
+
+    private fun slideTo(x: Float, y: Float) {
+        slideLength += hypot(x - lastX, y - lastY)
+        lastX = x
+        lastY = y
+        trail.lineTo(x, y)
+        decoder?.addPoint(x.toInt(), y.toInt())
+        invalidate()
+    }
+
+    @SuppressLint("ClickableViewAccessibility")
+    override fun onTouchEvent(e: MotionEvent): Boolean {
+        if (!sliding) return super.onTouchEvent(e)
+        val i = e.findPointerIndex(slidePointer)
+        when (e.actionMasked) {
+            MotionEvent.ACTION_MOVE -> if (i >= 0) {
+                for (h in 0 until e.historySize) slideTo(e.getHistoricalX(i, h), e.getHistoricalY(i, h))
+                slideTo(e.getX(i), e.getY(i))
+            }
+            MotionEvent.ACTION_UP -> {
+                if (i >= 0) slideTo(e.getX(i), e.getY(i))
+                finishSlide()
+            }
+            MotionEvent.ACTION_CANCEL -> cancelSlide()
+        }
+        return true
+    }
+
+    private fun finishSlide() {
+        val from = slideFrom
+        val keyWidth = from?.second?.width ?: 0
+        // A finger that only slipped on its key typed that key.
+        val candidates = if (slideLength < keyWidth) null else decoder?.candidates()
+        cancelSlide()
+        if (candidates == null) {
+            if (from != null) {
+                listener?.onText(KeyboardLayout.label(from.first, shift))
+                afterLetter()
+            }
+        } else if (candidates.isNotEmpty()) {
+            listener?.onSlide(candidates, shift.upper)
+            afterLetter()
+        }
+    }
+
+    private fun cancelSlide() {
+        sliding = false
+        slidePointer = -1
+        slideFrom = null
+        trail.reset()
+        decoder?.clearGesture()
+        invalidate()
+    }
+
+    override fun dispatchDraw(canvas: Canvas) {
+        super.dispatchDraw(canvas)
+        if (sliding) canvas.drawPath(trail, trailPaint)
     }
 
     companion object {

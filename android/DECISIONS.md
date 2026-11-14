@@ -4465,3 +4465,116 @@ Extraits de référence français : aucun ne touche le plafond à 1 000, texte i
 #40) est refait avec le silence et finit correctement (« La sorcière décide de rentrer au palais pour protéger les
 rebelles. »), au lieu de passer par le filtre. `WhisperRepetitionHostTest.automaticModeOfTheEngine` accepte donc l'un ou
 l'autre. Pas mesuré sur le téléphone.
+
+## Issue #71 : suggestions de mots, correction automatique, écriture en glissant (première version)
+
+**Décision de l'utilisateur** : première implémentation avec AnySoftKeyboard (Apache 2.0, donc sans contrainte sur la
+licence du dépôt) ; si le résultat ne convient pas, étudier CleverKeys (GPL-3.0).
+
+**Ce qui est repris d'AnySoftKeyboard** (commit `1ee43e7`), et rien d'autre :
+
+- **Les listes de mots** de ses paquets de langue : les listes « combined » d'AOSP (mot, fréquence de 1 à 255, drapeau
+  « possiblement offensant »). `tools/mots/build_wordlists.py` en tire `assets/words/{fr,en,es,pt}.tsv.gz` : 190 051,
+  165 112, 236 193 et 259 433 mots (le portugais réunit les listes du Brésil et du Portugal), 3,6 Mo en tout dans l'APK.
+- **Le détecteur de glissement** `GestureTypingDetector.java`, porté en Kotlin dans `ime/words/GestureDecoder.kt`
+  (en-tête de licence conservé, changements listés dans le fichier).
+
+Avis et licence : `assets/words/NOTICE.txt` et `assets/licences/Apache-2.0.txt`, dans l'APK.
+
+**Ce qui n'est pas repris** : le clavier lui-même. Notre vue, nos touches, le thème Kalmia et les tests restent ; le
+moteur de suggestions d'AnySoftKeyboard est en C++ (JNI) avec son format de dictionnaire binaire, ce qui aurait ajouté
+une compilation native au projet. Les suggestions sont donc écrites ici, en Kotlin, sur les mêmes listes.
+
+### Conception
+
+| Fichier (`ime/words/`) | Rôle | Type Android |
+|---|---|---|
+| `Lexicon` | Les mots d'une langue en tableaux plats, triés sans accents ni majuscules ; recherche par début et à une ou deux fautes près | aucun |
+| `Suggester` | Suggestions et correction pour le mot en cours, sur les listes des langues choisies | aucun |
+| `Typist` | Ce que font les touches : correction en fin de mot, annulation, choix d'une suggestion, mot glissé | aucun |
+| `GestureDecoder` | Le mot d'un tracé du doigt (port d'AnySoftKeyboard) | aucun |
+| `WordLists` | Lecture des listes, une fois par processus, hors du fil principal | aucun |
+
+Dans `ime/` : `SuggestionStripView` (la barre), le suivi du doigt et le tracé dans `LetterKeyboardView`, le branchement
+dans `DicteeImeService`.
+
+- **Suggestions**, meilleures d'abord : les mêmes lettres avec leurs accents et majuscules (`eleve` → `élève`,
+  `quebec` → `Québec`), les mots qui commencent ainsi (`bonj` → `bonjour`), les mots à une faute près (deux pour un mot
+  de six lettres ou plus). Après une apostrophe, la fin du mot est complétée (`l'arb` → `l'arbre`).
+- **Correction** quand le mot se termine (espace, ponctuation, Entrée), seulement si le mot tapé n'est pas un mot :
+  accents et majuscules d'abord, sinon une seule faute, pour un mot de trois lettres ou plus. Jamais pour : un mot avec
+  une majuscule au milieu d'une phrase (un nom), des majuscules à l'intérieur (`iPhone`), une courte liste de mots
+  familiers absents des listes (`chu`, `tsé`, `faque`, `lol`… : `Informal`), un mot déjà retenu.
+- **Annulation** : Effacer, juste après une correction, remet le mot tapé et son séparateur ; le mot est retenu
+  (`AppSettings.learnedWords`, 1 000 au plus, sur le téléphone, effaçable dans les Réglages) et n'est plus corrigé.
+  Toucher le mot entre guillemets dans la barre fait de même.
+- **Glissement** : le doigt part d'une lettre et s'en éloigne de plus de 14 dp ; le clavier trace son chemin et écrit
+  le meilleur mot, avec une espace devant s'il suit un mot ; les suivants vont dans la barre ; Effacer retire le mot
+  entier. Deux doigts posés : c'est de la frappe, pas un glissement. Une fenêtre d'accents ouverte garde le doigt. Un
+  glissement plus court qu'une touche tape la lettre de départ.
+- **Espace due** : après un mot choisi ou glissé, l'espace vient avec la lettre suivante, pas avant une ponctuation.
+- **Le texte du champ fait foi** : `Typist` ne garde aucune copie du texte. Avant d'annuler ou de remplacer, il relit
+  ce qui précède le curseur ; si la personne ou une dictée a changé le texte, rien n'est fait. Pas de texte « en
+  composition » : la dictée (`ImeTextSink`) garde le sien sans conflit.
+- **Champs** : texte ordinaire seulement. Rien dans un mot de passe (le texte n'y est jamais lu), une adresse courriel
+  ou web, un champ qui refuse les suggestions (`TYPE_TEXT_FLAG_NO_SUGGESTIONS`), ni quand une sélection est active.
+- **Mots offensants** des listes : reconnus (jamais « corrigés »), jamais proposés ni écrits par glissement.
+- **Plusieurs langues** : les listes des langues choisies servent ensemble, comme les accents par appui long. Un mot
+  d'une langue n'est pas corrigé vers l'autre (`dont` reste `dont` avec français + anglais).
+- **Réglages** : trois interrupteurs (suggestions, correction, glissement), tous actifs par défaut.
+
+### Écarts volontaires avec AnySoftKeyboard
+
+- Les deux pénalités de proximité du glissement étaient en pixels, réglées pour des touches d'environ 100 pixels ;
+  elles sont ramenées à la largeur de touche réelle.
+- Le glissement ne propose que les mots de fréquence 50 ou plus (114 022 sur 190 051 en français) : les formes rares
+  sortaient à la place de mots courants.
+- Pas de RxJava : le décodeur est construit sur le fil des listes de mots, puis remis au fil principal.
+
+### Mesures (hôte de développement, JVM ; pas mesuré sur un téléphone)
+
+- Suggestion avec les quatre langues chargées : 3,6 ms par appel en moyenne (`SuggesterTest.isQuickEnoughForEveryKey`).
+- Glissement, tracés **simulés** (droites d'un centre de touche au suivant, visée décalée d'au plus un cinquième de
+  touche ; un vrai doigt arrondit ses virages et dépasse, ce que la simulation ne fait pas), 1 500 mots les plus
+  fréquents de trois lettres ou plus (`GestureDecoderTest.accuracyOnSimulatedSlides`) :
+
+  | Langue, disposition | Mot voulu en premier | Dans les quatre premiers | Par tracé | Construction |
+  |---|---|---|---|---|
+  | fr, QWERTY | 80,1 % | 84,7 % | 2,2 ms | 90 ms |
+  | fr, AZERTY | 79,4 % | 84,5 % | 2,0 ms | 65 ms |
+  | en, QWERTY | 86,8 % | 90,7 % | 1,7 ms | 35 ms |
+  | es, QWERTY | 84,2 % | 87,9 % | 1,7 ms | 65 ms |
+  | pt, QWERTY | 84,4 % | 86,5 % | 2,3 ms | 55 ms |
+
+  Environ 15 % des mots ne sont pas trouvés du tout, même sur un tracé propre : c'est la limite de la méthode
+  d'AnySoftKeyboard (qui la dit « expérimentale »), et le premier point à juger sur un appareil.
+
+### Vérifié, et non vérifié
+
+| | État |
+|---|---|
+| Tests JVM (`words/` : `LexiconTest`, `SuggesterTest`, `TypistTest`, `GestureDecoderTest`), sur les vraies listes | passent ici |
+| Toute la suite JVM (617 tests, 21 sautés faute de modèles), `assembleDebug`, `assembleDebugAndroidTest` | passent ici |
+| Tests sur émulateur (`WordsInstrumentedTest` : suggestion, correction et annulation, accents, mot de passe, glissement) | **écrits, jamais exécutés** : pas d'émulateur dans cet environnement, et la tâche de CI échoue déjà sur `main` (#69) |
+| Le clavier sur un téléphone : barre, tracé, sensation du glissement | **non vérifié** |
+
+Les tests sur émulateur écrits avant cette issue tournent avec les trois réglages coupés (`ImeTestBase`) : ils
+vérifient les touches lettre par lettre.
+
+### Limites connues de cette première version
+
+- Pas de prédiction du mot suivant (les listes n'ont pas de paires de mots), pas de majuscule automatique en début de
+  phrase, pas de double espace → point, pas d'émojis ni de presse-papiers.
+- Le français des listes est celui d'AOSP (France, 2014) : pas de liste québécoise. `Informal` évite seulement les
+  pires corrections.
+- La barre ajoute 48 dp à la hauteur du clavier à touches.
+- Mémoire : environ 5 Mo par langue pour les mots, plus le décodeur de glissement ; gardés tant que le processus vit.
+- L'application n'a pas d'écran qui affiche les licences des composants : l'avis est dans l'APK, pas à l'écran.
+
+### À valider par un humain
+
+1. Sur un téléphone : la précision du glissement en français, en AZERTY et en QWERTY. C'est le critère pour rester
+   sur AnySoftKeyboard ou passer à CleverKeys.
+2. La correction automatique active par défaut : trop zélée ou non avec le français du Québec écrit au quotidien ?
+3. La hauteur du clavier avec la barre.
+

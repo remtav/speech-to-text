@@ -34,6 +34,9 @@ enum class CleanupMode(val label: String) {
     }
 }
 
+/** The list of kept words stays small: it is read at every key. */
+private const val MAX_LEARNED_WORDS = 1000
+
 enum class ThemeMode(val label: String) {
     SYSTEM("Selon le système"), LIGHT("Clair"), DARK("Sombre");
 
@@ -175,6 +178,33 @@ class AppSettings(context: Context, private val defaultServerUrl: String = io.gi
     var textKeyboardShown: Boolean
         get() = prefs.getBoolean("text_keyboard_shown", false)
         set(v) = prefs.edit().putBoolean("text_keyboard_shown", v).apply()
+
+    /** Text keyboard (issue #71): the bar of word suggestions above the letters. */
+    var wordSuggestions: Boolean
+        get() = prefs.getBoolean("word_suggestions", true)
+        set(v) = prefs.edit().putBoolean("word_suggestions", v).apply()
+
+    /** Text keyboard: a mistyped word is replaced when the next one starts. */
+    var autocorrect: Boolean
+        get() = prefs.getBoolean("autocorrect", true)
+        set(v) = prefs.edit().putBoolean("autocorrect", v).apply()
+
+    /** Text keyboard: sliding the finger over the letters writes a word. */
+    var slideTyping: Boolean
+        get() = prefs.getBoolean("slide_typing", true)
+        set(v) = prefs.edit().putBoolean("slide_typing", v).apply()
+
+    /** Words the person kept against a correction. They stay on the phone; never read in a password field. */
+    val learnedWords: Set<String>
+        get() = prefs.getStringSet("learned_words", null) ?: emptySet()
+
+    fun learnWord(word: String) {
+        val known = learnedWords
+        if (word.length !in 2..40 || word in known || known.size >= MAX_LEARNED_WORDS) return
+        prefs.edit().putStringSet("learned_words", known + word).apply()
+    }
+
+    fun forgetLearnedWords() = prefs.edit().remove("learned_words").apply()
 
     var haptics: Boolean
         get() = prefs.getBoolean("haptics", true)

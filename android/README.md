@@ -313,6 +313,14 @@ un verdict ».
   portugais : `é ñ ã ç`, `¿ ¡`, `« » ’ …`), deuxième page de symboles
   (`[ ] { } # + = _ \ | ~ € £`). Le clavier garde la dernière vue utilisée d'un
   champ à l'autre.
+- **Suggestions, correction, écriture en glissant** (issue #71) : au clavier à
+  touches, une barre propose jusqu'à trois mots ; un mot mal tapé est corrigé
+  quand on passe au suivant (`deja` → `déjà`, `bonjuor` → `bonjour`), et la
+  touche Effacer, juste après, remet ce qui avait été tapé ; glisser le doigt
+  d'une lettre à l'autre écrit le mot entier. Dans les langues choisies à
+  l'installation, sur le téléphone seulement, jamais dans un champ de mot de
+  passe. Trois interrupteurs dans les Réglages. Listes de mots et détection du
+  glissement reprises d'AnySoftKeyboard (Apache 2.0).
 - **Champs de chiffres** (nombre, montant, téléphone, date, heure, code) : le
   clavier ouvre directement un pavé numérique aux grandes touches, avec
   seulement les signes que le champ accepte. Pas de micro sur ce pavé.

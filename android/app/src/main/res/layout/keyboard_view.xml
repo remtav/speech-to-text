@@ -210,6 +210,13 @@
         android:orientation="vertical"
         android:visibility="gone">
 
+        <!-- Word suggestions (issue #71); hidden when they are off or the field refuses them. -->
+        <io.github.remtav.dictee.ime.SuggestionStripView
+            android:id="@+id/suggestions"
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:visibility="gone" />
+
         <io.github.remtav.dictee.ime.LetterKeyboardView
             android:id="@+id/letters"
             android:layout_width="match_parent"

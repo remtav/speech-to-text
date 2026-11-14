@@ -22,6 +22,7 @@ import android.view.LayoutInflater
 import android.view.MotionEvent
 import android.view.View
 import android.view.inputmethod.EditorInfo
+import android.view.inputmethod.InputConnection
 import android.view.inputmethod.InputMethodManager
 import android.widget.ImageButton
 import android.widget.PopupMenu
@@ -34,6 +35,12 @@ import io.github.remtav.dictee.dictation.DictationController
 import io.github.remtav.dictee.dictation.DictationListener
 import io.github.remtav.dictee.dictation.DictationState
 import io.github.remtav.dictee.dictation.TextSink
+import io.github.remtav.dictee.ime.words.GestureDecoder
+import io.github.remtav.dictee.ime.words.Lexicon
+import io.github.remtav.dictee.ime.words.StripItem
+import io.github.remtav.dictee.ime.words.Suggester
+import io.github.remtav.dictee.ime.words.TextField
+import io.github.remtav.dictee.ime.words.Typist
 import io.github.remtav.dictee.settings.ThemeMode
 import io.github.remtav.dictee.stt.EngineManager
 import io.github.remtav.dictee.stt.TranscriptionMode
@@ -82,6 +89,20 @@ class DicteeImeService : InputMethodService(), DictationListener, EngineManager.
     private var dictationField: String? = null
     private var currentField: String? = null
     private var passwordField = false
+
+    // Text keyboard, issue #71: word suggestions, correction and slide typing.
+    private var suggestions: SuggestionStripView? = null
+    /** The field takes ordinary words (not a password, an address or a field that refuses suggestions). */
+    private var wordField = false
+    private var typist: Typist? = null
+    /** Languages [typist] and [lexicons] were asked for (they arrive a moment later, from a background thread). */
+    private var wordLanguages: Set<KeyLanguage>? = null
+    private var lexicons: List<Lexicon> = emptyList()
+    private var decoder: GestureDecoder? = null
+    /** Keys and languages [decoder] was built for, and the ones being built. */
+    private var decoderFor: String? = null
+    private var decoderPending: String? = null
+    private val stripRefresh = Runnable { refreshStrip() }
     /** When the keyboard was last hidden (uptime ms), 0 while shown. */
     private var hiddenAt = 0L
 
@@ -204,8 +225,13 @@ class DicteeImeService : InputMethodService(), DictationListener, EngineManager.
         keys.onKeyPressed = { haptic(it) }
         keys.listener = object : LetterKeyboardView.Listener {
             override fun onText(text: String) = typeKey(text)
+            override fun onSlide(candidates: List<String>, capital: Boolean) = typeSlide(candidates, capital)
         }
+        keys.onGeometry = { requestDecoder() }
         keys.backspaceTouchListener = RepeatListener { typedBackspace() }
+        suggestions = v.findViewById<SuggestionStripView>(R.id.suggestions).apply {
+            onPick = { item -> haptic(this); pickSuggestion(item) }
+        }
         symbolsButton = v.findViewById<MaterialButton>(R.id.kb_symbols).apply {
             setOnClickListener {
                 haptic(it)
@@ -225,7 +251,13 @@ class DicteeImeService : InputMethodService(), DictationListener, EngineManager.
         v.findViewById<View>(R.id.kb_comma).setOnClickListener { haptic(it); typeKey(",") }
         // Long press on the period: the ellipsis. The same long-press window as the keys of the symbols page.
         v.findViewById<View>(R.id.kb_period).also { keys.installKeyTouch(it, ".") { haptic(it); typeKey(".") } }
-        v.findViewById<View>(R.id.kb_enter).setOnClickListener { haptic(it); stopDictationForTyping(); pressEnter() }
+        v.findViewById<View>(R.id.kb_enter).setOnClickListener {
+            haptic(it)
+            stopDictationForTyping()
+            edit { t, f -> t.beforeEnter(f) }
+            pressEnter()
+            refreshStripSoon()
+        }
         applyView()
     }
 
@@ -252,6 +284,9 @@ class DicteeImeService : InputMethodService(), DictationListener, EngineManager.
         pad?.visibility = if (padPage != null) View.VISIBLE else View.GONE
         dictationGroup?.visibility = if (text || padPage != null) View.GONE else View.VISIBLE
         textGroup?.visibility = if (text) View.VISIBLE else View.GONE
+        // The bar keeps its place while the lists load, so the keys do not move when they arrive.
+        suggestions?.visibility = if (text && wordField && app.settings.wordSuggestions) View.VISIBLE else View.GONE
+        applyDecoder()
         toggleView?.apply {
             // Only in the text view, to go back to the microphone; in a password field the microphone is refused.
             visibility = if (text && !passwordField) View.VISIBLE else View.GONE
@@ -321,12 +356,160 @@ class DicteeImeService : InputMethodService(), DictationListener, EngineManager.
 
     private fun typeKey(text: String) {
         stopDictationForTyping()
-        typeText(text)
+        if (edit { t, f -> t.type(f, text) } == null) typeText(text)
+        refreshStripSoon()
     }
 
     private fun typedBackspace() {
         stopDictationForTyping()
-        deleteBackward()
+        // Right after a correction or a slide, Backspace takes it back; otherwise it deletes one character.
+        if (edit { t, f -> t.backspace(f) } != true) deleteBackward()
+        refreshStripSoon()
+    }
+
+    // ------------------------------------------------- words (issue #71)
+
+    /** The field through its `InputConnection`, as [Typist] reads and changes it. */
+    private class ImeField(private val ic: InputConnection) : TextField {
+        override fun textBefore(n: Int) = ic.getTextBeforeCursor(n, 0)?.toString() ?: ""
+        override fun textAfter(n: Int) = ic.getTextAfterCursor(n, 0)?.toString() ?: ""
+        override fun deleteBefore(n: Int) { ic.deleteSurroundingText(n, 0) }
+        override fun commit(text: String) { ic.commitText(text, 1) }
+    }
+
+    /** The field of [typeKey] takes words, and the word lists are there. Never in a password field. */
+    private fun wordsActive(): Boolean = typist != null && wordField && !passwordField && inputPage is InputPage.Text
+
+    /**
+     * Runs [action] with the typing logic on the current field, as one edit. Null when words are off
+     * for this field, or when a selection is active (typing then replaces it, as without suggestions).
+     */
+    private fun <T> edit(action: (Typist, TextField) -> T): T? {
+        val t = typist?.takeIf { wordsActive() } ?: return null
+        val ic = currentInputConnection ?: return null
+        if (!ic.getSelectedText(0).isNullOrEmpty()) return null
+        ic.beginBatchEdit()
+        try {
+            return action(t, ImeField(ic))
+        } finally {
+            ic.endBatchEdit()
+        }
+    }
+
+    private fun typeSlide(candidates: List<String>, capital: Boolean) {
+        stopDictationForTyping()
+        edit { t, f -> t.slide(f, candidates, capital) }
+        refreshStripSoon()
+    }
+
+    private fun pickSuggestion(item: StripItem) {
+        stopDictationForTyping()
+        edit { t, f -> t.pick(f, item) }
+        refreshStripSoon()
+    }
+
+    /** The bar follows the text: asked after every key and every cursor move, done once. */
+    private fun refreshStripSoon() {
+        main.removeCallbacks(stripRefresh)
+        main.post(stripRefresh)
+    }
+
+    private fun refreshStrip() {
+        val bar = suggestions ?: return
+        val show = app.settings.wordSuggestions && textGroup?.visibility == View.VISIBLE && !controller.isActive
+        bar.show(if (show) edit { t, f -> t.strip(f) }.orEmpty() else emptyList())
+    }
+
+    override fun onUpdateSelection(
+        oldSelStart: Int, oldSelEnd: Int, newSelStart: Int, newSelEnd: Int, candidatesStart: Int, candidatesEnd: Int,
+    ) {
+        super.onUpdateSelection(oldSelStart, oldSelEnd, newSelStart, newSelEnd, candidatesStart, candidatesEnd)
+        if (suggestions?.visibility == View.VISIBLE) refreshStripSoon()
+    }
+
+    /** Whether the field is one where words are suggested and corrected: ordinary text only. */
+    private fun takesWords(info: EditorInfo): Boolean {
+        if (info.inputType and InputType.TYPE_MASK_CLASS != InputType.TYPE_CLASS_TEXT || isPassword(info)) return false
+        if (info.inputType and InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS != 0) return false
+        return when (info.inputType and InputType.TYPE_MASK_VARIATION) {
+            InputType.TYPE_TEXT_VARIATION_URI, InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS,
+            InputType.TYPE_TEXT_VARIATION_WEB_EMAIL_ADDRESS, InputType.TYPE_TEXT_VARIATION_FILTER -> false
+            else -> true
+        }
+    }
+
+    /** Reads the word lists of the chosen languages (once) and follows the three settings. */
+    private fun prepareWords() {
+        val s = app.settings
+        if (!s.wordSuggestions && !s.autocorrect && !s.slideTyping) {
+            typist = null
+            wordLanguages = null
+            lexicons = emptyList()
+            applyDecoder()
+            return
+        }
+        val wanted = KeyLanguage.forDictation(s.languages)
+        if (wanted != wordLanguages) {
+            wordLanguages = wanted
+            typist = null
+            lexicons = emptyList()
+            app.words.load(wanted) { lists ->
+                main.post {
+                    if (wordLanguages != wanted) return@post
+                    lexicons = lists
+                    typist = Typist(
+                        Suggester(
+                            lists,
+                            learned = { app.settings.learnedWords },
+                            neighbours = { a, b -> KeyboardLayout.areNeighbours(letters?.kind ?: LayoutKind.QWERTY, a, b) },
+                        ),
+                        learn = { app.settings.learnWord(it) },
+                    ).also { it.autocorrect = app.settings.autocorrect }
+                    requestDecoder()
+                    refreshStripSoon()
+                }
+            }
+        }
+        typist?.autocorrect = s.autocorrect
+        requestDecoder()
+    }
+
+    /** Builds, off the main thread, the slide decoder of the letter keys as they are laid out now. */
+    private fun requestDecoder() {
+        val keys = letters?.letterKeyRects().orEmpty()
+        val lists = lexicons
+        if (keys.isEmpty() || lists.isEmpty() || !app.settings.slideTyping) { applyDecoder(); return }
+        val wanted = decoderKey(keys)
+        if (wanted == decoderFor || wanted == decoderPending) { applyDecoder(); return }
+        decoderPending = wanted
+        val density = resources.displayMetrics.density
+        app.words.inBackground {
+            // AnySoftKeyboard's values: 2.5 dp per point of frequency, 5 dp between points, 60 dp around the start.
+            val built = GestureDecoder(keys, lists, 2.5 * density, (5 * density).toInt(), (60 * density).toInt())
+            main.post {
+                if (decoderPending == wanted) decoderPending = null
+                decoder = built
+                decoderFor = wanted
+                applyDecoder()
+            }
+        }
+    }
+
+    private fun decoderKey(keys: List<GestureDecoder.Key>): String =
+        "$wordLanguages|" + keys.joinToString(";") { "${it.char},${it.left},${it.top},${it.right},${it.bottom}" }
+
+    /** For the tests: the word lists are read, and (for [slide]) the keys can follow a finger. */
+    fun wordsReady(slide: Boolean = false): Boolean = wordsActive() && (!slide || letters?.decoder != null)
+
+    /** For the tests: what the suggestion bar shows. */
+    fun shownSuggestions(): List<StripItem> = suggestions?.shown().orEmpty()
+
+    /** Gives the keys their decoder when it fits them and sliding is allowed here; takes it away otherwise. */
+    private fun applyDecoder() {
+        val keys = letters ?: return
+        val rects = keys.letterKeyRects()
+        val fits = rects.isNotEmpty() && decoderFor == decoderKey(rects)
+        keys.decoder = decoder?.takeIf { fits && wordsActive() && app.settings.slideTyping }
     }
 
     override fun onEvaluateFullscreenMode(): Boolean = false
@@ -358,6 +541,8 @@ class DicteeImeService : InputMethodService(), DictationListener, EngineManager.
         val sameField = field == currentField
         currentField = field
         passwordField = isPassword(attribute)
+        wordField = takesWords(attribute)
+        if (!restarting) typist?.reset()
         inputPage = InputPages.forInputType(attribute.inputType)
         // The separator learned in this field stays through a restart of the same field (rotation).
         if (!sameField) decimalOrder = DecimalSeparator.order(java.util.Locale.getDefault())
@@ -400,6 +585,9 @@ class DicteeImeService : InputMethodService(), DictationListener, EngineManager.
         // rebuild it, so the keyboard follows the setting like the screens do.
         if (inflatedTheme != null && inflatedTheme != app.settings.theme) rebuildInputView()
         if (passwordField && controller.isActive) controller.cancel()
+        prepareWords()
+        applyView()
+        refreshStripSoon()
         // Preload the model so the first tap is fast.
         val spec = app.dictationSpec()
         if (!passwordField && inputPage is InputPage.Text && !app.benchmarkRunning && app.isInstalled(spec)) {

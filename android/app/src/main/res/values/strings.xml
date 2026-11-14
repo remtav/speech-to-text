@@ -134,6 +134,16 @@
     <string name="settings_vocabulary_help">Un mot par ligne pour le favoriser (noms propres, jargon). « mal entendu -> correct » pour corriger après transcription.</string>
     <string name="settings_feedback">Apparence et retour</string>
     <string name="settings_haptics">Retour haptique</string>
+    <string name="settings_suggestions">Suggestions de mots</string>
+    <string name="settings_autocorrect">Correction automatique</string>
+    <string name="settings_slide">Écrire en glissant le doigt</string>
+    <string name="settings_words_help">Au clavier à touches, dans les langues choisies à l\'installation. La correction remplace un mot mal tapé quand vous passez au suivant ; la touche Effacer, juste après, remet ce que vous aviez tapé, et le clavier s\'en souvient. Pour écrire en glissant, posez le doigt sur la première lettre et passez sur les suivantes sans le lever. Rien de ce que vous tapez ne quitte le téléphone, et rien n\'est proposé ni retenu dans un champ de mot de passe.</string>
+    <string name="settings_forget_words">Oublier les mots retenus</string>
+    <string name="settings_words_forgotten">Mots retenus oubliés</string>
+    <string name="suggestion_typed">« %1$s »</string>
+    <string name="cd_suggestion">Écrire %1$s</string>
+    <string name="cd_suggestion_correction">%1$s, remplacera le mot tapé</string>
+    <string name="cd_suggestion_typed">Garder %1$s tel que tapé</string>
     <string name="settings_performance">Performance</string>
     <string name="settings_keep_loaded">Garder le modèle en mémoire après fermeture du clavier</string>
     <string name="settings_threads">Threads de calcul</string>

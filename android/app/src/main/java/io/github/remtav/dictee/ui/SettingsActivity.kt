@@ -109,6 +109,14 @@ class SettingsActivity : AppCompatActivity() {
         col.body(getString(R.string.settings_layout), small = false)
         col.radio(LayoutKind.entries.map { it.label }, s.keyboardLayout.ordinal) { s.keyboardLayout = LayoutKind.entries[it] }
         col.body(getString(R.string.settings_layout_help), small = true)
+        col.switch(getString(R.string.settings_suggestions), s.wordSuggestions) { s.wordSuggestions = it }
+        col.switch(getString(R.string.settings_autocorrect), s.autocorrect) { s.autocorrect = it }
+        col.switch(getString(R.string.settings_slide), s.slideTyping) { s.slideTyping = it }
+        col.body(getString(R.string.settings_words_help), small = true)
+        col.button(getString(R.string.settings_forget_words), outlined = true) {
+            s.forgetLearnedWords()
+            android.widget.Toast.makeText(this, R.string.settings_words_forgotten, android.widget.Toast.LENGTH_SHORT).show()
+        }
 
 
 

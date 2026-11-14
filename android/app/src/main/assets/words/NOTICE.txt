@@ -1,0 +1,18 @@
+Word lists of the text keyboard (fr, en, es, pt)
+================================================
+
+The files *.tsv.gz in this directory are derived from the "combined" word lists of the
+Android Open Source Project (LatinIME dictionaries), as distributed in the language packs
+of AnySoftKeyboard (https://github.com/AnySoftKeyboard/AnySoftKeyboard, commit
+1ee43e7f037b905e1c762e3beceac1c0178797b6):
+
+    Copyright (C) The Android Open Source Project
+    Copyright (C) AnySoftKeyboard contributors
+    Licensed under the Apache License, Version 2.0 (see ../licences/Apache-2.0.txt).
+
+Changes: entries reduced to the word, its frequency and the "possibly offensive" flag; words
+with digits or other signs removed; the two Portuguese lists merged; lines sorted by the word
+without accents. Made by android/tools/mots/build_wordlists.py.
+
+The slide-typing code (ime/words/GestureDecoder.kt) is a Kotlin port of AnySoftKeyboard's
+GestureTypingDetector, under the same license.

@@ -157,6 +157,24 @@ object KeyboardLayout {
     fun alternatesFor(key: String, upper: Boolean, languages: Set<KeyLanguage> = allLanguages): List<String> =
         if (key.isNotEmpty() && key[0].isLetter()) accentsFor(key, upper, languages) else marksFor(key, languages)
 
+    private val neighbourPairs: Map<LayoutKind, Set<String>> = LayoutKind.entries.associateWith { kind ->
+        val rows = letterRows(kind)
+        val at = HashMap<String, Pair<Float, Int>>()
+        rows.forEachIndexed { r, row ->
+            // The last row sits between Shift and Backspace, the shorter ones are centred (see LetterKeyboardView).
+            val offset = if (r == rows.lastIndex) 1.5f + (rows[0].size - 3 - row.size) / 2f else (rows[0].size - row.size) / 2f
+            row.forEachIndexed { c, k -> at[k] = (offset + c) to r }
+        }
+        buildSet {
+            for ((a, pa) in at) for ((b, pb) in at) {
+                if (a != b && kotlin.math.abs(pa.first - pb.first) <= 1.1f && kotlin.math.abs(pa.second - pb.second) <= 1) add(a + b)
+            }
+        }
+    }
+
+    /** Whether the keys of letters [a] and [b] touch on the layout [kind]: a likely slip of the finger. */
+    fun areNeighbours(kind: LayoutKind, a: Char, b: Char): Boolean = "$a$b" in neighbourPairs.getValue(kind)
+
     /** The label a letter key shows (and types) for the given shift state. */
     fun label(base: String, shift: ShiftState): String = if (shift.upper) base.uppercase() else base
 

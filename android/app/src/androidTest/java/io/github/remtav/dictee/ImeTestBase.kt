@@ -49,6 +49,11 @@ abstract class ImeTestBase {
         app.settings.prefs.edit().clear().commit()
         app.settings.partials = false
         app.settings.haptics = false
+        // Issue #71: off for the tests written before it (they check the keys, letter for letter);
+        // WordsInstrumentedTest turns them on.
+        app.settings.wordSuggestions = false
+        app.settings.autocorrect = false
+        app.settings.slideTyping = false
         app.settings.cleanupMode = CleanupMode.OFF
         app.settings.activeModelId = ModelCatalog.parakeet.id
         TestHooks.assumeInstalled = true

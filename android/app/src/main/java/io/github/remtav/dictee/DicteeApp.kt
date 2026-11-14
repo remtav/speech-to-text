@@ -78,6 +78,9 @@ class DicteeApp : Application() {
     lateinit var engines: EngineManager
         private set
 
+    /** Word lists of the text keyboard (issue #71), read on first use. */
+    val words by lazy { io.github.remtav.dictee.ime.words.WordLists { assets.open(it) } }
+
     private var llmCleaner: LlmCleaner? = null
     private var llmKey: String? = null
 

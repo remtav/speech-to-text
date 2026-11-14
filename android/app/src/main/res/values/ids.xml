@@ -7,6 +7,9 @@
     <item name="pad_enter" type="id" />
     <item name="pad_decimal" type="id" />
     <item name="open_keys" type="id" />
+    <item name="sug_0" type="id" />
+    <item name="sug_1" type="id" />
+    <item name="sug_2" type="id" />
     <!-- Tag key: whether a button built by Ui.button is outlined (issue #55: one filled button at most). -->
     <item name="button_outlined" type="id" />
 </resources>
