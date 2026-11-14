@@ -677,15 +677,16 @@ class DicteeImeService : InputMethodService(), DictationListener, EngineManager.
 
     private fun showModelMenu(anchor: View) {
         val menu = PopupMenu(anchor.context, anchor)
-        // Issue #22: offered for the languages, then the experimental ones, then the user's server.
-        val installed = (ModelCatalog.listed(app.settings.languages) + ModelCatalog.remote).filter { app.isInstalled(it) }
+        // Issue #72: offered for the languages (Whisper), an « Avancé » model only while active, then the user's server.
+        val installed = (ModelCatalog.forKeyboard(app.settings.languages, app.settings.activeModelId) + ModelCatalog.remote)
+            .filter { app.isInstalled(it) }
         if (installed.isEmpty()) {
             showMessage(getString(R.string.msg_no_model), error = true)
             return
         }
         val shown = app.shownSpec()
         installed.forEachIndexed { i, spec ->
-            // Issue #37: models named by their effect in the keyboard.
+            // Issue #72: « Whisper » in the keyboard; a lone entry is kept (reported in the PR).
             menu.menu.add(0, i, i, io.github.remtav.dictee.stt.ModelPlainNames.of(spec)).apply {
                 isCheckable = true
                 isChecked = spec.id == shown.id

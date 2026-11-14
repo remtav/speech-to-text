@@ -17,14 +17,38 @@ class ModelMigrationTest {
     private val english = setOf(DictationLanguage.ENGLISH)
     private fun installed(vararg specs: ModelSpec): (ModelSpec) -> Boolean = { it in specs }
 
-    @Test fun parakeetWithQuebecFrenchMovesToWhisperTurbo() {
-        val n = ModelMigration.plan(ModelCatalog.parakeet.id, qc, installed(ModelCatalog.parakeet, ModelCatalog.whisperTurbo))
-        assertNotNull(n)
-        assertEquals(ModelCatalog.parakeet, n!!.retired)
+    /** Issue #72: Parakeet stays active, without notice, whatever the languages (it is allowed in « Avancé »). */
+    @Test fun anActiveParakeetStaysWithoutNoticeForEveryLanguage() {
+        for (l in DictationLanguage.entries) {
+            assertNull(l.toString(), ModelMigration.plan(ModelCatalog.parakeet.id, setOf(l), installed(ModelCatalog.parakeet)))
+            assertNull(l.toString(), ModelMigration.plan(ModelCatalog.parakeet.id, setOf(l), installed()))
+        }
+        assertNull(ModelMigration.plan(ModelCatalog.parakeet.id, qc, installed(ModelCatalog.parakeet, ModelCatalog.whisperTurbo)))
+    }
+
+    /** Issue #72: the withdrawn Lite-Whisper moves to Whisper; the notice is shown, its files are offered for deletion. */
+    @Test fun anActiveLiteWhisperMovesToWhisperTurboAndOffersToDeleteItsFiles() {
+        for (l in DictationLanguage.entries) {
+            val n = ModelMigration.plan(ModelCatalog.liteWhisperTurbo.id, setOf(l), installed(ModelCatalog.liteWhisperTurbo, ModelCatalog.whisperTurbo))
+            assertNotNull(l.toString(), n)
+            assertEquals(ModelCatalog.liteWhisperTurbo, n!!.retired)
+            assertEquals(ModelCatalog.whisperTurbo, n.replacement)
+            assertFalse(n.needsDownload)
+            assertTrue(n.offerDelete)
+        }
+    }
+
+    @Test fun liteWhisperToWhisperNotYetDownloadedInvitesToDownloadIt() {
+        val n = ModelMigration.plan(ModelCatalog.liteWhisperTurbo.id, qc, installed(ModelCatalog.liteWhisperTurbo))!!
         assertEquals(ModelCatalog.whisperTurbo, n.replacement)
-        assertFalse(n.needsDownload)
-        // Parakeet is not hidden (still offered for English alone): its files are not offered for deletion.
+        assertTrue(n.needsDownload)
+        assertTrue(n.offerDelete)
+    }
+
+    @Test fun liteWhisperFilesAlreadyGoneAreNotOfferedForDeletion() {
+        val n = ModelMigration.plan(ModelCatalog.liteWhisperTurbo.id, english, installed(ModelCatalog.whisperTurbo))!!
         assertFalse(n.offerDelete)
+        assertFalse(n.needsDownload)
     }
 
     @Test fun quebecWhisperMovesToWhisperTurboAndOffersToDeleteItsFiles() {
@@ -44,27 +68,19 @@ class ModelMigrationTest {
 
     @Test fun suitableModelsStay() {
         assertNull(ModelMigration.plan(ModelCatalog.whisperTurbo.id, qc, installed()))
-        assertNull(ModelMigration.plan(ModelCatalog.parakeet.id, english, installed()))
-        assertNull(ModelMigration.plan(ModelCatalog.liteWhisperTurbo.id, qc, installed()))
+        assertNull(ModelMigration.plan(ModelCatalog.parakeet.id, qc, installed()))
         assertNull(ModelMigration.plan(ModelCatalog.remote.id, qc, installed()))
         // Unknown id: AppSettings.activeModel already reads it as the default.
         assertNull(ModelMigration.plan("gone", qc, installed()))
-    }
-
-    @Test fun parakeetLeavesOnceAnUncoveredOrHeavyLanguageIsAddedToEnglish() {
-        assertNotNull(ModelMigration.plan(ModelCatalog.parakeet.id, english + DictationLanguage.MANDARIN, installed()))
-        assertNotNull(ModelMigration.plan(ModelCatalog.parakeet.id, english + DictationLanguage.FRENCH_QUEBEC, installed()))
-        // Issue #36: English with Spanish is a "light model" combination, Parakeet stays.
-        assertNull(ModelMigration.plan(ModelCatalog.parakeet.id, english + DictationLanguage.SPANISH, installed()))
     }
 
     @Test fun serverFallbackIsNeverHidden() {
         val turbo = ModelCatalog.whisperTurbo.id
         assertEquals(turbo, ModelMigration.fallbackId(ModelCatalog.qwen3.id, qc))
         assertEquals(turbo, ModelMigration.fallbackId(ModelCatalog.whisperQuebec.id, qc))
-        assertEquals(turbo, ModelMigration.fallbackId(ModelCatalog.parakeet.id, qc))
-        assertEquals(ModelCatalog.parakeet.id, ModelMigration.fallbackId(ModelCatalog.parakeet.id, english))
-        assertEquals(ModelCatalog.liteWhisperTurbo.id, ModelMigration.fallbackId(ModelCatalog.liteWhisperTurbo.id, qc))
+        assertEquals(turbo, ModelMigration.fallbackId(ModelCatalog.liteWhisperTurbo.id, qc))
+        // Parakeet is allowed in « Avancé »: it may stay the server's fallback.
+        assertEquals(ModelCatalog.parakeet.id, ModelMigration.fallbackId(ModelCatalog.parakeet.id, qc))
         assertEquals("", ModelMigration.fallbackId("", qc))
         // The server is never its own fallback.
         assertEquals(turbo, ModelMigration.fallbackId(ModelCatalog.remote.id, qc))

@@ -4465,3 +4465,52 @@ Extraits de référence français : aucun ne touche le plafond à 1 000, texte i
 #40) est refait avec le silence et finit correctement (« La sorcière décide de rentrer au palais pour protéger les
 rebelles. »), au lieu de passer par le filtre. `WhisperRepetitionHostTest.automaticModeOfTheEngine` accepte donc l'un ou
 l'autre. Pas mesuré sur le téléphone.
+
+## Issue #72 (partie 2) — Whisper seul sur le téléphone, et on le nomme
+
+Décisions de Rémi, 2026-11-14 (issue #72, mise à jour du jour comprise).
+
+**Ce qui change.**
+
+- **Retour en arrière sur #37.** Le modèle du téléphone s'appelle « Whisper » dans le parcours normal (carte de
+  l'installation, clavier, test de lecture, messages), à la place de « Plus précis ». Raison : Rémi juge important
+  de dire que c'est Whisper. Le reste de #37 tient : « développé au Québec », « code ouvert », pas de choix
+  technique au départ. La variante (« large-v3-turbo »), la quantification et les autres noms techniques restent dans
+  « Avancé », la comparaison et le diagnostic. `technicalWords` ne contient plus « Whisper ».
+- **Un seul modèle du téléphone dans le parcours normal.** `ModelCatalog.offered` ne rend que Whisper, quelles que
+  soient les langues. Raison : Whisper est le seul modèle qui transcrit bien le français québécois. Disparaissent :
+  `lightPhoneLanguages`, `lightPossible`, la condition propre à Parakeet dans `offered`, et la phrase de la
+  recommandation qui annonçait un second modèle. La raison est maintenant une phrase : « Whisper : le modèle qui
+  comprend le mieux le français d'ici aux essais (1,04 Go). »
+- **Parakeet rangé dans « Avancé ».** Nouveau niveau de visibilité `ADVANCED` (il remplace `EXPERIMENTAL`, qui n'a plus
+  de modèle). Parakeet y est listé (Réglages → Avancé, « Comparer les modèles ») sous son nom technique, quelles que
+  soient les langues cochées, avec la note « Plus léger et plus rapide, mais comprend moins bien le français
+  québécois ». Jamais à l'installation, jamais recommandé ; au clavier, seulement s'il est le modèle actif
+  (`ModelCatalog.forKeyboard`). `suits()` l'accepte : une personne qui l'utilise déjà le garde, sans avis, et peut
+  revenir à Whisper depuis l'écran principal.
+- **Lite-Whisper retiré.** Passé à `HIDDEN` : affiché nulle part. L'entrée reste dans le catalogue, sinon
+  l'application ne saurait plus supprimer ses fichiers d'un téléphone qui les a. Une personne dont il est le modèle
+  actif passe à Whisper par `migrateModels`, voit l'avis une fois et se voit offrir la suppression des fichiers ; si
+  Whisper n'est pas téléchargé, l'écran principal le propose et la dictée répond « Whisper n'est pas installé »
+  sans planter. Le dépôt Hugging Face de Lite-Whisper et `android/tools/` ne sont pas touchés. Le mot
+  « expérimental » a disparu des écrans (section « Autre modèle du téléphone » dans « Avancé »).
+- **Test rapide masqué à l'installation, code conservé.** Il a été conçu (#36) pour choisir entre deux modèles du
+  téléphone ; sans second modèle il n'a rien à comparer. `QuickTestActivity.REACHABLE = false` : ni l'installation ni
+  les Réglages ne l'ouvrent. `QuickTestActivity`, `QuickTestModel`, `QuickTestAdvice`, `QuickReading`, les chaînes
+  `quick_*` et leurs tests restent. `PhoneModelChoice.light` reste (toujours nul) pour que le code compile. Les
+  chaînes du test disent « Whisper » au lieu de « le modèle plus précis » ; ses verdicts ne sont pas réécrits (ils
+  parlent encore d'un « plus léger »). À reprendre quand le test resservira : Rémi prévoit de comparer Whisper local
+  et Whisper distant, ce qui demandera un consentement (le test est construit pour ne rien envoyer hors du
+  téléphone) et de nouveaux verdicts. #66 reste ouverte, moins urgente.
+
+**Mise à jour d'une installation existante.** Lite-Whisper actif → Whisper (avis une fois, suppression des fichiers
+offerte). Parakeet actif → inchangé, sans avis. Revue indépendante : l'écran
+principal ne se dit « prêt » que si le modèle actif est installé (des fichiers de Parakeet sans qu'il soit actif ne
+comptent pas) ; les fichiers d'un modèle caché encore sur le téléphone (Lite-Whisper téléchargé mais pas actif,
+Qwen3-ASR, Whisper québécois) sont listés avec un bouton « Supprimer » dans « Avancé » → « Fichiers d'anciens
+modèles » ; un avis en attente qui nomme Parakeet est effacé au démarrage (il est permis de nouveau).
+
+**Limite à signaler.** Au clavier, sans serveur configuré et sans Parakeet actif, le menu du bouton de modèle n'a plus
+qu'une entrée (Whisper). Le bouton est gardé (décision de l'issue : ne pas le retirer d'office).
+
+**À vérifier sur un vrai téléphone** : rien de ce lot n'a tourné sur un appareil.

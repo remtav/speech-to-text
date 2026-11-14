@@ -24,8 +24,13 @@ import java.util.Locale
 import kotlin.math.roundToInt
 
 /**
- * « Test rapide (1 minute) » (issue #36, recentred on the phone): optional, opened from the « Modèle » step of
- * the installation and from the settings. Draws [QuickTestModel]; models are named by their effect (issue #37).
+ * « Test rapide (1 minute) » (issue #36, recentred on the phone).
+ *
+ * **Hidden since issue #72** ([REACHABLE] is false): no screen opens it any more. With one phone model (Whisper) it
+ * has nothing to compare; Rémi wants it kept, to compare local Whisper and remote Whisper one day (a later issue:
+ * it will need a consent, since it is built to send nothing off the phone, and new verdicts, which are still the
+ * two-phone-model ones). Everything stays and compiles: this screen, [QuickTestModel], [QuickTestAdvice],
+ * `reading/QuickReading.kt`, the `quick_*` strings and their tests. Draws [QuickTestModel].
  */
 class QuickTestActivity : AppCompatActivity() {
     private lateinit var app: DicteeApp
@@ -232,6 +237,9 @@ class QuickTestActivity : AppCompatActivity() {
     private fun seconds(s: Double) = String.format(Locale.CANADA_FRENCH, "%.1f", s)
 
     companion object {
+        /** Issue #72: whether the installation and the settings offer the test. Set to true when it is wanted again. */
+        const val REACHABLE = false
+
         const val TAG_TEXT = "quick_text"
         const val TAG_PRIVATE = "quick_private"
         const val TAG_STATE = "quick_state"
