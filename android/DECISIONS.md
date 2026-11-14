@@ -4504,9 +4504,11 @@ Décisions de Rémi, 2026-11-14 (issue #72, mise à jour du jour comprise).
   téléphone) et de nouveaux verdicts. #66 reste ouverte, moins urgente.
 
 **Mise à jour d'une installation existante.** Lite-Whisper actif → Whisper (avis une fois, suppression des fichiers
-offerte). Parakeet actif → inchangé, sans avis. Limite connue : une personne qui a téléchargé Parakeet sans l'utiliser
-le voit dans « Avancé » (elle peut le supprimer de là) ; Lite-Whisper téléchargé mais pas actif n'est plus affiché
-nulle part, ses fichiers restent sur le téléphone (même situation que Qwen3-ASR et le Whisper québécois, #22).
+offerte). Parakeet actif → inchangé, sans avis. Revue indépendante : l'écran
+principal ne se dit « prêt » que si le modèle actif est installé (des fichiers de Parakeet sans qu'il soit actif ne
+comptent pas) ; les fichiers d'un modèle caché encore sur le téléphone (Lite-Whisper téléchargé mais pas actif,
+Qwen3-ASR, Whisper québécois) sont listés avec un bouton « Supprimer » dans « Avancé » → « Fichiers d'anciens
+modèles » ; un avis en attente qui nomme Parakeet est effacé au démarrage (il est permis de nouveau).
 
 **Limite à signaler.** Au clavier, sans serveur configuré et sans Parakeet actif, le menu du bouton de modèle n'a plus
 qu'une entrée (Whisper). Le bouton est gardé (décision de l'issue : ne pas le retirer d'office).

@@ -108,6 +108,8 @@
     <string name="model_notice_delete_button">Supprimer les fichiers de l\'ancien modèle (%1$s)</string>
     <string name="model_notice_deleted">Fichiers de l\'ancien modèle supprimés.</string>
     <string name="model_notice_ok">J\'ai compris</string>
+    <string name="settings_old_models">Fichiers d\'anciens modèles</string>
+    <string name="settings_old_models_delete">Supprimer les fichiers (%1$s)</string>
     <string name="settings_advanced_models">Autre modèle du téléphone</string>
     <string name="settings_advanced_models_help">Jamais recommandé : à essayer et à comparer sur votre téléphone (« Comparer les modèles », ci-dessus).</string>
     <string name="setup_downloading">Téléchargement : %1$d %% (%2$s / %3$s)</string>
@@ -269,7 +271,7 @@
     <string name="contrib_declined_close">Fermer</string>
 
     <string name="contrib_accept_title">Le test de lecture</string>
-    <string name="contrib_accept_body">Vous allez lire %1$d courts paragraphes à voix haute, un à la fois. Chacun est enregistré et transcrit sur votre téléphone par le ou les modèles installés, puis comparé au texte pour calculer un taux de ressemblance. Rien ne quitte le téléphone pendant le test. Vous pouvez réécouter, recommencer ou arrêter quand vous voulez.</string>
+    <string name="contrib_accept_body">Vous allez lire %1$d courts paragraphes à voix haute, un à la fois. Chacun est enregistré et transcrit sur votre téléphone par le modèle installé, puis comparé au texte pour calculer un taux de ressemblance. Rien ne quitte le téléphone pendant le test. Vous pouvez réécouter, recommencer ou arrêter quand vous voulez.</string>
     <string name="contrib_accept_start">Commencer le test</string>
     <string name="contrib_accept_cancel">Annuler</string>
 
@@ -340,7 +342,7 @@
     <string name="settings_participation_excluded">Vous avez répondu non : le test de lecture n\'est pas proposé, et rien n\'est enregistré. Changez votre réponse pour le retrouver.</string>
 
     <string name="reading_title">Test de lecture</string>
-    <string name="reading_models_used">Modèles utilisés : %1$s.</string>
+    <string name="reading_models_used">Modèle utilisé : %1$s.</string>
     <string name="reading_no_model">Aucun modèle n\'est installé sur ce téléphone. Téléchargez-en un depuis l\'écran principal, puis revenez faire le test.</string>
     <string name="reading_progress">Paragraphe %1$d sur %2$d</string>
     <string name="reading_hint">Lisez à voix haute, à votre rythme. L\'enregistrement s\'arrête tout seul après %1$d secondes.</string>

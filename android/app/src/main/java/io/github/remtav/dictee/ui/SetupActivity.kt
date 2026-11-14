@@ -237,7 +237,7 @@ class SetupActivity : AppCompatActivity() {
         val card = serverBox.card()
         card.tag = SERVER_STATUS_TAG
         card.heading(getString(R.string.setup_server_in_use)).setPadding(0, 0, 0, dp(6))
-        val localModel = ModelCatalog.listed(app.settings.languages).any { app.isInstalled(it) }
+        val localModel = isActiveLocalModelReady()
         card.body(
             getString(R.string.setup_server_in_use_text, app.settings.remoteConfig().normalizedBase()) + " " +
                 getString(if (localModel) R.string.setup_server_fallback else R.string.setup_server_no_fallback),
@@ -286,7 +286,16 @@ class SetupActivity : AppCompatActivity() {
      * server counts only when dictations really go to it.
      */
     private fun isModelReady(): Boolean =
-        ModelCatalog.listed(app.settings.languages).any { app.isInstalled(it) } || app.settings.serverInUse
+        isActiveLocalModelReady() || app.settings.serverInUse
+
+    /**
+     * The model dictation would use on the phone is installed (review of #72: a downloaded Parakeet that is not the
+     * active model, or files of a hidden model, do not make the phone ready: dictation says « … n'est pas installé »).
+     */
+    private fun isActiveLocalModelReady(): Boolean {
+        val active = app.settings.activeModel
+        return active.family != ModelFamily.REMOTE && ModelCatalog.suits(active, app.settings.languages) && app.isInstalled(active)
+    }
 
     private fun setupComplete(): Boolean = currentStep() == SetupStep.DONE
 
@@ -318,7 +327,7 @@ class SetupActivity : AppCompatActivity() {
         val chosen = app.settings.languages
         val recommendation = ModelRecommendations.recommend(chosen)
         renderRetiredNotice()
-        // Issue #22: only the models offered for the chosen languages (experimental ones are in the settings).
+        // Issue #22: only the models offered for the chosen languages (Parakeet is in « Avancé » of the settings).
         val modelIsNext = currentStep() == SetupStep.GET_MODEL
         for (spec in ModelCatalog.offered(chosen)) renderModel(spec, chosen, recommendation, modelIsNext && spec == recommendation.model)
         // Issue #72: the quick test is hidden (see QuickTestActivity.REACHABLE); its code stays.

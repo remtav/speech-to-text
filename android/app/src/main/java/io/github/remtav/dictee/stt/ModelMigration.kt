@@ -2,7 +2,8 @@ package io.github.remtav.dictee.stt
 
 /**
  * Moving the user off a model that is no longer offered (issue #22): a hidden model (Qwen3-ASR,
- * the Quebec Whisper, and since issue #72 Parakeet), or one that no longer suits the chosen languages.
+ * the Quebec Whisper, and since issue #72 Lite-Whisper), or one that no longer suits the chosen languages.
+ * Parakeet is in « Avancé » (issue #72): it suits every language and is never replaced.
  * Pure Kotlin: tested on the JVM.
  *
  * Nothing is deleted here: the notice only offers to delete a hidden model's files, on a click.

@@ -275,7 +275,8 @@ class ContributionInstrumentedTest : ImeTestBase() {
             val d = ReadingDriver(instrumentation, s, material)
             readAndScore(d)
             d.awaitTag(ReadingTestActivity.TAG_SHARE_CONSENT)
-            assertTrue(d.allText().contains(context.getString(R.string.contrib_share_only_recommended)))
+            // One model measured (#72): the sentence about « the other models' results » is not shown.
+            assertFalse(d.allText().contains(context.getString(R.string.contrib_share_only_recommended)))
             val listed = listedKeys(d)
             s.onActivity { a ->
                 a.window.decorView.findViewWithTag<EditText>(ReadingTestActivity.TAG_SHARE_REGION).setText(" Bas-Saint-Laurent ")

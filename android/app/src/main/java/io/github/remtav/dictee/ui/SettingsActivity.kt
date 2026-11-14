@@ -22,6 +22,7 @@ import io.github.remtav.dictee.ime.LayoutKind
 import io.github.remtav.dictee.settings.ThemeMode
 import io.github.remtav.dictee.stt.Acceleration
 import io.github.remtav.dictee.stt.ModelCatalog
+import io.github.remtav.dictee.stt.ModelVisibility
 import io.github.remtav.dictee.stt.RemoteApi
 import io.github.remtav.dictee.stt.RemoteEngine
 import io.github.remtav.dictee.stt.RepetitionFix
@@ -43,8 +44,9 @@ class SettingsActivity : AppCompatActivity() {
     private lateinit var remoteStatus: android.widget.TextView
     private lateinit var llmBox: LinearLayout
     private lateinit var participationBox: LinearLayout
-    private lateinit var advancedBox: LinearLayout
     /** « Avancé » section (issue #49): generic, other advanced settings are added to it (#37). */
+    private lateinit var advancedBox: LinearLayout
+    /** The « Avancé » models (Parakeet) and the files of withdrawn models (issue #72). */
     private lateinit var otherModelsBox: LinearLayout
     /** « Serveur distant, pour essais (développeurs) », folded inside « Avancé » (issue #57). */
     private lateinit var serverSection: Collapsible
@@ -418,6 +420,7 @@ class SettingsActivity : AppCompatActivity() {
     /** One card per « Avancé » model (Parakeet, issue #72): choose it, download it, delete it. */
     private fun renderAdvancedModels() {
         otherModelsBox.removeAllViews()
+        renderWithdrawnFiles()
         if (ModelCatalog.advanced.isEmpty()) return
         otherModelsBox.heading(getString(R.string.settings_advanced_models))
         otherModelsBox.body(getString(R.string.settings_advanced_models_help), small = true)
@@ -459,6 +462,26 @@ class SettingsActivity : AppCompatActivity() {
                         renderAdvancedModels()
                     }
                 }
+            }
+        }
+    }
+
+    /**
+     * Issue #72 (review): the files of a withdrawn (hidden) model that is still on the phone, such as Lite-Whisper
+     * downloaded and never made active, would otherwise have no way out: one line and one button each, technical name.
+     */
+    private fun renderWithdrawnFiles() {
+        val left = ModelCatalog.all.filter { it.visibility == ModelVisibility.HIDDEN && app.store.isInstalled(it) }
+        if (left.isEmpty()) return
+        otherModelsBox.heading(getString(R.string.settings_old_models))
+        for (spec in left) {
+            val card = otherModelsBox.card()
+            card.tag = oldModelCardTag(spec)
+            card.body(spec.displayName, small = true)
+            card.button(getString(R.string.settings_old_models_delete, size(app.store.installedBytes(spec.asDownloadable()))), outlined = true) {
+                if (app.engines.current()?.spec?.id == spec.id) app.engines.release()
+                app.store.delete(spec)
+                renderAdvancedModels()
             }
         }
     }
@@ -570,6 +593,9 @@ class SettingsActivity : AppCompatActivity() {
         const val COMPARE_TAG = "settings_compare"
         const val QUICK_TEST_TAG = "settings_quick_test"
         /** Tag of an « Avancé » model's card, for tests. */
+        /** Tag of the card of a withdrawn model's files, for tests. */
+        fun oldModelCardTag(spec: io.github.remtav.dictee.stt.ModelSpec) = "old_model_card_${spec.id}"
+
         fun advancedCardTag(spec: io.github.remtav.dictee.stt.ModelSpec) = "advanced_card_${spec.id}"
     }
 }

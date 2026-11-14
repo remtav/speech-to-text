@@ -112,12 +112,16 @@ class DicteeApp : Application() {
 
     /**
      * Issue #22: an active model that is hidden or no longer suits the chosen languages
-     * is replaced by Whisper turbo (issue #72: that is what happens to Parakeet, now hidden), and the main screen tells the user once
+     * is replaced by Whisper turbo (issue #72: Lite-Whisper, withdrawn), and the main screen tells the user once
      * (inviting to download Whisper turbo if it is missing, offering to delete the hidden model's
      * files: nothing is deleted without a click). Run at start-up and when the languages change.
      */
     fun migrateModels() {
         migrateServerChoice()
+        // A notice left by an earlier version about a model that is allowed again (Parakeet, #72) would be false.
+        ModelCatalog.byId(settings.retiredModelNotice)?.let {
+            if (ModelCatalog.suits(it, settings.languages)) settings.retiredModelNotice = ""
+        }
         val notice = ModelMigration.plan(settings.activeModelId, settings.languages) { isInstalled(it) } ?: return
         settings.activeModelId = notice.replacement.id
         settings.retiredModelNotice = notice.retired.id
