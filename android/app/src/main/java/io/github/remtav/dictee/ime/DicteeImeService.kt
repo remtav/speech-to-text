@@ -40,6 +40,7 @@ import io.github.remtav.dictee.stt.TranscriptionMode
 import io.github.remtav.dictee.stt.ModelCatalog
 import io.github.remtav.dictee.stt.DictationResult
 import io.github.remtav.dictee.stt.ModelFamily
+import io.github.remtav.dictee.stt.ModelSpec
 import io.github.remtav.dictee.stt.RemoteApi
 import io.github.remtav.dictee.stt.Transcription
 import io.github.remtav.dictee.ui.HowToActivity
@@ -675,11 +676,15 @@ class DicteeImeService : InputMethodService(), DictationListener, EngineManager.
         }
     }
 
+    /** What the model button's menu can list (issue #72): Whisper, an « Avancé » model only while active, the configured server. */
+    private fun modelChoices(): List<ModelSpec> =
+        (ModelCatalog.forKeyboard(app.settings.languages, app.settings.activeModelId) + ModelCatalog.remote)
+            .filter { it.family != ModelFamily.REMOTE || app.isInstalled(it) }
+
     private fun showModelMenu(anchor: View) {
         val menu = PopupMenu(anchor.context, anchor)
         // Issue #72: offered for the languages (Whisper), an « Avancé » model only while active, then the user's server.
-        val installed = (ModelCatalog.forKeyboard(app.settings.languages, app.settings.activeModelId) + ModelCatalog.remote)
-            .filter { app.isInstalled(it) }
+        val installed = modelChoices().filter { app.isInstalled(it) }
         if (installed.isEmpty()) {
             showMessage(getString(R.string.msg_no_model), error = true)
             return
@@ -762,6 +767,8 @@ class DicteeImeService : InputMethodService(), DictationListener, EngineManager.
         val status = statusText ?: return
         val spec = app.shownSpec()
         modelButton?.text = io.github.remtav.dictee.stt.ModelPlainNames.short(spec)
+        // Issue #72: with a single entry (Whisper alone: no server, no « Avancé » model active) the button has nothing to offer.
+        modelButton?.visibility = if (modelChoices().size > 1) View.VISIBLE else View.GONE
         val state = controller.state
         val listening = state == DictationState.LISTENING
         mic.setIconResource(if (listening) R.drawable.ic_stop else R.drawable.ic_mic)

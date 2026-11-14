@@ -73,12 +73,10 @@ class SettingsActivity : AppCompatActivity() {
             }
         }
 
-        // Issue #36: the quick test can be done again from here. Issue #72: hidden (QuickTestActivity.REACHABLE).
-        if (QuickTestActivity.REACHABLE) {
-            col.button(getString(R.string.quick_open), outlined = true) {
-                startActivity(android.content.Intent(this, QuickTestActivity::class.java))
-            }.tag = QUICK_TEST_TAG
-        }
+        // Issues #36 and #72: from here only, as a simple check of Whisper (« Whisper vous a compris à X % »).
+        col.button(getString(R.string.quick_open), outlined = true) {
+            startActivity(android.content.Intent(this, QuickTestActivity::class.java))
+        }.tag = QUICK_TEST_TAG
 
         participationBox = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         col.addView(participationBox)

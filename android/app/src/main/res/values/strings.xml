@@ -397,11 +397,11 @@
     <string name="quick_score">Ressemblance : %1$d %% · délai : %2$s s</string>
     <string name="quick_too_slow">Trop lent : pas de réponse dans les %1$d s du test.</string>
     <string name="quick_not_installed">Pas encore téléchargé.</string>
-    <string name="quick_installed_redo">Téléchargé : refaites le test pour le comparer.</string>
-    <string name="quick_download">Télécharger (%1$s) pour comparer</string>
-    <string name="quick_single_scored">Le modèle choisi pour vos langues vous a compris à %1$d %%.</string>
-    <string name="quick_single_too_slow">Le modèle choisi pour vos langues n\'a pas répondu à temps sur ce téléphone.</string>
-    <string name="quick_single_unavailable">Le modèle choisi pour vos langues n\'est pas encore téléchargé.</string>
+    <string name="quick_installed_redo">Téléchargé : refaites le test.</string>
+    <string name="quick_download">Télécharger (%1$s)</string>
+    <string name="quick_single_scored">Whisper vous a compris à %1$d %%.</string>
+    <string name="quick_single_too_slow">Whisper n\'a pas répondu à temps sur ce téléphone.</string>
+    <string name="quick_single_unavailable">Whisper n\'est pas encore téléchargé : téléchargez-le sur l\'écran principal.</string>
     <string name="quick_no_verdict">Aucun des deux modèles n\'est encore téléchargé. Téléchargez-en un sur l\'écran principal, puis refaites le test.</string>
     <string name="quick_verdict_best_quick">Gardez Whisper : il vous a bien compris, et assez vite.</string>
     <string name="quick_verdict_light_enough">Prenez le modèle plus léger : il vous comprend presque aussi bien, et plus vite.</string>
@@ -416,7 +416,7 @@
     <string name="quick_verdict_best_failed">Prenez le modèle plus léger : il vous a bien compris. Whisper n\'a pas pu être essayé.</string>
     <string name="quick_keep_best_unmeasured">Gardez Whisper : le plus léger a raté trop de mots, et Whisper n\'a pas pu être mesuré.</string>
     <string name="quick_no_verdict_slow">Aucun des deux modèles n\'a répondu à temps sur ce téléphone : pas de recommandation. Whisper reste votre modèle.</string>
-    <string name="quick_single_failed">Le modèle choisi pour vos langues n\'a pas pu être essayé.</string>
+    <string name="quick_single_failed">Whisper n\'a pas pu être essayé.</string>
     <string name="quick_skipped">Pas essayé : le modèle précédent calculait encore.</string>
     <string name="quick_failed">L\'essai a échoué.</string>
     <string name="quick_interrupted">Lecture interrompue (l\'application est passée en arrière-plan) : elle n\'est pas notée. Recommencez quand vous voulez.</string>

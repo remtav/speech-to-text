@@ -26,11 +26,12 @@ import kotlin.math.roundToInt
 /**
  * « Test rapide (1 minute) » (issue #36, recentred on the phone).
  *
- * **Hidden since issue #72** ([REACHABLE] is false): no screen opens it any more. With one phone model (Whisper) it
- * has nothing to compare; Rémi wants it kept, to compare local Whisper and remote Whisper one day (a later issue:
- * it will need a consent, since it is built to send nothing off the phone, and new verdicts, which are still the
- * two-phone-model ones). Everything stays and compiles: this screen, [QuickTestModel], [QuickTestAdvice],
- * `reading/QuickReading.kt`, the `quick_*` strings and their tests. Draws [QuickTestModel].
+ * **Since issue #72 it is a simple check of Whisper**, the only phone model: it reads a short text and says « Whisper
+ * vous a compris à X % ». It is opened from the settings only, no longer from the installation
+ * ([OFFERED_AT_SETUP] is false: with one model there is nothing to choose between). The two-model code stays
+ * ([QuickTestModel], [QuickTestAdvice], their verdict strings and tests, `reading/QuickReading.kt`) for the day a
+ * second model comes back, or to compare local Whisper and remote Whisper (a later issue: it will need a consent,
+ * since this test is built to send nothing off the phone, and new verdicts). Draws [QuickTestModel].
  */
 class QuickTestActivity : AppCompatActivity() {
     private lateinit var app: DicteeApp
@@ -237,8 +238,8 @@ class QuickTestActivity : AppCompatActivity() {
     private fun seconds(s: Double) = String.format(Locale.CANADA_FRENCH, "%.1f", s)
 
     companion object {
-        /** Issue #72: whether the installation and the settings offer the test. Set to true when it is wanted again. */
-        const val REACHABLE = false
+        /** Issue #72: whether the installation offers the test (the settings always do). */
+        const val OFFERED_AT_SETUP = false
 
         const val TAG_TEXT = "quick_text"
         const val TAG_PRIVATE = "quick_private"

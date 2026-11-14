@@ -330,8 +330,8 @@ class SetupActivity : AppCompatActivity() {
         // Issue #22: only the models offered for the chosen languages (Parakeet is in « Avancé » of the settings).
         val modelIsNext = currentStep() == SetupStep.GET_MODEL
         for (spec in ModelCatalog.offered(chosen)) renderModel(spec, chosen, recommendation, modelIsNext && spec == recommendation.model)
-        // Issue #72: the quick test is hidden (see QuickTestActivity.REACHABLE); its code stays.
-        if (QuickTestActivity.REACHABLE) renderQuickTest(chosen)
+        // Issue #72: the quick test is not offered at installation (see QuickTestActivity.OFFERED_AT_SETUP).
+        if (QuickTestActivity.OFFERED_AT_SETUP) renderQuickTest(chosen)
     }
 
     /**

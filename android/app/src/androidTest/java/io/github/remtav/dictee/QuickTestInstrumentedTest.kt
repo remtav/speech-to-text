@@ -27,6 +27,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
+import org.junit.Ignore
 import org.junit.Test
 import org.junit.runner.RunWith
 import java.util.Collections
@@ -149,6 +150,7 @@ class QuickTestInstrumentedTest {
         for (word in ModelPlainNames.technicalWords) assertFalse("« $word » on the quick test:\n$text", text.contains(word, ignoreCase = true))
     }
 
+    @Ignore("Issue #72: the two-model path is dormant (no light model is offered any more); kept for the day a second model comes back")
     @Test
     fun lightGoodEnoughAndBestSlowRecommendsTheLightOneAndTheButtonAppliesIt() {
         app.settings.languages = setOf(DictationLanguage.ENGLISH)
@@ -175,6 +177,7 @@ class QuickTestInstrumentedTest {
         assertEquals(setOf(best.id, light.id), models.used.toSet())
     }
 
+    @Ignore("Issue #72: the two-model path is dormant (no light model is offered any more); kept for the day a second model comes back")
     @Test
     fun lightMissingWordsKeepsTheBestOne() {
         app.settings.languages = setOf(DictationLanguage.FRENCH_FRANCE)
@@ -192,6 +195,7 @@ class QuickTestInstrumentedTest {
     }
 
     /** A model over the budget is « trop lent », and the test ends without waiting for it. */
+    @Ignore("Issue #72: the two-model path is dormant (no light model is offered any more); kept for the day a second model comes back")
     @Test
     fun aModelOverTheBudgetIsTooSlowAndTheTestEndsAnyway() {
         app.settings.languages = setOf(DictationLanguage.ENGLISH)
@@ -209,9 +213,9 @@ class QuickTestInstrumentedTest {
         }
     }
 
-    /** Québec French: one model makes sense, the test simply gives its score. */
+    /** Issue #72: one model, so the test simply gives Whisper's score, whatever the language. */
     @Test
-    fun quebecFrenchGivesASingleScore() {
+    fun theTestGivesWhisperSingleScore() {
         app.settings.languages = setOf(DictationLanguage.FRENCH_QUEBEC)
         val models = Models(text = { _, ref -> ref }, delayMillis = { 50 })
         models.reference = reference(DictationLanguage.FRENCH_QUEBEC)
@@ -226,6 +230,7 @@ class QuickTestInstrumentedTest {
     }
 
     /** The light model not on the phone: the test scores the best one and offers the download (outside the minute). */
+    @Ignore("Issue #72: the two-model path is dormant (no light model is offered any more); kept for the day a second model comes back")
     @Test
     fun aMissingModelIsOfferedForDownload() {
         app.settings.languages = setOf(DictationLanguage.SPANISH)
@@ -268,6 +273,14 @@ class QuickTestInstrumentedTest {
         }
     }
 
+    /** Issue #72: the settings offer the test as a simple check of Whisper. */
+    @Test
+    fun theSettingsOfferTheTest() {
+        ActivityScenario.launch(io.github.remtav.dictee.ui.SettingsActivity::class.java).use { s ->
+            assertTrue(s.has(io.github.remtav.dictee.ui.SettingsActivity.QUICK_TEST_TAG))
+        }
+    }
+
     /** Issue #72: the installation no longer offers the test, whatever the languages or the models on the phone. */
     @Test
     fun theSetupScreenNoLongerOffersTheTest() {
@@ -278,6 +291,7 @@ class QuickTestInstrumentedTest {
     }
 
     /** Review of #65: the light model (tried first) over the budget: the best one is not tried, the test ends anyway. */
+    @Ignore("Issue #72: the two-model path is dormant (no light model is offered any more); kept for the day a second model comes back")
     @Test
     fun theLightModelOverTheBudgetEndsTheTestWithAnHonestText() {
         app.settings.languages = setOf(DictationLanguage.ENGLISH)

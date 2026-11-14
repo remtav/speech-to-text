@@ -235,7 +235,7 @@ Configuration (accueil et étapes ; « Vos langues » ; modèle recommandé avec
 |---|---|
 | ![Modèles et performances, clair](docs/screenshots/settings-models-light.png) | ![Modèles et performances, sombre](docs/screenshots/settings-models-dark.png) |
 
-(Le test rapide, masqué depuis l'issue #72, n'est plus capturé.)
+(Le test rapide n'est plus capturé depuis l'issue #72.)
 
 | Réglages | Comparaison des modèles | Diagnostic serveur |
 |---|---|---|
@@ -269,14 +269,14 @@ Configuration (accueil et étapes ; « Vos langues » ; modèle recommandé avec
    (icône clavier de la barre de navigation, ou touche micro de votre clavier
    habituel) et appuyer sur le micro. Appuyer de nouveau pour arrêter.
 
-## Test rapide (1 minute) — masqué
+## Test rapide (1 minute) — simple vérification de Whisper
 
-**Masqué depuis l'issue #72** : avec un seul modèle du téléphone (Whisper), il n'a rien à comparer, et
-aucun écran ne l'ouvre plus (ni l'installation ni les Réglages ; `QuickTestActivity.REACHABLE`). Son code, ses
-chaînes et ses tests restent, pour comparer un jour Whisper local et Whisper distant (autre issue : il faudra un
-consentement, car il est conçu pour ne rien envoyer hors du téléphone, et de nouveaux verdicts). Ce qui suit décrit
-le test tel qu'il a été conçu (issue #36, recentrée sur le téléphone le 2026-11-13), pour le français (Québec ou
-France), l'anglais, l'espagnol et le portugais :
+**Depuis l'issue #72**, avec un seul modèle du téléphone (Whisper), le test n'a plus rien à comparer : il n'est plus
+offert à l'installation, et il reste dans les Réglages comme **simple vérification** (« Whisper vous a compris à X % »).
+Le code des deux modèles (verdicts, tests) est gardé, pour comparer un jour Whisper local et Whisper distant (autre
+issue : il faudra un consentement, car le test est conçu pour ne rien envoyer hors du téléphone, et de nouveaux
+verdicts). La suite décrit le test tel qu'il a été conçu (issue #36, recentrée sur le téléphone le 2026-11-13), pour le
+français (Québec ou France), l'anglais, l'espagnol et le portugais :
 
 1. Lire à voix haute un texte d'une quarantaine de mots dans la première de vos langues
    parmi ces cinq (25 s au plus).

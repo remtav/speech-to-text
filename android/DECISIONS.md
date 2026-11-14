@@ -4494,13 +4494,13 @@ Décisions de Rémi, 2026-11-14 (issue #72, mise à jour du jour comprise).
   Whisper n'est pas téléchargé, l'écran principal le propose et la dictée répond « Whisper n'est pas installé »
   sans planter. Le dépôt Hugging Face de Lite-Whisper et `android/tools/` ne sont pas touchés. Le mot
   « expérimental » a disparu des écrans (section « Autre modèle du téléphone » dans « Avancé »).
-- **Test rapide masqué à l'installation, code conservé.** Il a été conçu (#36) pour choisir entre deux modèles du
-  téléphone ; sans second modèle il n'a rien à comparer. `QuickTestActivity.REACHABLE = false` : ni l'installation ni
-  les Réglages ne l'ouvrent. `QuickTestActivity`, `QuickTestModel`, `QuickTestAdvice`, `QuickReading`, les chaînes
-  `quick_*` et leurs tests restent. `PhoneModelChoice.light` reste (toujours nul) pour que le code compile. Les
-  chaînes du test disent « Whisper » au lieu de « le modèle plus précis » ; ses verdicts ne sont pas réécrits (ils
-  parlent encore d'un « plus léger »). À reprendre quand le test resservira : Rémi prévoit de comparer Whisper local
-  et Whisper distant, ce qui demandera un consentement (le test est construit pour ne rien envoyer hors du
+- **Test rapide : plus offert à l'installation, gardé dans les Réglages comme simple vérification.** Il a été conçu
+  (#36) pour choisir entre deux modèles du téléphone ; sans second modèle il n'a rien à comparer. Décision de Rémi
+  (2026-11-14, après la PR) : le bouton des Réglages reste, comme vérification du score de Whisper (« Whisper vous a
+  compris à X % », chemin à un seul modèle déjà dans le code). `QuickTestActivity.OFFERED_AT_SETUP = false`. Le code des
+  deux modèles (`QuickTestAdvice`, verdicts `quick_*`, `PhoneModelChoice.light`, toujours nul) et ses tests restent ;
+  les tests instrumentés du chemin à deux modèles sont `@Ignore`. À reprendre quand le test resservira : comparer
+  Whisper local et Whisper distant demandera un consentement (le test est construit pour ne rien envoyer hors du
   téléphone) et de nouveaux verdicts. #66 reste ouverte, moins urgente.
 
 **Mise à jour d'une installation existante.** Lite-Whisper actif → Whisper (avis une fois, suppression des fichiers
@@ -4510,7 +4510,11 @@ comptent pas) ; les fichiers d'un modèle caché encore sur le téléphone (Lite
 Qwen3-ASR, Whisper québécois) sont listés avec un bouton « Supprimer » dans « Avancé » → « Fichiers d'anciens
 modèles » ; un avis en attente qui nomme Parakeet est effacé au démarrage (il est permis de nouveau).
 
-**Limite à signaler.** Au clavier, sans serveur configuré et sans Parakeet actif, le menu du bouton de modèle n'a plus
-qu'une entrée (Whisper). Le bouton est gardé (décision de l'issue : ne pas le retirer d'office).
+**Bouton de modèle du clavier.** Sans serveur configuré et sans Parakeet actif, son menu n'aurait qu'une entrée
+(Whisper) : sur décision de Rémi (2026-11-14, après la PR), le bouton est alors caché ; il revient dès qu'un serveur
+est configuré ou que Parakeet est actif.
+
+**Parakeet actif.** Pas d'avis pour les personnes qui l'utilisent déjà : décision de Rémi, personne ne se sert encore
+de l'application.
 
 **À vérifier sur un vrai téléphone** : rien de ce lot n'a tourné sur un appareil.
