@@ -85,7 +85,7 @@ class PlainWordsTest {
 
     @Test
     fun noModelNameInTheRecommendationReasons() {
-        for (c in listOf(setOf(DictationLanguage.FRENCH_QUEBEC), setOf(DictationLanguage.ENGLISH), setOf(DictationLanguage.MANDARIN))) {
+        for (c in listOf(setOf(DictationLanguage.FRENCH_QUEBEC), setOf(DictationLanguage.ENGLISH), setOf(DictationLanguage.PORTUGUESE))) {
             val reason = ModelRecommendations.recommend(c).reason
             for (word in ModelPlainNames.technicalWords) assertFalse("$reason : $word", reason.contains(word, ignoreCase = true))
         }

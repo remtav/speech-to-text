@@ -76,10 +76,9 @@ class KeyboardLanguagesTest {
         assertEquals(setOf(KeyLanguage.FRENCH), KeyLanguage.forDictation(setOf(DictationLanguage.FRENCH_QUEBEC)))
         assertEquals(
             setOf(KeyLanguage.FRENCH, KeyLanguage.PORTUGUESE),
-            KeyLanguage.forDictation(setOf(DictationLanguage.FRENCH_FRANCE, DictationLanguage.PORTUGUESE, DictationLanguage.HINDI)),
+            KeyLanguage.forDictation(setOf(DictationLanguage.FRENCH_FRANCE, DictationLanguage.PORTUGUESE)),
         )
         // None of the four: the keyboard stays complete rather than empty.
-        assertEquals(KeyLanguage.entries.toSet(), KeyLanguage.forDictation(setOf(DictationLanguage.MANDARIN)))
         assertEquals(KeyLanguage.entries.toSet(), KeyLanguage.forDictation(emptySet()))
     }
 

@@ -4465,3 +4465,42 @@ Extraits de référence français : aucun ne touche le plafond à 1 000, texte i
 #40) est refait avec le silence et finit correctement (« La sorcière décide de rentrer au palais pour protéger les
 rebelles. »), au lieu de passer par le filtre. `WhisperRepetitionHostTest.automaticModeOfTheEngine` accepte donc l'un ou
 l'autre. Pas mesuré sur le téléphone.
+
+## Cinq langues seulement (#60, #72 partie 1)
+
+**Décision de Rémi (2026-11-13 et 2026-11-14).** L'application ne propose plus que cinq cases à « Vos langues » :
+Français (Québec), Français (France), Anglais, Espagnol, Portugais. Mandarin, hindi, arabe, bengali, russe et ourdou sont
+retirés de `DictationLanguage`, avec leurs lignes dans `parakeetLanguages`, `qwen3Languages` et `qwen3Names` (la couverture
+de Whisper suit l'énumération). Cette décision **remplace celle de #15** (« les dix langues les plus parlées »). L'arabe n'a pas
+été retenu ; on n'a pas vérifié le rang des langues au recensement. Les deux cases de français restent (typographie de France,
+test de lecture québécois).
+
+**Pas de case « Autre langue »** (décision révisée de #60, qui remplace la proposition du premier commentaire). Pour une autre
+langue, ni la qualité de la transcription ni la vitesse ne sont mesurées, et il n'y aurait ni commandes vocales, ni touches
+(#42), ni typographie : la case promettrait plus que l'application ne tient. La promesse est courte : « Kalmia Blabla comprend
+le français, l'anglais, l'espagnol et le portugais. » (étape « Vos langues » et README ; le texte d'accueil et la fiche de la
+boutique ne sont pas touchés ici.)
+
+**Mise à jour d'une installation existante.** `AppSettings.migrateLanguages`, appelée au démarrage avant `migrateModels`,
+relit le choix enregistré sans le lisser : si un nom n'existe plus, le choix est réécrit (langues restantes, ou « Français
+(Québec) » s'il n'en reste aucune, ce que fait `DictationLanguages.parse`) et le drapeau `languagesNotice` est levé. Une
+installation neuve (rien d'enregistré) et un choix déjà propre ne changent rien et ne lèvent rien. Le drapeau n'est levé que
+par cette migration, qui ne trouve plus rien au démarrage suivant : l'avis « Kalmia Blabla se concentre maintenant sur quatre
+langues. Vérifiez vos langues. » ne revient donc pas ; il reste sur l'écran principal jusqu'au « OK ». Conséquence assumée :
+une personne qui avait coché anglais et mandarin se retrouve avec l'anglais seul, donc **forcé** (avant : détection
+automatique). L'avis lui demande de vérifier ; on ne lui ajoute pas de langue à sa place.
+
+**Limite connue : la détection n'est pas restreinte aux langues cochées.** Quand plusieurs langues sont cochées (ou
+pour toute personne qui coche français et anglais, par exemple), le modèle détecte la langue lui-même parmi **toutes** celles
+qu'il connaît (Whisper en connaît une centaine), pas seulement les cinq. Il peut donc, rarement, écrire dans une langue non prise en
+charge. Restreindre la détection n'est pas simple avec sherpa-onnx 2.0.1 : `OfflineWhisperModelConfig.language` est une seule
+chaîne (un code, ou vide pour la détection automatique), pas une liste ; on ne peut que forcer une langue ou laisser tout
+détecter. Contourner demanderait de détecter d'abord (ou de décoder plusieurs fois) puis de comparer : hors de cette issue,
+qui ne touche pas à la détection. À reprendre si des personnes signalent des textes dans une autre langue.
+
+**Hors portée, inchangé.** `app/languages.py` (serveur) et `DictationLanguages.remoteCodes` (le serveur n'accepte que `fr`
+et `en`).
+
+**Non vérifié ici.** Les tests unitaires (JVM) passent. Aucun émulateur n'était disponible : les tests instrumentés
+(`SetupLanguageTest`, etc.) ont été mis à jour et compilent, mais n'ont pas tourné (ils sont déjà en échec sur `main`, #69), et
+les captures `ScreenshotTest` n'ont pas été produites.

@@ -21,11 +21,9 @@ object DictationLanguages {
      * Language names Qwen3-ASR takes in its prompt ("language French"), for the
      * codes of [DictationLanguage] it covers (Qwen3-ASR model card; sherpa-onnx
      * 2.0.1 passes them through `OfflineStream.setOption("language", …)`).
-     * Bengali and Urdu are not Qwen3-ASR languages: no forcing.
      */
     private val qwen3Names = mapOf(
-        "fr" to "French", "en" to "English", "zh" to "Chinese", "hi" to "Hindi",
-        "es" to "Spanish", "ar" to "Arabic", "pt" to "Portuguese", "ru" to "Russian",
+        "fr" to "French", "en" to "English", "es" to "Spanish", "pt" to "Portuguese",
     )
 
     /**
@@ -51,6 +49,19 @@ object DictationLanguages {
     fun parse(names: Collection<String>?): Set<DictationLanguage> {
         val found = DictationLanguage.entries.filter { l -> names?.contains(l.name) == true }
         return if (found.isEmpty()) setOf(DictationLanguage.default) else found.toSet()
+    }
+
+    /**
+     * Issue #60: a stored choice that names a language since removed. Null when nothing is stored (a fresh
+     * install) or when the choice is already clean; otherwise the clean choice that replaces it (the
+     * remaining languages, or [DictationLanguage.default] when none remain). The caller stores it and
+     * tells the person once.
+     */
+    fun cleaned(stored: Collection<String>?): Set<DictationLanguage>? {
+        if (stored == null) return null
+        // Only an unknown name changes the choice: an empty stored set already read as the default.
+        if (stored.all { n -> DictationLanguage.entries.any { it.name == n } }) return null
+        return parse(stored)
     }
 
     /** Names to store; an empty selection is stored as the default. */

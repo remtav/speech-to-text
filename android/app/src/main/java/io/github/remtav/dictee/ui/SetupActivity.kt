@@ -50,6 +50,7 @@ class SetupActivity : AppCompatActivity() {
     private lateinit var stepsBox: LinearLayout
     private lateinit var modelsBox: LinearLayout
     private lateinit var languagesBox: LinearLayout
+    private lateinit var languagesNoticeBox: LinearLayout
     private lateinit var participationBox: LinearLayout
     private lateinit var readyBox: LinearLayout
     /** Whether the « C'est prêt » card is drawn now; null before the first draw. */
@@ -92,8 +93,12 @@ class SetupActivity : AppCompatActivity() {
             startActivity(Intent(this@SetupActivity, HowToActivity::class.java))
         }.tag = HOWTO_BUTTON_TAG
 
+        // Issue #60: the one-time notice sits right above the languages it is about.
+        languagesNoticeBox = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        col.addView(languagesNoticeBox)
         col.heading(getString(R.string.setup_step_languages))
         col.body(getString(R.string.setup_languages_help), small = true)
+        col.body(getString(R.string.setup_languages_supported), small = true)
         languagesBox = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         col.addView(languagesBox)
 
@@ -129,6 +134,7 @@ class SetupActivity : AppCompatActivity() {
         Downloads.addListener(refresh)
         // Redrawn on each resume: the languages, or the server, may have been changed in the settings.
         languagesBox.renderLanguageChoices(app.settings) { renderModels(); renderParticipation() }
+        renderLanguagesNotice()
         renderSteps()
         renderModels()
         renderParticipation()
@@ -338,6 +344,22 @@ class SetupActivity : AppCompatActivity() {
     }
 
     /**
+     * Issue #60: the one-time notice after an update dropped a language from the stored choice
+     * ([AppSettings.migrateLanguages]). Closing it clears the flag; nothing raises it again.
+     */
+    private fun renderLanguagesNotice() {
+        languagesNoticeBox.removeAllViews()
+        if (!app.settings.languagesNotice) return
+        val card = languagesNoticeBox.card()
+        card.tag = LANGUAGES_NOTICE_TAG
+        card.body(getString(R.string.languages_notice))
+        card.button(getString(R.string.model_notice_ok), outlined = true) {
+            app.settings.languagesNotice = false
+            renderLanguagesNotice()
+        }.tag = LANGUAGES_NOTICE_OK_TAG
+    }
+
+    /**
      * The one-time notice after the active model was replaced ([DicteeApp.migrateModels]): an invitation to
      * download Whisper turbo when it is missing, and a button to delete a hidden model's files. Nothing is
      * deleted without that click; closing the notice keeps the files.
@@ -466,6 +488,8 @@ class SetupActivity : AppCompatActivity() {
         const val RETIRED_NOTICE_TAG = "retired_model_notice"
         const val RETIRED_DOWNLOAD_TAG = "retired_model_download"
         const val RETIRED_DELETE_TAG = "retired_model_delete"
+        const val LANGUAGES_NOTICE_TAG = "languages_notice"
+        const val LANGUAGES_NOTICE_OK_TAG = "languages_notice_ok"
         const val RETIRED_OK_TAG = "retired_model_ok"
         const val INTRO_TAG = "setup_intro"
         const val STEPS_TAG = "setup_steps"
