@@ -4420,3 +4420,24 @@ un serveur. Placée en petit à la fin de l'écran, même balise `PRIVACY_TAG`.
 - Fin de configuration : « C'est prêt » apparaît, rien ne s'ouvre, le bouton ouvre bien le tutoriel.
 - **Essai « dicter un deux-points » avec une personne qui ne connaît pas l'application** (critère
   d'acceptation de #56 **non coché** : à faire par un humain).
+
+## Fin de segment coupée par le VAD (sherpa-onnx 2.0.1)
+
+**Constat** (sources `voice-activity-detector.cc` et `silero-vad-model.cc` au tag `v2.0.1`, vrai modèle Silero rejoué
+sur l'hôte) : quand le VAD clôt un énoncé, il finit le segment à `Tail - min_silence` et **jette** les `min_silence`
+derniers échantillons (ni dans ce segment ni dans le suivant). C'est juste seulement si la pause a commencé il y a
+exactement `min_silence`. Or le début de pause (`temp_end_`) n'est effacé que par une fenêtre au-dessus du seuil (0,5),
+alors qu'une fenêtre entre le seuil bas (0,35) et 0,5 compte encore comme de la parole : après un court blanc entre deux
+mots, une fin dite plus doucement garde l'ancien début de pause, l'énoncé se clôt à la première fenêtre sous 0,35 et les
+0,5 s finales de parole disparaissent. Mesure : la fin de `en1.wav` atténuée (dernière 1,2 s × 0,15) perd 0,37 s que le
+VAD jugeait lui-même parole ; « silence » perdu de 0,36 s sur `fr1.wav` (× 0,04), 0,25 à 0,47 s sur `frqc5.wav`. Les clips
+de référence non modifiés ne déclenchent pas le cas, ce qui explique l'enquête sans résultat plus haut (« aucune correction
+sûre trouvée »).
+
+**Correction** : `audio/SegmentTail` (dans `Vad.kt`), utilisé par `SileroVad` : il garde les 2,5 s d'audio les plus
+récentes et rend à chaque segment les échantillons qui suivent sa fin, au plus la pause réglée (`minSilenceSeconds`) et au
+plus ce qui a été lu. Un segment ne commence jamais avant la fin du précédent rendu : aucun audio en double. Avec la
+correction, les cas ci-dessus ne perdent plus rien (`fr1`, `frqc5` × 0,15 et × 0,08), ou 0,5 s de moins (`en1`). Ce qui
+reste perdu est de la voix que Silero juge silence. Effet : chaque segment local finit par au plus 0,5 s de la pause
+réelle (bruit de la pièce), comme le texte provisoire le faisait déjà. Tests : `SegmentTailTest` (JVM, sans bibliothèque
+native).
