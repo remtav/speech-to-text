@@ -11,6 +11,8 @@ data class Transcription(
     val audioSeconds: Float = 0f,
     /** What the Whisper repetition filter did with this segment (issue #49); [RepetitionOutcome.NONE] outside automatic mode. */
     val repetition: RepetitionOutcome = RepetitionOutcome.NONE,
+    /** Whisper ran into sherpa-onnx's token ceiling and was decoded again with silence added ([WhisperTuning.ceilingSilence]). */
+    val ceilingExtended: Boolean = false,
 ) {
     val realTimeFactor: Float
         get() = if (audioSeconds > 0f) decodeMillis / 1000f / audioSeconds else 0f

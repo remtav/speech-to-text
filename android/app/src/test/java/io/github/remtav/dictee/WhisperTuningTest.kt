@@ -75,4 +75,23 @@ class WhisperTuningTest {
         val parakeet = { v: Int -> EngineOptions(whisperTailPaddings = WhisperTuning.tailPaddingsFor(ModelCatalog.parakeet, v)) }
         assertEquals(parakeet(1000), parakeet(300))
     }
+
+    /** sherpa-onnx stops Whisper at 6 tokens per second of the samples given, silently: the end of fast speech was lost. */
+    @Test fun tokenCeilingAndTheSilenceThatRaisesIt() {
+        // 4.26 s, the user's dictation cut at « … on dirait que j » (25 tokens).
+        val n = (4.26f * 16000).toInt()
+        assertEquals(25, WhisperTuning.tokenCeiling(n, 16000))
+        assertTrue(WhisperTuning.atTokenCeiling(25, n, 16000))
+        assertTrue(WhisperTuning.atTokenCeiling(24, n, 16000))
+        assertFalse(WhisperTuning.atTokenCeiling(20, n, 16000))
+        // As much silence as audio: the ceiling doubles (51), the full sentence (39 tokens) fits.
+        val silence = WhisperTuning.ceilingSilence(n, 16000)
+        assertEquals(n, silence)
+        assertEquals(51, WhisperTuning.tokenCeiling(n + silence, 16000))
+        assertFalse(WhisperTuning.atTokenCeiling(39, n + silence, 16000))
+        // Never past the 30 s sherpa-onnx decodes.
+        assertEquals((29.4f * 16000).toInt() - 20 * 16000, WhisperTuning.ceilingSilence(20 * 16000, 16000))
+        assertEquals(0, WhisperTuning.ceilingSilence(30 * 16000, 16000))
+        assertEquals(0, WhisperTuning.tokenCeiling(16000, 0))
+    }
 }

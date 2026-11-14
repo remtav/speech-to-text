@@ -4441,3 +4441,27 @@ correction, les cas ci-dessus ne perdent plus rien (`fr1`, `frqc5` × 0,15 et ×
 reste perdu est de la voix que Silero juge silence. Effet : chaque segment local finit par au plus 0,5 s de la pause
 réelle (bruit de la pièce), comme le texte provisoire le faisait déjà. Tests : `SegmentTailTest` (JVM, sans bibliothèque
 native).
+
+## Fin de phrase coupée par Whisper : plafond de jetons de sherpa-onnx
+
+**Constat** (dictée de l'utilisateur, 5,6 s, Whisper turbo local, coupée « … mais on dirait que j » à chaque fois, même
+après la correction du VAD ci-dessus) : le VAD rend toute la parole (segment 0,84–5,10 s, rien après), Parakeet transcrit la
+phrase entière. C'est Whisper qui s'arrête : sherpa-onnx 2.0.1 (`offline-whisper-greedy-search-decoder.cc`, « assume at
+most 6 tokens per second ») arrête le décodage après `frames / 100 × 6` jetons, frames de l'audio donné, marge de fin
+**non comptée**, sans le signaler. La phrase en demande 39 (9 par seconde, débit normal en français) ; le segment de
+4,26 s en permet 25 : exactement le nombre de jetons rendus, et 28 / 33 pour 4,76 s / 5,62 s. Marge de fin (1 000 ou 300)
+et langue forcée ou non n'y changent rien. La ligne « Plafond » du filtre de #49 voyait ce cas, mais le redécodage à 1 000
+retombe sur le même plafond et la coupe n'a rien à couper.
+
+**Correction** (`SherpaEngine.decode`, `WhisperTuning.atTokenCeiling` / `ceilingSilence`) : un décodage Whisper qui
+atteint le plafond (à un jeton près) est refait avec autant de silence ajouté que d'audio (dans la limite des 30 s de
+sherpa-onnx), ce qui double le plafond. Le second n'est gardé que s'il finit de lui-même sous son propre plafond ; s'il
+l'atteint encore, c'est une boucle (#40) et le premier est gardé comme avant (puis le filtre de #49 en mode Automatique).
+Le redécodage à 1 000 du filtre passe par la même fonction. `Transcription.ceilingExtended` le signale.
+
+Mesures sur l'hôte (paquet Python sherpa-onnx 2.0.1, mêmes modèles, langue `fr`) : la dictée donne la phrase entière à
+1 000 et à 300 (39 jetons, plafond 51 ; 3,2 s au lieu de 2,0 s pour ce segment, seulement quand le plafond est atteint).
+Extraits de référence français : aucun ne touche le plafond à 1 000, texte inchangé ; à 300, `frqc5` (boucle connue de
+#40) est refait avec le silence et finit correctement (« La sorcière décide de rentrer au palais pour protéger les
+rebelles. »), au lieu de passer par le filtre. `WhisperRepetitionHostTest.automaticModeOfTheEngine` accepte donc l'un ou
+l'autre. Pas mesuré sur le téléphone.

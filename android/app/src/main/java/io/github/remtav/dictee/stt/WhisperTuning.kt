@@ -38,6 +38,32 @@ object WhisperTuning {
     fun repetitionFixFor(spec: ModelSpec, auto: Boolean, fix: RepetitionFix): RepetitionFix? =
         if (spec.family == ModelFamily.WHISPER && auto) fix else null
 
+    /**
+     * sherpa-onnx 2.0.1 stops Whisper after this many tokens: 6 per second of the samples given, tail padding
+     * not counted (`offline-whisper-greedy-search-decoder.cc`). Same formula as
+     * [io.github.remtav.dictee.text.WhisperRepetition.tokenCeiling].
+     */
+    fun tokenCeiling(samples: Int, sampleRate: Int): Int =
+        io.github.remtav.dictee.text.WhisperRepetition.tokenCeiling(samples, sampleRate)
+
+    /** The decode stopped at the ceiling (within one token: the frame count of sherpa-onnx can be one lower). */
+    fun atTokenCeiling(tokens: Int, samples: Int, sampleRate: Int): Boolean {
+        val ceiling = tokenCeiling(samples, sampleRate)
+        return ceiling > 0 && tokens >= ceiling - 1
+    }
+
+    /**
+     * Silence (in samples) added after a segment that ran into the token ceiling: as long as the segment, which
+     * doubles the ceiling, within the 30 s sherpa-onnx decodes ([MAX_DECODE_SECONDS]); 0 when there is no room.
+     */
+    fun ceilingSilence(samples: Int, sampleRate: Int): Int {
+        val room = (MAX_DECODE_SECONDS * sampleRate).toInt() - samples
+        return minOf(samples, room).coerceAtLeast(0)
+    }
+
+    /** sherpa-onnx keeps at most 3 000 - 50 frames (`offline-recognizer-whisper-impl.h`), a little margin taken. */
+    const val MAX_DECODE_SECONDS = 29.4f
+
     /** How the Whisper padding is described in the « Copier » report of the comparison screen. */
     fun describe(tailPaddings: Int, fix: RepetitionFix?): String =
         if (fix == null) "silence ajouté Whisper $tailPaddings"
