@@ -68,10 +68,10 @@ class ThemeContrastTest {
         Triple("colorOnSurfaceVariant", "colorSurface", "texte secondaire, étiquettes"),
         Triple("colorOnSurfaceVariant", "colorSurfaceContainer", "état du clavier, texte secondaire dans les cartes"),
         Triple("colorPrimary", "colorSurface", "titres de section, badge « Recommandé », liens"),
-        Triple("colorPrimary", "colorSurfaceContainer", "badge « Recommandé » dans les cartes"),
+        Triple("colorPrimary", "colorSurfaceContainer", "badge « Recommandé » dans les cartes, signe obtenu des exemples de « Comment dicter »"),
         Triple("colorOnPrimary", "colorPrimary", "boutons d'action, micro au repos, coche et interrupteur activés"),
         Triple("colorOnPrimaryContainer", "colorPrimaryContainer", "éléments sélectionnés, interrupteur"),
-        Triple("colorOnSecondaryContainer", "colorSecondaryContainer", "touches du clavier, boutons tonals"),
+        Triple("colorOnSecondaryContainer", "colorSecondaryContainer", "touches du clavier, boutons tonals, commande dite des exemples de « Comment dicter »"),
         Triple("colorOnError", "colorError", "micro à l'écoute (rouge)"),
         Triple("colorError", "colorSurface", "erreur du clavier et des écrans (avec texte et icône)"),
         Triple("colorError", "colorSurfaceContainer", "erreur dans une carte et sur le clavier (avec texte et icône)"),
@@ -115,6 +115,23 @@ class ThemeContrastTest {
         assertTrue("surlignage sans soulignement", code.contains("UnderlineSpan"))
         assertTrue("la couleur d'erreur ne sert pas au surlignage", !code.contains("colorError"))
         assertTrue(Triple("colorOnTertiaryContainer", "colorTertiaryContainer", "") .let { t -> pairs.any { it.first == t.first && it.second == t.second } })
+    }
+
+    @Test
+    fun howToHighlightUsesMeasuredPairsAndNeverTheColourAlone() {
+        // The command and the sign of the first screen of "Comment dicter" (issue #56): measured pairs, plus bold and underline.
+        val src = res.parentFile.resolve("java/io/github/remtav/dictee/ui/HowToStyle.kt").readText()
+        val code = src.replace(Regex("/\\*[\\s\\S]*?\\*/"), "")
+        assertTrue(code.contains("attr.colorSecondaryContainer") && code.contains("attr.colorOnSecondaryContainer"))
+        assertTrue(code.contains("attr.colorPrimary"))
+        assertTrue("mise en évidence sans gras", code.contains("Typeface.BOLD"))
+        assertTrue("commande sans soulignement", code.contains("UnderlineSpan"))
+        assertTrue("la couleur d'erreur ne sert pas à la mise en évidence", !code.contains("colorError"))
+        for ((fg, bg) in listOf(
+            "colorOnSecondaryContainer" to "colorSecondaryContainer",
+            "colorPrimary" to "colorSurface",
+            "colorPrimary" to "colorSurfaceContainer",
+        )) assertTrue("$fg sur $bg n'est pas mesurée", pairs.any { it.first == fg && it.second == bg })
     }
 
     @Test

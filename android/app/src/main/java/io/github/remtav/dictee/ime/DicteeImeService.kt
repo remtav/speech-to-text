@@ -69,6 +69,13 @@ class DicteeImeService : InputMethodService(), DictationListener, EngineManager.
     private var toggleView: ImageButton? = null
     private var letters: LetterKeyboardView? = null
     private var symbolsButton: MaterialButton? = null
+    private var header: View? = null
+    private var pad: NumberPadView? = null
+    private var openKeys: View? = null
+    /** Page the current field asked for (text views or a number pad), from its `inputType`. */
+    private var inputPage: InputPage = InputPage.Text
+    /** Decimal separators to try in the current pad, preferred first (see [typeDecimal]). */
+    private var decimalOrder: List<String> = DecimalSeparator.order(java.util.Locale.getDefault())
 
     private var sink: ImeTextSink? = null
     /** Field the current dictation types into: package + field id. */
@@ -180,13 +187,20 @@ class DicteeImeService : InputMethodService(), DictationListener, EngineManager.
     private fun bindTextKeyboard(v: View) {
         dictationGroup = v.findViewById(R.id.dictation_group)
         textGroup = v.findViewById(R.id.text_group)
+        header = v.findViewById(R.id.header)
+        // Text view -> microphone (the header button) and microphone -> text keys (the labelled button by the mic).
         toggleView = v.findViewById<ImageButton>(R.id.toggle_view).apply {
-            setOnClickListener { haptic(it); setTextKeyboardShown(!app.settings.textKeyboardShown) }
+            setOnClickListener { haptic(it); setTextKeyboardShown(false) }
         }
+        openKeys = v.findViewById<View>(R.id.open_keys).apply {
+            setOnClickListener { haptic(it); setTextKeyboardShown(true) }
+        }
+        bindPad(v.findViewById(R.id.pad))
         micSmall = v.findViewById<MaterialButton>(R.id.mic_small).apply { setOnClickListener { onMicTapped() } }
         val keys = v.findViewById<LetterKeyboardView>(R.id.letters)
         letters = keys
         keys.kind = app.settings.keyboardLayout
+        keys.languages = KeyLanguage.forDictation(app.settings.languages)
         keys.onKeyPressed = { haptic(it) }
         keys.listener = object : LetterKeyboardView.Listener {
             override fun onText(text: String) = typeKey(text)
@@ -197,6 +211,7 @@ class DicteeImeService : InputMethodService(), DictationListener, EngineManager.
                 haptic(it)
                 val k = letters ?: return@setOnClickListener
                 k.symbols = !k.symbols
+                k.moreSymbols = false
                 updateSymbolsButton()
             }
         }
@@ -208,7 +223,8 @@ class DicteeImeService : InputMethodService(), DictationListener, EngineManager.
         }
         v.findViewById<View>(R.id.kb_space).setOnClickListener { haptic(it); typeKey(" ") }
         v.findViewById<View>(R.id.kb_comma).setOnClickListener { haptic(it); typeKey(",") }
-        v.findViewById<View>(R.id.kb_period).setOnClickListener { haptic(it); typeKey(".") }
+        // Long press on the period: the ellipsis. The same long-press window as the keys of the symbols page.
+        v.findViewById<View>(R.id.kb_period).also { keys.installKeyTouch(it, ".") { haptic(it); typeKey(".") } }
         v.findViewById<View>(R.id.kb_enter).setOnClickListener { haptic(it); stopDictationForTyping(); pressEnter() }
         applyView()
     }
@@ -230,16 +246,72 @@ class DicteeImeService : InputMethodService(), DictationListener, EngineManager.
 
     /** Shows the dictation view or the text view, as [textViewShown] says. */
     private fun applyView() {
-        val text = textViewShown()
-        dictationGroup?.visibility = if (text) View.GONE else View.VISIBLE
+        val padPage = inputPage as? InputPage.Pad
+        val text = padPage == null && textViewShown()
+        header?.visibility = if (padPage != null) View.GONE else View.VISIBLE
+        pad?.visibility = if (padPage != null) View.VISIBLE else View.GONE
+        dictationGroup?.visibility = if (text || padPage != null) View.GONE else View.VISIBLE
         textGroup?.visibility = if (text) View.VISIBLE else View.GONE
         toggleView?.apply {
-            // In a password field the microphone is refused: nothing to go back to.
-            visibility = if (passwordField) View.GONE else View.VISIBLE
-            setImageResource(if (text) R.drawable.ic_mic else R.drawable.ic_text_fields)
-            contentDescription = getString(if (text) R.string.cd_to_dictation else R.string.cd_to_keyboard)
+            // Only in the text view, to go back to the microphone; in a password field the microphone is refused.
+            visibility = if (text && !passwordField) View.VISIBLE else View.GONE
+            contentDescription = getString(R.string.cd_to_dictation)
         }
         updateSymbolsButton()
+    }
+
+    /** The number pad (issue #42): digits go to the field, Enter acts as in the other views. */
+    @SuppressLint("ClickableViewAccessibility")
+    private fun bindPad(p: NumberPadView) {
+        pad = p
+        p.onKeyPressed = { haptic(it) }
+        p.backspaceTouchListener = RepeatListener { deleteBackward() }
+        p.listener = object : NumberPadView.Listener {
+            override fun onText(text: String) = typeText(text)
+            override fun onDecimal() = typeDecimal()
+            override fun onEnter() = pressEnter()
+            override fun onSwitch() {
+                if (!switchToPreviousInputMethod()) {
+                    getSystemService(InputMethodManager::class.java).showInputMethodPicker()
+                }
+            }
+        }
+        // A pad built after the field started (first input of the service, theme change rebuilding the view)
+        // must show the keys the current field asked for, not wait for the next onStartInput.
+        applyPadPage()
+    }
+
+    /** Gives the pad the keys and the decimal label of the current field, when it is a digit field. */
+    private fun applyPadPage() {
+        val p = inputPage as? InputPage.Pad ?: return
+        pad?.decimalLabel = decimalOrder.first()
+        pad?.page = p
+    }
+
+    /**
+     * Types the decimal separator the field accepts. A field filters what it takes and many accept only
+     * the point, so the phone's separator is tried first and, when the field leaves the text unchanged,
+     * the other one; the key then shows the one that worked. Nothing is retried when the field already
+     * holds a separator: that refusal is the field's own rule.
+     */
+    private fun typeDecimal() {
+        val ic = currentInputConnection ?: return
+        // A numeric password is never read back: the preferred separator is typed as is.
+        if (passwordField) { ic.commitText(decimalOrder.first(), 1); return }
+        val around = (ic.getTextBeforeCursor(64, 0)?.toString() ?: "") + (ic.getTextAfterCursor(64, 0)?.toString() ?: "")
+        val hadSeparator = '.' in around || ',' in around
+        for (sep in decimalOrder) {
+            val before = ic.getTextBeforeCursor(64, 0)?.toString() ?: ""
+            ic.commitText(sep, 1)
+            // Accepted only if the text before the cursor grew by exactly this separator: a field already
+            // ending with it ("12.") that refuses a second one leaves the text unchanged.
+            if ((ic.getTextBeforeCursor(64, 0)?.toString() ?: "") == before + sep) {
+                if (sep != decimalOrder.first()) decimalOrder = decimalOrder.reversed()
+                pad?.decimalLabel = sep
+                return
+            }
+            if (hadSeparator) return
+        }
     }
 
     /** What was already said is inserted first, so the typed character lands after it. */
@@ -283,9 +355,18 @@ class DicteeImeService : InputMethodService(), DictationListener, EngineManager.
             return
         }
         val field = fieldKey(attribute!!)
+        val sameField = field == currentField
         currentField = field
         passwordField = isPassword(attribute)
-        letters?.apply { kind = app.settings.keyboardLayout; reset() }
+        inputPage = InputPages.forInputType(attribute.inputType)
+        // The separator learned in this field stays through a restart of the same field (rotation).
+        if (!sameField) decimalOrder = DecimalSeparator.order(java.util.Locale.getDefault())
+        applyPadPage()
+        letters?.apply {
+            kind = app.settings.keyboardLayout
+            languages = KeyLanguage.forDictation(app.settings.languages)
+            reset()
+        }
         applyView()
         currentInputConnection?.let { sink = ImeTextSink(it) } ?: run { sink = null }
         if (controller.isActive && !restarting && !isSameFieldAfterRotation(attribute, field)) {
@@ -321,7 +402,7 @@ class DicteeImeService : InputMethodService(), DictationListener, EngineManager.
         if (passwordField && controller.isActive) controller.cancel()
         // Preload the model so the first tap is fast.
         val spec = app.dictationSpec()
-        if (!passwordField && !app.benchmarkRunning && app.isInstalled(spec)) {
+        if (!passwordField && inputPage is InputPage.Text && !app.benchmarkRunning && app.isInstalled(spec)) {
             app.engines.factory = app.engineFactory()
             app.engines.load(spec, app.engineOptions(spec))
         }

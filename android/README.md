@@ -306,6 +306,16 @@ un verdict ».
   modèles y sont nommés par leur effet (« Précis », « Léger » ; issue #37).
 - Touches : clavier précédent, `,` `.` espace `?` `!`, effacer (maintenir pour
   répéter), entrée.
+- **Clavier à touches** : le bouton « Clavier à touches », à côté du micro, ouvre
+  de vraies touches (QWERTY, ou AZERTY si « Français (France) » est choisi à
+  l'installation ; modifiable dans les Réglages). Appui long sur une touche :
+  accents et ponctuation des langues choisies (français, anglais, espagnol,
+  portugais : `é ñ ã ç`, `¿ ¡`, `« » ’ …`), deuxième page de symboles
+  (`[ ] { } # + = _ \ | ~ € £`). Le clavier garde la dernière vue utilisée d'un
+  champ à l'autre.
+- **Champs de chiffres** (nombre, montant, téléphone, date, heure, code) : le
+  clavier ouvre directement un pavé numérique aux grandes touches, avec
+  seulement les signes que le champ accepte. Pas de micro sur ce pavé.
 - Commandes vocales : voir « Dicter la ponctuation » ci-dessous.
 - Désactivé dans les champs de mot de passe.
 
@@ -337,8 +347,12 @@ diverger du comportement.
 ![Comment dicter, clair](docs/screenshots/howto-light.png)
 ![Comment dicter, sombre](docs/screenshots/howto-dark.png)
 
-L'écran « Comment dicter » s'ouvre à la fin de la configuration ; on le rouvre
-depuis l'écran principal et depuis le bouton d'aide du clavier.
+L'écran « Comment dicter » ne s'ouvre jamais tout seul : à la fin de la configuration,
+l'écran d'installation dit « C'est prêt » et propose « Aller plus loin : dicter la
+ponctuation ». On l'ouvre aussi depuis le bouton « Comment dicter » de l'écran principal
+et depuis le bouton d'aide du clavier. Le premier écran donne la règle en une phrase,
+trois exemples (la commande et le signe obtenu sont mis en évidence) et la zone d'essai ;
+les autres commandes et leurs variantes sont sous « Toutes les commandes », fermé au départ.
 
 - **Peu de faux positifs.** Une formulation n'est une commande que si les mots
   autour n'en font pas du texte ordinaire : « j'ai marqué deux points » ou

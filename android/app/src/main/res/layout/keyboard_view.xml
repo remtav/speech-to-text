@@ -12,6 +12,7 @@
     android:paddingBottom="8dp">
 
     <LinearLayout
+        android:id="@+id/header"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:gravity="center_vertical"
@@ -65,8 +66,8 @@
             android:layout_width="48dp"
             android:layout_height="48dp"
             android:background="?attr/selectableItemBackgroundBorderless"
-            android:contentDescription="@string/cd_to_keyboard"
-            android:src="@drawable/ic_text_fields" />
+            android:contentDescription="@string/cd_to_dictation"
+            android:src="@drawable/ic_mic" />
 
         <ImageButton
             android:id="@+id/help"
@@ -99,16 +100,54 @@
             android:layout_marginTop="6dp"
             android:layout_marginEnd="24dp" />
 
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/mic"
-            style="@style/Widget.Dictee.Button.Mic"
-            android:layout_width="96dp"
-            android:layout_height="96dp"
-            android:layout_gravity="center_horizontal"
+        <!-- The microphone stays centred; the labelled button to the text keys sits beside it (issue #54). -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
             android:layout_marginTop="8dp"
             android:layout_marginBottom="8dp"
-            android:contentDescription="@string/cd_start"
-            app:icon="@drawable/ic_mic" />
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <View
+                android:layout_width="0dp"
+                android:layout_height="1dp"
+                android:layout_weight="1" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/mic"
+                style="@style/Widget.Dictee.Button.Mic"
+                android:layout_width="96dp"
+                android:layout_height="96dp"
+                android:contentDescription="@string/cd_start"
+                app:icon="@drawable/ic_mic" />
+
+            <FrameLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1">
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/open_keys"
+                    style="@style/Widget.Material3.Button.TonalButton"
+                    android:layout_width="match_parent"
+                    android:layout_height="64dp"
+                    android:layout_gravity="center"
+                    android:layout_marginStart="8dp"
+                    android:insetTop="0dp"
+                    android:insetBottom="0dp"
+                    android:minWidth="0dp"
+                    android:paddingStart="4dp"
+                    android:paddingEnd="4dp"
+                    android:contentDescription="@string/cd_to_keyboard"
+                    android:maxLines="2"
+                    android:text="@string/keys_open"
+                    android:textAppearance="@style/TextAppearance.Dictee.Label"
+                    app:icon="@drawable/ic_keyboard"
+                    app:iconGravity="top"
+                    app:iconPadding="0dp" />
+            </FrameLayout>
+        </LinearLayout>
 
         <LinearLayout
             android:layout_width="match_parent"
@@ -192,7 +231,9 @@
                 android:id="@+id/kb_symbols"
                 style="@style/KeyButton"
                 android:contentDescription="@string/cd_symbols"
-                android:text="123" />
+                android:maxLines="1"
+                android:text="123"
+                android:textSize="18sp" />
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/kb_comma"
@@ -228,4 +269,11 @@
                 app:icon="@drawable/ic_enter" />
         </LinearLayout>
     </LinearLayout>
+
+    <!-- Digit fields (issue #42): the pad opens directly, with no header and no microphone. -->
+    <io.github.remtav.dictee.ime.NumberPadView
+        android:id="@+id/pad"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:visibility="gone" />
 </LinearLayout>

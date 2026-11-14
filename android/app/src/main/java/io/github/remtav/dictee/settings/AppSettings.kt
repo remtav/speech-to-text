@@ -2,6 +2,7 @@ package io.github.remtav.dictee.settings
 
 import android.content.Context
 import android.content.SharedPreferences
+import io.github.remtav.dictee.ime.LayoutDefault
 import io.github.remtav.dictee.ime.LayoutKind
 import io.github.remtav.dictee.reading.Declaration
 import io.github.remtav.dictee.reading.Participation
@@ -47,6 +48,16 @@ enum class ThemeMode(val label: String) {
  */
 class AppSettings(context: Context, private val defaultServerUrl: String = io.github.remtav.dictee.BuildConfig.DEFAULT_SERVER_URL) {
     val prefs: SharedPreferences = context.getSharedPreferences("dictee", Context.MODE_PRIVATE)
+
+    init {
+        // Issue #42: the layout default now follows the languages, for new installs only (see [LayoutDefault]).
+        if (LayoutDefault.CHECKED_KEY !in prefs.all) {
+            prefs.edit().apply {
+                LayoutDefault.pinnedFor(prefs.all)?.let { putString(LayoutDefault.LAYOUT_KEY, it.name) }
+                putBoolean(LayoutDefault.CHECKED_KEY, true)
+            }.apply()
+        }
+    }
 
     /**
      * The on-device model (#22): used when the server is not (see [route]), and as the server's fallback.
@@ -127,11 +138,6 @@ class AppSettings(context: Context, private val defaultServerUrl: String = io.gi
         get() = WhisperTuning.sanitizeGroupSeconds(prefs.getInt("whisper_group_seconds", 0))
         set(v) = prefs.edit().putInt("whisper_group_seconds", WhisperTuning.sanitizeGroupSeconds(v)).apply()
 
-    /** The "Comment dicter" screen has been opened (by itself at the end of the first setup, or by the user): it opens by itself only once. */
-    var howToShown: Boolean
-        get() = prefs.getBoolean("howto_shown", false)
-        set(v) = prefs.edit().putBoolean("howto_shown", v).apply()
-
     /** The installation screen has been left once (issue #55): coming back, it starts on a missing keyboard step. */
     var setupSeen: Boolean
         get() = prefs.getBoolean("setup_seen", false)
@@ -164,9 +170,13 @@ class AppSettings(context: Context, private val defaultServerUrl: String = io.gi
         get() = ThemeMode.fromName(prefs.getString("theme", null))
         set(v) = prefs.edit().putString("theme", v.name).apply()
 
-    /** Letter arrangement of the text keyboard (issue #21): QWERTY unless the user picked AZERTY. */
+    /**
+     * Letter arrangement of the text keyboard (issue #21): the user's pick, else deduced from the languages
+     * chosen at setup (issue #54): AZERTY with "Français (France)", QWERTY otherwise.
+     */
     var keyboardLayout: LayoutKind
-        get() = LayoutKind.fromName(prefs.getString("keyboard_layout", null))
+        get() = prefs.getString("keyboard_layout", null)?.let { LayoutKind.fromName(it) }
+            ?: LayoutKind.defaultFor(languages)
         set(v) = prefs.edit().putString("keyboard_layout", v.name).apply()
 
     /** The keyboard shows the text keys rather than the microphone (last view used, kept between fields). */

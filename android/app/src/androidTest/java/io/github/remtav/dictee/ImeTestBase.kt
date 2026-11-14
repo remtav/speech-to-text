@@ -51,9 +51,6 @@ abstract class ImeTestBase {
         app.settings.haptics = false
         app.settings.cleanupMode = CleanupMode.OFF
         app.settings.activeModelId = ModelCatalog.parakeet.id
-        // Keyboard enabled, microphone granted (HowToInstrumentedTest) and a scripted model "installed":
-        // the setup screen would open "Comment dicter" over itself. Only HowToInstrumentedTest tests that.
-        app.settings.howToShown = true
         TestHooks.assumeInstalled = true
         app.engines.release()
         waitUntilImeIsKnown()
@@ -120,8 +117,11 @@ abstract class ImeTestBase {
         TestHooks.engineFactory = factory
     }
 
-    protected fun launchFields() {
-        scenario = ActivityScenario.launch(TestFieldActivity::class.java)
+    /** [focus]: "number", "decimal" or "phone" to start on that field instead of the first one. */
+    protected fun launchFields(focus: String? = null) {
+        val intent = android.content.Intent(context, TestFieldActivity::class.java)
+        if (focus != null) intent.putExtra(TestFieldActivity.EXTRA_FOCUS, focus)
+        scenario = ActivityScenario.launch(intent)
         dismissNotRespondingDialogs()
         val shown = {
             val svc = DicteeImeService.instance?.get()
@@ -164,6 +164,9 @@ abstract class ImeTestBase {
 
     protected fun field1(): String { var t = ""; scenario.onActivity { t = it.field1.text.toString() }; return t }
     protected fun field2(): String { var t = ""; scenario.onActivity { t = it.field2.text.toString() }; return t }
+    protected fun fieldText(pick: (TestFieldActivity) -> android.widget.EditText): String {
+        var t = ""; scenario.onActivity { t = pick(it).text.toString() }; return t
+    }
 
     protected fun focus(which: Int) {
         // The keyboard only hears of a focus change inside a window that has the window focus. A
@@ -174,7 +177,7 @@ abstract class ImeTestBase {
         awaitWindowFocus()
         val before = onMain { DicteeImeService.instance?.get()?.currentInputEditorInfo }
         scenario.onActivity {
-            val f = when (which) { 1 -> it.field1; 2 -> it.field2; 4 -> it.noId1; 5 -> it.noId2; else -> it.password }
+            val f = when (which) { 1 -> it.field1; 2 -> it.field2; 4 -> it.noId1; 5 -> it.noId2; 6 -> it.number; 7 -> it.decimal; 8 -> it.phone; else -> it.password }
             f.requestFocus()
         }
         instrumentation.waitForIdleSync()

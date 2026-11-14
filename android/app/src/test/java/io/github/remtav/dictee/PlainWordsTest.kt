@@ -44,13 +44,10 @@ class PlainWordsTest {
 
     /**
      * Known, justified uses, each with its reason. Remove an entry as soon as its reason goes.
-     * - `HowToActivity`: « Recommandé pour vos langues : Whisper large-v3-turbo » is removed by PR #63 (tutorial);
-     *   delete this entry when #63 is merged into this branch.
      * - `ReadingTestModel`: the contribution archive (sent by the person, read by the people who improve the
      *   models) keeps the technical name next to the id; the screen shows the plain name.
      */
     private val allowed = mapOf(
-        "ui/HowToActivity.kt" to "recommendation.model.displayName",
         "ui/ReadingTestModel.kt" to "val technical = onDevice(result.recommendedModelId)?.displayName",
     )
 

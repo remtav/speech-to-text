@@ -134,6 +134,14 @@ class ScreenshotTest : ImeTestBase() {
             tapMic()
             awaitIdle()
             shot("keyboard-text-$suffix", scenario)
+            // The text keys (issue #42: Spanish and Portuguese chosen) and the pad of an amount field.
+            app.settings.languages = setOf(DictationLanguage.FRENCH_QUEBEC, DictationLanguage.SPANISH, DictationLanguage.PORTUGUESE)
+            onMain { service.setTextKeyboardShown(true) }
+            focus(2)
+            shot("keyboard-keys-$suffix", scenario)
+            focus(7)
+            shot("keyboard-pad-$suffix", scenario)
+            onMain { service.setTextKeyboardShown(false) }
             scenario.close()
         }
     }
@@ -231,9 +239,6 @@ class ScreenshotTest : ImeTestBase() {
 
     @Test
     fun appScreens() {
-        // The setup screen opens "Comment dicter" by itself once the keyboard, the microphone and a model
-        // are in place (here a scripted model counts as installed): seen already, so the captures show the screens.
-        app.settings.howToShown = true
         for (mode in listOf(ThemeMode.LIGHT, ThemeMode.DARK)) {
             val suffix = mode.name.lowercase()
             setTheme(mode)
@@ -248,8 +253,14 @@ class ScreenshotTest : ImeTestBase() {
                 s.scrollToTag(SetupActivity.modelCardTag(ModelCatalog.whisperTurbo), above = 24)
                 shot("setup-models-$suffix", s)
             }
-            // "Comment dicter": generated from the command table (Québec French is the default language).
-            ActivityScenario.launch(HowToActivity::class.java).use { shot("howto-$suffix", it) }
+            // "Comment dicter" (issue #56), generated from the command table (Québec French is the default
+            // language): the first screen, then the full list opened by a click on "Toutes les commandes".
+            ActivityScenario.launch(HowToActivity::class.java).use { s ->
+                shot("howto-$suffix", s)
+                s.onActivity { a -> a.window.decorView.findViewWithTag<View>(HowToActivity.ALL_TOGGLE_TAG).performClick() }
+                s.scrollToTag(HowToActivity.ALL_TOGGLE_TAG, above = 8)
+                shot("howto-all-$suffix", s)
+            }
             ActivityScenario.launch(SettingsActivity::class.java).use { shot("settings-$suffix", it) }
             ActivityScenario.launch<CompareActivity>(Intent(context, CompareActivity::class.java)).use {
                 shot("compare-$suffix", it)
@@ -265,7 +276,6 @@ class ScreenshotTest : ImeTestBase() {
      */
     @Test
     fun setupSteps() {
-        app.settings.howToShown = true
         val states = listOf("none" to (false to false), "enabled" to (true to false), "chosen" to (true to true))
         try {
             for (mode in listOf(ThemeMode.LIGHT, ThemeMode.DARK)) {

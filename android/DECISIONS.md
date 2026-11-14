@@ -3996,6 +3996,61 @@ pendant la dictée ». Le contrat du serveur est celui de la PR #46 (`POST /poli
     reçoit alors des blocs (sans polissage), et le texte brut est inséré au lieu du texte poli. Rien n'est
     perdu.
 
+## Issue #42 (et ajout de #54) : clavier à touches complet, pavé numérique, visibilité
+
+### Les deux questions ouvertes, tranchées
+
+- **Micro dans les champs numériques : retiré.** Dicter « quatre cent cinquante » pour obtenir `450` exige une
+  conversion des nombres en chiffres, hors de portée de cette issue. Un micro qui insérerait « quatre cent
+  cinquante » en lettres dans un champ de chiffres serait refusé par le champ ou trompeur. Le pavé n'a donc
+  pas de micro ; il a une touche « clavier précédent » (sinon on ne pourrait pas en sortir) et pas d'en-tête
+  (modèle, réglages, aide). À reprendre quand les nombres dictés seront convertis.
+- **Séparateur décimal : ce que le champ accepte.** Android laisse chaque champ filtrer ce qu'il prend, et
+  beaucoup de champs décimaux n'acceptent que le point. La touche s'affiche avec le séparateur de la langue
+  du téléphone (`DecimalSeparator.order`). Si le champ laisse le texte inchangé après la frappe, le service
+  tape l'autre séparateur et la touche affiche celui qui a fonctionné (`DicteeImeService.typeDecimal`).
+  On ne réessaie pas quand le champ contient déjà un séparateur : ce refus est la règle du champ. Un seul
+  caractère à la fois est essayé ; rien n'est inséré deux fois.
+
+### Choix de conception
+
+- **Une langue = une entrée de données** (`KeyLanguage` : accents par lettre, ponctuation par touche, les plus
+  fréquents d'abord). La vue ne change pas. Les fenêtres d'appui long fusionnent, sans doublon, les langues
+  choisies à l'installation (`KeyLanguage.forDictation`, lu depuis `DictationLanguage`, jamais modifié).
+  Un choix qui ne contient aucune des quatre langues (mandarin seul, par exemple) donne les quatre : le clavier
+  reste complet plutôt que vide.
+- **Ponctuation par appui long** : `?` → `¿`, `!` → `¡` (espagnol), `"` → `« »` ou `“ ”` selon la langue,
+  `'` → `’`, `.` → `…`, `$` → `€ £ ¥ ¢`, `-` → `– —`. L'appui long vaut aussi pour le point de la rangée du bas.
+- **Deuxième page de symboles** : `[ ] { } # % ^ * + =`, `_ \ | ~ < > € £ ¥ ¢`, `° • · § ¶`. La touche « #+= » /
+  « 123 » remplace Majuscule sur les pages de symboles.
+- **Choix de la page** : fonction pure `InputPages.forInputType(inputType)` (testée sur la JVM). Nombre : chiffres,
+  `-` si signé, séparateur si décimal ; un mot de passe numérique prend le même pavé. Téléphone : `* 0 #` et
+  `+ ( ) - espace`. Date/heure : `/ -` (date), `:` (heure), les deux et l'espace sinon. Tout le reste : les vues
+  habituelles.
+- **Disposition par défaut** : AZERTY si « Français (France) » est dans les langues choisies, QWERTY sinon, tant
+  que l'utilisateur n'a pas choisi lui-même (`AppSettings.keyboardLayout`). **Nouvelles installations seulement** :
+  une installation qui a déjà des réglages mais jamais choisi de disposition garde QWERTY, inscrit une fois au
+  premier démarrage de cette version (`LayoutDefault`, testé sur la JVM et sur l'appareil).
+- **Limites connues du pavé** (relecture indépendante) : il est plus étroit que ce que certains champs acceptent
+  (heure sur 12 h avec « pm », dates en « jj.mm.aaaa »), et on ne rejoint pas le clavier à lettres depuis le pavé
+  (seulement « clavier précédent »). Le pavé suit `inputType` à la lettre ; un champ de texte reste un champ de texte.
+- **Accessibilité** : une touche gère aussi l'action « cliquer » de TalkBack (en plus du toucher, que la vue consomme).
+- **Séparateur** : succès reconnu seulement si le texte avant le curseur grandit exactement du séparateur ; ordre
+  appris conservé au redémarrage du même champ (rotation) ; jamais de lecture du texte dans un mot de passe numérique.
+- **Pas de test de la regex** : rien dans ce lot n'utilise d'expression régulière. Le piège de PR #52 (`(?U)`
+  accepté par la JVM et refusé par Android) est traité par des tests instrumentés pour tout ce qui dépend du
+  système : pavé dans un champ nombre, montant et téléphone (`TextKeyboardInstrumentedTest`).
+
+### Visibilité du clavier à touches (#54)
+
+- Avant : un petit bouton icône (un « A ») dans l'en-tête de la vue du micro, sans libellé. Après : un bouton
+  tonal **« Clavier à touches »** avec icône de clavier, de 64 dp de haut, à droite du micro dans la vue du
+  micro (`open_keys`). Le micro reste centré, sa taille est inchangée. Dans la vue des touches, le bouton
+  de l'en-tête devient un micro (retour à la dictée).
+- Les chaînes ne parlent plus de « clavier de correction » : « Clavier à touches » (bouton, Réglages, aide).
+- La dernière vue (micro ou touches) était déjà retenue d'un champ à l'autre (`textKeyboardShown`) ; le premier
+  usage reste le micro (c'est un clavier vocal d'abord). Un test instrumenté couvre la conservation.
+
 ## Issues #55 et #57 : les deux étapes du clavier, le serveur hors du parcours (PR 1 du retour de #54)
 
 Fait d'un seul tenant, sans intervention humaine, dans l'ordre demandé par #54 (#55 puis #57, même écran).
@@ -4418,3 +4473,108 @@ Revue par un autre agent, relayée par l'orchestrateur ; chaque constat vérifi�
 - Une personne qui n'a jamais vu l'application comprend-elle « Plus précis » / « Plus léger et plus
   rapide » et la phrase de recommandation ?
 - Le bouton du modèle du clavier (« Précis », « Léger ») reste lisible.
+
+## Issue #56 — « Comment dicter » : un choix, et l'essentiel d'abord
+
+Suite du retour d'une testeuse (#54, 2026-11-13) : le tutoriel s'ouvrait sans qu'on le demande et
+empilait trop d'information. Les « décisions proposées » de l'issue sont prises telles quelles,
+sauf deux ajustements indiqués (mise en évidence, anglais).
+
+### Changement par rapport au lot 2 de #15
+
+Le lot 2 de l'issue #15 demandait l'**ouverture automatique**, une fois, à la fin de la première
+configuration. Elle est **retirée** : `SetupActivity.maybeOpenHowTo`, `SetupProgress.shouldOpenHowTo`
+et le réglage `AppSettings.howToShown` n'existent plus (l'ancienne clé `howto_shown` reste
+inutilisée dans les préférences des téléphones qui l'ont écrite : sans effet). À la place, l'écran
+d'installation, une fois la configuration complète (`SetupProgress.isComplete`, inchangé ici),
+montre une carte « C'est prêt » au-dessus de la zone d'essai, avec le bouton discret « Aller plus
+loin : dicter la ponctuation » (`ui/SetupReady.kt`, appelée par `SetupActivity.renderReady`).
+Rien ne s'ouvre seul. Le tutoriel reste ouvert par le bouton de l'écran principal et par le
+bouton d'aide du clavier (`ime/` non touché).
+
+Pour limiter le conflit avec la refonte de l'écran d'installation (#55, #57, #36, #37), le
+changement dans `SetupActivity` est petit : un champ, un appel à la fin de `renderSteps` et une
+fonction `renderReady`, le dessin de la carte étant dans `ui/SetupReady.kt`. Rien d'autre n'y est
+réordonné. Depuis la fusion de #62, la carte suit `setupComplete()` (donc `SetupProgress.isComplete` :
+clavier activé **et** choisi, la règle « choisi une fois » de #55 comprise, micro, modèle prêt), sans
+la recalculer. `renderReady` ne fait aucun défilement : le saut vers les étapes ne se fait qu'à
+l'ouverture de l'écran. Dans la section #55/#57 ci-dessus, les phrases sur l'ouverture automatique du
+tutoriel sont remplacées par cette décision.
+
+### Premier écran
+
+Titre ; la règle « Dites le nom du signe au milieu de votre phrase : il s'écrit tout seul. » ;
+**trois exemples au plus**, de deux lignes chacun (« Dites : … », « Vous obtenez : … ») ; la zone
+d'essai, tout de suite après ; puis le bouton « Toutes les commandes » (liste **fermée** par
+défaut, état gardé à la rotation) ; enfin la phrase de confidentialité, en petit.
+
+- **Les trois exemples** : deux-points, point d'interrogation, nouvelle ligne (français). Ils sont
+  choisis par `HowToExamples.firstScreen`, dans `CommandTable.active`, et le résultat est celui du
+  pipeline du clavier (typographie de l'utilisateur) : rien n'est écrit à la main dans l'écran.
+  Avec plusieurs langues, les places sont partagées comme avant (français d'abord, avec l'impair).
+- **Phrase courte pour le deux-points** : l'exemple de la table (« il a dit deux-points ouvrir les
+  guillemets bonjour fermer les guillemets ») enseigne trois commandes à la fois. Pour que la
+  commande et le signe se repèrent, `CommandEntry.firstScreen` donne, pour le deux-points français
+  seulement, « il a dit deux-points bonjour » → « Il a dit : bonjour ». C'est une donnée d'aide dans
+  la table, pas une commande : aucune formulation n'est ajoutée ni changée. Un test vérifie que le
+  pipeline donne bien le résultat écrit à côté.
+- **Anglais** : « colon » est un homographe (le côlon) que l'analyseur n'accepte qu'entre deux
+  ponctuations ou en bord de segment, donc jamais « au milieu de la phrase ». L'anglais montre
+  donc point d'interrogation, nouvelle ligne, point d'exclamation ; le deux-points anglais reste
+  dans la liste complète.
+- **Nouvelle ligne** : le saut de ligne est dessiné « ↵ » dans le résultat, pour pouvoir être mis en
+  évidence et pour que l'exemple reste sur deux lignes ; c'est le seul écart avec le texte produit.
+- **Ce qui sort du premier écran** : « Si le champ contient », « Commandes : … », les variantes
+  (« Aussi : »), les effacements, guillemets, parenthèses, point-virgule (tous dans la liste), la
+  section « Votre modèle » (elle appartient à l'installation) ; le lien du vocabulaire passe au bas
+  de la partie repliée.
+- **Liste complète** : toutes les commandes de `CommandTable.active`, chacune avec « Donne : », « Aussi : »
+  et, une fois par phrase partagée, son exemple (avec « Si le champ contient » pour les effacements).
+
+### Mise en évidence (écart par rapport à la proposition)
+
+La proposition parlait d'IBM Plex Mono et du fond « papier 2 ». L'application n'a ni l'un ni l'autre :
+polices du système et palette Material 3 (`NoHardcodedStyleTest` interdit toute police et couleur en
+dur). Le principe est gardé, avec ce qui existe :
+
+| Élément | Style | Paire de couleurs (`ThemeContrastTest`, ≥ 4,5 : 1 en clair et en sombre) |
+| --- | --- | --- |
+| Commande dite | gras + soulignement + fond `colorSecondaryContainer` | `colorOnSecondaryContainer` sur `colorSecondaryContainer` |
+| Signe obtenu | gras + `colorPrimary` | `colorPrimary` sur `colorSurface` / `colorSurfaceContainer` |
+
+Jamais la couleur seule : le gras (et le soulignement pour la commande) la double. Le style est posé
+par des plages (`ui/HowToStyle.kt`, `emphasised`), vérifiées par un test instrumenté plage par plage.
+
+### Phrase sur la confidentialité
+
+Reprise de #62 (#57) : « Tout se passe sur votre téléphone : votre voix y est transcrite et n'est
+envoyée à personne. », ou, si un serveur est réellement utilisé (`settings.serverInUse`), « Vos dictées
+sont envoyées au serveur distant que vous avez configuré dans les réglages avancés, pour y être
+transcrites. » (`howto_privacy` / `howto_privacy_server`). Aucune phrase n'est fausse pour qui a configuré
+un serveur. Placée en petit à la fin de l'écran, même balise `PRIVACY_TAG`.
+
+### Tests
+
+- JVM (`HowToTest.kt`, `ThemeContrastTest.kt`) : trois exemples au plus pour tous les jeux de langues,
+  partage des places, exemples tirés de la table et résultat égal au pipeline, plage de la commande
+  (une formulation de la table) et du signe (le signe produit, ou « ↵ ») dans chaque exemple, y compris
+  en typographie de France (espace insécable avant le signe), aucun exemple recopié dans l'écran ni les
+  chaînes, paires de couleurs de la mise en évidence.
+- Instrumentés (`HowToInstrumentedTest.kt`) : rien ne s'ouvre seul, « C'est prêt » absent sans modèle
+  et présent avec, l'invitation ouvre le tutoriel (remplace l'assertion d'ouverture automatique) ;
+  réouverture depuis l'écran principal et depuis le clavier (inchangés) ; premier écran : règle, au plus
+  trois cartes de deux lignes, ordre règle → exemples → essai → liste, pas de section modèle ; styles
+  distincts de la commande et du signe, plages exactes, gras jamais absent ; liste fermée au départ,
+  ouverte d'un geste, une ligne par commande de la table, « Aussi » visible seulement ouverte ;
+  vocabulaire dans la partie repliée ; phrase de confidentialité sans « serveur ».
+  `ScreenshotTest` : `howto-{light,dark}.png` (premier écran) et `howto-all-{light,dark}.png` (liste ouverte).
+- Pas de nouveau traitement de texte sur le téléphone : les plages sont calculées par `indexOf` sur
+  des chaînes, sans expression régulière ; le piège `(?U)` de la PR #52 ne s'applique pas.
+
+### À vérifier sur un vrai téléphone (rien n'y a tourné)
+
+- Les deux premiers écrans (clair et sombre) : lisibilité du gras/souligné de la commande et du signe en
+  couleur, longueur réelle des exemples sur un petit écran.
+- Fin de configuration : « C'est prêt » apparaît, rien ne s'ouvre, le bouton ouvre bien le tutoriel.
+- **Essai « dicter un deux-points » avec une personne qui ne connaît pas l'application** (critère
+  d'acceptation de #56 **non coché** : à faire par un humain).

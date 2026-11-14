@@ -49,7 +49,6 @@ class QuickTestInstrumentedTest {
     @Before
     fun setUp() {
         app.settings.prefs.edit().clear().commit()
-        app.settings.howToShown = true
         TestHooks.installedModelIds = setOf(best.id, light.id)
         TestHooks.audioSourceFactory = AudioSourceFactory {
             PcmAudioSource(listOf(PcmAudio(FloatArray(3 * 16000) { 0.05f }, 16000)), realTime = false, leadSeconds = 0f, tailSeconds = 0f)
