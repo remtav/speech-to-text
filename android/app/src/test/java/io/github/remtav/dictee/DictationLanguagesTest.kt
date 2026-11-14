@@ -98,11 +98,12 @@ class DictationLanguagesTest {
     fun aCleanOrMissingChoiceChangesNothingAndRaisesNoNotice() {
         assertNull(DictationLanguages.cleaned(null))
         assertNull(DictationLanguages.cleaned(setOf("ENGLISH", "SPANISH")))
+        assertNull(DictationLanguages.cleaned(emptySet())) // already read as the default: no change to tell
         assertNull(DictationLanguages.cleaned(DictationLanguages.serialize(setOf(PORTUGUESE))))
     }
 
     @Test
-    fun theNoticeIsRaisedOnlyByTheFirstRun() {
+    fun aCleanedChoiceIsCleanAgain() {
         // What AppSettings.migrateLanguages does: store the cleaned choice, then look again.
         val first = DictationLanguages.cleaned(setOf("ENGLISH", "RUSSIAN"))
         assertEquals(setOf(ENGLISH), first)

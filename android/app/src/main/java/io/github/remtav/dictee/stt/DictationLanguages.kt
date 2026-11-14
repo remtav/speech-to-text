@@ -59,8 +59,9 @@ object DictationLanguages {
      */
     fun cleaned(stored: Collection<String>?): Set<DictationLanguage>? {
         if (stored == null) return null
-        val clean = parse(stored)
-        return if (clean.map { it.name }.toSet() == stored.toSet()) null else clean
+        // Only an unknown name changes the choice: an empty stored set already read as the default.
+        if (stored.all { n -> DictationLanguage.entries.any { it.name == n } }) return null
+        return parse(stored)
     }
 
     /** Names to store; an empty selection is stored as the default. */

@@ -50,6 +50,7 @@ class SetupActivity : AppCompatActivity() {
     private lateinit var stepsBox: LinearLayout
     private lateinit var modelsBox: LinearLayout
     private lateinit var languagesBox: LinearLayout
+    private lateinit var languagesNoticeBox: LinearLayout
     private lateinit var participationBox: LinearLayout
     private lateinit var readyBox: LinearLayout
     /** Whether the « C'est prêt » card is drawn now; null before the first draw. */
@@ -92,6 +93,9 @@ class SetupActivity : AppCompatActivity() {
             startActivity(Intent(this@SetupActivity, HowToActivity::class.java))
         }.tag = HOWTO_BUTTON_TAG
 
+        // Issue #60: the one-time notice sits right above the languages it is about.
+        languagesNoticeBox = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        col.addView(languagesNoticeBox)
         col.heading(getString(R.string.setup_step_languages))
         col.body(getString(R.string.setup_languages_help), small = true)
         col.body(getString(R.string.setup_languages_supported), small = true)
@@ -130,6 +134,7 @@ class SetupActivity : AppCompatActivity() {
         Downloads.addListener(refresh)
         // Redrawn on each resume: the languages, or the server, may have been changed in the settings.
         languagesBox.renderLanguageChoices(app.settings) { renderModels(); renderParticipation() }
+        renderLanguagesNotice()
         renderSteps()
         renderModels()
         renderParticipation()
@@ -318,7 +323,6 @@ class SetupActivity : AppCompatActivity() {
         modelsBox.removeAllViews()
         val chosen = app.settings.languages
         val recommendation = ModelRecommendations.recommend(chosen)
-        renderLanguagesNotice()
         renderRetiredNotice()
         // Issue #22: only the models offered for the chosen languages (experimental ones are in the settings).
         val modelIsNext = currentStep() == SetupStep.GET_MODEL
@@ -344,13 +348,14 @@ class SetupActivity : AppCompatActivity() {
      * ([AppSettings.migrateLanguages]). Closing it clears the flag; nothing raises it again.
      */
     private fun renderLanguagesNotice() {
+        languagesNoticeBox.removeAllViews()
         if (!app.settings.languagesNotice) return
-        val card = modelsBox.card()
+        val card = languagesNoticeBox.card()
         card.tag = LANGUAGES_NOTICE_TAG
         card.body(getString(R.string.languages_notice))
         card.button(getString(R.string.model_notice_ok), outlined = true) {
             app.settings.languagesNotice = false
-            renderModels()
+            renderLanguagesNotice()
         }.tag = LANGUAGES_NOTICE_OK_TAG
     }
 
