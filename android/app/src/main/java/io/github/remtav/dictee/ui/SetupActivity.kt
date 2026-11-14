@@ -94,6 +94,7 @@ class SetupActivity : AppCompatActivity() {
 
         col.heading(getString(R.string.setup_step_languages))
         col.body(getString(R.string.setup_languages_help), small = true)
+        col.body(getString(R.string.setup_languages_supported), small = true)
         languagesBox = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         col.addView(languagesBox)
 
@@ -317,6 +318,7 @@ class SetupActivity : AppCompatActivity() {
         modelsBox.removeAllViews()
         val chosen = app.settings.languages
         val recommendation = ModelRecommendations.recommend(chosen)
+        renderLanguagesNotice()
         renderRetiredNotice()
         // Issue #22: only the models offered for the chosen languages (experimental ones are in the settings).
         val modelIsNext = currentStep() == SetupStep.GET_MODEL
@@ -335,6 +337,21 @@ class SetupActivity : AppCompatActivity() {
         modelsBox.button(getString(R.string.quick_open), outlined = true) {
             startActivity(Intent(this, QuickTestActivity::class.java))
         }.tag = QUICK_TEST_BUTTON_TAG
+    }
+
+    /**
+     * Issue #60: the one-time notice after an update dropped a language from the stored choice
+     * ([AppSettings.migrateLanguages]). Closing it clears the flag; nothing raises it again.
+     */
+    private fun renderLanguagesNotice() {
+        if (!app.settings.languagesNotice) return
+        val card = modelsBox.card()
+        card.tag = LANGUAGES_NOTICE_TAG
+        card.body(getString(R.string.languages_notice))
+        card.button(getString(R.string.model_notice_ok), outlined = true) {
+            app.settings.languagesNotice = false
+            renderModels()
+        }.tag = LANGUAGES_NOTICE_OK_TAG
     }
 
     /**
@@ -466,6 +483,8 @@ class SetupActivity : AppCompatActivity() {
         const val RETIRED_NOTICE_TAG = "retired_model_notice"
         const val RETIRED_DOWNLOAD_TAG = "retired_model_download"
         const val RETIRED_DELETE_TAG = "retired_model_delete"
+        const val LANGUAGES_NOTICE_TAG = "languages_notice"
+        const val LANGUAGES_NOTICE_OK_TAG = "languages_notice_ok"
         const val RETIRED_OK_TAG = "retired_model_ok"
         const val INTRO_TAG = "setup_intro"
         const val STEPS_TAG = "setup_steps"

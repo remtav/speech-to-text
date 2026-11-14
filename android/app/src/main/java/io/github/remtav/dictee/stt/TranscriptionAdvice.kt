@@ -25,7 +25,7 @@ data class PhoneModelChoice(val best: ModelSpec, val light: ModelSpec?) {
  *
  * - Québec French, alone or with others → the best model only: the French spoken here needs it.
  * - Only French (France), English, Spanish, Portuguese → the best model, and a lighter one is possible.
- * - Any other language → the best model only (the only one that covers the eleven languages).
+ * - Any other language → the best model only (the only one that covers all five languages).
  *
  * The "a lighter model is possible" row is an **estimate**, not a measurement on a phone; the quick test
  * ([QuickTestAdvice]) checks it with the person's own voice.

@@ -279,8 +279,6 @@ class QuickTestInstrumentedTest {
                 assertEquals(true, b.getTag(R.id.button_outlined))
             }
         }
-        app.settings.languages = setOf(DictationLanguage.MANDARIN)
-        ActivityScenario.launch(SetupActivity::class.java).use { s -> assertFalse(s.has(SetupActivity.QUICK_TEST_BUTTON_TAG)) }
         app.settings.languages = setOf(DictationLanguage.FRENCH_QUEBEC)
         TestHooks.installedModelIds = emptySet()
         ActivityScenario.launch(SetupActivity::class.java).use { s -> assertFalse(s.has(SetupActivity.QUICK_TEST_BUTTON_TAG)) }

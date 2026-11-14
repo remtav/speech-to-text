@@ -93,6 +93,8 @@
     <string name="setup_mic_missing">Le clavier ne peut pas demander le micro lui-même : autorisez-le ici.</string>
     <string name="setup_step_languages">4. Vos langues</string>
     <string name="setup_languages_help">Cochez les langues que vous dictez. Elles servent à recommander un modèle et à régler la langue de la transcription : avec une seule langue, elle est imposée ; avec plusieurs, elle est détectée automatiquement. Au moins une langue reste cochée.</string>
+    <string name="setup_languages_supported">Kalmia Blabla comprend le français, l\'anglais, l\'espagnol et le portugais.</string>
+    <string name="languages_notice">Kalmia Blabla se concentre maintenant sur quatre langues. Vérifiez vos langues.</string>
     <string name="languages_keep_one">Au moins une langue doit rester cochée.</string>
     <string name="setup_models">5. Modèle</string>
     <string name="model_publisher">Éditeur : %1$s</string>

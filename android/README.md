@@ -82,9 +82,12 @@ phrase avec les deux et jugez le texte.
 
 ## Vos langues et le modèle recommandé
 
-Sur l'écran de configuration, l'étape **« 3. Vos langues »** propose onze
-langues en cases à cocher : français (Québec), français (France), anglais,
-mandarin, hindi, espagnol, arabe, bengali, portugais, russe et ourdou.
+**Kalmia Blabla comprend le français, l'anglais, l'espagnol et le portugais.**
+Sur l'écran de configuration, l'étape **« 3. Vos langues »** propose cinq
+cases à cocher : français (Québec), français (France), anglais, espagnol et
+portugais. Pas de case « Autre langue » : pour une autre langue, ni la
+qualité de la transcription ni la vitesse ne sont mesurées, et il n'y aurait
+ni commandes vocales ni touches (#60, #72).
 « Français (Québec) » est présélectionné et il reste toujours au moins une
 langue cochée. Le choix se modifie aussi dans les Réglages. Il sert à :
 
@@ -102,8 +105,19 @@ La table de recommandation (`stt/ModelRecommendation.kt`) se lit de haut en
 bas : Parakeet si toutes vos langues font partie de ses 25 langues
 européennes ; sinon Qwen3-ASR s'il les couvre toutes ; sinon Whisper. La
 couverture vient des fiches des modèles (détail et sources dans `DECISIONS.md`).
-Bengali et ourdou ne sont couverts que par Whisper, et « couvert » ne veut pas
-dire « bien transcrit ».
+« Couvert » ne veut pas dire « bien transcrit ».
+
+**Mise à jour d'une installation existante.** Mandarin, hindi, arabe, bengali,
+russe et ourdou ont été retirés. Au premier démarrage après la mise à jour, une
+langue retirée disparaît du choix enregistré ; s'il ne reste rien, « Français
+(Québec) » est repris. Si le choix a changé, l'écran principal affiche une fois
+l'avis « Kalmia Blabla se concentre maintenant sur quatre langues. Vérifiez vos
+langues. » (fermé avec « OK », il ne revient pas).
+
+**Limite connue.** Quand plusieurs langues sont cochées, le modèle détecte la
+langue lui-même, parmi toutes celles qu'il connaît, pas seulement les cinq :
+il peut, rarement, écrire dans une langue non prise en charge (voir
+`DECISIONS.md`).
 
 **Mesure en français québécois, et ses limites.** Six courts extraits Common
 Voice 22.0 (CC0) portant l'accent déclaré « Français du Canada », 59 mots au

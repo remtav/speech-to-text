@@ -109,7 +109,7 @@ enum class KeyLanguage(
     companion object {
         /**
          * The keyboard languages for the languages chosen at setup. A choice that holds none of the four
-         * (Mandarin alone, say) gets all four: the keyboard stays complete rather than empty.
+         * (a language since removed, say) gets all four: the keyboard stays complete rather than empty.
          */
         fun forDictation(chosen: Set<DictationLanguage>): Set<KeyLanguage> =
             entries.filter { l -> l.dictation.any { it in chosen } }.toSet().ifEmpty { entries.toSet() }

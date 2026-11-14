@@ -4,6 +4,7 @@ import io.github.remtav.dictee.stt.DictationLanguage
 import io.github.remtav.dictee.stt.DictationLanguage.*
 import io.github.remtav.dictee.stt.DictationLanguages
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -19,7 +20,7 @@ class DictationLanguagesTest {
     @Test
     fun severalDistinctCodesMeanAutomaticDetection() {
         assertEquals("", DictationLanguages.whisperLanguage(setOf(FRENCH_QUEBEC, ENGLISH)))
-        assertEquals("", DictationLanguages.whisperLanguage(setOf(HINDI, URDU)))
+        assertEquals("", DictationLanguages.whisperLanguage(setOf(SPANISH, PORTUGUESE)))
         assertEquals("", DictationLanguages.remoteLanguage(setOf(FRENCH_QUEBEC, ENGLISH)))
     }
 
@@ -36,9 +37,8 @@ class DictationLanguagesTest {
         assertEquals("French", DictationLanguages.qwen3Language(setOf(FRENCH_QUEBEC, FRENCH_FRANCE)))
         assertEquals("English", DictationLanguages.qwen3Language(setOf(ENGLISH)))
         assertEquals("", DictationLanguages.qwen3Language(setOf(FRENCH_QUEBEC, ENGLISH)))
-        // Not Qwen3-ASR languages: automatic detection rather than a wrong name.
-        assertEquals("", DictationLanguages.qwen3Language(setOf(URDU)))
-        assertEquals("", DictationLanguages.qwen3Language(setOf(DictationLanguage.BENGALI)))
+        assertEquals("Spanish", DictationLanguages.qwen3Language(setOf(SPANISH)))
+        assertEquals("Portuguese", DictationLanguages.qwen3Language(setOf(PORTUGUESE)))
         for (l in DictationLanguage.entries) {
             val name = DictationLanguages.qwen3Language(setOf(l))
             assertTrue("$l -> $name", name.isEmpty() || name.first().isUpperCase())
@@ -53,7 +53,7 @@ class DictationLanguagesTest {
         }
         assertEquals("fr", DictationLanguages.remoteLanguage(setOf(FRENCH_FRANCE)))
         assertEquals("en", DictationLanguages.remoteLanguage(setOf(ENGLISH)))
-        assertEquals("", DictationLanguages.remoteLanguage(setOf(MANDARIN)))
+        assertEquals("", DictationLanguages.remoteLanguage(setOf(SPANISH)))
     }
 
     @Test
@@ -66,10 +66,50 @@ class DictationLanguagesTest {
 
     @Test
     fun storageRoundTripKeepsListOrder() {
-        val chosen = setOf(RUSSIAN, ENGLISH, FRENCH_QUEBEC)
+        val chosen = setOf(PORTUGUESE, ENGLISH, FRENCH_QUEBEC)
         val back = DictationLanguages.parse(DictationLanguages.serialize(chosen))
         assertEquals(chosen, back)
-        assertEquals(listOf(FRENCH_QUEBEC, ENGLISH, RUSSIAN), back.toList())
+        assertEquals(listOf(FRENCH_QUEBEC, ENGLISH, PORTUGUESE), back.toList())
+    }
+
+    @Test
+    fun exactlyTheFiveLanguagesOfIssue60AreOffered() {
+        assertEquals(
+            listOf(FRENCH_QUEBEC, FRENCH_FRANCE, ENGLISH, SPANISH, PORTUGUESE),
+            DictationLanguage.entries.toList(),
+        )
+    }
+
+    // Issue #60: updating an existing install.
+
+    @Test
+    fun aRemovedLanguageDisappearsFromTheStoredChoice() {
+        val stored = setOf("ENGLISH", "MANDARIN", "FRENCH_FRANCE", "URDU")
+        assertEquals(setOf(FRENCH_FRANCE, ENGLISH), DictationLanguages.cleaned(stored))
+    }
+
+    @Test
+    fun aChoiceLeftEmptyBecomesFrenchQuebec() {
+        assertEquals(setOf(FRENCH_QUEBEC), DictationLanguages.cleaned(setOf("HINDI", "ARABIC", "BENGALI", "RUSSIAN")))
+        assertEquals(setOf(FRENCH_QUEBEC), DictationLanguages.cleaned(setOf("MANDARIN")))
+    }
+
+    @Test
+    fun aCleanOrMissingChoiceChangesNothingAndRaisesNoNotice() {
+        assertNull(DictationLanguages.cleaned(null))
+        assertNull(DictationLanguages.cleaned(setOf("ENGLISH", "SPANISH")))
+        assertNull(DictationLanguages.cleaned(DictationLanguages.serialize(setOf(PORTUGUESE))))
+    }
+
+    @Test
+    fun theNoticeIsRaisedOnlyByTheFirstRun() {
+        // What AppSettings.migrateLanguages does: store the cleaned choice, then look again.
+        val first = DictationLanguages.cleaned(setOf("ENGLISH", "RUSSIAN"))
+        assertEquals(setOf(ENGLISH), first)
+        assertNull(DictationLanguages.cleaned(DictationLanguages.serialize(first!!)))
+        val second = DictationLanguages.cleaned(setOf("URDU"))
+        assertEquals(setOf(FRENCH_QUEBEC), second)
+        assertNull(DictationLanguages.cleaned(DictationLanguages.serialize(second!!)))
     }
 
     @Test

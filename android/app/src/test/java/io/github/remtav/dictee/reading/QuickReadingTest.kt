@@ -29,7 +29,7 @@ class QuickReadingTest {
             assertEquals("lecture/$v.txt", QuickReading.assetPath(l))
             assertTrue(v, File(ReadingTestSupport.assetsDir, "lecture/$v.txt").isFile)
         }
-        assertFalse(QuickReading.hasText(DictationLanguage.MANDARIN))
+        assertEquals(5, DictationLanguage.entries.count { QuickReading.hasText(it) })
     }
 
     @Test fun eachTextIsOneParagraphOfAboutFortyWords() {
