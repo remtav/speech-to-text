@@ -5,6 +5,9 @@ name: Android
 # instrumented tests of the keyboard on an emulator. A push to main, or a manual
 # run (Actions -> Android -> Run workflow) on main, also publishes the APK as a
 # GitHub release; a manual run on any other branch only builds and tests.
+# Publishing needs every job green, except on a manual run with "skip_slow_tests"
+# checked: the model and emulator jobs are then skipped and the APK is published
+# once the build job (unit tests, release signature) is green.
 
 on:
   # Branches are covered by their pull request; a push only matters on main (release).
@@ -18,6 +21,11 @@ on:
       - "android/**"
       - ".github/workflows/android.yml"
   workflow_dispatch:
+    inputs:
+      skip_slow_tests:
+        description: "Publish without the model and emulator tests (they are skipped; the build, unit tests and signature still must pass)"
+        type: boolean
+        default: false
 
 concurrency:
   group: android-${{ github.ref }}
@@ -95,6 +103,7 @@ jobs:
 
   models:
     name: Model tests on the CI host (every catalogue model, FR + EN)
+    if: ${{ !(github.event_name == 'workflow_dispatch' && inputs.skip_slow_tests) }}
     runs-on: ubuntu-latest
     # Five models (~5,8 Go) downloaded again whenever the catalogue changes (cache key).
     timeout-minutes: 90
@@ -123,6 +132,7 @@ jobs:
 
   emulator:
     name: Instrumented keyboard tests (emulator)
+    if: ${{ !(github.event_name == 'workflow_dispatch' && inputs.skip_slow_tests) }}
     runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:
@@ -168,12 +178,25 @@ jobs:
     name: Publish APK
     needs: [build, models, emulator]
     # Only on main (push or manual run, never a pull request), and only with an
-    # APK signed by the private release key.
-    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main' && needs.build.outputs.signed == 'true'
+    # APK signed by the private release key. !cancelled() lets a manual run skip
+    # the slow jobs (skipped needs), but a cancelled run never publishes.
+    if: >-
+      !cancelled()
+      && github.event_name != 'pull_request'
+      && github.ref == 'refs/heads/main'
+      && needs.build.result == 'success'
+      && needs.build.outputs.signed == 'true'
+      && ((needs.models.result == 'success' && needs.emulator.result == 'success') || (github.event_name == 'workflow_dispatch' && inputs.skip_slow_tests))
     runs-on: ubuntu-latest
     permissions:
       contents: write
     steps:
+      - name: Say when the slow tests did not pass
+        if: needs.models.result != 'success' || needs.emulator.result != 'success'
+        working-directory: .
+        run: |
+          echo "::warning::Published without the model and emulator tests (manual run, skip_slow_tests)."
+          echo "### Published without the model and emulator tests (manual run)" >> "$GITHUB_STEP_SUMMARY"
       - uses: actions/download-artifact@v4
         with:
           name: dictee-apk
