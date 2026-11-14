@@ -14,14 +14,14 @@ class ModelRecommendationTest {
     private val langs = DictationLanguage.entries
     private val english = setOf(DictationLanguage.ENGLISH)
 
-    /** Every non-empty subset of the eleven languages (2047). */
+    /** Every non-empty subset of the five languages (31). */
     private fun allCombinations(): Sequence<Set<DictationLanguage>> =
         (1 until (1 shl langs.size)).asSequence().map { mask ->
             langs.filterIndexed { i, _ -> mask and (1 shl i) != 0 }.toSet()
         }
 
-    @Test fun thereAre2047Combinations() {
-        assertEquals(2047, allCombinations().count())
+    @Test fun thereAre31Combinations() {
+        assertEquals(31, allCombinations().count())
     }
 
     @Test fun whisperTurboIsAlwaysRecommended() {
@@ -105,14 +105,12 @@ class ModelRecommendationTest {
 
     @Test fun coverageQuestion() {
         assertTrue(ModelRecommendations.covers(ModelCatalog.parakeet, DictationLanguage.FRENCH_QUEBEC))
-        assertFalse(ModelRecommendations.covers(ModelCatalog.parakeet, DictationLanguage.MANDARIN))
-        assertTrue(ModelRecommendations.covers(ModelCatalog.qwen3, DictationLanguage.HINDI))
-        assertFalse(ModelRecommendations.covers(ModelCatalog.qwen3, DictationLanguage.BENGALI))
-        assertTrue(ModelRecommendations.covers(ModelCatalog.whisperTurbo, DictationLanguage.URDU))
-        assertTrue(ModelRecommendations.covers(ModelCatalog.remote, DictationLanguage.URDU))
-        assertEquals(listOf(DictationLanguage.MANDARIN),
-            ModelRecommendations.uncovered(ModelCatalog.parakeet,
-                setOf(DictationLanguage.ENGLISH, DictationLanguage.MANDARIN)))
+        assertTrue(ModelRecommendations.covers(ModelCatalog.qwen3, DictationLanguage.PORTUGUESE))
+        assertTrue(ModelRecommendations.covers(ModelCatalog.whisperTurbo, DictationLanguage.SPANISH))
+        assertTrue(ModelRecommendations.covers(ModelCatalog.remote, DictationLanguage.PORTUGUESE))
+        // The model covers every language the app offers: no « ne couvre pas » warning remains.
+        for (model in ModelCatalog.offered(DictationLanguage.entries.toSet()))
+            assertEquals(emptyList<DictationLanguage>(), ModelRecommendations.uncovered(model, DictationLanguage.entries.toSet()))
     }
 
     @Test fun quebecWhisperCoversFrenchOnly() {
@@ -131,7 +129,7 @@ class ModelRecommendationTest {
 
     @Test fun languageNamesInSentencesKeepTheirProperNouns() {
         assertEquals("français (Québec)", DictationLanguage.FRENCH_QUEBEC.inSentence)
-        assertEquals("mandarin", DictationLanguage.MANDARIN.inSentence)
+        assertEquals("portugais", DictationLanguage.PORTUGUESE.inSentence)
     }
 
     @Test fun whisperNoteIsAnObservationAndNoLongerALastResort() {
@@ -140,7 +138,7 @@ class ModelRecommendationTest {
         assertEquals("", ModelCatalog.parakeet.note)
     }
 
-    @Test fun parakeetCoversExactlySixOfTheEleven() {
-        assertEquals(6, langs.count { ModelRecommendations.covers(ModelCatalog.parakeet, it) })
+    @Test fun parakeetCoversAllFiveLanguages() {
+        assertEquals(5, langs.count { ModelRecommendations.covers(ModelCatalog.parakeet, it) })
     }
 }

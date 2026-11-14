@@ -141,15 +141,74 @@ class SetupLanguageTest {
             assertEquals(setOf(DictationLanguage.ENGLISH), app.settings.languages)
             assertEquals(listOf(whisper, parakeet), s.shownModels())
             assertEquals(listOf(whisper), s.recommendedModels())
-            s.click(DictationLanguage.MANDARIN)
+            s.click(DictationLanguage.FRENCH_QUEBEC) // Quebec French and English: Whisper alone
             assertEquals(listOf(whisper), s.shownModels())
         }
+    }
+
+    /** Issue #60: five check boxes, in this order, on the setup step and in the settings; the sentence about the four languages. */
+    @Test
+    fun onlyTheFiveLanguagesAreOffered() {
+        val expected = listOf("Français (Québec)", "Français (France)", "Anglais", "Espagnol", "Portugais")
+        assertEquals(expected, DictationLanguage.entries.map { it.label })
+        ActivityScenario.launch(SetupActivity::class.java).use { s ->
+            var boxes = emptyList<String>()
+            s.onActivity { a -> boxes = a.window.decorView.allViews().filterIsInstance<CheckBox>().map { it.text.toString() }.toList() }
+            assertEquals(expected, boxes)
+            assertTrue(s.text().contains("Kalmia Blabla comprend le français, l'anglais, l'espagnol et le portugais."))
+        }
+        ActivityScenario.launch(SettingsActivity::class.java).use { s ->
+            var boxes = emptyList<String>()
+            s.onActivity { a ->
+                boxes = a.window.decorView.allViews().filterIsInstance<CheckBox>()
+                    .filter { (it.tag as? String)?.startsWith("lang_") == true }.map { it.text.toString() }.toList()
+            }
+            assertEquals(expected, boxes)
+        }
+    }
+
+    /** Issue #60: update of an existing install. A removed language leaves the stored choice; the notice shows once. */
+    @Test
+    fun anUpdateDropsRemovedLanguagesAndTellsOnce() {
+        app.settings.prefs.edit().putStringSet("languages", setOf("ENGLISH", "MANDARIN", "URDU")).commit()
+        assertTrue(app.settings.migrateLanguages())
+        assertEquals(setOf(DictationLanguage.ENGLISH), app.settings.languages)
+        assertEquals(setOf("ENGLISH"), app.settings.prefs.getStringSet("languages", null))
+        assertTrue(app.settings.languagesNotice)
+        ActivityScenario.launch(SetupActivity::class.java).use { s ->
+            assertTrue(s.hasTag(SetupActivity.LANGUAGES_NOTICE_TAG))
+            assertTrue(s.text().contains("Kalmia Blabla se concentre maintenant sur quatre langues. Vérifiez vos langues."))
+            s.onActivity { a -> a.window.decorView.findViewWithTag<View>(SetupActivity.LANGUAGES_NOTICE_OK_TAG).performClick() }
+            instrumentation.waitForIdleSync()
+            assertTrue(!s.hasTag(SetupActivity.LANGUAGES_NOTICE_TAG))
+        }
+        // Next start-up: the choice is clean, nothing raises the notice again.
+        assertTrue(!app.settings.migrateLanguages())
+        assertTrue(!app.settings.languagesNotice)
+        ActivityScenario.launch(SetupActivity::class.java).use { s -> assertTrue(!s.hasTag(SetupActivity.LANGUAGES_NOTICE_TAG)) }
+    }
+
+    @Test
+    fun anUpdateLeftWithNoLanguageGivesFrenchQuebec() {
+        app.settings.prefs.edit().putStringSet("languages", setOf("HINDI", "ARABIC")).commit()
+        assertTrue(app.settings.migrateLanguages())
+        assertEquals(setOf(DictationLanguage.FRENCH_QUEBEC), app.settings.languages)
+        assertTrue(app.settings.languagesNotice)
+    }
+
+    @Test
+    fun aFreshInstallAndACleanChoiceGetNoNotice() {
+        assertTrue(!app.settings.migrateLanguages())
+        assertTrue(!app.settings.languagesNotice)
+        app.settings.languages = setOf(DictationLanguage.ENGLISH, DictationLanguage.PORTUGUESE)
+        assertTrue(!app.settings.migrateLanguages())
+        assertTrue(!app.settings.languagesNotice)
     }
 
     @Test
     fun hiddenAndExperimentalModelsAreNotOnTheSetupScreen() {
         ActivityScenario.launch(SetupActivity::class.java).use { s ->
-            for (language in listOf(DictationLanguage.ENGLISH, DictationLanguage.MANDARIN, DictationLanguage.BENGALI)) {
+            for (language in listOf(DictationLanguage.ENGLISH, DictationLanguage.SPANISH, DictationLanguage.PORTUGUESE)) {
                 s.click(language)
                 val shown = s.shownModels()
                 assertTrue(shown.toString(), ModelCatalog.qwen3.id !in shown)
@@ -245,7 +304,7 @@ class SetupLanguageTest {
         assertEquals("fr", s.remoteLanguage)
         s.languages = setOf(DictationLanguage.ENGLISH)
         assertEquals("en", s.remoteLanguage)
-        s.languages = setOf(DictationLanguage.MANDARIN)
+        s.languages = setOf(DictationLanguage.SPANISH)
         assertEquals("", s.remoteLanguage)
         s.remoteLanguage = "fr" // explicit
         s.languages = setOf(DictationLanguage.ENGLISH)

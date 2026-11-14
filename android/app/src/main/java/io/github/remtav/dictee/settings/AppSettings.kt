@@ -75,6 +75,24 @@ class AppSettings(context: Context, private val defaultServerUrl: String = io.gi
         get() = DictationLanguages.parse(prefs.getStringSet("languages", null))
         set(v) = prefs.edit().putStringSet("languages", DictationLanguages.serialize(v)).apply()
 
+    /**
+     * Issue #60: drops from the stored choice a language the app no longer offers. A fresh install (nothing
+     * stored) and an already clean choice change nothing. When the choice changes it is rewritten, and
+     * [languagesNotice] is raised, once: the flag is only ever raised here, and a second run finds a clean
+     * choice. Run at start-up, before [io.github.remtav.dictee.DicteeApp.migrateModels].
+     */
+    fun migrateLanguages(): Boolean {
+        val clean = DictationLanguages.cleaned(prefs.getStringSet("languages", null)) ?: return false
+        languages = clean
+        languagesNotice = true
+        return true
+    }
+
+    /** The one-time « Kalmia Blabla se concentre maintenant sur quatre langues » notice is still to be read. */
+    var languagesNotice: Boolean
+        get() = prefs.getBoolean("languages_notice", false)
+        set(v) = prefs.edit().putBoolean("languages_notice", v).apply()
+
     /** « Parlez-vous un français québécois ? » (issue #15, lot 4): self-declared, kept on the phone, editable in the settings. */
     var quebecDeclaration: Declaration
         get() = Declaration.fromName(prefs.getString("qc_declaration", null))

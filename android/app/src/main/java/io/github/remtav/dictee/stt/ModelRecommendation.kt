@@ -13,18 +13,13 @@ enum class DictationLanguage(
     /** Name shown to the user. */
     val label: String,
 ) {
-    // Order of the list shown to the user; Quebec French comes first.
+    // Order of the list shown to the user; Quebec French comes first. Five choices since issue #60:
+    // Mandarin, Hindi, Arabic, Bengali, Russian and Urdu were removed (DECISIONS.md).
     FRENCH_QUEBEC("fr", "Français (Québec)"),
     FRENCH_FRANCE("fr", "Français (France)"),
     ENGLISH("en", "Anglais"),
-    MANDARIN("zh", "Mandarin"),
-    HINDI("hi", "Hindi"),
     SPANISH("es", "Espagnol"),
-    ARABIC("ar", "Arabe"),
-    BENGALI("bn", "Bengali"),
-    PORTUGUESE("pt", "Portugais"),
-    RUSSIAN("ru", "Russe"),
-    URDU("ur", "Ourdou");
+    PORTUGUESE("pt", "Portugais");
 
     /** The name inside a sentence: first letter in lower case only, so « (Québec) » keeps its capital. */
     val inSentence: String get() = label.replaceFirstChar { it.lowercase() }
@@ -43,14 +38,12 @@ object ModelRecommendations {
     private val parakeetLanguages = setOf(
         DictationLanguage.FRENCH_QUEBEC, DictationLanguage.FRENCH_FRANCE,
         DictationLanguage.ENGLISH, DictationLanguage.SPANISH,
-        DictationLanguage.PORTUGUESE, DictationLanguage.RUSSIAN,
+        DictationLanguage.PORTUGUESE,
     )
 
-    private val qwen3Languages = parakeetLanguages + setOf(
-        DictationLanguage.MANDARIN, DictationLanguage.HINDI, DictationLanguage.ARABIC,
-    )
+    private val qwen3Languages = parakeetLanguages
 
-    // Whisper's tokenizer lists all eleven (zh, hi, ar, bn, ur included).
+    // Whisper's tokenizer lists all five (and many more).
     private val whisperLanguages = DictationLanguage.entries.toSet()
 
     /**
@@ -83,7 +76,7 @@ object ModelRecommendations {
 
     /**
      * Issue #22: Whisper large-v3-turbo is always the recommended model. It did best in the user's
-     * tests, Quebec French included, and it covers all eleven languages. With French (France), English,
+     * tests, Quebec French included, and it covers all five languages. With French (France), English,
      * Spanish or Portuguese only, Parakeet is offered as a lighter option ([ModelCatalog.offered],
      * [TranscriptionAdvisor.lightPossible]); it is never the recommendation, the quick test may suggest it.
      * Hidden and experimental models are never recommended.

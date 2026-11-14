@@ -4,7 +4,6 @@ import io.github.remtav.dictee.stt.DictationLanguage
 import io.github.remtav.dictee.stt.DictationLanguage.ENGLISH
 import io.github.remtav.dictee.stt.DictationLanguage.FRENCH_FRANCE
 import io.github.remtav.dictee.stt.DictationLanguage.FRENCH_QUEBEC
-import io.github.remtav.dictee.stt.DictationLanguage.MANDARIN
 import io.github.remtav.dictee.stt.DictationLanguage.PORTUGUESE
 import io.github.remtav.dictee.stt.DictationLanguage.SPANISH
 import io.github.remtav.dictee.stt.ModelCatalog
@@ -18,7 +17,7 @@ import org.junit.Test
 
 /** Issue #36, recentred on the phone (issue #57): the table languages → phone models. */
 class TranscriptionAdvisorTest {
-    /** Every non-empty combination of the eleven languages. */
+    /** Every non-empty combination of the five languages. */
     private val combos: List<Set<DictationLanguage>> = (1 until (1 shl DictationLanguage.entries.size)).map { mask ->
         DictationLanguage.entries.filterIndexed { i, _ -> mask and (1 shl i) != 0 }.toSet()
     }
@@ -56,16 +55,14 @@ class TranscriptionAdvisorTest {
             assertNull(c.toString(), TranscriptionAdvisor.choice(c).light)
             assertFalse(c.toString(), ModelCatalog.parakeet in ModelCatalog.offered(c))
         }
-        assertNull(TranscriptionAdvisor.choice(setOf(ENGLISH, MANDARIN)).light)
         assertNull(TranscriptionAdvisor.choice(emptySet()).light)
     }
 
     @Test fun quickTestLanguageIsTheFirstChosenOfTheFive() {
         assertEquals(FRENCH_QUEBEC, TranscriptionAdvisor.quickTestLanguage(setOf(PORTUGUESE, FRENCH_QUEBEC)))
-        assertEquals(FRENCH_FRANCE, TranscriptionAdvisor.quickTestLanguage(setOf(ENGLISH, FRENCH_FRANCE, MANDARIN)))
-        assertEquals(ENGLISH, TranscriptionAdvisor.quickTestLanguage(setOf(MANDARIN, ENGLISH, SPANISH)))
+        assertEquals(FRENCH_FRANCE, TranscriptionAdvisor.quickTestLanguage(setOf(ENGLISH, FRENCH_FRANCE)))
+        assertEquals(ENGLISH, TranscriptionAdvisor.quickTestLanguage(setOf(ENGLISH, SPANISH)))
         assertEquals(SPANISH, TranscriptionAdvisor.quickTestLanguage(setOf(SPANISH, PORTUGUESE)))
-        assertNull(TranscriptionAdvisor.quickTestLanguage(setOf(MANDARIN)))
         assertNull(TranscriptionAdvisor.quickTestLanguage(emptySet()))
     }
 

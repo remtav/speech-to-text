@@ -77,11 +77,9 @@ textes n'ont pas changé.
 ### 5. La table de recommandation te convient-elle ?
 
 - **Règle** : Parakeet si toutes les langues choisies sont parmi ses 25 ;
-  sinon Qwen3-ASR s'il les couvre toutes ; sinon Whisper. Bengali et ourdou ne
-  sont couverts que par Whisper (absents de la fiche de Qwen3-ASR). « Chinese »
-  sur la fiche de Qwen3-ASR a été lu comme le mandarin.
-- **Non mesuré** : la qualité réelle de Whisper en bengali et en ourdou, et
-  l'effet de la langue forcée sur Whisper quand une seule langue est choisie.
+  sinon Qwen3-ASR s'il les couvre toutes ; sinon Whisper. Depuis #60, l'application ne
+  propose que cinq langues (français Québec et France, anglais, espagnol, portugais).
+- **Non mesuré** : l'effet de la langue forcée sur Whisper quand une seule langue est choisie.
 - **Où corriger** : `android/app/src/main/java/io/github/remtav/dictee/stt/ModelRecommendation.kt`.
 
 ## Lot 2 — ponctuation dictée et tutoriel « Comment dicter »
