@@ -1,5 +1,6 @@
 package io.github.remtav.dictee
 
+import io.github.remtav.dictee.ime.KeyLanguage
 import io.github.remtav.dictee.ime.KeyboardLayout
 import io.github.remtav.dictee.ime.LayoutKind
 import io.github.remtav.dictee.ime.ShiftState
@@ -10,13 +11,14 @@ import org.junit.Test
 /** Issue #21: the layouts, the accents by long press, Shift and its lock. */
 class KeyboardLayoutTest {
 
+    private val fr = setOf(KeyLanguage.FRENCH)
     private val accentedLower = "éèêëàâæçîïôœùûüÿ"
     private val accentedUpper = accentedLower.uppercase()
 
     @Test
     fun everyFrenchAccentIsReachableInBothLayouts() {
         for (kind in LayoutKind.entries) {
-            val reachable = KeyboardLayout.reachable(kind)
+            val reachable = KeyboardLayout.reachable(kind, setOf(KeyLanguage.FRENCH))
             for (c in accentedLower + accentedUpper) {
                 assertTrue("$c missing in $kind", c.toString() in reachable)
             }
@@ -25,16 +27,16 @@ class KeyboardLayoutTest {
 
     @Test
     fun accentsOfEachKeyMatchTheIssue() {
-        assertEquals(listOf("é", "è", "ê", "ë"), KeyboardLayout.accentsFor("e"))
-        assertEquals(listOf("à", "â", "æ"), KeyboardLayout.accentsFor("a"))
-        assertEquals(listOf("ç"), KeyboardLayout.accentsFor("c"))
-        assertEquals(listOf("î", "ï"), KeyboardLayout.accentsFor("i"))
-        assertEquals(listOf("ô", "œ"), KeyboardLayout.accentsFor("o"))
-        assertEquals(listOf("ù", "û", "ü"), KeyboardLayout.accentsFor("u"))
-        assertEquals(listOf("ÿ"), KeyboardLayout.accentsFor("y"))
-        assertEquals(listOf("É", "È", "Ê", "Ë"), KeyboardLayout.accentsFor("e", upper = true))
-        assertEquals(listOf("Œ"), KeyboardLayout.accentsFor("o", upper = true).drop(1))
-        assertTrue(KeyboardLayout.accentsFor("z").isEmpty())
+        assertEquals(listOf("é", "è", "ê", "ë"), KeyboardLayout.accentsFor("e", languages = fr))
+        assertEquals(listOf("à", "â", "æ"), KeyboardLayout.accentsFor("a", languages = fr))
+        assertEquals(listOf("ç"), KeyboardLayout.accentsFor("c", languages = fr))
+        assertEquals(listOf("î", "ï"), KeyboardLayout.accentsFor("i", languages = fr))
+        assertEquals(listOf("ô", "œ"), KeyboardLayout.accentsFor("o", languages = fr))
+        assertEquals(listOf("ù", "û", "ü"), KeyboardLayout.accentsFor("u", languages = fr))
+        assertEquals(listOf("ÿ"), KeyboardLayout.accentsFor("y", languages = fr))
+        assertEquals(listOf("É", "È", "Ê", "Ë"), KeyboardLayout.accentsFor("e", upper = true, languages = fr))
+        assertEquals(listOf("Œ"), KeyboardLayout.accentsFor("o", upper = true, languages = fr).drop(1))
+        assertTrue(KeyboardLayout.accentsFor("z", languages = fr).isEmpty())
     }
 
     @Test

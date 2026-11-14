@@ -134,6 +134,14 @@ class ScreenshotTest : ImeTestBase() {
             tapMic()
             awaitIdle()
             shot("keyboard-text-$suffix", scenario)
+            // The text keys (issue #42: Spanish and Portuguese chosen) and the pad of an amount field.
+            app.settings.languages = setOf(DictationLanguage.FRENCH_QUEBEC, DictationLanguage.SPANISH, DictationLanguage.PORTUGUESE)
+            onMain { service.setTextKeyboardShown(true) }
+            focus(2)
+            shot("keyboard-keys-$suffix", scenario)
+            focus(7)
+            shot("keyboard-pad-$suffix", scenario)
+            onMain { service.setTextKeyboardShown(false) }
             scenario.close()
         }
     }
