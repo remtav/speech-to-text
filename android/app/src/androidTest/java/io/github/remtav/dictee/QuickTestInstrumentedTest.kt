@@ -284,7 +284,7 @@ class QuickTestInstrumentedTest {
     /** Issue #72: the installation no longer offers the test, whatever the languages or the models on the phone. */
     @Test
     fun theSetupScreenNoLongerOffersTheTest() {
-        for (languages in listOf(setOf(DictationLanguage.ENGLISH), setOf(DictationLanguage.FRENCH_QUEBEC), setOf(DictationLanguage.MANDARIN))) {
+        for (languages in listOf(setOf(DictationLanguage.ENGLISH), setOf(DictationLanguage.FRENCH_QUEBEC), setOf(DictationLanguage.PORTUGUESE))) {
             app.settings.languages = languages
             ActivityScenario.launch(SetupActivity::class.java).use { s -> assertFalse(s.has(SetupActivity.QUICK_TEST_BUTTON_TAG)) }
         }

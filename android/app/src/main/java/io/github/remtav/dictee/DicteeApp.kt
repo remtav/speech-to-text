@@ -89,6 +89,7 @@ class DicteeApp : Application() {
         // Messages are redacted by RemoteEngine: no token or Cloudflare secret reaches logcat.
         RemoteEngine.defaultLog = RemoteLog { android.util.Log.i("DicteeRemote", it) }
         applyTheme()
+        settings.migrateLanguages()
         migrateModels()
         // Reading-test contribution (issue #15, step 4.3): an archive is deleted with its screen; one that
         // survived a killed process for more than a day goes now (not younger: the person's mail may still
