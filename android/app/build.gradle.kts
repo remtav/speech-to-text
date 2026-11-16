@@ -96,12 +96,12 @@ val fetchHostNative by tasks.registering {
 
 android {
     namespace = "io.github.remtav.dictee"
-    compileSdk = 35
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "io.github.remtav.dictee"
         minSdk = 29
-        targetSdk = 35
+        targetSdk = 36
         // CI passes the workflow run number so each published APK upgrades the previous one.
         versionCode = (project.findProperty("versionCode") as String?)?.toInt() ?: 1
         versionName = (project.findProperty("versionName") as String?) ?: "0.1.0-dev"
