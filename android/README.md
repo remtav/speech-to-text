@@ -584,13 +584,14 @@ téléphone sont dans [`docs/POLISSAGE_LOCAL.md`](docs/POLISSAGE_LOCAL.md).
 
 ## Développement
 
-Prérequis : JDK 17+, SDK Android (plateforme 35). Les dépendances natives
+Prérequis : JDK 17+, SDK Android (plateforme 36). Les dépendances natives
 (AAR sherpa-onnx, VAD Silero) sont téléchargées et vérifiées par Gradle.
 
 ```bash
 cd android
 ./gradlew assembleDebug              # APK debug (arm64 + x86_64)
 ./gradlew assembleRelease            # APK release (arm64)
+./gradlew bundleRelease              # bundle Play Store (.aab, arm64)
 ./gradlew testDebugUnitTest          # tests JVM (dont le VAD sherpa-onnx réel)
 ./gradlew testDebugUnitTest -PmodelsDir=$HOME/dictee-models \
     --tests '*ModelAccuracyHostTest*' --tests '*EndToEndHostTest*'
@@ -628,3 +629,28 @@ il construit et teste, sans rien publier. Une publication exige tous les jobs
 verts ; seule exception, un lancement manuel avec la case « skip_slow_tests »
 cochée saute les tests de modèles et l'émulateur et publie dès que le build
 (tests unitaires, signature) est vert, avec un avertissement dans le résumé.
+
+### Play Store
+
+Le Play Store n'accepte pas d'APK pour une nouvelle application : il demande un
+bundle (`.aab`). La CI le construit avec l'APK, le signe avec la même clé privée et
+le joint à chaque release (`dictee-0.1.<run>.aab`, aussi dans l'artefact `dictee-aab`
+du run). Pour un test interne :
+
+1. Lancer Actions → Android → Run workflow sur `main` (au besoin avec
+   « skip_slow_tests »), puis télécharger le `.aab` de la release `android-v…`.
+2. Play Console → Tests et publication → Tests internes → Créer une version →
+   téléverser le `.aab`.
+
+À la première version, Play propose sa signature d'application (Play App Signing) :
+le `.aab` est signé par la clé d'importation (ici `dictee-release.p12`) et Google
+re-signe ce qu'il distribue. Si Google génère sa propre clé de signature, la version
+du Play Store et l'APK des releases GitHub portent des signatures différentes : on
+ne peut pas installer l'une par-dessus l'autre (désinstaller d'abord). Pour garder
+une seule signature, choisir à cette étape « utiliser ma propre clé » et téléverser
+`dictee-release.p12` chiffrée avec l'outil PEPK que la console fournit.
+
+Chaque version envoyée au Play Store doit avoir un `versionCode` plus grand que la
+précédente : le numéro du run de la CI s'en charge. Play exige aussi un `targetSdk`
+récent (36 depuis le 31 août 2026) et des bibliothèques natives alignées sur 16 Ko
+(c'est le cas de sherpa-onnx 2.0.1, onnxruntime et MediaPipe).
