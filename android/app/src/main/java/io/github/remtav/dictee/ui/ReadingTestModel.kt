@@ -20,6 +20,7 @@ import io.github.remtav.dictee.reading.ReadingTranscriber
 import io.github.remtav.dictee.reading.SecondTicker
 import io.github.remtav.dictee.reading.ShareOffer
 import io.github.remtav.dictee.stt.ModelCatalog
+import io.github.remtav.dictee.stt.ModelPlainNames
 import java.io.File
 import kotlin.concurrent.thread
 
@@ -191,7 +192,7 @@ class ReadingTestModel(private val app: DicteeApp, val session: ReadingSession) 
     /** Display name of a model of the test. */
     fun labelOf(modelId: String): String =
         session.models.firstOrNull { it.id == modelId }?.label
-            ?: onDevice(modelId)?.let { io.github.remtav.dictee.stt.ModelPlainNames.of(it) } ?: modelId
+            ?: onDevice(modelId)?.let { ModelPlainNames.of(it) } ?: modelId
 
     /** The sharing offer of the current result, or null when nothing is offered (below the threshold). */
     fun shareOffer(): ShareOffer? {

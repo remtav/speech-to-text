@@ -5,6 +5,7 @@ import io.github.remtav.dictee.audio.SpeechChunk
 import io.github.remtav.dictee.stt.AudioBlock
 import io.github.remtav.dictee.stt.BlockDictation
 import io.github.remtav.dictee.stt.DictationResult
+import io.github.remtav.dictee.stt.RemoteException
 import io.github.remtav.dictee.stt.Transcription
 import io.github.remtav.dictee.stt.WaitControl
 import io.github.remtav.dictee.stt.monotonicMillis
@@ -431,7 +432,7 @@ class DictationController(
                 setWaiting(id, false)
                 return
             } catch (e: Throwable) {
-                val detail = if (e is io.github.remtav.dictee.stt.RemoteException) e.message else e.cause?.message ?: e.message
+                val detail = if (e is RemoteException) e.message else e.cause?.message ?: e.message
                 error = "Erreur de transcription : ${detail ?: e.javaClass.simpleName}"
                 stopRequested = true
             }

@@ -1,5 +1,8 @@
 package io.github.remtav.dictee.stt
 
+import io.github.remtav.dictee.dictation.LocalGrouping
+import io.github.remtav.dictee.text.WhisperRepetition
+
 /**
  * Speed settings specific to Whisper (issue #15, user request: Whisper turbo is too slow
  * on the phone). Pure functions, so the rules are unit-tested without a model.
@@ -27,7 +30,7 @@ object WhisperTuning {
 
     /**
      * « Automatique » choice of « Silence ajouté pour Whisper » (issue #49): a short padding of 300 frames
-     * plus the repetition filter ([io.github.remtav.dictee.text.WhisperRepetition]).
+     * plus the repetition filter ([WhisperRepetition]).
      */
     const val AUTO_TAIL_PADDINGS = 300
 
@@ -41,10 +44,10 @@ object WhisperTuning {
     /**
      * sherpa-onnx 2.0.1 stops Whisper after this many tokens: 6 per second of the samples given, tail padding
      * not counted (`offline-whisper-greedy-search-decoder.cc`). Same formula as
-     * [io.github.remtav.dictee.text.WhisperRepetition.tokenCeiling].
+     * [WhisperRepetition.tokenCeiling].
      */
     fun tokenCeiling(samples: Int, sampleRate: Int): Int =
-        io.github.remtav.dictee.text.WhisperRepetition.tokenCeiling(samples, sampleRate)
+        WhisperRepetition.tokenCeiling(samples, sampleRate)
 
     /** The decode stopped at the ceiling (within one token: the frame count of sherpa-onnx can be one lower). */
     fun atTokenCeiling(tokens: Int, samples: Int, sampleRate: Int): Boolean {
@@ -71,7 +74,7 @@ object WhisperTuning {
 
     /**
      * « Regrouper les énoncés (Whisper) » (issue #53): 0 (off, the default) or the minimum length of a group, in
-     * seconds. Two values to try on the phone; see [io.github.remtav.dictee.dictation.LocalGrouping].
+     * seconds. Two values to try on the phone; see [LocalGrouping].
      */
     val GROUP_CHOICES = listOf(0, 5, 10)
 
@@ -81,9 +84,9 @@ object WhisperTuning {
     /**
      * The grouping of a local dictation with [spec]: only for Whisper (Parakeet is left as it is), null when the setting is off.
      */
-    fun groupingFor(spec: ModelSpec, seconds: Int): io.github.remtav.dictee.dictation.LocalGrouping? {
+    fun groupingFor(spec: ModelSpec, seconds: Int): LocalGrouping? {
         val v = sanitizeGroupSeconds(seconds)
-        return if (spec.family == ModelFamily.WHISPER && v > 0) io.github.remtav.dictee.dictation.LocalGrouping(v.toFloat()) else null
+        return if (spec.family == ModelFamily.WHISPER && v > 0) LocalGrouping(v.toFloat()) else null
     }
 
     /**
@@ -96,8 +99,8 @@ object WhisperTuning {
 }
 
 /**
- * What [io.github.remtav.dictee.stt.SherpaEngine] does with a Whisper segment in which
- * [io.github.remtav.dictee.text.WhisperRepetition] finds a repetition (issue #49, « Correction des
+ * What [SherpaEngine] does with a Whisper segment in which
+ * [WhisperRepetition] finds a repetition (issue #49, « Correction des
  * répétitions (Whisper) »). Both are kept so the user can compare them on the phone.
  */
 enum class RepetitionFix(val reportLabel: String) {

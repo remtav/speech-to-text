@@ -19,6 +19,7 @@ import io.github.remtav.dictee.ime.LayoutKind
 import io.github.remtav.dictee.settings.ThemeMode
 import io.github.remtav.dictee.stt.Acceleration
 import io.github.remtav.dictee.stt.ModelCatalog
+import io.github.remtav.dictee.stt.ModelSpec
 import io.github.remtav.dictee.stt.RemoteApi
 import io.github.remtav.dictee.stt.RemoteEngine
 import io.github.remtav.dictee.stt.TranscriptionMode
@@ -478,6 +479,6 @@ class SettingsActivity : AppCompatActivity() {
         const val COMPARE_TAG = "settings_compare"
         const val QUICK_TEST_TAG = "settings_quick_test"
         /** Tag of an « Avancé » model's card, for tests. */
-        fun advancedCardTag(spec: io.github.remtav.dictee.stt.ModelSpec) = "advanced_card_${spec.id}"
+        fun advancedCardTag(spec: ModelSpec) = "advanced_card_${spec.id}"
     }
 }

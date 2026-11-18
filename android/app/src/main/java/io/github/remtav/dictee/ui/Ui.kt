@@ -14,7 +14,9 @@ import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.card.MaterialCardView
+import io.github.remtav.dictee.DicteeApp
 import io.github.remtav.dictee.R
+import io.github.remtav.dictee.reading.Participation
 import io.github.remtav.dictee.settings.AppSettings
 import io.github.remtav.dictee.stt.DictationLanguage
 
@@ -246,7 +248,7 @@ internal fun LinearLayout.renderLanguageChoices(settings: AppSettings, onChange:
                 } else {
                     settings.languages = next
                     // An active model that no longer suits the chosen languages is replaced.
-                    io.github.remtav.dictee.DicteeApp.from(context).ensureModelSuitsLanguages()
+                    DicteeApp.from(context).ensureModelSuitsLanguages()
                     onChange()
                 }
             }
@@ -264,7 +266,7 @@ internal const val PARTICIPATION_DISMISS_TAG = "participation_dismiss"
  * button that starts the reading test. [onDismiss] adds the close button (main screen only: in the settings
  * the card stays). [filled] false on the installation screen, whose one filled button is the next step
  * (issue #55). Showing it changes nothing in how the app works; the decision to show it is
- * [io.github.remtav.dictee.reading.Participation].
+ * [Participation].
  */
 internal fun ViewGroup.participationCard(onStart: () -> Unit, onDismiss: (() -> Unit)?, filled: Boolean = true) {
     val card = card()

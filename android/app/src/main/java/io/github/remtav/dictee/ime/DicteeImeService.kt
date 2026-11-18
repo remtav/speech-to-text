@@ -28,12 +28,14 @@ import androidx.core.content.ContextCompat
 import com.google.android.material.button.MaterialButton
 import io.github.remtav.dictee.DicteeApp
 import io.github.remtav.dictee.R
+import io.github.remtav.dictee.TestHooks
 import io.github.remtav.dictee.dictation.DictationController
 import io.github.remtav.dictee.dictation.DictationListener
 import io.github.remtav.dictee.dictation.DictationState
 import io.github.remtav.dictee.dictation.TextSink
 import io.github.remtav.dictee.settings.ThemeMode
 import io.github.remtav.dictee.stt.EngineManager
+import io.github.remtav.dictee.stt.ModelPlainNames
 import io.github.remtav.dictee.stt.TranscriptionMode
 import io.github.remtav.dictee.stt.ModelCatalog
 import io.github.remtav.dictee.stt.DictationResult
@@ -42,6 +44,7 @@ import io.github.remtav.dictee.stt.ModelSpec
 import io.github.remtav.dictee.stt.RemoteApi
 import io.github.remtav.dictee.stt.Transcription
 import io.github.remtav.dictee.ui.HowToActivity
+import io.github.remtav.dictee.ui.SettingsActivity
 import io.github.remtav.dictee.ui.SetupActivity
 import java.lang.ref.WeakReference
 
@@ -443,7 +446,7 @@ class DicteeImeService : InputMethodService(), DictationListener, EngineManager.
             return
         }
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED &&
-            io.github.remtav.dictee.TestHooks.audioSourceFactory == null
+            TestHooks.audioSourceFactory == null
         ) {
             showMessage(getString(R.string.msg_no_permission), error = true)
             openSettings()
@@ -652,7 +655,7 @@ class DicteeImeService : InputMethodService(), DictationListener, EngineManager.
         val shown = app.shownSpec()
         installed.forEachIndexed { i, spec ->
             // Issue #72: « Whisper » in the keyboard; a lone entry is kept (reported in the PR).
-            menu.menu.add(0, i, i, io.github.remtav.dictee.stt.ModelPlainNames.of(spec)).apply {
+            menu.menu.add(0, i, i, ModelPlainNames.of(spec)).apply {
                 isCheckable = true
                 isChecked = spec.id == shown.id
             }
@@ -704,8 +707,8 @@ class DicteeImeService : InputMethodService(), DictationListener, EngineManager.
     /** The settings screen, at the "Envoi au serveur" choice. */
     private fun openSettingsScreen() {
         startActivity(
-            Intent(this, io.github.remtav.dictee.ui.SettingsActivity::class.java)
-                .putExtra(io.github.remtav.dictee.ui.SettingsActivity.EXTRA_SCROLL_TO_SERVER_MODE, true)
+            Intent(this, SettingsActivity::class.java)
+                .putExtra(SettingsActivity.EXTRA_SCROLL_TO_SERVER_MODE, true)
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
         )
     }
@@ -726,7 +729,7 @@ class DicteeImeService : InputMethodService(), DictationListener, EngineManager.
         val mic = micButton ?: return
         val status = statusText ?: return
         val spec = app.shownSpec()
-        modelButton?.text = io.github.remtav.dictee.stt.ModelPlainNames.short(spec)
+        modelButton?.text = ModelPlainNames.short(spec)
         // Issue #72: with a single entry (Whisper alone: no server, no « Avancé » model active) the button has nothing to offer.
         modelButton?.visibility = if (modelChoices().size > 1) View.VISIBLE else View.GONE
         val state = controller.state
@@ -754,10 +757,10 @@ class DicteeImeService : InputMethodService(), DictationListener, EngineManager.
             ).let { if (blocksTotal > 1) getString(R.string.status_server_blocks, it.trimEnd('…'), blocksDone, blocksTotal) else it } to false
             lastMessage != null && !listening -> lastMessage!! to lastMessageIsError
             state == DictationState.FINISHING -> getString(R.string.status_finishing) to false
-            listening && es is EngineManager.State.Loading -> getString(R.string.status_listening_loading, io.github.remtav.dictee.stt.ModelPlainNames.inSentence(es.spec)) to false
+            listening && es is EngineManager.State.Loading -> getString(R.string.status_listening_loading, ModelPlainNames.inSentence(es.spec)) to false
             listening && speaking -> getString(R.string.status_speaking) to false
             listening -> getString(R.string.status_listening) to false
-            es is EngineManager.State.Loading -> getString(R.string.status_loading, io.github.remtav.dictee.stt.ModelPlainNames.inSentence(es.spec)) to false
+            es is EngineManager.State.Loading -> getString(R.string.status_loading, ModelPlainNames.inSentence(es.spec)) to false
             es is EngineManager.State.Failed -> es.message to true
             es is EngineManager.State.Ready && es.note != null -> es.note to false
             !app.isInstalled(spec) -> getString(R.string.msg_no_model) to true
