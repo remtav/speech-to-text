@@ -23,7 +23,7 @@ import org.junit.runner.RunWith
 
 /**
  * Issue #15, step 1.3, and issue #22: first launch -> welcome -> language choice ->
- * only the models offered for the languages are shown (Whisper, alone since #72); changing the languages in the settings changes the offer. Reads the view tree (stable tags and ids), needs neither
+ * only the models offered for the languages are shown (Whisper alone); changing the languages in the settings changes the offer. Reads the view tree (stable tags and ids), needs neither
  * network nor an installed model.
  */
 @RunWith(AndroidJUnit4::class)

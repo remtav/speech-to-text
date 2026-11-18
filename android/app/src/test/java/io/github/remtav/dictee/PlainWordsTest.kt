@@ -89,7 +89,7 @@ class PlainWordsTest {
         for (r in retired) for (n in names) assertFalse("$n : $r", n.contains(r))
         val source = main.resolve("java/io/github/remtav/dictee/stt/ModelPlainNames.kt").readText()
         for (r in retired) assertFalse("ModelPlainNames.kt : $r", source.substringAfter("object ModelPlainNames").contains("\"$r\""))
-        // The strings of the hidden quick test too: Whisper, not the old name (their verdicts are not rewritten).
+        // The quick test's strings too (reached from the settings only): none uses the retired names.
         for ((key, text) in strings) {
             for (r in listOf("modèle plus précis", "Plus précis")) assertFalse("$key : $r", text.contains(r))
         }

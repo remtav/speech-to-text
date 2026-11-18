@@ -71,7 +71,7 @@ object ModelRecommendations {
      * Quebec French included, and it covers all five languages. Advanced models are never
      * recommended.
      *
-     * Issue #72: the model is named « Whisper » (a step back from #37), in one sentence that mentions no second model.
+     * Issue #72: the model is named « Whisper », in one sentence that mentions no second model.
      */
     @Suppress("UNUSED_PARAMETER")
     fun recommend(chosen: Set<DictationLanguage>): ModelRecommendation =

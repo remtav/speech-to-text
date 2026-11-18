@@ -274,8 +274,7 @@ object CommandTable {
      * Commands active for [chosen], in table order (what the help screen lists).
      * French and/or English as chosen. With neither (Spanish only, for
      * instance), no punctuation command: it would be French or English words in
-     * another language; the line breaks and deletions of both languages stay, as
-     * before step 2.2.
+     * another language; the line breaks and deletions of both languages stay.
      */
     fun active(chosen: Set<DictationLanguage>): List<CommandEntry> {
         val langs = languagesFor(chosen)
