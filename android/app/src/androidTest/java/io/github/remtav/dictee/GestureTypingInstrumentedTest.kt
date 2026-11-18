@@ -81,8 +81,10 @@ class GestureTypingInstrumentedTest : ImeTestBase() {
         showTextKeyboard()
         trace("tout")
         waitFor("a word written", 15_000, details = { field1() }) { field1().isNotEmpty() }
-        waitFor("other guesses in the bar", 5_000, details = { barWords().toString() }) { barWords().isNotEmpty() }
-        val other = barWords().first()
+        // The best other guess sits in the middle of the bar.
+        fun middle() = device.findObject(res("suggestion_middle"))?.text.orEmpty()
+        waitFor("other guesses in the bar", 5_000, details = { barWords().toString() }) { middle().isNotEmpty() }
+        val other = middle()
         assertFalse("the written word is not offered again", other == field1())
         obj(By.text(other).res(BuildConfig.APPLICATION_ID, "suggestion_middle"), "first other guess").click()
         waitFor("replaced", 5_000, details = { field1() }) { field1() == "$other " }
