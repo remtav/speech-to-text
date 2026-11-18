@@ -25,6 +25,13 @@ object DictationLanguages {
         whisperLanguage(chosen).takeIf { it in remoteCodes } ?: ""
 
     /**
+     * Languages the server's automatic detection chooses among (issue #86): the distinct engine codes of
+     * [chosen], in list order, when there are several; empty for a single one (nothing to limit).
+     */
+    fun detectionLanguages(chosen: Set<DictationLanguage>): List<String> =
+        DictationLanguage.entries.filter { it in chosen }.map { it.engineCode }.distinct().takeIf { it.size > 1 }.orEmpty()
+
+    /**
      * Reads a stored set of enum names. Unknown names are dropped; an absent or
      * empty result falls back to [DictationLanguage.default], so the selection
      * is never empty. The result follows the order of the list shown to the user.

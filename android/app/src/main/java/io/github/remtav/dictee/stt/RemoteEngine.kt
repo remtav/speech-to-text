@@ -69,7 +69,7 @@ class RemoteEngine(
         val fields = LinkedHashMap<String, String>()
         when (config.api) {
             RemoteApi.DICTEE_SERVER -> {
-                if (config.language.isNotBlank()) fields["language"] = config.language
+                putLanguage(fields)
                 if (polish) fields["polish"] = "true" else if (explicitOff) fields["polish"] = "false"
             }
             RemoteApi.OPENAI -> {
@@ -80,6 +80,15 @@ class RemoteEngine(
             }
         }
         return fields
+    }
+
+    /**
+     * This repository's server: the forced language, or else the user's languages the detection chooses among
+     * (issue #86: a wrongly detected language makes Whisper translate instead of transcribe).
+     */
+    private fun putLanguage(fields: MutableMap<String, String>) {
+        if (config.language.isNotBlank()) fields["language"] = config.language
+        else if (config.detectLanguages.isNotEmpty()) fields["languages"] = config.detectLanguages.joinToString(",")
     }
 
     // --------------------------------------------------------- whole dictation
@@ -114,7 +123,7 @@ class RemoteEngine(
                 val fields = LinkedHashMap<String, String>().apply {
                     put("quick", "true")
                     put("polish", if (config.polish) "true" else "false")
-                    if (config.language.isNotBlank()) put("language", config.language)
+                    putLanguage(this)
                 }
                 val job = runJob(fields, wav, deadline, control, syncFields(polish = config.polish, explicitOff = true))
                 serverResult(job.result, job.uploadMillis, elapsed(start), seconds, job.transport, config.polish)
@@ -210,30 +219,27 @@ class RemoteEngine(
     }
 
     override fun transcribeBlock(
-        audio: FloatArray, language: String, prompt: String, polish: Boolean, notAfter: Long, control: WaitControl,
+        audio: FloatArray, prompt: String, polish: Boolean, notAfter: Long, control: WaitControl,
     ): BlockText {
         val seconds = audio.size / SttEngine.SAMPLE_RATE.toFloat()
         if (audio.isEmpty()) return BlockText("", "")
         val deadline = minOf(notAfter, now() + config.waitBudgetMillis(seconds))
         val wav = WavReader.encode(PcmAudio(audio, SttEngine.SAMPLE_RATE))
-        val lang = config.language.ifBlank { language }
         val askPolish = polish && polishWanted
         log("block: %.1f s, %d bytes, api %s, polish %s".format(java.util.Locale.ROOT, seconds, wav.size, config.api, askPolish))
         return when (config.api) {
             RemoteApi.OPENAI -> {
-                val fields = syncFields(polish = false)
-                if (lang.isNotBlank()) fields["language"] = lang
-                val json = parse(postCancellable(config.transcriptionUrl(), fields, wav, deadline, control))
-                BlockText(json.optString("text", "").trim(), json.optString("language", "").ifBlank { lang })
+                val json = parse(postCancellable(config.transcriptionUrl(), syncFields(polish = false), wav, deadline, control))
+                BlockText(json.optString("text", "").trim(), json.optString("language", "").ifBlank { config.language })
             }
             RemoteApi.DICTEE_SERVER -> {
                 val fields = LinkedHashMap<String, String>().apply {
                     put("quick", "true")
                     put("polish", if (askPolish) "true" else "false")
-                    if (lang.isNotBlank()) put("language", lang)
+                    putLanguage(this)
                     promptTail(prompt).takeIf { it.isNotEmpty() }?.let { put("prompt", it) }
                 }
-                val sync = syncFields(polish = askPolish, explicitOff = true).apply { if (lang.isNotBlank()) put("language", lang) }
+                val sync = syncFields(polish = askPolish, explicitOff = true)
                 val job = runJob(fields, wav, deadline, control, sync)
                 val raw = job.result.optString("text", "").trim()
                 val detected = job.result.optString("language", "").takeIf { it != "null" }.orEmpty()

@@ -189,6 +189,24 @@ class TestTranscribe:
     def test_invalid_language(self, client):
         assert _post_audio(client, data={"language": "klingon"}).status_code == 400
 
+    @pytest.mark.parametrize("path", ["/transcribe", "/transcribe/streaming", "/jobs"])
+    def test_languages_limit_the_detection(self, client, path):
+        # Issue #86: the user's languages, comma-separated, in their order; duplicates and case dropped.
+        response = _post_audio(client, path, data={"languages": " FR, en ,fr", "quick": "true"})
+        assert response.status_code in (200, 202)
+        if path == "/jobs":
+            _wait_job(client, response.json()["id"])
+        assert client.engine.calls[-1][2]["languages"] == ["fr", "en"]
+
+    def test_no_languages_by_default(self, client):
+        _post_audio(client, data={"languages": " "})
+        assert "languages" not in client.engine.calls[-1][2]
+
+    def test_invalid_languages(self, client):
+        response = _post_audio(client, data={"languages": "fr,klingon"})
+        assert response.status_code == 400
+        assert "klingon" in response.json()["detail"]
+
     def test_diarization(self, client, monkeypatch):
         monkeypatch.setenv("HF_TOKEN", "hf_test")
         data = _post_audio(client, data={"diarize": "true"}).json()

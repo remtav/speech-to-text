@@ -83,6 +83,14 @@ Transcribe an audio file, optionally identifying speakers.
 | `max_speakers` | `int`   | Maximum number of speakers (optional)                              |
 | `polish`       | `bool`  | Also return an LLM-polished text (default: `WHISPER_POLISH`, i.e. `false`) |
 | `prompt`       | `string`| `POST /jobs` only: context given to Whisper as `initial_prompt` (≤ 1000 characters, optional) |
+| `language`     | `string`| Whisper language code such as `fr`, or `auto` / absent to detect it (optional) |
+| `languages`    | `string`| With detection: the speaker's languages, comma-separated (`fr,en`); detection only chooses among them (optional) |
+
+**Language.** A forced `language` is imposed: Whisper *translates* into it anything said in another language. Without
+it, the language is detected on the first 30 s of the audio; on very short audio the detection is unreliable, and a
+wrong guess gives a translation instead of a transcription. `languages` limits the guess to the speaker's languages.
+The response gives the chosen `language` and its `language_probability` (`null` when forced), and the server logs both
+(never the text).
 
 **Response (200), without diarization:**
 
@@ -162,7 +170,8 @@ curl -F "file=@recording.webm" http://localhost:8081/transcribe
 
 ### POST `/transcribe/streaming`
 
-Fast transcription with language detection, skipping alignment and diarization. Returns `text`, `language` and `task`.
+Fast transcription with language detection, skipping alignment and diarization. Returns `text`, `language`,
+`language_probability` and `task`. Takes `language`, `languages` and `polish` as `/transcribe`.
 
 ### Jobs
 
@@ -350,7 +359,7 @@ The web interface provides:
 - **Microphone mode** — click "Record" to capture audio, with a live frequency visualizer
 - **Upload mode** — drag and drop audio files or click to browse
 - **Model selector** — pick the desired Whisper model and device, with live download / load progress
-- **Language** — auto-detect, or force the language when detection gets it wrong (short or accented recordings)
+- **Language** — auto-detect, or force the language when detection gets it wrong (short or accented recordings); a forced language makes Whisper translate into it anything said in another language
 - **Identify speakers** — toggle diarization, optionally with a min/max speaker count; the transcript is grouped by color-coded speaker and "Copy" includes the speaker labels
 - **Polish transcript** — clean up the transcript with the local LLM (greyed out while the model is unavailable); the result card then has a Raw / Polished switch, and Copy and TXT follow it
 - **Hugging Face token** — add, test or remove the token used for speaker identification

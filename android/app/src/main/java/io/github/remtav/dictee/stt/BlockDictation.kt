@@ -5,9 +5,11 @@ package io.github.remtav.dictee.stt
  *
  * The controller cuts the audio into blocks of 15 to 30 s at pauses and hands each one to [add] on its decode
  * thread, in order, as soon as it is complete. Each block goes to the server (`POST /jobs`, `quick`, no polish,
- * with the end of the previous text as `prompt` and the language of the first block); the texts are kept in
- * order. At the end, [finish] polishes the whole text once (`POST /polish`) and returns it, to be inserted in one
- * go like a whole dictation.
+ * with the end of the previous text as `prompt`); the texts are kept in order. Without a forced language, the
+ * server detects the language of each block: the language of the first one is not imposed on the next ones
+ * (issue #86: a first block taken for English made Whisper translate the rest of a French dictation). At the
+ * end, [finish] polishes the whole text once (`POST /polish`) and returns it, to be inserted in one go like a
+ * whole dictation.
  *
  * Nothing is lost: a block the server does not transcribe (network, 5xx, 429, timeout, "Annuler") is transcribed
  * by the local fallback model from its kept audio, and the texts already received are kept; a polish that fails
@@ -26,8 +28,8 @@ class BlockDictation(
     private var serverBlocks = 0
     private var localBlocks = 0
     private var audioSamples = 0L
-    /** Language detected on the first server block, imposed on the next ones (when none is set). */
-    private var language = ""
+    /** Languages the server detected, one per server block: the most frequent one goes with the polish. */
+    private val detected = ArrayList<String>()
     /** Why some block did not go to the server (the first reason). */
     private var reason: String? = null
     /** Blocks neither the server nor the phone transcribed yet: tried once more at the end. */
@@ -97,10 +99,10 @@ class BlockDictation(
             val single = last && i == 0 && server.polishWanted
             val child = control.child()
             try {
-                val r = server.transcribeBlock(block.audio, language, previousText(i), single, endDeadline, child)
+                val r = server.transcribeBlock(block.audio, previousText(i), single, endDeadline, child)
                 texts[i] = listOfNotNull(r.text.takeIf { it.isNotBlank() })
                 serverBlocks++
-                if (language.isEmpty()) language = r.language
+                if (r.language.isNotBlank()) detected += r.language
                 if (single) singlePolish = r
                 return
             } catch (e: InterruptedException) {
@@ -159,6 +161,10 @@ class BlockDictation(
         return ""
     }
 
+    /** The language most server blocks were detected in (the first one on a tie); "" when none. */
+    private fun language(): String =
+        detected.groupingBy { it }.eachCount().maxByOrNull { it.value }?.key.orEmpty()
+
     private fun note(why: String?) {
         if (reason == null && !why.isNullOrBlank()) reason = why
     }
@@ -180,10 +186,10 @@ class BlockDictation(
             if (server != null && control.mode == WaitControl.Mode.NONE) {
                 val child = control.child()
                 try {
-                    val r = server.transcribeBlock(block.audio, language, previousText(i), false, Long.MAX_VALUE, child)
+                    val r = server.transcribeBlock(block.audio, previousText(i), false, Long.MAX_VALUE, child)
                     texts[i] = listOfNotNull(r.text.takeIf { it.isNotBlank() })
                     serverBlocks++
-                    if (language.isEmpty()) language = r.language
+                    if (r.language.isNotBlank()) detected += r.language
                     done = true
                 } catch (e: InterruptedException) {
                     throw e
@@ -204,6 +210,7 @@ class BlockDictation(
         }
         val raw = texts.flatten()
         val joined = raw.joinToString(" ")
+        val language = language()
         var polished: String? = null
         val status: String = when {
             joined.isBlank() -> ""
@@ -284,11 +291,11 @@ interface BlockServer {
     fun supportsBlocks(control: WaitControl): Boolean
 
     /**
-     * Transcribes one block: [language] when none is set ("" to detect), [prompt] the previous text (its end
-     * goes to Whisper), [polish] to polish it in the same job. Gives up at [notAfter] at the latest
-     * ([monotonicMillis] clock).
+     * Transcribes one block, in the forced language or else the one the server detects on this block alone:
+     * [prompt] the previous text (its end goes to Whisper), [polish] to polish it in the same job. Gives up at
+     * [notAfter] at the latest ([monotonicMillis] clock).
      */
-    fun transcribeBlock(audio: FloatArray, language: String, prompt: String, polish: Boolean, notAfter: Long, control: WaitControl): BlockText
+    fun transcribeBlock(audio: FloatArray, prompt: String, polish: Boolean, notAfter: Long, control: WaitControl): BlockText
 
     /** Polishes [text] (`POST /polish`, then `GET /jobs/{id}`). */
     fun polish(text: String, language: String, audioSeconds: Float, control: WaitControl): PolishOutcome
@@ -325,8 +332,8 @@ class LentBlockBackend(private val use: ((SttEngine) -> Any?) -> Any?) : BlockBa
         override val polishWanted: Boolean get() = on({ it.blockServer?.polishWanted == true }, { false })
         override fun supportsBlocks(control: WaitControl) =
             on({ (it.blockServer ?: noServer()).supportsBlocks(control) }, { false })
-        override fun transcribeBlock(audio: FloatArray, language: String, prompt: String, polish: Boolean, notAfter: Long, control: WaitControl) =
-            on({ (it.blockServer ?: noServer()).transcribeBlock(audio, language, prompt, polish, notAfter, control) }, { noServer() })
+        override fun transcribeBlock(audio: FloatArray, prompt: String, polish: Boolean, notAfter: Long, control: WaitControl) =
+            on({ (it.blockServer ?: noServer()).transcribeBlock(audio, prompt, polish, notAfter, control) }, { noServer() })
         override fun polish(text: String, language: String, audioSeconds: Float, control: WaitControl) =
             on({ (it.blockServer ?: noServer()).polish(text, language, audioSeconds, control) }, { noServer() })
         override fun budgetMillis(audioSeconds: Float) = on({ it.blockServer?.budgetMillis(audioSeconds) ?: 0L }, { 0L })

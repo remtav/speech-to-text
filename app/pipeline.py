@@ -268,7 +268,10 @@ class Engine:
     # ---------------------------------------------------------- transcription
 
     def transcribe(self, audio_path, options=None, progress=_noop_progress):
-        """Transcribe a file. Options: model, device, language, diarize, num/min/max_speakers, quick.
+        """Transcribe a file. Options: model, device, language, languages, diarize, num/min/max_speakers, quick.
+
+        Without ``language``, the language is detected here (see ``_detect_language``), limited to
+        ``languages`` (the user's languages) when given.
 
         `model` / `device` default to the loaded ones; the model is (re)loaded if needed.
         """
@@ -281,10 +284,40 @@ class Engine:
         audio = load_audio(audio_path, self.ffmpeg_path, self.ffmpeg_timeout)
         duration = len(audio) / 16000
 
+        language = options.get("language") or None
+        probability = None
+        if language is None:
+            language, probability = self._detect_language(audio, options.get("languages"))
+        options = dict(options, language=language, language_probability=probability)
+
         with self._initial_prompt(options.get("prompt")):
             if options.get("quick"):
                 return self._quick(audio, options, progress)
             return self._full(audio, duration, options, progress)
+
+    def _detect_language(self, audio, candidates=None):
+        """(language, probability) of the first 30 s of ``audio``, among ``candidates`` when given.
+
+        Issue #86: Whisper given the wrong language translates the speech into it instead of
+        transcribing it. WhisperX's own detection keeps only the best of ~100 languages and is not
+        logged; done here, it can be limited to the user's languages and its probability reported
+        and logged. Same input as WhisperX (``FasterWhisperPipeline.detect_language``): the first
+        30 s, padded with silence when shorter. Candidates Whisper does not know are ignored; with
+        none left, the best language wins. Only codes and probabilities are logged, never text.
+        """
+        from whisperx.audio import N_SAMPLES, log_mel_spectrogram
+
+        whisper = self.model.model  # faster-whisper WhisperModel; .model is the CTranslate2 model
+        n_mels = whisper.feat_kwargs.get("feature_size") or 80
+        segment = log_mel_spectrogram(audio[:N_SAMPLES], n_mels=n_mels,
+                                      padding=max(N_SAMPLES - audio.shape[0], 0))
+        scores = [(token[2:-2], float(p)) for token, p in whisper.model.detect_language(whisper.encode(segment))[0]]
+        allowed = [(code, p) for code, p in scores if code in set(candidates or ())]
+        language, probability = max(allowed or scores, key=lambda s: s[1])
+        top = ", ".join(f"{code} ({p:.2f})" for code, p in scores[:3])
+        log.info("Detected language: %s (%.2f) among %s; best: %s",
+                 language, probability, ",".join(candidates) if allowed else "all", top)
+        return language, round(probability, 4)
 
     @contextlib.contextmanager
     def _initial_prompt(self, prompt):
@@ -310,12 +343,13 @@ class Engine:
         """Transcription only (no alignment / diarization), for low-latency use."""
         progress(0.15, "Transcribing (quick)…", "transcribe")
         result = self.model.transcribe(
-            audio, batch_size=self.batch_size, language=options.get("language") or None,
+            audio, batch_size=self.batch_size, language=options["language"],
             progress_callback=_progress_range(progress, 0.15, 0.95, "Transcribing", "transcribe"),
         )
         return to_builtin({
             "text": " ".join(seg["text"].strip() for seg in result["segments"]).strip(),
-            "language": result.get("language", "unknown"),
+            "language": options["language"],
+            "language_probability": options["language_probability"],
             "task": "transcribe",
         })
 
@@ -329,10 +363,10 @@ class Engine:
         # Phase 1: transcribe (VAD-batched faster-whisper)
         progress(0.15, "Running Whisper transcription…", "transcribe")
         result = self.model.transcribe(
-            audio, batch_size=self.batch_size, language=options.get("language") or None,
+            audio, batch_size=self.batch_size, language=options["language"],
             progress_callback=_progress_range(progress, 0.15, 0.55, "Transcribing", "transcribe"),
         )
-        language = result.get("language", "unknown")
+        language = options["language"]
 
         # Phase 2: word-level alignment (wav2vec2). Optional: on failure, keep segment timestamps.
         aligned = False
@@ -376,6 +410,7 @@ class Engine:
         response = {
             "text": " ".join(seg["text"].strip() for seg in segments if seg.get("text")).strip(),
             "language": language,
+            "language_probability": options["language_probability"],
             "aligned": aligned,
             "duration": round(duration, 3),
             "segments": segments,
