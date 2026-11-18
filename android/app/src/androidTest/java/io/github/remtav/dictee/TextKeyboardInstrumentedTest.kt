@@ -219,9 +219,12 @@ class TextKeyboardInstrumentedTest : ImeTestBase() {
         assertNull(device.findObject(res("letters")))
     }
 
-    /** Hides the keyboard with Back and brings it back on the focused field (the only way a person reopens it). */
+    /**
+     * Hides the keyboard and brings it back on the focused field. The keyboard hides itself rather than through
+     * Back, which would also close the test activity and leave the launcher in front for the next test.
+     */
     private fun hideThenReopenKeyboard(waitMs: Long) {
-        device.pressBack()
+        onMain { service.requestHideSelf(0) }
         waitFor("keyboard hidden", 5_000) { !onMain { service.isInputViewShown } }
         android.os.SystemClock.sleep(waitMs)
         scenario.onActivity {
