@@ -1,6 +1,5 @@
 package io.github.remtav.dictee
 
-import android.graphics.Rect
 import android.view.View
 import android.view.ViewGroup
 import androidx.core.view.WindowInsetsCompat
@@ -38,56 +37,69 @@ class NavigationBarInstrumentedTest : ImeTestBase() {
         originalMode?.let { shell("cmd overlay enable-exclusive --category $it") }
     }
 
-    /** Bottom of the lowest touchable view of the keyboard, and the top of the navigation bar, in screen pixels. */
-    private fun keysBottomAndBarTop(): Triple<Int, Int, Int> = onMain {
+    /** What the keyboard's touchable views cover and what the navigation bar takes, in screen pixels. */
+    private data class Measure(
+        val keys: Int, val left: Int, val right: Int, val bottom: Int,
+        val barLeft: Int, val barRight: Int, val barBottom: Int,
+    )
+
+    private fun measure(): Measure = onMain {
         val root = service.window.window!!.decorView.findViewById<View>(R.id.keyboard_root)
         val bar = WindowInsetsCompat.toWindowInsetsCompat(root.rootWindowInsets, root)
             .getInsetsIgnoringVisibility(WindowInsetsCompat.Type.navigationBars())
-        var lowest = 0
+        var keys = 0
+        var left = Int.MAX_VALUE
+        var right = 0
+        var bottom = 0
         fun walk(v: View) {
-            if (v.visibility != View.VISIBLE || !v.isShown) return
-            if (v is ViewGroup) { for (i in 0 until v.childCount) walk(v.getChildAt(i)); if (v.isClickable) lowest = maxOf(lowest, bottomOf(v)) }
-            else if (v.isClickable || v.isLongClickable) lowest = maxOf(lowest, bottomOf(v))
+            if (!v.isShown) return
+            if (v is ViewGroup) for (i in 0 until v.childCount) walk(v.getChildAt(i))
+            if (v.isClickable || v.isLongClickable) {
+                val at = IntArray(2)
+                v.getLocationOnScreen(at)
+                keys++
+                left = minOf(left, at[0])
+                right = maxOf(right, at[0] + v.width)
+                bottom = maxOf(bottom, at[1] + v.height)
+            }
         }
         walk(root)
-        Triple(lowest, device.displayHeight - bar.bottom, bar.bottom)
+        Measure(keys, left, right, bottom, bar.left, bar.right, bar.bottom)
     }
 
-    private fun bottomOf(v: View): Int {
-        val r = Rect()
-        val at = IntArray(2)
-        v.getLocationOnScreen(at)
-        r.set(at[0], at[1], at[0] + v.width, at[1] + v.height)
-        return r.bottom
-    }
-
+    /** [expectBar]: the three-button bar must have reached the keyboard window (a gesture bar may be thin or absent). */
     private fun check(what: String, expectBar: Boolean) {
-        val (keys, barTop, barHeight) = keysBottomAndBarTop()
-        if (expectBar) assertTrue("$what: no navigation bar inset reached the keyboard", barHeight > 0)
-        assertTrue("$what: the keys end at $keys px, under the navigation bar that starts at $barTop px", keys <= barTop)
+        val m = measure()
+        assertTrue("$what: no touchable key found, nothing was measured", m.keys > 0)
+        if (expectBar) assertTrue("$what: no navigation bar inset reached the keyboard", m.barLeft + m.barRight + m.barBottom > 0)
+        val barTop = device.displayHeight - m.barBottom
+        assertTrue("$what: the keys end at ${m.bottom} px, under the navigation bar that starts at $barTop px", m.bottom <= barTop)
+        assertTrue("$what: the keys start at ${m.left} px, under the navigation bar that ends at ${m.barLeft} px", m.left >= m.barLeft)
+        val barStart = device.displayWidth - m.barRight
+        assertTrue("$what: the keys end at ${m.right} px, under the navigation bar that starts at $barStart px", m.right <= barStart)
     }
 
-    private fun checkThreeViews(mode: String) {
+    private fun checkThreeViews(mode: String, expectBar: Boolean) {
         launchFields()
-        check("$mode, dictation view", expectBar = mode == "three buttons")
+        check("$mode, dictation view", expectBar)
         onMain { service.setTextKeyboardShown(true) }
         device.waitForIdle()
-        check("$mode, letters", expectBar = mode == "three buttons")
+        check("$mode, letters", expectBar)
         focus(6) // the number field: the pad
         device.waitForIdle()
-        check("$mode, number pad", expectBar = mode == "three buttons")
+        check("$mode, number pad", expectBar)
     }
 
     @Test
     fun keysStayAboveTheThreeButtonBar() {
         setNavigation(threeButton)
-        checkThreeViews("three buttons")
+        checkThreeViews("three buttons", expectBar = true)
     }
 
     @Test
     fun keysStayAboveTheGestureBar() {
         setNavigation(gestural)
-        checkThreeViews("gestures")
+        checkThreeViews("gestures", expectBar = false)
     }
 
     @Test
@@ -95,6 +107,6 @@ class NavigationBarInstrumentedTest : ImeTestBase() {
         setNavigation(threeButton)
         device.setOrientationLeft()
         device.waitForIdle()
-        checkThreeViews("three buttons, landscape")
+        checkThreeViews("three buttons, landscape", expectBar = true)
     }
 }
