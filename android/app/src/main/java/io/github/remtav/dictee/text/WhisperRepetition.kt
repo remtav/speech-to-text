@@ -1,6 +1,5 @@
 package io.github.remtav.dictee.text
 
-import io.github.remtav.dictee.cleanup.SafetyCheck
 import io.github.remtav.dictee.stt.SherpaEngine
 import java.text.Normalizer
 import java.util.Locale
