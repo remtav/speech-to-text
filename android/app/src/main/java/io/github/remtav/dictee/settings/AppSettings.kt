@@ -269,18 +269,14 @@ class AppSettings(context: Context, private val defaultServerUrl: String = io.gi
         return EngineOptions(
             numThreads = threads,
             // Forced only when a single language is chosen, on the models that take one:
-            // Whisper (code) and Qwen3-ASR (name). Parakeet takes none (sherpa-onnx 2.0.1).
-            language = when (spec.family) {
-                ModelFamily.WHISPER -> DictationLanguages.whisperLanguage(languages)
-                ModelFamily.QWEN3_ASR -> DictationLanguages.qwen3Language(languages)
-                else -> ""
-            },
+            // Whisper (code). Parakeet takes none (sherpa-onnx 2.0.1).
+            language = if (spec.family == ModelFamily.WHISPER) DictationLanguages.whisperLanguage(languages) else "",
             acceleration = acceleration,
             whisperTailPaddings = WhisperTuning.tailPaddingsFor(spec, whisperTailPaddings, whisperTailAuto),
             whisperRepetitionFix = WhisperTuning.repetitionFixFor(spec, whisperTailAuto, whisperRepetitionFix),
-            // Only these use hotwords: keeping them out of the other models' options means a
-            // vocabulary edit does not reload an on-device model that ignores them.
-            hotwords = if (spec.family == ModelFamily.QWEN3_ASR || remote) vocabulary.favoured else emptyList(),
+            // Only the server uses hotwords: keeping them out of the on-device models' options means a
+            // vocabulary edit does not reload a model that ignores them.
+            hotwords = if (remote) vocabulary.favoured else emptyList(),
             remote = if (remote) remoteConfig() else null,
             // The server's fallback is the on-device model (issue #23), when it is installed.
             remoteFallback = if (remote) activeModel.takeIf { it.family != ModelFamily.REMOTE }?.takeIf(fallbackInstalled) else null,

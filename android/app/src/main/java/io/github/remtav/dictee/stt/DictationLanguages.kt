@@ -18,23 +18,6 @@ object DictationLanguages {
     fun whisperLanguage(chosen: Set<DictationLanguage>): String = engineCodes(chosen).singleOrNull() ?: ""
 
     /**
-     * Language names Qwen3-ASR takes in its prompt ("language French"), for the
-     * codes of [DictationLanguage] it covers (Qwen3-ASR model card; sherpa-onnx
-     * 2.0.1 passes them through `OfflineStream.setOption("language", …)`).
-     */
-    private val qwen3Names = mapOf(
-        "fr" to "French", "en" to "English", "es" to "Spanish", "pt" to "Portuguese",
-    )
-
-    /**
-     * Language forced on Qwen3-ASR (issue #15, "friperie": on a single word the
-     * model guessed English): same rule as [whisperLanguage], as a Qwen3 name,
-     * "" (automatic detection) when several codes are chosen or the code is not
-     * a Qwen3-ASR language.
-     */
-    fun qwen3Language(chosen: Set<DictationLanguage>): String = qwen3Names[whisperLanguage(chosen)] ?: ""
-
-    /**
      * Default of the server language: the single chosen code if the server
      * accepts it, "" otherwise.
      */

@@ -11,7 +11,7 @@ package io.github.remtav.dictee.stt
  * .tar.bz2 release archives: no 1 GB bzip2 to unpack on the phone, and a
  * download can resume file by file.
  */
-enum class ModelFamily { NEMO_TRANSDUCER, QWEN3_ASR, WHISPER, REMOTE }
+enum class ModelFamily { NEMO_TRANSDUCER, WHISPER, REMOTE }
 
 /**
  * Where a model is shown. [VISIBLE] models are offered on every screen, subject to the chosen languages
@@ -52,7 +52,7 @@ data class ModelSpec(
 }
 
 object ModelCatalog {
-    /** Shown on Whisper's card (DECISIONS.md, issue #15, « friperie »; no longer « dernier recours » since issue #22). */
+    /** Shown on Whisper's card (DECISIONS.md, issue #15, « friperie »). */
     const val WHISPER_NOTE =
         "Observé sur un téléphone : comprend bien des mots que les autres modèles ratent, " +
             "mais la transcription prend plus de temps."
@@ -115,8 +115,8 @@ object ModelCatalog {
     val advanced: List<ModelSpec> = all.filter { it.visibility == ModelVisibility.ADVANCED }
 
     /**
-     * The models offered for [languages] (issue #22): visible and covering every chosen language,
-     * in catalogue order. Since issue #72 that is Whisper alone (Parakeet is in « Avancé »).
+     * The models offered for [languages]: visible and covering every chosen language,
+     * in catalogue order. That is Whisper alone (Parakeet is in « Avancé »).
      */
     fun offered(languages: Set<DictationLanguage>): List<ModelSpec> =
         all.filter { spec ->

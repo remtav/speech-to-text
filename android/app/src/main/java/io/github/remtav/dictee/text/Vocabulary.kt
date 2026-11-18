@@ -6,7 +6,7 @@ package io.github.remtav.dictee.text
  *     Rémi                    a word or name to favour
  *     cloud code -> Claude Code   a correction applied after transcription
  *
- * Favoured words are passed to models that accept hotwords (Qwen3-ASR) and,
+ * Favoured words are passed to servers that accept hotwords and,
  * for all models, used to correct near misses after transcription: a word
  * within a small edit distance of a favoured word (accents and case ignored)
  * is replaced by it. Corrections ("->" or "=>") replace a word or phrase,

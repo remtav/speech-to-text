@@ -79,8 +79,7 @@ object WhisperTuning {
     fun sanitizeGroupSeconds(value: Int): Int = if (value in GROUP_CHOICES) value else 0
 
     /**
-     * The grouping of a local dictation with [spec]: only for Whisper (the issue's scope; Parakeet and Qwen3-ASR are
-     * left as they are), null when the setting is off.
+     * The grouping of a local dictation with [spec]: only for Whisper (Parakeet is left as it is), null when the setting is off.
      */
     fun groupingFor(spec: ModelSpec, seconds: Int): io.github.remtav.dictee.dictation.LocalGrouping? {
         val v = sanitizeGroupSeconds(seconds)
