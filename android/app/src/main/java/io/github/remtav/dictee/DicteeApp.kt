@@ -18,6 +18,7 @@ import io.github.remtav.dictee.reading.ContributionArchive
 import io.github.remtav.dictee.settings.AppSettings
 import io.github.remtav.dictee.settings.CleanupMode
 import io.github.remtav.dictee.settings.ThemeMode
+import io.github.remtav.dictee.stt.BenchmarkLock
 import io.github.remtav.dictee.stt.EngineManager
 import io.github.remtav.dictee.stt.ModelStore
 import io.github.remtav.dictee.stt.DefaultEngineFactory
@@ -248,8 +249,13 @@ class DicteeApp : Application() {
 
     @Volatile var keyboardVisible = false
     @Volatile var dictationActive = false
-    /** The comparison screen loads models itself: the keyboard must not load another meanwhile. */
-    @Volatile var benchmarkRunning = false
+    /**
+     * The guard of the three measuring screens (quick test, « Comparer les modèles », reading test), which load
+     * models themselves: one screen at a time, released only by the one that took it (issue #66, point 3).
+     */
+    val benchmark = BenchmarkLock()
+    /** A measuring screen holds the engine: the keyboard must not load another model meanwhile. */
+    val benchmarkRunning: Boolean get() = benchmark.held
 
     companion object {
         fun from(context: Context) = context.applicationContext as DicteeApp

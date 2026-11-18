@@ -74,8 +74,8 @@ class CompareActivity : AppCompatActivity() {
         recordButton = col.button(getString(R.string.compare_record)) { toggleRecording() }
 
         col.heading(getString(R.string.compare_run_heading))
-        runButton = col.button(getString(R.string.compare_run)) { runComparison() }
-        progress = col.body("", small = true)
+        runButton = col.button(getString(R.string.compare_run)) { runComparison() }.apply { tag = TAG_RUN }
+        progress = col.body("", small = true).apply { tag = TAG_PROGRESS }
         resultsBox = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         col.addView(resultsBox)
         col.row().apply {
@@ -144,8 +144,14 @@ class CompareActivity : AppCompatActivity() {
             Toast.makeText(this, R.string.compare_nothing, Toast.LENGTH_LONG).show()
             return
         }
+        // Issue #66, point 3: one measuring screen at a time, and none while a quick-test decode lingers (two big
+        // models in memory). Only this run's claim gives the keyboard back.
+        val claim = app.benchmark.tryClaim(HOLDER)
+        if (claim == null) {
+            progress.text = getString(R.string.measure_busy)
+            return
+        }
         busy = true
-        app.benchmarkRunning = true
         runButton.isEnabled = false
         resultsBox.removeAllViews()
         // Free the keyboard's model: measurements start from a clean slate.
@@ -164,29 +170,32 @@ class CompareActivity : AppCompatActivity() {
             }
         })
         thread(name = "compare-run") {
-            val results = ArrayList<ModelResult>()
-            for (spec in models) {
-                val r = bench.runOne(spec, samples) { msg -> main.post { progress.text = msg } }
-                results += r
-                main.post { renderResult(r) }
-            }
-            val header = "Kalmia Blabla ${BuildConfig.VERSION_NAME} · ${Build.MANUFACTURER} ${Build.MODEL} · Android ${Build.VERSION.RELEASE}" +
-                " · ${app.settings.threads} threads" +
-                (models.firstOrNull { it.family == ModelFamily.WHISPER }?.let { whisper ->
-                    // The options the engine actually got (issue #49: automatic mode and its correction).
-                    val o = app.engineOptions(whisper)
-                    " · ${WhisperTuning.describe(o.whisperTailPaddings, o.whisperRepetitionFix)} · langue Whisper " +
-                        o.language.ifEmpty { "automatique" } +
-                        // Issue #53: the grouping setting, and that the samples are then cut as a dictation.
-                        " · " + (WhisperTuning.groupingFor(whisper, app.settings.whisperGroupSeconds)
-                            ?.let { "${it.describe()}, extraits découpés comme une dictée" } ?: LocalGrouping.OFF_DESCRIPTION)
-                } ?: "")
-            report = Benchmark.report(results, header) { spec -> app.engineOptions(spec).whisperRepetitionFix != null }
-            main.post {
-                progress.text = getString(R.string.compare_done)
-                runButton.isEnabled = true
-                busy = false
-                app.benchmarkRunning = false
+            try {
+                val results = ArrayList<ModelResult>()
+                for (spec in models) {
+                    val r = bench.runOne(spec, samples) { msg -> main.post { progress.text = msg } }
+                    results += r
+                    main.post { renderResult(r) }
+                }
+                val header = "Kalmia Blabla ${BuildConfig.VERSION_NAME} · ${Build.MANUFACTURER} ${Build.MODEL} · Android ${Build.VERSION.RELEASE}" +
+                    " · ${app.settings.threads} threads" +
+                    (models.firstOrNull { it.family == ModelFamily.WHISPER }?.let { whisper ->
+                        // The options the engine actually got (issue #49: automatic mode and its correction).
+                        val o = app.engineOptions(whisper)
+                        " · ${WhisperTuning.describe(o.whisperTailPaddings, o.whisperRepetitionFix)} · langue Whisper " +
+                            o.language.ifEmpty { "automatique" } +
+                            // Issue #53: the grouping setting, and that the samples are then cut as a dictation.
+                            " · " + (WhisperTuning.groupingFor(whisper, app.settings.whisperGroupSeconds)
+                                ?.let { "${it.describe()}, extraits découpés comme une dictée" } ?: LocalGrouping.OFF_DESCRIPTION)
+                    } ?: "")
+                report = Benchmark.report(results, header) { spec -> app.engineOptions(spec).whisperRepetitionFix != null }
+                main.post {
+                    progress.text = getString(R.string.compare_done)
+                    runButton.isEnabled = true
+                    busy = false
+                }
+            } finally {
+                app.benchmark.release(claim)
             }
         }
     }
@@ -230,6 +239,13 @@ class CompareActivity : AppCompatActivity() {
     }
 
     companion object {
+        /** Who holds `DicteeApp.benchmark` during a comparison. */
+        const val HOLDER = "comparer"
+        /** « Lancer la comparaison ». */
+        const val TAG_RUN = "compare_run"
+        /** The progress line (also where a refused run says why). */
+        const val TAG_PROGRESS = "compare_progress"
+
         /** Bundled reference clips with their transcripts (assets/reference/references.tsv). */
         fun loadReferences(context: Context): List<BenchSample> {
             val tsv = context.assets.open("reference/references.tsv").bufferedReader().readText()
