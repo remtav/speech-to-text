@@ -42,12 +42,11 @@ class SettingsActivity : AppCompatActivity() {
     /** « Avancé » section (issue #49): generic, other advanced settings are added to it (#37). */
     private lateinit var advancedBox: LinearLayout
     /** The « Avancé » models (Parakeet): choose, download, delete. */
-    private lateinit var otherModelsBox: LinearLayout
     /** « Serveur distant, pour essais (développeurs) », folded inside « Avancé » (issue #57). */
     private lateinit var serverSection: Collapsible
     /** Redraws the server-language choice; set once that section exists. */
     private var refreshRemoteLanguage: () -> Unit = {}
-    private val refresh: () -> Unit = { renderLlm(); renderAdvancedModels() }
+    private val refresh: () -> Unit = { renderLlm() }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -151,7 +150,6 @@ class SettingsActivity : AppCompatActivity() {
         super.onResume()
         Downloads.addListener(refresh)
         renderLlm()
-        renderAdvancedModels()
         // Back from the reading test, where the question may have been answered.
         renderParticipation()
     }
@@ -283,19 +281,16 @@ class SettingsActivity : AppCompatActivity() {
     }
 
     /**
-     * « Modèles et performances » (issue #37): the technical names of the phone models, the comparison, the
-     * the « Avancé » models (issue #72) and the performance settings, moved here from the first level.
+     * « Modèles et performances » (issue #37): the technical names of the phone models, the comparison and the
+     * performance settings, moved here from the first level. Both phone models are on the main screen (issue #89).
      */
     private fun buildModelsAdvanced(box: LinearLayout) {
         val s = app.settings
-        box.body(getString(R.string.settings_models_names, ModelCatalog.whisperTurbo.displayName, ModelCatalog.whisperTurbo.publisher), small = true)
+        box.body(getString(R.string.settings_models_names, ModelCatalog.whisperTurbo.displayName, ModelCatalog.whisperTurbo.publisher,
+            ModelCatalog.parakeet.displayName, ModelCatalog.parakeet.publisher), small = true)
         box.button(getString(R.string.setup_compare), outlined = true) {
             startActivity(android.content.Intent(this, CompareActivity::class.java))
         }.tag = COMPARE_TAG
-        // Issue #72: Parakeet is listed here (and in the comparison), never on the main screen.
-        otherModelsBox = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
-        box.addView(otherModelsBox)
-        renderAdvancedModels()
         box.heading(getString(R.string.settings_performance))
         box.slider(getString(R.string.settings_keep_loaded), 0f, 30f, 1f, s.keepLoadedMinutes.toFloat(), { "${it.toInt()} min" }) {
             s.keepLoadedMinutes = it.toInt()
@@ -361,54 +356,6 @@ class SettingsActivity : AppCompatActivity() {
                     { getString(R.string.settings_remote_failed, it.message) },
                 ) + if (config.isInsecurePublic) "\n" + getString(R.string.settings_remote_insecure) else ""
                 remoteStatus.markError(r.isFailure || config.isInsecurePublic)
-            }
-        }
-    }
-
-    /** One card per « Avancé » model (Parakeet, issue #72): choose it, download it, delete it. */
-    private fun renderAdvancedModels() {
-        otherModelsBox.removeAllViews()
-        if (ModelCatalog.advanced.isEmpty()) return
-        otherModelsBox.heading(getString(R.string.settings_advanced_models))
-        otherModelsBox.body(getString(R.string.settings_advanced_models_help), small = true)
-        for (spec in ModelCatalog.advanced) {
-            val card = otherModelsBox.card()
-            card.tag = advancedCardTag(spec)
-            val installed = app.store.isInstalled(spec)
-            card.addView(RadioButton(this).apply {
-                text = spec.displayName
-                isChecked = app.settings.activeModelId == spec.id
-                isEnabled = installed
-                setOnClickListener { app.settings.activeModelId = spec.id; renderAdvancedModels() }
-            })
-            card.body("${spec.publisher} · ${spec.description}", small = true)
-            if (spec.note.isNotEmpty()) card.body(spec.note, small = true)
-            card.body(getString(R.string.model_license_runs_local, spec.license), small = true)
-            val st = Downloads.status[spec.id]
-            card.body(
-                when {
-                    Downloads.isBusy(spec.id) && st != null ->
-                        getString(R.string.setup_downloading, st.percent, SizeFormat.format(st.downloaded), SizeFormat.format(st.total))
-                    st?.error != null -> getString(R.string.setup_download_error, st.error)
-                    installed -> getString(R.string.setup_installed, SizeFormat.format(app.store.installedBytes(spec.asDownloadable())))
-                    else -> getString(R.string.setup_not_installed, SizeFormat.format(spec.totalBytes))
-                },
-                small = true,
-            ).apply { if (!Downloads.isBusy(spec.id) && st?.error != null) markError() }
-            card.row().apply {
-                when {
-                    Downloads.isBusy(spec.id) -> button(getString(R.string.cancel), outlined = true) { Downloads.cancel(spec.id) }
-                    installed -> button(getString(R.string.delete), outlined = true) {
-                        if (app.engines.current()?.spec?.id == spec.id) app.engines.release()
-                        app.store.delete(spec)
-                        if (app.settings.activeModelId == spec.id) app.settings.activeModelId = ModelCatalog.default.id
-                        renderAdvancedModels()
-                    }
-                    else -> button(getString(R.string.download)) {
-                        Downloads.start(this@SettingsActivity, spec.asDownloadable(), getString(R.string.setup_downloading_label, spec.displayName))
-                        renderAdvancedModels()
-                    }
-                }
             }
         }
     }
@@ -479,6 +426,5 @@ class SettingsActivity : AppCompatActivity() {
         const val COMPARE_TAG = "settings_compare"
         const val QUICK_TEST_TAG = "settings_quick_test"
         /** Tag of an « Avancé » model's card, for tests. */
-        fun advancedCardTag(spec: ModelSpec) = "advanced_card_${spec.id}"
     }
 }

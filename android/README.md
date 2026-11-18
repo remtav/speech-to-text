@@ -53,9 +53,10 @@ portent un lien vers une source officielle, lue le 2026-11-12.
 - **Ici, la transcription se fait sur le téléphone, par un modèle que vous
   avez téléchargé et que vous choisissez.** Aucun compte n'est demandé, et le
   code qui le fait est dans ce dépôt, où chacun peut le lire. Un serveur
-  n'intervient que si une adresse de « Serveur distant » est configurée **et**
-  que vous choisissez le mode « serveur », deux réglages que vous ne trouvez que
-  dans Réglages → Avancé → « Serveur distant, pour essais (développeurs) ».
+  n'intervient que si une adresse de serveur est configurée **et** que vous
+  activez **Kalmia Pro** sur son écran, sous le texte qui dit que l'audio y est
+  envoyé (issue #89). L'adresse et les autres réglages techniques sont dans
+  Réglages → Avancé → « Serveur distant, pour essais (développeurs) ».
 - **Chez Google, l'endroit du traitement dépend de la fonction.** Sur la page
   d'aide de Gboard
   [« Utiliser les fonctionnalités avancées de saisie vocale »](https://support.google.com/gboard/answer/11197787?hl=fr),
@@ -100,8 +101,10 @@ langue cochée. Le choix se modifie aussi dans les Réglages. Il sert à :
   Parakeet ne prend aucune langue (sherpa-onnx 2.0.1 n'a pas d'entrée pour
   elle) : il la devine, ce qui peut mal tourner sur un mot dicté seul.
 
-Depuis l'issue #72, la recommandation (`stt/ModelRecommendation.kt`) est toujours
-Whisper, et c'est le seul modèle du téléphone proposé à l'installation. La
+Depuis l'issue #89, la recommandation (`stt/ModelRecommendation.kt`) est toujours
+Whisper (présélectionné : plus lent, mais le seul à bien transcrire le français
+québécois aux essais) ; Parakeet est proposé à côté, jamais recommandé d'office, pour
+les deux modèles et toutes les combinaisons des cinq langues. La
 couverture des langues vient des fiches des modèles (détail et sources dans `DECISIONS.md`).
 « Couvert » ne veut pas dire « bien transcrit ».
 
@@ -268,16 +271,20 @@ Configuration (accueil et étapes ; « Vos langues » ; modèle recommandé avec
      s'ouvre sur elle ;
    - **3. Autoriser le micro** (un clavier ne peut pas demander la permission lui-même) ;
    - cocher vos langues (étape « 4. Vos langues ») ;
-   - **5. Modèle** : une seule carte, **« Whisper »** (1,04 Go), quelles que soient vos
-     langues (issue #72, marche arrière sur #37 : le nom est dit, la variante « large-v3-turbo »
-     reste dans « Avancé »). Le télécharger (Wi-Fi conseillé).
+   - **5. Choix de transcription** (issue #89) : trois cartes, quelles que soient vos langues.
+     **Parakeet** · « Rapide » (671 Mo : le plus rapide, moins précis en français québécois),
+     **Whisper** · « Précis » (1,04 Go, présélectionné : plus lent, plus précis) et
+     **Kalmia Pro** · pastille « Pro » (abonnement bientôt disponible). Les noms
+     techniques (« large-v3-turbo », « TDT 0.6b v3 ») restent dans « Avancé ». Télécharger un modèle
+     (Wi-Fi conseillé). La carte Kalmia Pro est toujours visible et ouvre un écran d'information ;
+     elle n'envoie jamais d'audio (voir « Kalmia Pro » plus bas).
 3. Dans n'importe quelle application, basculer vers le clavier Kalmia Blabla
    (icône clavier de la barre de navigation, ou touche micro de votre clavier
    habituel) et appuyer sur le micro. Appuyer de nouveau pour arrêter.
 
 ## Test rapide (1 minute) — simple vérification de Whisper
 
-**Depuis l'issue #72**, avec un seul modèle du téléphone (Whisper), le test n'a plus rien à comparer : il n'est plus
+**Depuis l'issue #72**, avec un seul modèle du téléphone (Whisper), le test n'a plus rien à comparer ; il reste masqué avec l'issue #89 (Parakeet est offert, mais le test n'est pas rouvert ; le sort de son code à deux modèles est ouvert, #107) : il n'est plus
 offert à l'installation, et il reste dans les Réglages comme **simple vérification** (« Whisper vous a compris à X % »).
 Le code des deux modèles (verdicts, tests) est gardé, pour comparer un jour Whisper local et Whisper distant (autre
 issue : il faudra un consentement, car le test est conçu pour ne rien envoyer hors du téléphone, et de nouveaux
@@ -406,8 +413,8 @@ Limites connues :
 
 | Modèle | Éditeur | Taille (int8) | Affichage (issue #22) |
 |---|---|---|---|
-| Whisper large-v3-turbo (défaut) | OpenAI | 1,04 Go | Toujours proposé et recommandé |
-| Parakeet TDT 0.6b v3 | NVIDIA | 671 Mo | « Avancé » et « Comparer les modèles » seulement, quelles que soient les langues (issue #72) ; au clavier, seulement s'il est le modèle actif ; jamais recommandé |
+| Whisper large-v3-turbo (défaut) | OpenAI | 1,04 Go | « Whisper · Précis » : proposé, présélectionné et recommandé |
+| Parakeet TDT 0.6b v3 | NVIDIA | 671 Mo | « Parakeet · Rapide » : proposé à l'installation, sur l'écran principal et au clavier, quelles que soient les langues (issue #89) ; jamais recommandé d'office |
 
 Whisper large-v3-turbo est le modèle par défaut, français québécois compris : aux essais de l'utilisateur, il a
 fait mieux que les autres, et mieux que le Whisper affiné québécois (essayé puis retiré du catalogue). Si le modèle
@@ -422,9 +429,10 @@ CI, le facteur temps réel indicatif est de 0,07 pour Parakeet, 0,3 pour
 Whisper (`DECISIONS.md`, étape 1.2), ce qui ne
 prédit pas l'ordre sur un téléphone. La carte de Whisper le dit. Pour le rendre plus rapide, Whisper n'affiche pas de texte provisoire pendant qu'on parle, et un réglage avancé (Réglages > Avancé, « Silence ajouté pour Whisper », 1 000 par défaut, 600, 300 ou « Automatique ») raccourcit le silence qu'il décode à la fin de chaque segment ; « Automatique » utilise 300 et corrige les phrases que Whisper recommence (« Correction des répétitions (Whisper) » : redécoder à 1 000 ou couper, issue #49). Mesuré sur ordinateur seulement, à valider sur le téléphone (`docs/ACCELERER_WHISPER.md`).
 
-Dans le parcours normal, le modèle du téléphone s'appelle **« Whisper »** (issue #72, marche arrière sur #37 qui
-l'appelait « Plus précis ») : l'écran principal, le clavier et le test de lecture le disent ainsi, sans la variante.
-Les noms techniques (« large-v3-turbo », Parakeet…), la comparaison, Parakeet et les
+Dans le parcours normal, les choix s'appellent **« Parakeet »** (court « Rapide »), **« Whisper »** (court
+« Précis ») et **« Kalmia Pro »** (court « Pro ») (issue #89, qui reprend #72 partie 2 et #57) : l'écran
+principal, le clavier et le test de lecture les disent ainsi, sans la variante.
+Les noms techniques (« large-v3-turbo », « TDT 0.6b v3 »…), la comparaison et les
 réglages de performance (modèle gardé en mémoire, threads, accélération) sont dans
 **Réglages → Avancé → « Modèles et performances »**, section repliée.
 
@@ -436,10 +444,25 @@ texte, temps de chargement, facteur temps réel, mémoire en pointe et WER ;
 
 ### Serveur distant (mode « serveur »), réglage pour développeurs
 
-Depuis l'issue #57, Kalmia Blabla transcrit sur le téléphone ; le serveur ne sert plus
-qu'aux essais et au débogage. Il n'apparaît ni à l'installation ni au premier niveau des
-Réglages : il est dans **Réglages → Avancé → « Serveur distant, pour essais
-(développeurs) »**, section repliée à l'ouverture. Un serveur avec GPU répond plus vite
+Depuis l'issue #89, le choix du serveur est visible de tous, sous le nom **« Kalmia Pro »**
+(option avec abonnement, bientôt disponible ; la mécanique de paiement n'existe pas encore). Sa
+**configuration technique** (adresse, jeton, type d'API, polissage, langue envoyée) reste dans
+**Réglages → Avancé → « Serveur distant, pour essais (développeurs) »**, section repliée à l'ouverture.
+
+### Kalmia Pro dans le parcours normal (issue #89)
+
+- **Carte « Kalmia Pro »** à l'installation et sur l'écran principal, après Parakeet et Whisper, avec la
+  pastille « Pro » et « Abonnement · bientôt disponible ». Le bouton « Découvrir Kalmia Pro » ouvre un court
+  écran : ce que Pro apporte, « l'audio est envoyé au serveur pour être transcrit, puis supprimé dès la
+  transcription », « Abonnement bientôt disponible ». Aucun paiement, aucun formulaire, aucun prix.
+- **Sans adresse de serveur**, rien ne peut être activé : la carte et l'écran informent seulement, aucun audio n'est
+  envoyé.
+- **Avec une adresse** (saisie dans « Avancé », ou compilée avec `-PdefaultServerUrl`), le bouton « Activer
+  Kalmia Pro » de cet écran enregistre le mode « serveur » : le texte de consentement de #23 est affiché juste
+  au-dessus. Ni la carte, ni l'ouverture de l'écran, ni l'entrée « Kalmia Pro » du menu du clavier n'enregistrent le
+  consentement (`ProOffer.modeAfterConsent`, `stt/EngineChoice.kt`).
+- **Menu du clavier** : Parakeet, Whisper, Kalmia Pro, dans cet ordre. Un modèle non téléchargé figure quand même
+  dans le menu et renvoie à l'écran principal ; Kalmia Pro ouvre son écran tant qu'il n'est pas actif. Un serveur avec GPU répond plus vite
 que Whisper sur le téléphone (issue #23). Dans cette section, saisir l'adresse
 (par exemple `https://dictee.example.ca` pour le serveur speech-to-text de ce dépôt,
 déployé selon [`docs/DEPLOIEMENT_SERVEUR.md`](../docs/DEPLOIEMENT_SERVEUR.md), ou
@@ -448,8 +471,8 @@ l'adresse d'un serveur compatible avec l'API OpenAI `/v1/audio/transcriptions`) 
 `Authorization: Bearer`), puis tester la connexion. En dehors du réseau local, utilisez
 HTTPS ou un VPN (WireGuard, Tailscale).
 
-- **Mode serveur ou téléphone.** Le choix se fait seulement dans cette section
-  (« Envoi au serveur ») : « Sur le serveur configuré » (l'audio y est
+- **Mode serveur ou téléphone.** Le choix se fait sur l'écran Kalmia Pro (bouton
+  d'activation sous le texte) ou dans cette section (« Envoi au serveur ») : « Sur le serveur configuré » (l'audio y est
   envoyé, puis supprimé dès la transcription) ou « Toujours transcrire sur le
   téléphone ». Choisir « serveur » sous ce texte vaut consentement. Sans adresse, en
   mode « téléphone », tant qu'aucun mode n'est choisi ou sans réseau, tout reste sur
@@ -457,8 +480,7 @@ HTTPS ou un VPN (WireGuard, Tailscale).
 - **Comparer les modèles** n'inclut le serveur que s'il est utilisé (adresse et mode
   « serveur ») : une adresse seule n'envoie pas l'audio de la comparaison.
 - **Visible tant qu'il sert.** Avec une adresse et le mode « serveur », l'écran
-  principal affiche « Transcription : serveur distant » et un bouton « Voir le
-  réglage » ; l'accueil et « Comment dicter » disent alors que les dictées vont au
+  principal affiche « Transcription : Kalmia Pro » et un bouton « Voir Kalmia Pro » ; l'accueil et « Comment dicter » disent alors que les dictées vont au
   serveur, au lieu de « n'est envoyée à personne ».
 - **Repli sur le téléphone.** Le modèle choisi sur l'écran principal (Whisper turbo par
   défaut) sert de repli : si le serveur est injoignable ou ne répond pas dans le délai
@@ -466,10 +488,9 @@ HTTPS ou un VPN (WireGuard, Tailscale).
   sur le téléphone »), la dictée est transcrite sur le téléphone, avec un court message
   dans le clavier. Le bouton **Annuler** le fait tout de suite.
 - Choisir un modèle du téléphone (écran principal ou bouton du clavier) en mode
-  « serveur » passe en mode « téléphone ». Choisir « Serveur distant » dans le menu
-  du clavier (il y figure dès qu'une adresse est configurée, saisie dans la section
-  avancée ou compilée avec `-PdefaultServerUrl`) sans le mode « serveur »
-  ouvre les Réglages sur ce choix, section dépliée : seul ce texte enregistre le mode.
+  « serveur » passe en mode « téléphone ». Choisir « Kalmia Pro » dans le menu du clavier
+  sans le mode « serveur » ouvre l'écran Kalmia Pro (issue #89) : seuls le texte de cet
+  écran avec son bouton, et le choix de la section « Avancé », enregistrent le mode.
 - Adresse par défaut à la compilation : `./gradlew assembleRelease
   -PdefaultServerUrl=https://dictee.example.ca` (vide par défaut ; jamais de jeton dans
   l'APK). Une adresse saisie dans les Réglages la remplace. Réservé aux builds d'essai :

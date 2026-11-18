@@ -103,7 +103,7 @@ class ServerModeInstrumentedTest : ImeTestBase() {
 
     /**
      * Issue #57: an address and the "server" mode recorded: the dictations go to the server, and the main screen
-     * shows « Transcription : serveur distant ».
+     * shows « Transcription : Kalmia Pro ».
      */
     @Test
     fun aServerSetUpIsUsedAndShownOnTheMainScreen() {

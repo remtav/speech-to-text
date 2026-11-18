@@ -13,20 +13,6 @@ package io.github.remtav.dictee.stt
  */
 enum class ModelFamily { NEMO_TRANSDUCER, WHISPER, REMOTE }
 
-/**
- * Where a model is shown. [VISIBLE] models are offered on every screen, subject to the chosen languages
- * ([ModelCatalog.offered]).
- */
-enum class ModelVisibility {
-    /** Offered on every screen, subject to the chosen languages ([ModelCatalog.offered]). */
-    VISIBLE,
-    /**
-     * Issue #72: listed in « Avancé » (settings) and in the comparison, under its technical name; never offered at
-     * installation, never recommended, and in the keyboard's menu only while it is the active model.
-     */
-    ADVANCED,
-}
-
 data class ModelFile(
     /** Path relative to the model directory. */
     val path: String,
@@ -46,18 +32,20 @@ data class ModelSpec(
     val files: List<ModelFile>,
     /** Short practical note shown on the model's card (empty: none). Not a warning. */
     val note: String = "",
-    val visibility: ModelVisibility = ModelVisibility.VISIBLE,
 ) {
     val totalBytes: Long get() = files.sumOf { it.size }
 }
 
 object ModelCatalog {
-    /** Shown on Whisper's card (DECISIONS.md, issue #15, « friperie »). */
-    const val WHISPER_NOTE =
-        "Observé sur un téléphone : comprend bien des mots que les autres modèles ratent, " +
-            "mais la transcription prend plus de temps."
-    /** Shown on Parakeet's card in « Avancé » (issue #72). */
-    const val PARAKEET_NOTE = "Plus léger et plus rapide, mais comprend moins bien le français québécois."
+    /**
+     * Shown on Whisper's card (issue #89: speed against precision; the observation of issue #15, « friperie »,
+     * on the user's phone).
+     */
+    const val WHISPER_NOTE = "Plus lent, plus précis. Le meilleur sur le téléphone pour le français d'ici."
+    /** Shown on Parakeet's card (issue #89). */
+    const val PARAKEET_NOTE = "Le plus rapide. Moins précis en français québécois."
+    /** Shown on Kalmia Pro's card and screen (issue #89; « Le plus précis » waits for what the server runs, #13, #88). */
+    const val PRO_NOTE = "Rapide et précis, sans charger le téléphone."
     private const val PARAKEET =
         "https://huggingface.co/csukuangfj/sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8/resolve/main"
     private const val WHISPER =
@@ -70,8 +58,7 @@ object ModelCatalog {
         family = ModelFamily.NEMO_TRANSDUCER,
         description = "Transducteur, 25 langues européennes. Rapide.",
         license = "CC-BY-4.0",
-        // Issue #72: out of the normal path (Whisper alone transcribes Quebec French well), kept in « Avancé ».
-        visibility = ModelVisibility.ADVANCED,
+        // Issue #89: back in the normal path, next to Whisper (never recommended: Whisper is preselected).
         note = PARAKEET_NOTE,
         files = listOf(
             ModelFile("encoder.int8.onnx", "$PARAKEET/encoder.int8.onnx",
@@ -106,33 +93,18 @@ object ModelCatalog {
     )
 
     /**
-     * Every downloadable on-device model. Screens list [offered] and [listed] by language.
+     * Every downloadable on-device model, in the order shown (issue #89: Parakeet, Whisper, then Kalmia Pro,
+     * which is not a download). Screens list [offered] by language.
      */
     val all: List<ModelSpec> =
-        listOf(whisperTurbo, parakeet)
-
-    /** Issue #72: the models of « Avancé » (Parakeet): never recommended, never at installation. */
-    val advanced: List<ModelSpec> = all.filter { it.visibility == ModelVisibility.ADVANCED }
+        listOf(parakeet, whisperTurbo)
 
     /**
-     * The models offered for [languages]: visible and covering every chosen language,
-     * in catalogue order. That is Whisper alone (Parakeet is in « Avancé »).
+     * The models offered for [languages]: those covering every chosen language, in catalogue order. Whisper and
+     * Parakeet cover all five languages, so both are offered for every combination (issue #89).
      */
     fun offered(languages: Set<DictationLanguage>): List<ModelSpec> =
-        all.filter { spec ->
-            spec.visibility == ModelVisibility.VISIBLE &&
-                ModelRecommendations.uncovered(spec, languages).isEmpty()
-        }
-
-    /** What « Avancé » and the comparison list: [offered] then [advanced]. */
-    fun listed(languages: Set<DictationLanguage>): List<ModelSpec> = offered(languages) + advanced
-
-    /**
-     * What the keyboard's menu lists (issue #72): [offered], plus an [advanced] model only while it is the active
-     * one ([activeId]), so that a person who chose Parakeet in « Avancé » can come back from the keyboard.
-     */
-    fun forKeyboard(languages: Set<DictationLanguage>, activeId: String): List<ModelSpec> =
-        offered(languages) + advanced.filter { it.id == activeId }
+        all.filter { spec -> ModelRecommendations.uncovered(spec, languages).isEmpty() }
 
     /**
      * The model to use when [active] was chosen and [languages] are the ones dictated: [active] while it
@@ -142,25 +114,27 @@ object ModelCatalog {
         if (suits(active, languages)) active else default
 
     /**
-     * Can [spec] stay the active (or fallback) model with [languages]? The server always can; so can an
-     * [advanced] model, whatever the languages (issue #72: Parakeet may be chosen with Quebec French).
+     * Can [spec] stay the active (or fallback) model with [languages]? The server always can; a phone model can
+     * while it is [offered] for them.
      */
     fun suits(spec: ModelSpec, languages: Set<DictationLanguage>): Boolean =
-        spec.family == ModelFamily.REMOTE || spec in listed(languages)
+        spec.family == ModelFamily.REMOTE || spec in offered(languages)
 
     /**
-     * A server the user runs (opt-in): nothing to download, "installed" once its
-     * address is set. See [RemoteEngine].
+     * The server, shown as « Kalmia Pro » (issue #89): nothing to download, "installed" once its address is set
+     * (typed in « Avancé » or compiled in with -PdefaultServerUrl). The subscription does not exist yet. See
+     * [RemoteEngine].
      */
     val remote = ModelSpec(
         id = "remote-server",
-        displayName = "Serveur distant",
-        shortName = "Serveur",
-        publisher = "Votre serveur",
+        displayName = "Kalmia Pro",
+        shortName = "Pro",
+        publisher = "Kalmia",
         family = ModelFamily.REMOTE,
-        description = "Transcription sur un serveur que vous contrôlez. L'audio quitte le téléphone.",
+        description = "Transcription sur un serveur. L'audio quitte le téléphone.",
         license = "",
         files = emptyList(),
+        note = PRO_NOTE,
     )
 
     /** Everything the keyboard can dictate with. */

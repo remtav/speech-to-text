@@ -74,3 +74,34 @@ object ServerTimeout {
         )
     }
 }
+
+/** What the « Kalmia Pro » card and its screen can do (issue #89). */
+enum class ProState {
+    /** No server address (typed in « Avancé » or compiled in): the card informs, nothing can be turned on. */
+    UNAVAILABLE,
+    /** An address is set, dictations stay on the phone until the person agrees on the Pro screen. */
+    READY,
+    /** An address is set and the "server" mode is recorded: dictations go to the server. */
+    ACTIVE,
+}
+
+/**
+ * Kalmia Pro in the normal path (issue #89). Pure Kotlin. The rule that matters: **no audio leaves the phone
+ * without the consent of issue #23**, i.e. the "server" mode recorded where the consent text is shown. A card, a
+ * menu entry or a tap alone never records it: only [modeAfterConsent] does, from the Pro screen's activation
+ * button, whose text sits right above it.
+ */
+object ProOffer {
+    fun state(serverConfigured: Boolean, mode: TranscriptionMode): ProState = when {
+        !serverConfigured -> ProState.UNAVAILABLE
+        mode == TranscriptionMode.SERVER -> ProState.ACTIVE
+        else -> ProState.READY
+    }
+
+    /**
+     * The mode to record when the person asks to activate Pro: [TranscriptionMode.SERVER] only with a server **and**
+     * the consent given (the button pressed under the consent text); null (change nothing) otherwise.
+     */
+    fun modeAfterConsent(serverConfigured: Boolean, consentGiven: Boolean): TranscriptionMode? =
+        if (serverConfigured && consentGiven) TranscriptionMode.SERVER else null
+}

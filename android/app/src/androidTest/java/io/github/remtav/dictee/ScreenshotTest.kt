@@ -157,6 +157,25 @@ class ScreenshotTest : ImeTestBase() {
         }
     }
 
+    /** Issue #89: the keyboard's model menu with its three entries, Parakeet, Whisper and Kalmia Pro. */
+    @Test
+    fun keyboardModelMenu() {
+        for (mode in listOf(ThemeMode.LIGHT, ThemeMode.DARK)) {
+            val suffix = mode.name.lowercase()
+            app.settings.theme = mode
+            onMain { app.applyTheme() }
+            app.settings.activeModelId = ModelCatalog.whisperTurbo.id
+            launchFields()
+            onMain { service.rebuildInputView() }
+            val button = device.wait(androidx.test.uiautomator.Until.findObject(androidx.test.uiautomator.By.res(BuildConfig.APPLICATION_ID, "model")), 5_000)
+            checkNotNull(button) { "model button" }.click()
+            checkNotNull(device.wait(androidx.test.uiautomator.Until.findObject(androidx.test.uiautomator.By.text("Kalmia Pro")), 5_000)) { "model menu" }
+            shot("keyboard-menu-$suffix", scenario)
+            device.pressBack()
+            scenario.close()
+        }
+    }
+
     /**
      * The reading test with a result (issue #15, step 4.2): two scripted models (English alone, so both
      * Whisper turbo and Parakeet are offered, issue #22), the active one (Parakeet) loses every fourth word
@@ -257,14 +276,23 @@ class ScreenshotTest : ImeTestBase() {
             // Setup: the top (welcome text, steps), then the "Vos langues" step
             // and the model card carrying the "Recommandé" badge (the screen is
             // taller than the phone). Quebec French is preselected: Whisper turbo is
-            // the recommended (and only offered) model. No network, no model downloaded.
+            // the recommended and preselected model, next to Parakeet. No network, no model downloaded.
             ActivityScenario.launch(SetupActivity::class.java).use { s ->
                 shot("setup-$suffix", s)
                 s.scrollToTag(languageTag(DictationLanguage.FRENCH_QUEBEC), above = 120)
                 shot("setup-languages-$suffix", s)
-                s.scrollToTag(SetupActivity.modelCardTag(ModelCatalog.whisperTurbo), above = 24)
+                // Issue #89: the three choices, Parakeet, Whisper (preselected) and Kalmia Pro.
+                s.scrollToTag(SetupActivity.modelCardTag(ModelCatalog.parakeet), above = 24)
                 shot("setup-models-$suffix", s)
+                s.scrollToTag(io.github.remtav.dictee.ui.ProActivity.CARD_TAG, above = 120)
+                shot("setup-pro-$suffix", s)
             }
+            // Issue #89: the Kalmia Pro screen without a server (« bientôt disponible », nothing to turn on)...
+            ActivityScenario.launch(io.github.remtav.dictee.ui.ProActivity::class.java).use { shot("pro-$suffix", it) }
+            // ...and with a server set up: the consent text above the button.
+            app.settings.remoteUrl = "https://dictee.example.ca"
+            ActivityScenario.launch(io.github.remtav.dictee.ui.ProActivity::class.java).use { shot("pro-server-$suffix", it) }
+            app.settings.remoteUrl = ""
             // "Comment dicter" (issue #56), generated from the command table (Québec French is the default
             // language): the first screen, then the full list opened by a click on "Toutes les commandes".
             ActivityScenario.launch(HowToActivity::class.java).use { s ->

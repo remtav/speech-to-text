@@ -4870,3 +4870,42 @@ dernière vue.
   dans ce cas ?
 - Tests instrumentés (`TextKeyboardInstrumentedTest`) : réouverture après Back → micro ; rotation sur les touches →
   touches ; mot de passe et pavé inchangés. Non lancés en local (émulateur seulement en CI).
+
+## Issue #89 : trois choix visibles, Parakeet (rapide), Whisper (précis), Kalmia Pro (abonnement, bientôt)
+
+Décisions de Rémi du 2026-11-16 (ne pas redemander). Revient sur deux décisions : celle de #72 (partie 2), qui rangeait
+Parakeet dans « Avancé » seulement, et celle de #57, qui rangeait le serveur distant dans « Avancé » comme réglage de
+développeur. **La raison** : laisser la personne choisir entre vitesse et précision, et préparer l'offre Pro. Le reste de
+#72 tient : Lite-Whisper reste retiré, le test rapide reste masqué, « large-v3-turbo » reste dans « Avancé ».
+
+- **Catalogue.** Parakeet est visible ; `ModelCatalog.offered` rend Parakeet puis Whisper pour toute combinaison des cinq
+  langues (les deux couvrent les cinq). Plus aucun modèle n'étant `ADVANCED`, le niveau `ModelVisibility`, `advanced`,
+  `listed` et `forKeyboard` sont retirés, ainsi que la section « Autre modèle du téléphone » de « Avancé ».
+- **Noms.** « Parakeet » (court « Rapide »), « Whisper » (court « Précis »), « Kalmia Pro » (court « Pro »).
+  « Parakeet » sort de `technicalWords` ; « TDT 0.6b v3 » y entre : il reste réservé à « Avancé » et à la comparaison.
+- **Présélection.** Whisper reste le modèle présélectionné et recommandé : seul à bien transcrire le français québécois.
+  Parakeet est proposé à côté, jamais d'office. La raison parle des deux et ne renvoie pas au test rapide (masqué).
+- **Accroches** (celles proposées par l'issue) : Parakeet « Le plus rapide. Moins précis en français québécois. » ;
+  Whisper « Plus lent, plus précis. Le meilleur sur le téléphone pour le français d'ici. » ; Kalmia Pro « Rapide et
+  précis, sans charger le téléphone. » La confidentialité n'est pas un argument de vente : elle n'est dite qu'en petit
+  (« Sur le téléphone », et le texte d'envoi de l'audio sur l'écran Pro). Aucun prix.
+- **Kalmia Pro.** `ModelCatalog.remote` s'affiche « Kalmia Pro ». Une carte, toujours visible, après les deux modèles
+  locaux (installation et écran principal), ouvre `ProActivity` : ce que Pro apporte, « l'audio est envoyé au serveur
+  pour être transcrit », « Abonnement bientôt disponible ». Sans serveur configuré : information seulement. Avec un
+  serveur (adresse dans « Avancé » ou `-PdefaultServerUrl`) : un bouton « Activer Kalmia Pro », sous le texte de
+  consentement de #23, enregistre le mode « serveur ». `ProOffer` (dans `stt/EngineChoice.kt`) porte la règle :
+  `modeAfterConsent` ne rend `SERVER` qu'avec un serveur **et** le consentement donné. Ni la carte, ni l'ouverture de
+  l'écran, ni le menu du clavier n'enregistrent le consentement ; la bascule vers un modèle du téléphone remet le mode
+  « téléphone » (comme avant). La configuration technique (adresse, jeton, type d'API, polissage, langue envoyée)
+  reste dans « Avancé ».
+- **Menu du clavier.** Trois entrées, dans l'ordre Parakeet, Whisper, Kalmia Pro. Un modèle non téléchargé figure quand
+  même et renvoie à l'écran principal ; Kalmia Pro ouvre son écran tant que le mode « serveur » n'est pas enregistré.
+  Le bouton de modèle est donc toujours visible, plus jamais seul avec une entrée (question laissée ouverte par #72).
+- **Installation existante.** Aucun changement de modèle actif : un Parakeet actif le reste (il est maintenant offert
+  pour toute langue) ; le mode serveur actif reste actif et s'affiche « Kalmia Pro ».
+- **Hors portée** (inchangé) : mécanique d'abonnement (Play Billing, comptes, jetons par abonné), protocole du serveur
+  (#88), test rapide pour comparer les choix.
+- **Décisions de Rémi encore ouvertes** : (1) l'accroche de Kalmia Pro : « Le plus précis » ne se dira que si le serveur
+  fait tourner un modèle plus gros que celui du téléphone (#13, #88), la PR garde donc « Rapide et précis, sans charger
+  le téléphone » ; (2) le sort du code dormant du test rapide à deux modèles (#107) : non touché ici ; (3) le
+  `@Ignore` de `ScreenshotTest.readingTest`, posé par #72 faute d'un deuxième modèle offert, n'est pas levé ici.
