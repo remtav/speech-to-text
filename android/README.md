@@ -630,6 +630,16 @@ verts ; seule exception, un lancement manuel avec la case « skip_slow_tests »
 cochée saute les tests de modèles et l'émulateur et publie dès que le build
 (tests unitaires, signature) est vert, avec un avertissement dans le résumé.
 
+Sur une pull request, la CI ne lance que ce que le changement touche (issue #76) :
+rien pour la documentation seule (`*.md`, `android/docs/`) ; les tests de modèles
+seulement si le code de transcription (`audio/`, `dictation/`, `stt/`, `text/`), le
+catalogue ou le build changent ; l'émulateur seulement si le code de l'application,
+ses ressources ou les tests instrumentés changent. Le job « changes » l'écrit dans le
+résumé du run. Un push sur `main` et un lancement manuel lancent toujours tout. Les
+tests instrumentés sont répartis sur trois émulateurs en parallèle ; chaque part a
+ses rapports (`instrumented-test-reports-<n>`), ses captures (`screenshots-<n>`) et
+la durée de ses tests par classe dans le résumé.
+
 ### Play Store
 
 Le Play Store n'accepte pas d'APK pour une nouvelle application : il demande un

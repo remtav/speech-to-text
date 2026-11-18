@@ -8,6 +8,13 @@ name: Android
 # Publishing needs every job green, except on a manual run with "skip_slow_tests"
 # checked: the model and emulator jobs are then skipped and the APK is published
 # once the build job (unit tests, release signature) is green.
+#
+# Issue #76: on a pull request, the "changes" job picks the jobs from the files
+# changed. Documentation only (*.md, android/docs/): nothing runs. Model tests:
+# only when the transcription code, the catalogue or the build changes. Emulator:
+# only when the app's code, resources or instrumented tests change. A skipped
+# job counts as passed for required checks. A push to main and a manual run
+# always run everything: a release never ships with fewer tests than before.
 
 on:
   # Branches are covered by their pull request; a push only matters on main (release).
@@ -41,8 +48,94 @@ env:
   VERSION_NAME: 0.1.${{ github.run_number }}
 
 jobs:
+  changes:
+    name: Pick the jobs from the changed files
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      build: ${{ steps.pick.outputs.build }}
+      models: ${{ steps.pick.outputs.models }}
+      emulator: ${{ steps.pick.outputs.emulator }}
+    steps:
+      - name: Changed files (pull request only)
+        id: filter
+        if: github.event_name == 'pull_request'
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            android:
+              - "android/**"
+              - ".github/workflows/android.yml"
+              - ".github/scripts/test_durations.py"
+            docs:
+              - "android/**/*.md"
+              - "android/docs/**"
+            # Everything HostModelTest compiles against or reads (packages audio, dictation,
+            # stt, text and what they import; CompareActivity.parseReferences; the references).
+            models:
+              - "android/app/src/main/java/io/github/remtav/dictee/audio/**"
+              - "android/app/src/main/java/io/github/remtav/dictee/dictation/**"
+              - "android/app/src/main/java/io/github/remtav/dictee/stt/**"
+              - "android/app/src/main/java/io/github/remtav/dictee/text/**"
+              - "android/app/src/main/java/io/github/remtav/dictee/ui/CompareActivity.kt"
+              - "android/app/src/main/assets/reference/**"
+              - "android/app/src/test/java/io/github/remtav/dictee/HostModelTest.kt"
+              - "android/*.gradle.kts"
+              - "android/app/*.gradle.kts"
+              - "android/gradle.properties"
+              - "android/gradle/**"
+              - ".github/workflows/android.yml"
+            # The app (code, resources, assets, manifest), the instrumented tests and their
+            # assets (src/test/resources/polissage is an androidTest asset dir), the build.
+            emulator:
+              - "android/app/src/main/**"
+              - "android/app/src/debug/**"
+              - "android/app/src/androidTest/**"
+              - "android/app/src/test/resources/polissage/**"
+              - "android/*.gradle.kts"
+              - "android/app/*.gradle.kts"
+              - "android/gradle.properties"
+              - "android/gradle/**"
+              - "android/keystore/**"
+              - ".github/workflows/android.yml"
+              - ".github/scripts/test_durations.py"
+      - name: Jobs to run
+        id: pick
+        working-directory: .
+        env:
+          IS_PR: ${{ github.event_name == 'pull_request' }}
+          ANDROID_COUNT: ${{ steps.filter.outputs.android_count }}
+          DOCS_COUNT: ${{ steps.filter.outputs.docs_count }}
+          MODELS: ${{ steps.filter.outputs.models }}
+          EMULATOR: ${{ steps.filter.outputs.emulator }}
+        run: |
+          if [ "$IS_PR" != "true" ]; then
+            # Push to main or manual run: everything (skip_slow_tests is handled by each job).
+            build=true; models=true; emulator=true
+          else
+            # Docs are a subset of android/**: any other changed file is code.
+            if [ "${ANDROID_COUNT:-0}" != "${DOCS_COUNT:-0}" ]; then build=true; else build=false; fi
+            models=$MODELS; emulator=$EMULATOR
+          fi
+          echo "build=$build" >> "$GITHUB_OUTPUT"
+          echo "models=$models" >> "$GITHUB_OUTPUT"
+          echo "emulator=$emulator" >> "$GITHUB_OUTPUT"
+          {
+            echo "### Jobs picked from the changed files"
+            echo "| Job | Runs |"
+            echo "|---|---|"
+            echo "| Build and unit tests | $build |"
+            echo "| Model tests | $models |"
+            echo "| Instrumented tests (emulator) | $emulator |"
+          } >> "$GITHUB_STEP_SUMMARY"
+
   build:
     name: Build and unit tests
+    needs: changes
+    if: needs.changes.outputs.build == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     outputs:
@@ -117,7 +210,8 @@ jobs:
 
   models:
     name: Model tests on the CI host (every catalogue model, FR + EN)
-    if: ${{ !(github.event_name == 'workflow_dispatch' && inputs.skip_slow_tests) }}
+    needs: changes
+    if: ${{ needs.changes.outputs.models == 'true' && !(github.event_name == 'workflow_dispatch' && inputs.skip_slow_tests) }}
     runs-on: ubuntu-latest
     # Five models (~5,8 Go) downloaded again whenever the catalogue changes (cache key).
     timeout-minutes: 90
@@ -145,10 +239,27 @@ jobs:
           path: android/app/build/reports/tests/
 
   emulator:
-    name: Instrumented keyboard tests (emulator)
-    if: ${{ !(github.event_name == 'workflow_dispatch' && inputs.skip_slow_tests) }}
+    # Issue #76: the ~130 instrumented tests (10-11 min alone) are split over three
+    # emulators running side by side, by whole classes (a class keeps its order and
+    # its setup). Shards 1 and 2 name their classes, about a third of the time each
+    # (measured on PR #93); shard 3 runs every OTHER class, so a new test class always
+    # runs, and a class renamed without updating this list fails loudly (class not
+    # found) instead of being skipped. Rebalance with the "Test duration per class"
+    # table of each shard's summary. Room for #70 (3-button navigation bar): add a
+    # dimension to this matrix, or a shard, rather than lengthening one emulator.
+    name: Instrumented keyboard tests (emulator ${{ matrix.shard }}/3)
+    needs: changes
+    if: ${{ needs.changes.outputs.emulator == 'true' && !(github.event_name == 'workflow_dispatch' && inputs.skip_slow_tests) }}
     runs-on: ubuntu-latest
     timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3]
+    env:
+      # Classes of shards 1 and 2 (package io.github.remtav.dictee); shard 3 = all the others.
+      SHARD1_CLASSES: TextKeyboardInstrumentedTest ReadingTestInstrumentedTest DictationEndToEndTest ServerModeInstrumentedTest
+      SHARD2_CLASSES: ScreenshotTest HowToInstrumentedTest ContributionInstrumentedTest SetupLanguageTest VoiceCommandInstrumentedTest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
@@ -156,6 +267,18 @@ jobs:
           distribution: temurin
           java-version: "17"
       - uses: gradle/actions/setup-gradle@v4
+      - name: Classes of this shard
+        env:
+          SHARD: ${{ matrix.shard }}
+        run: |
+          qualify() { for c in $1; do printf 'io.github.remtav.dictee.%s,' "$c"; done | sed 's/,$//'; }
+          case "$SHARD" in
+            1) filter="class=$(qualify "$SHARD1_CLASSES")" ;;
+            2) filter="class=$(qualify "$SHARD2_CLASSES")" ;;
+            3) filter="notClass=$(qualify "$SHARD1_CLASSES $SHARD2_CLASSES")" ;;
+          esac
+          echo "Shard $SHARD: $filter"
+          echo "SHARD_ARGS=-Pandroid.testInstrumentationRunnerArguments.$filter" >> "$GITHUB_ENV"
       - name: Enable KVM
         working-directory: .
         run: |
@@ -164,7 +287,18 @@ jobs:
           sudo udevadm trigger --name-match=kvm
       - name: Build test APKs
         run: ./gradlew --no-daemon assembleDebug assembleDebugAndroidTest
-      - name: Run instrumented tests
+      # Issue #76: the booted AVD is cached as a snapshot (pattern documented by
+      # android-emulator-runner); the test run starts from it and saves nothing back.
+      - name: AVD cache
+        uses: actions/cache@v4
+        id: avd-cache
+        with:
+          path: |
+            ~/.android/avd/*
+            ~/.android/adb*
+          key: avd-34-google_apis-x86_64-pixel_6-4096M-v1
+      - name: Create the AVD and its snapshot (cache miss only)
+        if: steps.avd-cache.outputs.cache-hit != 'true'
         uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: 34
@@ -172,6 +306,20 @@ jobs:
           target: google_apis
           profile: pixel_6
           ram-size: 4096M
+          force-avd-creation: false
+          disable-animations: false
+          emulator-options: -no-window -gpu swiftshader_indirect -no-boot-anim -camera-back none
+          working-directory: android
+          script: echo "AVD snapshot generated for the cache."
+      - name: Run instrumented tests (shard ${{ matrix.shard }}/3)
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 34
+          arch: x86_64
+          target: google_apis
+          profile: pixel_6
+          ram-size: 4096M
+          force-avd-creation: false
           disable-animations: true
           emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -no-boot-anim -camera-back none
           working-directory: android
@@ -179,21 +327,26 @@ jobs:
           # hide_error_dialogs (issue #69): a loaded emulator often shows « Pixel Launcher isn't responding »;
           # the box took the window focus from the test field and failed keyboard tests at random. With it set,
           # Android closes the stuck launcher instead of showing the box (the CI emulator only, never a phone).
-          script: adb shell settings put global hide_error_dialogs 1; ./gradlew --no-daemon connectedDebugAndroidTest -Pandroid.injected.androidTest.leaveApksInstalledAfterRun=true; s=$?; mkdir -p screenshots; adb pull /sdcard/Android/data/io.github.remtav.dictee/files/screenshots/. screenshots/ || true; exit $s
+          # One line on purpose: the action runs each line of the script as its own command.
+          script: adb shell settings put global hide_error_dialogs 1; ./gradlew --no-daemon connectedDebugAndroidTest $SHARD_ARGS -Pandroid.injected.androidTest.leaveApksInstalledAfterRun=true; s=$?; mkdir -p screenshots; adb pull /sdcard/Android/data/io.github.remtav.dictee/files/screenshots/. screenshots/ || true; exit $s
+      - name: Test duration per class
+        if: always()
+        working-directory: .
+        run: python3 .github/scripts/test_durations.py "Instrumented tests, shard ${{ matrix.shard }}/3" android/app/build/outputs/androidTest-results >> "$GITHUB_STEP_SUMMARY"
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: instrumented-test-reports
+          name: instrumented-test-reports-${{ matrix.shard }}
           path: android/app/build/reports/androidTests/
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: screenshots
+          name: screenshots-${{ matrix.shard }}
           path: android/screenshots/
 
   release:
     name: Publish APK
-    needs: [build, models, emulator]
+    needs: [changes, build, models, emulator]
     # Only on main (push or manual run, never a pull request), and only with an
     # APK signed by the private release key. !cancelled() lets a manual run skip
     # the slow jobs (skipped needs), but a cancelled run never publishes.
