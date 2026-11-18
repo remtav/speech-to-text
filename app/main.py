@@ -73,6 +73,19 @@ def _validate_language(language):
     return language
 
 
+def _validate_languages(languages):
+    """The user's languages ("fr,en"), to limit language detection (issue #86); None when empty."""
+    codes = []
+    for code in (languages or "").split(","):
+        code = code.strip().lower()
+        if not code or code in codes:
+            continue
+        if code not in LANGUAGES:
+            raise HTTPException(status_code=400, detail=f"Unsupported language '{code}' in languages")
+        codes.append(code)
+    return codes or None
+
+
 def _require_diarization_token():
     if hf.get_token() is None:
         raise HTTPException(
@@ -344,9 +357,12 @@ def create_app(settings=None, backend=None, polish_client=None):
     # --------------------------------------------------- transcription
 
     async def submit_transcription(request, file, diarize, num_speakers, min_speakers, max_speakers,
-                                   language, quick=False, polish=None, prompt=None):
+                                   language, quick=False, polish=None, prompt=None, languages=None):
         params = {"quick": quick, "language": _validate_language(language),
                   "polish": settings.polish_default if polish is None else bool(polish)}
+        languages = _validate_languages(languages)
+        if languages:
+            params["languages"] = languages
         prompt = (prompt or "").strip()
         if prompt:
             if len(prompt) > MAX_PROMPT_CHARS:
@@ -373,14 +389,19 @@ def create_app(settings=None, backend=None, polish_client=None):
         max_speakers: Optional[int] = Form(None),
         language: Optional[str] = Form(None),
         polish: Optional[bool] = Form(None),
+        languages: Optional[str] = Form(None),
     ):
         """Transcribe audio with word timestamps, optionally labelling speakers. Waits for the result.
+
+        Without ``language`` (or with "auto"), the language is detected; ``languages`` ("fr,en", the
+        user's languages) limits the detection to them. A forced ``language`` makes Whisper translate
+        speech in any other language into it.
 
         With ``polish`` (default: WHISPER_POLISH), the result also has ``polished_text`` when the LLM
         polish step succeeded, and a ``polish`` status; ``text`` is always the raw transcript.
         """
         job = await submit_transcription(request, file, diarize, num_speakers, min_speakers, max_speakers, language,
-                                         polish=polish)
+                                         polish=polish, languages=languages)
         await _wait(job)
         _raise_for_job(job)
         return job.result
@@ -388,9 +409,11 @@ def create_app(settings=None, backend=None, polish_client=None):
     @app.post("/transcribe/streaming")
     async def transcribe_streaming(request: Request, file: UploadFile = File(...),
                                    language: Optional[str] = Form(None),
-                                   polish: Optional[bool] = Form(None)):
+                                   polish: Optional[bool] = Form(None),
+                                   languages: Optional[str] = Form(None)):
         """Fast transcription with language detection, skipping alignment and diarization."""
-        job = await submit_transcription(request, file, None, None, None, None, language, quick=True, polish=polish)
+        job = await submit_transcription(request, file, None, None, None, None, language, quick=True, polish=polish,
+                                         languages=languages)
         await _wait(job)
         _raise_for_job(job)
         return job.result
@@ -431,14 +454,16 @@ def create_app(settings=None, backend=None, polish_client=None):
         quick: bool = Form(False),
         polish: Optional[bool] = Form(None),
         prompt: Optional[str] = Form(None),
+        languages: Optional[str] = Form(None),
     ):
         """Queue a transcription and return immediately; poll GET /jobs/{id} for progress and result.
 
         ``prompt`` (optional): text given to Whisper as context (``initial_prompt``), e.g. the end of the
-        previous block of a long dictation. It is never logged.
+        previous block of a long dictation. It is never logged. ``languages`` (optional, "fr,en"): see
+        ``POST /transcribe``.
         """
         job = await submit_transcription(request, file, diarize, num_speakers, min_speakers, max_speakers,
-                                         language, quick, polish, prompt)
+                                         language, quick, polish, prompt, languages)
         return job.to_dict()
 
     @app.get("/jobs")

@@ -20,6 +20,11 @@ data class RemoteConfig(
     val model: String = "",
     /** "fr", "en", or blank for automatic detection. */
     val language: String = "",
+    /**
+     * With automatic detection ([language] blank): the user's languages, sent as `languages=fr,en` so this
+     * repository's server only chooses among them (issue #86). Empty: the server chooses among all.
+     */
+    val detectLanguages: List<String> = emptyList(),
     /** Cloudflare Access service token: both headers are sent only when both are set. */
     val cfAccessClientId: String = "",
     val cfAccessClientSecret: String = "",

@@ -169,7 +169,7 @@
     <string name="settings_remote_api">Type d\'API</string>
     <string name="settings_remote_model_hint">Nom du modèle (API OpenAI uniquement, ex. whisper-1)</string>
     <string name="settings_remote_key_hint">Jeton d\'accès (DICTEE_TOKENS du serveur ; envoyé en Authorization: Bearer)</string>
-    <string name="settings_remote_language">Langue envoyée au serveur (par défaut : selon vos langues, « français » ou « anglais » seulement)</string>
+    <string name="settings_remote_language">Langue envoyée au serveur (par défaut : selon vos langues, « français » ou « anglais » seulement). Une langue choisie est imposée : ce qui est dit dans une autre langue est traduit vers elle. En détection automatique, le serveur choisit parmi vos langues.</string>
     <string name="settings_remote_lang_auto">Détection automatique</string>
     <string name="settings_server_use">Envoi au serveur</string>
     <string name="settings_server_mode_help">Où vos dictées sont transcrites. Tant que « Sur le serveur configuré » n\'est pas choisi ici, rien n\'est envoyé.</string>
