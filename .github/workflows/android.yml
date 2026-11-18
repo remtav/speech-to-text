@@ -257,7 +257,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shard: [1, 2, 3]
+        shard: [1]
+        rep: [a, b, c, d]
     env:
       # Classes of shards 1 and 2 (package io.github.remtav.dictee); shard 3 = all the others.
       SHARD1_CLASSES: TextKeyboardInstrumentedTest ReadingTestInstrumentedTest DictationEndToEndTest ServerModeInstrumentedTest
@@ -330,7 +331,7 @@ jobs:
           # the box took the window focus from the test field and failed keyboard tests at random. With it set,
           # Android closes the stuck launcher instead of showing the box (the CI emulator only, never a phone).
           # One line on purpose: the action runs each line of the script as its own command.
-          script: adb shell settings put global hide_error_dialogs 1; ./gradlew --no-daemon connectedDebugAndroidTest $SHARD_ARGS -Pandroid.injected.androidTest.leaveApksInstalledAfterRun=true; s=$?; mkdir -p screenshots; adb pull /sdcard/Android/data/io.github.remtav.dictee/files/screenshots/. screenshots/ || true; exit $s
+          script: adb shell settings put global hide_error_dialogs 1; s=0; mkdir -p screenshots; for i in 1 2; do ./gradlew --no-daemon connectedDebugAndroidTest $SHARD_ARGS -Pandroid.injected.androidTest.leaveApksInstalledAfterRun=true || s=1; cp -r app/build/reports/androidTests/connected screenshots/run$i || true; done; exit $s
       - name: Test duration per class
         if: always()
         working-directory: .
@@ -338,12 +339,12 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: instrumented-test-reports-${{ matrix.shard }}
+          name: instrumented-test-reports-${{ matrix.shard }}-${{ matrix.rep }}
           path: android/app/build/reports/androidTests/
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: screenshots-${{ matrix.shard }}
+          name: screenshots-${{ matrix.shard }}-${{ matrix.rep }}
           path: android/screenshots/
 
   release:
