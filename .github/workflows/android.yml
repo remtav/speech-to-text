@@ -258,8 +258,8 @@ jobs:
         shard: [1, 2, 3]
     env:
       # Classes of shards 1 and 2 (package io.github.remtav.dictee); shard 3 = all the others.
-      SHARD1_CLASSES: TextKeyboardInstrumentedTest ReadingTestInstrumentedTest DictationEndToEndTest
-      SHARD2_CLASSES: ScreenshotTest HowToInstrumentedTest ContributionInstrumentedTest SetupLanguageTest
+      SHARD1_CLASSES: TextKeyboardInstrumentedTest ReadingTestInstrumentedTest DictationEndToEndTest ServerModeInstrumentedTest
+      SHARD2_CLASSES: ScreenshotTest HowToInstrumentedTest ContributionInstrumentedTest SetupLanguageTest VoiceCommandInstrumentedTest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
