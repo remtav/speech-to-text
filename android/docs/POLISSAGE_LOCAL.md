@@ -74,7 +74,7 @@ sans atteindre l'attendu compte comme « modifié à tort ».
 - **Lignes rédigées.** Plus d'un tiers des paires sont vraisemblables, pas
   observées.
 - **Surapprentissage du vocabulaire.** La liste livrée
-  (`android/app/src/main/java/io/github/remtav/dictee/text/polish/ShippedVocabulary.kt`)
+  (`android/app/src/sharedTest/java/io/github/remtav/dictee/text/polish/ShippedVocabulary.kt`)
   a été écrite en connaissant le jeu. Sur ses 178 formes, 20 (11 %) sont
   marquées `OBSERVED` : elles figurent mot pour mot dans une transcription du
   jeu. Elles font **la moitié** des corrections du vocabulaire (19 sur 38).
@@ -191,7 +191,7 @@ Ce qu'il faut en retenir :
   consigne. Seul le garde-fou empêche la sortie fautive d'arriver dans le
   texte.
 - **Ce que le garde-fou assoupli protège.** Il est défini dans
-  `android/app/src/main/java/io/github/remtav/dictee/cleanup/eval/RelaxedSafetyCheck.kt`.
+  `android/app/src/sharedTest/java/io/github/remtav/dictee/cleanup/eval/RelaxedSafetyCheck.kt`.
   La sortie n'est acceptée que si elle se dérive du texte d'entrée par des
   réécritures fixes : casse « mixte » (`git hub` → `GitHub`), traits d'union,
   lettres épelées recollées, code postal, adresse lue mot à mot, nom du
@@ -365,9 +365,9 @@ combinaison ne peut pas dépasser 56, avec ou sans proximité.
 
 ### Polissage local : inchangé
 
-- `android/app/src/main/java/io/github/remtav/dictee/text/polish/` (règles,
+- `android/app/src/sharedTest/java/io/github/remtav/dictee/text/polish/` (règles,
   vocabulaire livré) et
-  `android/app/src/main/java/io/github/remtav/dictee/cleanup/eval/`
+  `android/app/src/sharedTest/java/io/github/remtav/dictee/cleanup/eval/`
   (garde-fou assoupli, prompt élargi, approches 3 et 4) ne sont appelés par
   aucun autre fichier de l'application. Aucun appel n'existe depuis
   `DicteeApp`, `TextPipeline` ou `SettingsActivity`, et aucun réglage ne les
