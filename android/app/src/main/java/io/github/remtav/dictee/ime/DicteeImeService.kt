@@ -50,6 +50,7 @@ import io.github.remtav.dictee.stt.Transcription
 import io.github.remtav.dictee.ui.HowToActivity
 import io.github.remtav.dictee.ui.ProActivity
 import io.github.remtav.dictee.ui.SetupActivity
+import io.github.remtav.dictee.ime.words.GestureDecoder
 import io.github.remtav.dictee.ime.words.GestureText
 import io.github.remtav.dictee.ime.words.KeyGeometry
 import io.github.remtav.dictee.ime.words.KeyPoint
@@ -390,6 +391,10 @@ class DicteeImeService : InputMethodService(), DictationListener, EngineManager.
         stopDictationForTyping()
         val request = ++gestureRequest
         app.wordLists.decodeGesture(KeyLanguage.forDictation(app.settings.languages), geometry, trace) { words ->
+            // The trace in key widths (a dozen points) and the guesses: what to look at when a word comes out wrong.
+            val path = GestureDecoder.resampleCount(trace, 12).joinToString(" ") { "%.1f,%.1f".format(java.util.Locale.ROOT, it.x, it.y) }
+            val keys = "aqmn".joinToString(" ") { c -> geometry.centre(c)?.let { "$c=%.1f,%.1f".format(java.util.Locale.ROOT, it.x, it.y) } ?: "$c=?" }
+            Log.i(TAG, "gesture: ${trace.size} points [$path] keys [$keys] -> $words")
             main.post { if (request == gestureRequest) writeGesture(words, shift) }
         }
     }
