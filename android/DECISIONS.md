@@ -2473,7 +2473,7 @@ Téléphone arm64, débogage USB activé.
    télécharger Qwen2.5 0,5B (et 1,5B), puis remettre le nettoyage sur
    « Désactivé ». Pour Gemma 3 1B (accès restreint) : le télécharger sur un
    ordinateur après avoir accepté la licence, puis
-   `adb push gemma3-1b-it-int4.task /sdcard/Android/data/io.github.remtav.dictee/files/llm/`.
+   `adb push gemma3-1b-it-int4.task /sdcard/Android/data/com.kalmia.stt/files/llm/`.
 2. Construire et installer l'application et l'APK de test, depuis `android/` :
    `./gradlew installDebug installDebugAndroidTest`.
 3. Lancer l'enregistrement (un modèle à la fois ; 1 ou 2 appels au LLM par
@@ -2483,15 +2483,15 @@ Téléphone arm64, débogage USB activé.
    adb shell am instrument -w \
      -e class io.github.remtav.dictee.LlmPolishRecordingTest \
      -e llmModel llm-qwen2.5-0.5b-instruct-q8 \
-     io.github.remtav.dictee.test/androidx.test.runner.AndroidJUnitRunner
+     com.kalmia.stt.test/androidx.test.runner.AndroidJUnitRunner
    ```
 
    Variantes : `-e llmModel llm-qwen2.5-1.5b-instruct-q8` ;
-   `-e llmModel /sdcard/Android/data/io.github.remtav.dictee/files/llm/gemma3-1b-it-int4.task -e llmTemplate gemma -e llmName gemma3-1b` ;
+   `-e llmModel /sdcard/Android/data/com.kalmia.stt/files/llm/gemma3-1b-it-int4.task -e llmTemplate gemma -e llmName gemma3-1b` ;
    `-e nearMatch true` pour le garde-fou avec proximité (changer aussi
    `llmName`). Suivi : `adb logcat -s LlmPolishRecording`.
 4. Récupérer les fichiers :
-   `adb pull /sdcard/Android/data/io.github.remtav.dictee/files/polissage/ .`
+   `adb pull /sdcard/Android/data/com.kalmia.stt/files/polissage/ .`
    puis copier les `llm-*.tsv` dans `app/src/test/resources/polissage/sorties/`
    (le noteur les reprend tels quels, latence « appareil ») et reporter
    `memoire-<nom>.txt` dans le rapport.
