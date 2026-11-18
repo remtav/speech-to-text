@@ -254,6 +254,7 @@ class AppSettings(context: Context, private val defaultServerUrl: String = Build
             apiKey = remoteApiKey,
             model = remoteModel,
             language = remoteLanguage,
+            detectLanguages = DictationLanguages.detectionLanguages(languages),
             cfAccessClientId = cfAccessClientId,
             cfAccessClientSecret = cfAccessClientSecret,
             polish = remotePolish,

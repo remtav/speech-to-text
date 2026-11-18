@@ -168,7 +168,7 @@
     <string name="settings_remote_api">Type d\'API</string>
     <string name="settings_remote_model_hint">Nom du modèle (API OpenAI uniquement, ex. whisper-1)</string>
     <string name="settings_remote_key_hint">Jeton d\'accès (DICTEE_TOKENS du serveur ; envoyé en Authorization: Bearer)</string>
-    <string name="settings_remote_language">Langue envoyée au serveur (par défaut : selon vos langues, « français » ou « anglais » seulement)</string>
+    <string name="settings_remote_language">Langue envoyée au serveur (par défaut : selon vos langues, « français » ou « anglais » seulement). Une langue choisie est imposée : ce qui est dit dans une autre langue est traduit vers elle. En détection automatique, le serveur choisit parmi vos langues.</string>
     <string name="settings_remote_lang_auto">Détection automatique</string>
     <string name="settings_server_use">Envoi au serveur</string>
     <string name="settings_server_mode_help">Où vos dictées sont transcrites. Tant que « Sur le serveur configuré » n\'est pas choisi ici, rien n\'est envoyé.</string>
@@ -415,6 +415,7 @@
     <string name="quick_skipped">Pas essayé : le modèle précédent calculait encore.</string>
     <string name="quick_failed">L\'essai a échoué.</string>
     <string name="quick_interrupted">Lecture interrompue (l\'application est passée en arrière-plan) : elle n\'est pas notée. Recommencez quand vous voulez.</string>
+    <string name="measure_busy">Une autre mesure de modèle est en cours (test rapide, comparaison ou test de lecture). Réessayez quand elle sera terminée.</string>
     <string name="quick_previous_running">Le calcul d\'un test précédent se termine. Réessayez dans un instant.</string>
     <string name="quick_server_note">Vos dictées passent par le serveur distant configuré dans les réglages avancés : le modèle du téléphone ne sert qu\'en repli tant que ce réglage est actif.</string>
     <string name="quick_adopt">Utiliser %1$s</string>

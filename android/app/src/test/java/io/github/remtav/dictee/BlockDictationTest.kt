@@ -58,6 +58,8 @@ class BlockDictationTest {
     @Volatile private var holdPolish = false
     /** Language the server reports for every job. */
     @Volatile private var detected = "fr"
+    /** Language the server reports for job n (1-based): [detected] unless a test changes it. */
+    @Volatile private var detectedFor: (Int) -> String = { detected }
     private val jobCount = AtomicInteger()
     private val polishTexts: MutableMap<String, String> = ConcurrentHashMap()
     private lateinit var server: RecordingServer
@@ -94,7 +96,7 @@ class BlockDictationTest {
             req.method == "GET" && p.startsWith("/jobs/b") -> {
                 val n = p.removePrefix("/jobs/b").toInt()
                 if (n in heldBlocks) 200 to """{"id": "b$n", "status": "running"}"""
-                else 200 to """{"id": "b$n", "status": "done", "result": {"text": " ${blockTexts[n - 1]} ", "language": "$detected"}}"""
+                else 200 to """{"id": "b$n", "status": "done", "result": {"text": " ${blockTexts[n - 1]} ", "language": "${detectedFor(n)}"}}"""
             }
             req.method == "GET" && p.startsWith("/jobs/p") -> {
                 val id = p.removePrefix("/jobs/")
@@ -128,9 +130,13 @@ class BlockDictationTest {
         return wav.samples.size / 16000f
     }
 
-    private fun config(language: String = "", polish: Boolean = true, api: RemoteApi = RemoteApi.DICTEE_SERVER, waitBase: Long = 5_000) =
+    private fun config(
+        language: String = "", polish: Boolean = true, api: RemoteApi = RemoteApi.DICTEE_SERVER, waitBase: Long = 5_000,
+        detectLanguages: List<String> = emptyList(),
+    ) =
         RemoteConfig(
-            "http://127.0.0.1:${server.port}", api, language = language, connectTimeoutMillis = 500,
+            "http://127.0.0.1:${server.port}", api, language = language, detectLanguages = detectLanguages,
+            connectTimeoutMillis = 500,
             waitBaseMillis = waitBase, pollIntervalMillis = 20, polish = polish,
         )
 
@@ -264,9 +270,10 @@ class BlockDictationTest {
         assertTrue(blocks.all { field(it.body, "quick") == "true" && field(it.body, "polish") == "false" })
         // Each block holds its own utterance only (2.2 s of speech, the pause, the lookback): nothing twice.
         blocks.forEach { val s = wavSeconds(it.body); assertTrue("block of $s s", s in 2.2f..4.0f) }
-        // Whisper gets the end of the previous text; the language of the first block is imposed on the next ones.
+        // Whisper gets the end of the previous text. No language is set: the server detects it on every block
+        // (issue #86: the language of the first block imposed on the next ones made them translated).
         assertEquals(listOf(null, "un", "deux", "trois"), blocks.map { field(it.body, "prompt") })
-        assertEquals(listOf(null, "fr", "fr", "fr"), blocks.map { field(it.body, "language") })
+        assertEquals(listOf(null, null, null, null), blocks.map { field(it.body, "language") })
         // At the stop, only the last block and the polish were left.
         val after = reqs().drop(run.atStop).filter { it.method == "POST" }
         assertEquals(listOf("/jobs", "/polish"), after.map { it.path })
@@ -294,6 +301,33 @@ class BlockDictationTest {
         assertNoGateFailure()
         assertTrue(jobPosts().all { field(it.body, "language") == "fr" })
         assertEquals("fr", JSONObject(String(realPolishPosts().single().body)).getString("language"))
+    }
+
+    /**
+     * Issue #86: a French dictation whose first block the server took for English. The next blocks are not sent
+     * with "en" (Whisper would translate them into English): each one is detected on its own, and the whole text
+     * is polished in the language of most blocks.
+     */
+    @Test fun frenchDictationStaysFrenchWhenTheFirstBlockIsDetectedAsEnglish() {
+        detectedFor = { n -> if (n == 1) "en" else "fr" }
+        val run = dictate(remote())
+        assertNoGateFailure()
+        assertTrue(jobPosts().none { field(it.body, "language") != null })
+        assertEquals("fr", JSONObject(String(realPolishPosts().single().body)).getString("language"))
+        assertEquals("fr", run.rec.results.single().language)
+    }
+
+    @Test fun usersLanguagesLimitTheDetectionOfEveryBlock() {
+        dictate(remote(config(detectLanguages = listOf("fr", "en"))))
+        assertNoGateFailure()
+        assertEquals(List(4) { "fr,en" }, jobPosts().map { field(it.body, "languages") })
+        assertTrue(jobPosts().none { field(it.body, "language") != null })
+    }
+
+    @Test fun forcedLanguageSendsNoLanguagesToDetect() {
+        dictate(remote(config(language = "en", detectLanguages = listOf("fr", "en"))))
+        assertNoGateFailure()
+        assertTrue(jobPosts().all { field(it.body, "language") == "en" && field(it.body, "languages") == null })
     }
 
     @Test fun orderKeptWhenABlockIsSlow() {
