@@ -266,6 +266,24 @@ punctuation, capitalization and sentence boundaries, and formats clear enumerati
 words and language (English and French are covered by the prompt; it never translates), and never answers a dictated
 question or follows a dictated instruction.
 
+The system prompt starts by giving the model a role: an editor who gets dictated text ready to send (message, email,
+note), keeps the speaker's words and decides only the layout (punctuation, paragraphs, lists). Three or more items that
+the speaker lists, with or without "first… second…" / "premièrement… deuxièmement…", come out as an introduction, a colon
+(preceded by a space in French) and one `- ` item per line, without the "and" before the last item:
+
+```
+pour l'épicerie il faut du lait des œufs du pain et du beurre
+→ Pour l'épicerie, il faut :
+  - du lait
+  - des œufs
+  - du pain
+  - du beurre
+```
+
+Two items ("du lait et des œufs") and people or things mentioned inside a story ("j'ai vu Paul, Marie et Luc hier") stay
+a normal sentence. The polished text can therefore contain line breaks. The safety check is unchanged: it ignores
+the list formatting but still requires the same words, the same facts and the same ending.
+
 The model is not trusted blindly: every output goes through a strict safety check against the raw transcript (length
 ratio, new words, numbers and dates, negations, assistant-style openers…). If any rule fails, or the endpoint errors or
 is slower than `POLISH_TIMEOUT`, the raw transcript is shown with a warning. The raw text is always kept, and the result
