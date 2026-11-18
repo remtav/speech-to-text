@@ -43,7 +43,6 @@ object EmojiCluster {
             i += Character.charCount(first)
             fun peek() = if (i < before.length) Character.codePointAt(before, i) else -1
             var emoji = isPictographic(first) || isRegional(first)
-            var cp = first
             if (isRegional(first) && isRegional(peek())) i += Character.charCount(peek())
             while (true) {
                 val next = peek()
@@ -51,7 +50,6 @@ object EmojiCluster {
                 if (isModifier(next)) {
                     // A digit, # or * becomes an emoji only with its keycap or variation selector.
                     if (next == KEYCAP || next == VS16) emoji = true
-                    cp = next
                     i += Character.charCount(next)
                 } else if (next == ZWJ && emoji) {
                     val afterJoiner = if (i + 1 < before.length) Character.codePointAt(before, i + 1) else -1
@@ -65,7 +63,7 @@ object EmojiCluster {
                 }
             }
             lastStart = start
-            lastEmoji = emoji && cp != -1
+            lastEmoji = emoji
         }
         return if (lastStart >= 0 && lastEmoji) before.length - lastStart else 0
     }

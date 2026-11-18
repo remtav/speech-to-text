@@ -6,6 +6,7 @@ import androidx.test.uiautomator.BySelector
 import androidx.test.uiautomator.StaleObjectException
 import androidx.test.uiautomator.UiObject2
 import androidx.test.uiautomator.Until
+import io.github.remtav.dictee.dictation.DictationState
 import io.github.remtav.dictee.ime.DicteeImeService
 import io.github.remtav.dictee.ime.emoji.Emoji
 import org.junit.After
@@ -98,6 +99,21 @@ class EmojiInstrumentedTest : ImeTestBase() {
         assertNotNull("the dictation is back", device.wait(Until.findObject(res("mic")), 5_000))
         gone(res("emoji_picker"), "emoji panel")
         assertRecents(listOf("😃"))
+    }
+
+    /** The panel hides the microphone: opening it while listening ends the dictation, and what was said is inserted. */
+    @Test
+    fun openingThePanelWhileListeningStopsTheDictation() {
+        useAudio("en2", realTime = true)
+        useScript("God as a direct consequence of the sin.")
+        launchFields()
+        tapMic()
+        waitFor("listening", 5_000) { state() == DictationState.LISTENING }
+        Thread.sleep(2_000) // mid-sentence
+        openFromDictation()
+        awaitIdle()
+        assertTrue("the dictation is over", !onMain { service.controller.isActive })
+        waitFor("what was said is in the field", 5_000, details = { field1() }) { field1().isNotEmpty() }
     }
 
     @Test

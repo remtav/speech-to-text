@@ -312,7 +312,12 @@ class DicteeImeService : InputMethodService(), DictationListener, EngineManager.
 
     fun setEmojiShown(shown: Boolean) {
         emojiOn = shown
-        if (shown) emojiPicker?.open()
+        // The panel hides the microphone and the header: nothing on screen would say the recording goes on. What was
+        // said is inserted before the panel opens.
+        if (shown) {
+            stopDictationForTyping()
+            emojiPicker?.open()
+        }
         applyView()
         render()
     }
