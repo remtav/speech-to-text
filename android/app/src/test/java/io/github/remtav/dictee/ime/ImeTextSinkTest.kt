@@ -118,7 +118,7 @@ class ImeTextSinkTest {
         ic.deliverTo(sink)
         sink.say(ic, "merci.")
         assertEquals("Bonjour. Merci.", ic.text)
-        assertEquals(0, ic.selStart)
+        assertEquals("the cursor was not moved: it follows the dictation", ic.text.length, ic.selStart)
     }
 
     @Test fun aCursorAfterTheDictationMovesWithTheText() {
