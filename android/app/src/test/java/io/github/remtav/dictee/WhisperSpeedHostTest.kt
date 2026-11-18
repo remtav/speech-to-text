@@ -171,9 +171,9 @@ class WhisperSpeedHostTest {
         }
     }
 
-    /** Part F: the other two models, same clips, 4 threads, automatic language. */
+    /** Part F: the other model, same clips, 4 threads, automatic language. */
     @Test fun otherModels() {
-        for (spec in listOf(ModelCatalog.parakeet, ModelCatalog.qwen3)) {
+        for (spec in listOf(ModelCatalog.parakeet)) {
             val r = Rec(spec, 4, "", null)
             try {
                 for (d in listOf("1", "5", "15")) line("F", spec, d, 4, "", null, 0, stats(r, audio(d)))
@@ -193,7 +193,6 @@ class WhisperSpeedHostTest {
             Triple(ModelCatalog.whisperTurbo, "fr", null as Int?),
             Triple(ModelCatalog.whisperTurbo, "fr", 300),
             Triple(ModelCatalog.parakeet, "", null),
-            Triple(ModelCatalog.qwen3, "", null),
         )
         for ((spec, lang, tail) in variants) {
             val r = Rec(spec, 4, lang, tail)

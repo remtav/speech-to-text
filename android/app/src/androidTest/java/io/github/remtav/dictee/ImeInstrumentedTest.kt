@@ -64,10 +64,10 @@ class DictationEndToEndTest : ImeTestBase() {
         launchFields()
         waitFor("default model loaded", 10_000) { (app.engines.state as? EngineManager.State.Ready)?.spec == ModelCatalog.parakeet }
         val first = factory.last!!
-        onMain { service.switchModel(ModelCatalog.qwen3.id) }
-        waitFor("qwen loaded", 10_000) { (app.engines.state as? EngineManager.State.Ready)?.spec == ModelCatalog.qwen3 }
+        onMain { service.switchModel(ModelCatalog.whisperTurbo.id) }
+        waitFor("whisper loaded", 10_000) { (app.engines.state as? EngineManager.State.Ready)?.spec == ModelCatalog.whisperTurbo }
         assertTrue("previous model released", first.released)
-        assertEquals(ModelCatalog.qwen3.id, app.settings.activeModelId)
+        assertEquals(ModelCatalog.whisperTurbo.id, app.settings.activeModelId)
         tapMic()
         waitFor("text", 20_000) { field1() == "One." }
     }
@@ -211,7 +211,7 @@ class RobustnessInstrumentedTest : ImeTestBase() {
         launchFields()
         tapMic()
         waitFor("listening", 5_000) { state() == DictationState.LISTENING }
-        onMain { service.switchModel(ModelCatalog.qwen3.id) }
+        onMain { service.switchModel(ModelCatalog.whisperTurbo.id) }
         assertEquals(ModelCatalog.parakeet.id, app.settings.activeModelId)
         onMain { service.controller.cancel() }
     }

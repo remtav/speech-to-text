@@ -80,37 +80,10 @@ class DictationLanguagesTest {
         )
     }
 
-    // Issue #60: updating an existing install.
-
     @Test
-    fun aRemovedLanguageDisappearsFromTheStoredChoice() {
-        val stored = setOf("ENGLISH", "MANDARIN", "FRENCH_FRANCE", "URDU")
-        assertEquals(setOf(FRENCH_FRANCE, ENGLISH), DictationLanguages.cleaned(stored))
-    }
-
-    @Test
-    fun aChoiceLeftEmptyBecomesFrenchQuebec() {
-        assertEquals(setOf(FRENCH_QUEBEC), DictationLanguages.cleaned(setOf("HINDI", "ARABIC", "BENGALI", "RUSSIAN")))
-        assertEquals(setOf(FRENCH_QUEBEC), DictationLanguages.cleaned(setOf("MANDARIN")))
-    }
-
-    @Test
-    fun aCleanOrMissingChoiceChangesNothingAndRaisesNoNotice() {
-        assertNull(DictationLanguages.cleaned(null))
-        assertNull(DictationLanguages.cleaned(setOf("ENGLISH", "SPANISH")))
-        assertNull(DictationLanguages.cleaned(emptySet())) // already read as the default: no change to tell
-        assertNull(DictationLanguages.cleaned(DictationLanguages.serialize(setOf(PORTUGUESE))))
-    }
-
-    @Test
-    fun aCleanedChoiceIsCleanAgain() {
-        // What AppSettings.migrateLanguages does: store the cleaned choice, then look again.
-        val first = DictationLanguages.cleaned(setOf("ENGLISH", "RUSSIAN"))
-        assertEquals(setOf(ENGLISH), first)
-        assertNull(DictationLanguages.cleaned(DictationLanguages.serialize(first!!)))
-        val second = DictationLanguages.cleaned(setOf("URDU"))
-        assertEquals(setOf(FRENCH_QUEBEC), second)
-        assertNull(DictationLanguages.cleaned(DictationLanguages.serialize(second!!)))
+    fun anUnknownStoredNameIsIgnoredAndAnEmptyResultIsFrenchQuebec() {
+        assertEquals(setOf(FRENCH_FRANCE, ENGLISH), DictationLanguages.parse(setOf("ENGLISH", "MANDARIN", "FRENCH_FRANCE", "URDU")))
+        assertEquals(setOf(FRENCH_QUEBEC), DictationLanguages.parse(setOf("HINDI", "MANDARIN")))
     }
 
     @Test

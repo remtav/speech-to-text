@@ -2,7 +2,6 @@ package io.github.remtav.dictee.settings
 
 import android.content.Context
 import android.content.SharedPreferences
-import io.github.remtav.dictee.ime.LayoutDefault
 import io.github.remtav.dictee.ime.LayoutKind
 import io.github.remtav.dictee.reading.Declaration
 import io.github.remtav.dictee.reading.Participation
@@ -14,7 +13,6 @@ import io.github.remtav.dictee.stt.EngineRoute
 import io.github.remtav.dictee.stt.EngineOptions
 import io.github.remtav.dictee.stt.ModelCatalog
 import io.github.remtav.dictee.stt.ModelFamily
-import io.github.remtav.dictee.stt.ModelMigration
 import io.github.remtav.dictee.stt.RemoteApi
 import io.github.remtav.dictee.stt.RemoteConfig
 import io.github.remtav.dictee.stt.RepetitionFix
@@ -49,19 +47,9 @@ enum class ThemeMode(val label: String) {
 class AppSettings(context: Context, private val defaultServerUrl: String = io.github.remtav.dictee.BuildConfig.DEFAULT_SERVER_URL) {
     val prefs: SharedPreferences = context.getSharedPreferences("dictee", Context.MODE_PRIVATE)
 
-    init {
-        // Issue #42: the layout default now follows the languages, for new installs only (see [LayoutDefault]).
-        if (LayoutDefault.CHECKED_KEY !in prefs.all) {
-            prefs.edit().apply {
-                LayoutDefault.pinnedFor(prefs.all)?.let { putString(LayoutDefault.LAYOUT_KEY, it.name) }
-                putBoolean(LayoutDefault.CHECKED_KEY, true)
-            }.apply()
-        }
-    }
-
     /**
      * The on-device model (#22): used when the server is not (see [route]), and as the server's fallback.
-     * Never the server itself since issue #23 (an old "remote-server" value is migrated by [DicteeApp]).
+     * Never the server itself (see [activeModel]).
      */
     var activeModelId: String
         get() = prefs.getString("active_model", ModelCatalog.default.id) ?: ModelCatalog.default.id
@@ -74,24 +62,6 @@ class AppSettings(context: Context, private val defaultServerUrl: String = io.gi
     var languages: Set<DictationLanguage>
         get() = DictationLanguages.parse(prefs.getStringSet("languages", null))
         set(v) = prefs.edit().putStringSet("languages", DictationLanguages.serialize(v)).apply()
-
-    /**
-     * Issue #60: drops from the stored choice a language the app no longer offers. A fresh install (nothing
-     * stored) and an already clean choice change nothing. When the choice changes it is rewritten, and
-     * [languagesNotice] is raised, once: the flag is only ever raised here, and a second run finds a clean
-     * choice. Run at start-up, before [io.github.remtav.dictee.DicteeApp.migrateModels].
-     */
-    fun migrateLanguages(): Boolean {
-        val clean = DictationLanguages.cleaned(prefs.getStringSet("languages", null)) ?: return false
-        languages = clean
-        languagesNotice = true
-        return true
-    }
-
-    /** The one-time « Kalmia Blabla se concentre maintenant sur quatre langues » notice is still to be read. */
-    var languagesNotice: Boolean
-        get() = prefs.getBoolean("languages_notice", false)
-        set(v) = prefs.edit().putBoolean("languages_notice", v).apply()
 
     /** « Parlez-vous un français québécois ? » (issue #15, lot 4): self-declared, kept on the phone, editable in the settings. */
     var quebecDeclaration: Declaration
@@ -108,14 +78,6 @@ class AppSettings(context: Context, private val defaultServerUrl: String = io.gi
         get() = Participation(languages, quebecDeclaration, participationCardDismissed)
 
     val activeModel: ModelSpec get() = ModelCatalog.byId(activeModelId)?.takeIf { it.family != ModelFamily.REMOTE } ?: ModelCatalog.default
-
-    /**
-     * Id of a model the app moved the user off (issue #22, see [io.github.remtav.dictee.stt.ModelMigration]),
-     * whose notice is still to be read on the main screen; "" for none.
-     */
-    var retiredModelNotice: String
-        get() = prefs.getString("retired_model_notice", "") ?: ""
-        set(v) = prefs.edit().putString("retired_model_notice", v).apply()
 
     var acceleration: Acceleration
         get() = Acceleration.fromName(prefs.getString("acceleration", null))
@@ -278,16 +240,6 @@ class AppSettings(context: Context, private val defaultServerUrl: String = io.gi
     var cfAccessClientSecret: String
         get() = prefs.getString("cf_access_secret", "") ?: ""
         set(v) = prefs.edit().putString("cf_access_secret", RemoteConfig.cleanHeaderValue(v)).apply()
-
-    /**
-     * Before issue #23, the local model used when the server could not be reached ("" for none); read
-     * once to migrate a user whose active model was the server. Since #23 the fallback is [activeModel].
-     * Never a hidden model nor one that no longer suits the languages (issue #22): such a value reads
-     * as Whisper turbo.
-     */
-    var remoteFallbackId: String
-        get() = ModelMigration.fallbackId(prefs.getString("remote_fallback", ModelCatalog.default.id) ?: "", languages)
-        set(v) = prefs.edit().putString("remote_fallback", v).apply()
 
     /** Server-side LLM polish of a whole dictation (issue #15). On by default; off = raw transcript. */
     var remotePolish: Boolean

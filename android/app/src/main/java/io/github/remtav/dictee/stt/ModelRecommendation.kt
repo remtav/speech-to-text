@@ -41,8 +41,6 @@ object ModelRecommendations {
         DictationLanguage.PORTUGUESE,
     )
 
-    private val qwen3Languages = parakeetLanguages
-
     // Whisper's tokenizer lists all five (and many more).
     private val whisperLanguages = DictationLanguage.entries.toSet()
 
@@ -52,12 +50,7 @@ object ModelRecommendations {
      */
     val coverage: Map<String, Set<DictationLanguage>> = mapOf(
         ModelCatalog.parakeet.id to parakeetLanguages,
-        ModelCatalog.qwen3.id to qwen3Languages,
         ModelCatalog.whisperTurbo.id to whisperLanguages,
-        // Fine-tuned on French only: the other languages are not covered.
-        ModelCatalog.whisperQuebec.id to setOf(DictationLanguage.FRENCH_QUEBEC, DictationLanguage.FRENCH_FRANCE),
-        // Same tokenizer and decoder as Whisper turbo, only the encoder is compressed (issue #22).
-        ModelCatalog.liteWhisperTurbo.id to whisperLanguages,
     )
 
     /**

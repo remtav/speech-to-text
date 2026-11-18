@@ -322,19 +322,17 @@ class TextKeyboardInstrumentedTest : ImeTestBase() {
     }
 
     @Test
-    fun layoutDefaultIsAzertyForANewInstallAndKeptForAnExistingOne() {
-        val fr = setOf(io.github.remtav.dictee.stt.DictationLanguage.FRENCH_FRANCE)
+    fun layoutDefaultFollowsTheLanguagesUnlessChosen() {
         app.settings.prefs.edit().clear().commit()
-        val fresh = io.github.remtav.dictee.settings.AppSettings(context)
-        fresh.languages = fr
-        assertEquals(LayoutKind.AZERTY, fresh.keyboardLayout)
-        // An install that already has settings but never chose a layout keeps QWERTY.
-        app.settings.prefs.edit().clear().putString("active_model", ModelIdForTest).commit()
-        val existing = io.github.remtav.dictee.settings.AppSettings(context)
-        existing.languages = fr
-        assertEquals(LayoutKind.QWERTY, existing.keyboardLayout)
+        val settings = io.github.remtav.dictee.settings.AppSettings(context)
+        settings.languages = setOf(io.github.remtav.dictee.stt.DictationLanguage.FRENCH_FRANCE)
+        assertEquals(LayoutKind.AZERTY, settings.keyboardLayout)
+        settings.languages = setOf(io.github.remtav.dictee.stt.DictationLanguage.ENGLISH)
+        assertEquals(LayoutKind.QWERTY, settings.keyboardLayout)
+        // An explicit choice wins over the languages.
+        settings.languages = setOf(io.github.remtav.dictee.stt.DictationLanguage.FRENCH_FRANCE)
+        settings.keyboardLayout = LayoutKind.QWERTY
+        assertEquals(LayoutKind.QWERTY, settings.keyboardLayout)
         app.settings.prefs.edit().clear().commit()
     }
-
-    private companion object { val ModelIdForTest = io.github.remtav.dictee.stt.ModelCatalog.parakeet.id }
 }

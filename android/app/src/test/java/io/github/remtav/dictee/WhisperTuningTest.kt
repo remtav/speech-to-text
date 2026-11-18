@@ -16,8 +16,8 @@ import org.junit.Test
 class WhisperTuningTest {
     private val whisperModels = ModelCatalog.all.filter { it.family == ModelFamily.WHISPER }
 
-    @Test fun whisperModelsAreTurboQuebecAndLite() {
-        assertEquals(listOf(ModelCatalog.whisperTurbo, ModelCatalog.whisperQuebec, ModelCatalog.liteWhisperTurbo), whisperModels)
+    @Test fun theOnlyWhisperModelIsTurbo() {
+        assertEquals(listOf(ModelCatalog.whisperTurbo), whisperModels)
     }
 
     @Test fun noProvisionalDecodesWithWhisperWhateverTheSetting() {

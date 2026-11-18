@@ -25,14 +25,14 @@ import java.io.File
  *         -PmodelsDir=$HOME/dictee-models -PpolishAudioDir=/tmp/polish-audio
  */
 class PolishSetTranscriptionHostTest {
-    @Test fun transcribeSyntheticUtterancesWithTheThreeModels() {
+    @Test fun transcribeSyntheticUtterancesWithTheTwoModels() {
         val audioDir = System.getProperty("dictee.polishAudioDir")?.let { File(it) }
         assumeTrue("set -PpolishAudioDir=... to regenerate the tts rows", audioDir != null)
         val lines = File(audioDir!!, "liste.tsv").readLines()
             .filter { it.isNotBlank() && !it.startsWith("#") }
             .map { it.split('\t') }
         val out = StringBuilder()
-        for (spec in listOf(ModelCatalog.parakeet, ModelCatalog.qwen3, ModelCatalog.whisperTurbo)) {
+        for (spec in listOf(ModelCatalog.parakeet, ModelCatalog.whisperTurbo)) {
             val store = Host.ensureModel(spec)
             for ((lang, group) in lines.groupBy { it[1] }) {
                 // Whisper is told the language, as the app does when a single language is chosen.

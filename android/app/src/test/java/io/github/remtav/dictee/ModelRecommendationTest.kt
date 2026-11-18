@@ -60,40 +60,12 @@ class ModelRecommendationTest {
             assertFalse(combo.toString(), p in ModelCatalog.offered(combo))
             assertTrue(combo.toString(), p in ModelCatalog.listed(combo))
             assertTrue(combo.toString(), ModelRecommendations.recommend(combo).model != p)
-            // It may be chosen whatever the languages, Québec French included (no notice, see ModelMigrationTest).
+            // It may be chosen whatever the languages, Québec French included.
             assertTrue(combo.toString(), ModelCatalog.suits(p, combo))
             // The keyboard's menu shows it only while it is the active model.
             assertFalse(combo.toString(), p in ModelCatalog.forKeyboard(combo, ModelCatalog.whisperTurbo.id))
             assertEquals(combo.toString(), listOf(ModelCatalog.whisperTurbo, p), ModelCatalog.forKeyboard(combo, p.id))
         }
-    }
-
-    @Test fun hiddenModelsAreNeverOffered() {
-        assertEquals(ModelVisibility.HIDDEN, ModelCatalog.qwen3.visibility)
-        assertEquals(ModelVisibility.HIDDEN, ModelCatalog.whisperQuebec.visibility)
-        for (combo in allCombinations() + sequenceOf(emptySet())) {
-            val offered = ModelCatalog.offered(combo)
-            assertFalse(combo.toString(), ModelCatalog.qwen3 in offered)
-            assertFalse(combo.toString(), ModelCatalog.whisperQuebec in offered)
-            assertFalse(combo.toString(), ModelCatalog.qwen3 in ModelCatalog.listed(combo))
-            assertFalse(combo.toString(), ModelCatalog.whisperQuebec in ModelCatalog.listed(combo))
-        }
-    }
-
-    /** Issue #72: Lite-Whisper is withdrawn: shown nowhere, but kept in the catalogue so its files can be deleted. */
-    @Test fun liteWhisperIsHiddenEverywhereButStaysInTheCatalogue() {
-        val lite = ModelCatalog.liteWhisperTurbo
-        assertEquals(ModelVisibility.HIDDEN, lite.visibility)
-        assertTrue(lite in ModelCatalog.all)
-        assertFalse(lite in ModelCatalog.advanced)
-        for (combo in allCombinations()) {
-            assertFalse(combo.toString(), lite in ModelCatalog.offered(combo))
-            assertFalse(combo.toString(), lite in ModelCatalog.listed(combo))
-            assertFalse(combo.toString(), lite in ModelCatalog.forKeyboard(combo, lite.id))
-            assertTrue(combo.toString(), ModelRecommendations.recommend(combo).model != lite)
-        }
-        // Same coverage as Whisper turbo.
-        for (l in langs) assertTrue(l.toString(), ModelRecommendations.covers(lite, l))
     }
 
     @Test fun offeredModelsCoverEveryChosenLanguage() {
@@ -116,25 +88,28 @@ class ModelRecommendationTest {
         }
     }
 
+    /** The active model stays while it suits the chosen languages; otherwise the default takes its place. */
+    @Test fun anActiveModelThatNoLongerSuitsGivesWayToTheDefault() {
+        for (combo in allCombinations() + sequenceOf(emptySet())) {
+            for (spec in listOf(ModelCatalog.whisperTurbo, ModelCatalog.parakeet, ModelCatalog.remote))
+                assertEquals(combo.toString(), spec, ModelCatalog.forLanguages(spec, combo))
+        }
+        val unlisted = ModelCatalog.whisperTurbo.copy(id = "not-in-the-catalogue")
+        assertFalse(ModelCatalog.suits(unlisted, setOf(DictationLanguage.ENGLISH)))
+        assertEquals(ModelCatalog.default, ModelCatalog.forLanguages(unlisted, setOf(DictationLanguage.ENGLISH)))
+    }
+
     @Test fun defaultModelIsWhisperTurbo() {
         assertEquals(ModelCatalog.whisperTurbo, ModelCatalog.default)
     }
 
     @Test fun coverageQuestion() {
         assertTrue(ModelRecommendations.covers(ModelCatalog.parakeet, DictationLanguage.FRENCH_QUEBEC))
-        assertTrue(ModelRecommendations.covers(ModelCatalog.qwen3, DictationLanguage.PORTUGUESE))
         assertTrue(ModelRecommendations.covers(ModelCatalog.whisperTurbo, DictationLanguage.SPANISH))
         assertTrue(ModelRecommendations.covers(ModelCatalog.remote, DictationLanguage.PORTUGUESE))
         // The model covers every language the app offers: no « ne couvre pas » warning remains.
         for (model in ModelCatalog.offered(DictationLanguage.entries.toSet()))
             assertEquals(emptyList<DictationLanguage>(), ModelRecommendations.uncovered(model, DictationLanguage.entries.toSet()))
-    }
-
-    @Test fun quebecWhisperCoversFrenchOnly() {
-        val qc = ModelCatalog.whisperQuebec
-        assertTrue(ModelRecommendations.covers(qc, DictationLanguage.FRENCH_QUEBEC))
-        assertTrue(ModelRecommendations.covers(qc, DictationLanguage.FRENCH_FRANCE))
-        for (l in langs.filter { it.engineCode != "fr" }) assertFalse(l.toString(), ModelRecommendations.covers(qc, l))
     }
 
     @Test fun bothFrenchesShareTheEngineCode() {
