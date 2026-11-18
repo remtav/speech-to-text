@@ -14,6 +14,8 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
+import org.junit.After
+import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 
@@ -86,10 +88,32 @@ class GestureTypingInstrumentedTest : ImeTestBase() {
         app.settings.keyboardLayout = layout
     }
 
+    /** The setting as it was before the test: off by default, turned on by the tests that trace a word. */
+    private var gestureBefore = false
+
+    @Before
+    fun rememberGestureSetting() {
+        gestureBefore = app.settings.gestureTyping
+    }
+
+    @After
+    fun restoreGestureSetting() {
+        app.settings.gestureTyping = gestureBefore
+    }
+
+    private fun gestureOn() {
+        app.settings.gestureTyping = true
+    }
+
+    /** No trace was read: at most the one letter under the finger went in (the key the finger went down on). */
+    private fun assertNoTraceRead(text: String) {
+        assertTrue("no word from the trace, at most one letter: \"$text\"", text.length <= 1)
+    }
+
     @Test
     fun aTracedWordIsWrittenAndTheNextOneGetsASpace() {
         french()
-        assertTrue("on by default", app.settings.gestureTyping)
+        gestureOn()
         launchFields()
         showTextKeyboard()
         trace("bonjour")
@@ -101,6 +125,7 @@ class GestureTypingInstrumentedTest : ImeTestBase() {
     @Test
     fun theOtherGuessesAreInTheBarAndATapReplacesTheWord() {
         french()
+        gestureOn()
         launchFields()
         showTextKeyboard()
         trace("tout")
@@ -117,6 +142,7 @@ class GestureTypingInstrumentedTest : ImeTestBase() {
     @Test
     fun azertyTracesFollowTheAzertyKeys() {
         french(LayoutKind.AZERTY)
+        gestureOn()
         launchFields()
         showTextKeyboard()
         trace("maison")
@@ -126,6 +152,7 @@ class GestureTypingInstrumentedTest : ImeTestBase() {
     @Test
     fun aTapStillTypesOneLetter() {
         french()
+        gestureOn()
         launchFields()
         showTextKeyboard()
         obj(res("letters"), "letters").findObject(By.text("b")).click()
@@ -133,25 +160,26 @@ class GestureTypingInstrumentedTest : ImeTestBase() {
     }
 
     @Test
-    fun noGestureTypingWhenTurnedOff() {
+    fun noGestureTypingByDefault() {
         french()
-        app.settings.gestureTyping = false
+        assertFalse("off by default", app.settings.gestureTyping)
         launchFields()
         showTextKeyboard()
         trace("bonjour")
         device.waitForIdle(1_500)
-        assertTrue(field1(), field1() != "bonjour")
+        assertNoTraceRead(field1())
     }
 
     @Test
     fun noGestureTypingInAPasswordField() {
         french()
+        gestureOn()
         launchFields()
         focus(3)
         obj(res("letters"), "text view in a password field")
         trace("bonjour")
         device.waitForIdle(1_500)
-        assertTrue(fieldText { it.password }, fieldText { it.password } != "bonjour")
+        assertNoTraceRead(fieldText { it.password })
     }
 
     @Test
@@ -160,7 +188,7 @@ class GestureTypingInstrumentedTest : ImeTestBase() {
             s.onActivity { a ->
                 val sw = a.window.decorView.findViewWithTag<android.widget.CompoundButton>(SettingsActivity.GESTURE_TAG)
                 assertNotNull("gesture typing switch", sw)
-                assertEquals(true, sw.isChecked)
+                assertEquals("off by default", false, sw.isChecked)
             }
         }
     }

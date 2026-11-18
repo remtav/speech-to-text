@@ -5020,13 +5020,16 @@ Après l'essai du lot 1 par Rémi (2026-11-18, #78). Part de `main` ; la branche
   un tracé ; la vue reprend le toucher aux touches (elles reçoivent `ACTION_CANCEL` : ni lettre tapée, ni appui long)
   et dessine le tracé par-dessus. Pas de tracé sur les pages de symboles, depuis Maj ou Retour arrière, quand la
   fenêtre des accents est ouverte, ni dès qu'un deuxième doigt se pose (frappe à deux pouces).
+- **Mot deviné en retard** : un tracé dont le mot n'est pas encore deviné est abandonné si une touche est tapée ou
+  si le champ change entre-temps (le mot n'arrive jamais après cette touche, ni dans un autre champ).
 - **Dans le champ** : le mot est validé tel quel, sans texte en composition (comme `WordTyping`), précédé d'une espace
   après un mot, un chiffre ou une ponctuation de fin, sans espace en début de champ, après une espace, une
   parenthèse ou un guillemet ouvrant, une apostrophe ou un trait d'union (`GestureText`). Maj donne la capitale
   initiale (une fois) ou les capitales (verrouillée). Les autres mots possibles vont dans la barre ; un toucher
   remplace le mot tracé (suivi d'une espace, comme une suggestion).
 - **Où** : là où les suggestions sont offertes (pas de mot de passe, d'adresse courriel ou web, de champ qui refuse les
-  suggestions). Réglage « Saisie par glissement », **activé par défaut** (à confirmer par Rémi).
+  suggestions). Réglage « Saisie par glissement », **désactivé par défaut** : l'usager l'active dans les Réglages
+  (décision de Rémi, 2026-11-18, en revue de la PR #121). Pas de migration.
 - **Hors de ce lot** : effacer le mot tracé entier d'un seul retour arrière, espace automatique avant une lettre tapée
   après un tracé, mots appris.
 - Tests : `GestureDecoderTest`, `GestureTextTest` (JVM) ; `GestureTypingInstrumentedTest` (tracés par uiautomator

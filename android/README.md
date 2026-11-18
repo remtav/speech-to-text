@@ -342,7 +342,7 @@ un verdict ».
   l'autre sans le lever écrit le mot au lever du doigt, précédé d'une espace si
   besoin ; les autres mots possibles sont dans la barre, un toucher remplace le
   mot. QWERTY et AZERTY, mêmes listes de mots, tout reste sur le téléphone.
-  Activée par défaut (Réglages → « Saisie par glissement »).
+  Désactivée par défaut : à activer dans Réglages → « Saisie par glissement ».
 - **Émojis** (issue #80) : le bouton « Émojis » (visage souriant, contour), de l'autre côté du micro par rapport à
   « Clavier à touches », ouvre un panneau : onglet « Récents » (les derniers émojis utilisés, gardés après la
   fermeture du clavier), puis les neuf groupes d'Unicode (smileys, personnes, animaux, nourriture, voyages, activités,

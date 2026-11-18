@@ -110,7 +110,7 @@ class SettingsActivity : AppCompatActivity() {
         col.body(getString(R.string.settings_suggestions_help), small = true)
         col.switch(getString(R.string.settings_autocorrect), s.autoCorrect) { s.autoCorrect = it }.tag = AUTOCORRECT_TAG
         col.body(getString(R.string.settings_autocorrect_help), small = true)
-        // Issue #71, lot 2: gesture typing, on by default.
+        // Issue #71, lot 2: gesture typing, off by default (Rémi, 2026-11-18).
         col.switch(getString(R.string.settings_gesture), s.gestureTyping) { s.gestureTyping = it }.tag = GESTURE_TAG
         col.body(getString(R.string.settings_gesture_help), small = true)
         col.button(getString(R.string.licences_open), outlined = true) {

@@ -512,6 +512,8 @@ class DicteeImeService : InputMethodService(), DictationListener, EngineManager.
 
     private fun typeKey(text: String) {
         stopDictationForTyping()
+        // A word still being guessed from a trace would land after this key: it is dropped.
+        ++gestureRequest
         val ic = currentInputConnection ?: return
         if (WordTyping.isSeparator(text)) {
             typeSeparator(ic, text)
@@ -523,6 +525,7 @@ class DicteeImeService : InputMethodService(), DictationListener, EngineManager.
 
     private fun typedBackspace() {
         stopDictationForTyping()
+        ++gestureRequest
         val ic = currentInputConnection ?: return
         // Right after an automatic correction, Backspace puts back the word as typed (issue #71).
         if (!wordTyping.undoCorrection(ic)) ic.deleteBackward()
@@ -561,6 +564,8 @@ class DicteeImeService : InputMethodService(), DictationListener, EngineManager.
         passwordField = attribute.isPassword()
         suggestionField = suggestionsWanted(attribute.inputType)
         wordTyping.forget()
+        // A word still being guessed from a trace made in the previous field is not written in this one.
+        ++gestureRequest
         suggestions = Suggestions.NONE
         inputPage = InputPages.forInputType(attribute.inputType)
         // The separator learned in this field stays through a restart of the same field (rotation).
