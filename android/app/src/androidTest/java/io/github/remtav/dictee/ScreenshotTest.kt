@@ -172,6 +172,7 @@ class ScreenshotTest : ImeTestBase() {
             checkNotNull(device.wait(androidx.test.uiautomator.Until.findObject(androidx.test.uiautomator.By.text("Kalmia Pro")), 5_000)) { "model menu" }
             shot("keyboard-menu-$suffix", scenario)
             device.pressBack()
+            assertTrue("menu closed", device.wait(androidx.test.uiautomator.Until.gone(androidx.test.uiautomator.By.text("Kalmia Pro")), 5_000))
             scenario.close()
         }
     }

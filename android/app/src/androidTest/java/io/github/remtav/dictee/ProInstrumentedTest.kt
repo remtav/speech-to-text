@@ -145,6 +145,15 @@ class ModelMenuInstrumentedTest : ImeTestBase() {
         assertNotNull("menu opened", device.wait(Until.findObject(By.text("Kalmia Pro")), 5_000))
     }
 
+    /**
+     * The menu is a window of the keyboard service, which outlives the test: left open it would take the focus
+     * from the tests that follow on the same emulator.
+     */
+    private fun closeMenu() {
+        if (device.hasObject(By.text("Kalmia Pro"))) device.pressBack()
+        assertTrue("menu closed", device.wait(Until.gone(By.text("Whisper · Précis")), 5_000))
+    }
+
     @Test
     fun theMenuListsParakeetWhisperAndProInThatOrder() {
         launchFields()
@@ -156,6 +165,7 @@ class ModelMenuInstrumentedTest : ImeTestBase() {
         }
         assertEquals(tops.sorted(), tops)
         assertEquals(3, tops.toSet().size)
+        closeMenu()
     }
 
     @Test
@@ -167,6 +177,8 @@ class ModelMenuInstrumentedTest : ImeTestBase() {
         assertNotNull("Pro screen", device.wait(Until.findObject(By.text(context.getString(R.string.pro_unavailable))), 10_000))
         assertEquals(TranscriptionMode.UNSET, app.settings.transcriptionMode)
         assertFalse(app.settings.serverInUse)
+        // Leave the Pro screen (its own task) so the next tests find the test activity in front.
         device.pressBack()
+        assertTrue("Pro screen closed", device.wait(Until.gone(By.text(context.getString(R.string.pro_unavailable))), 10_000))
     }
 }
