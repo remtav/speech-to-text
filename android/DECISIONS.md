@@ -4795,3 +4795,33 @@ se comporte comme avant ; seul ce qui servait à migrer ou à garder un état an
   compatibilité avec un serveur plus ancien (repli quand `POST /polish` répond 404/405) : ce sont des questions de
   nettoyage, pas d'anciens usagers. `textKeyboardShown` reste (#90 le retire).
 - **Hors de la portée.** Le dépôt Hugging Face du Whisper québécois et `android/tools/` ne sont pas touchés.
+
+## Issue #66, point 3 : un seul verrou pour les trois écrans de mesure
+
+Le test rapide, « Comparer les modèles » et le test de lecture chargent eux-mêmes des modèles. Avant, seul le test
+rapide protégeait `benchmarkRunning` par un jeton ; les deux autres écrans l'écrivaient sans propriétaire. Un fil de
+« Comparer » ou du test de lecture qui survivait à son écran pouvait le remettre à faux au milieu d'un test rapide
+(le clavier chargeait alors son modèle), le `finally` du test de lecture libérait le moteur en plein test, et aucun
+des deux ne regardait si un décodage du test rapide tournait encore (deux gros modèles en mémoire).
+
+- **Un seul mécanisme** : `stt/BenchmarkLock` (Kotlin pur, testé sur la JVM par `BenchmarkLockTest`), une instance
+  pour le processus (`DicteeApp.benchmark`). `benchmarkRunning` n'est plus qu'une lecture (`benchmark.held`) : le
+  clavier le consulte comme avant.
+- **Un écran à la fois, avec jeton** : `tryClaim` ne donne le verrou que si personne ne mesure et qu'aucun décodage
+  ne traîne ; seul ce jeton le rend (`release`). Un écran qui ne l'obtient pas ne charge rien, ne libère rien et dit
+  « Une autre mesure de modèle est en cours… » (chaîne `measure_busy`). Le test de lecture garde alors ses
+  enregistrements, pour les noter plus tard ; le test rapide abandonne la lecture (rien n'est gardé, comme avant).
+- **Le test rapide ne prend plus le verrou de force** : avant, un nouveau test remplaçait le propriétaire. Il ne peut
+  plus démarrer tant qu'un autre écran mesure ; c'est ce qui garantit qu'un seul modèle de mesure est chargé.
+- **Décodage en retard compté, pas noté par un booléen** (point 4) : `beginLingering` / `Lingering.end`, appelable
+  une seule fois ; la fin d'un décodage n'efface plus un autre. Le clavier récupère le moteur tout de suite (le
+  verrou n'est pas tenu), mais aucun écran de mesure ne démarre avant la fin. Si le fil du décodage ne peut pas être
+  créé, le compte est rendu aussitôt.
+- **Test de lecture** : la libération du moteur reste dans le `finally`, mais n'a lieu que pour l'écran qui tenait
+  le verrou, et le verrou est rendu même si cette libération échoue.
+- **Tests instrumentés** (`MeasureLockInstrumentedTest`) : chacun des trois écrans refuse de démarrer pendant la mesure
+  d'un autre, sans charger de modèle ni rendre le clavier ; « Comparer » refuse aussi pendant un décodage en retard ;
+  une mesure lancée pendant la lecture du test rapide n'est pas écrasée.
+- **Hors de cette PR** (écran du test rapide masqué par #72, chemin à deux modèles en sommeil) : points 1, 2 et 5 de
+  #66 (libération du moteur après un dépassement, phrase finale, test de fermeture d'écran), et le reste du point 6
+  (fil de calcul impossible à créer juste après la prise du verrou).

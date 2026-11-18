@@ -267,12 +267,18 @@ class ReadingTestModel(private val app: DicteeApp, val session: ReadingSession) 
     /** Transcribes and scores what was read, with every installed on-device model, off the main thread. */
     fun startScoring() {
         if (!session.canScore) return
+        // Issue #66, point 3: the guard shared with the quick test and « Comparer les modèles ». Refused while
+        // another screen measures (or a decode of the quick test lingers): the recordings stay, to score later.
+        val claim = app.benchmark.tryClaim(HOLDER)
+        if (claim == null) {
+            notice = app.getString(R.string.measure_busy)
+            changed()
+            return
+        }
         session.beginScoring()
         cancelRequested = false
         notice = null
         progress = null
-        // The comparison screen's guard: the keyboard must not load another model meanwhile.
-        app.benchmarkRunning = true
         changed()
         thread(name = "reading-score") {
             try {
@@ -284,9 +290,9 @@ class ReadingTestModel(private val app: DicteeApp, val session: ReadingSession) 
             } catch (e: Throwable) {
                 main.post { notice = app.getString(R.string.reading_scoring_failed, e.message ?: e.javaClass.simpleName) }
             } finally {
-                // Give the ~1 GB of the last model back: nothing else needs it now.
-                app.engines.release()
-                app.benchmarkRunning = false
+                // Give the ~1 GB of the last model back: nothing else needs it now (this test held the lock, so no
+                // other screen was measuring with it).
+                try { app.engines.release() } finally { app.benchmark.release(claim) }
                 main.post { progress = null; changed() }
             }
         }
@@ -314,5 +320,10 @@ class ReadingTestModel(private val app: DicteeApp, val session: ReadingSession) 
         // The screen is closed for good: the contribution archive goes with it (sent or not).
         dropArchive()
         session.clear()
+    }
+
+    companion object {
+        /** Who holds `DicteeApp.benchmark` during the scoring. */
+        const val HOLDER = "test de lecture"
     }
 }

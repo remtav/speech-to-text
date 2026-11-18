@@ -60,7 +60,7 @@ class QuickTestInstrumentedTest {
     fun cleanUp() {
         // A slow scripted decode left by a test ends before the next one starts.
         val end = System.currentTimeMillis() + 15_000
-        while (QuickTestModel.lingering && System.currentTimeMillis() < end) Thread.sleep(100)
+        while (app.benchmark.lingering && System.currentTimeMillis() < end) Thread.sleep(100)
         TestHooks.installedModelIds = null
         TestHooks.audioSourceFactory = null
         TestHooks.engineFactory = null
@@ -308,7 +308,7 @@ class QuickTestInstrumentedTest {
             assertFalse(s.has(QuickTestActivity.TAG_ADOPT))
             assertFalse(app.benchmarkRunning)
             // A new test is refused until the slow decode ends.
-            assertTrue(QuickTestModel.lingering)
+            assertTrue(app.benchmark.lingering)
             s.click(QuickTestActivity.TAG_REDO)
             s.click(QuickTestActivity.TAG_RECORD)
             assertEquals(context.getString(R.string.quick_previous_running), s.textOf(QuickTestActivity.TAG_NOTICE))
@@ -331,9 +331,9 @@ class QuickTestInstrumentedTest {
         } // closed during the scoring (onCleared)
         // Past the budget and past the slow decode: the process is still here, and the keyboard is free.
         val end = System.currentTimeMillis() + 10_000
-        while ((app.benchmarkRunning || QuickTestModel.lingering) && System.currentTimeMillis() < end) Thread.sleep(100)
+        while ((app.benchmarkRunning || app.benchmark.lingering) && System.currentTimeMillis() < end) Thread.sleep(100)
         assertFalse(app.benchmarkRunning)
-        assertFalse(QuickTestModel.lingering)
+        assertFalse(app.benchmark.lingering)
     }
 
     /** Review of #65: a reading cut by the app going to the background is dropped, not scored; a rotation is not a cut. */

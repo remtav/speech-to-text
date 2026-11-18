@@ -43,9 +43,11 @@ import kotlin.concurrent.thread
  *   waiting for it. Neither a download nor the loading of a model counts.
  * - **A decode cannot be interrupted** (sherpa-onnx has no cancel): a model over the budget keeps computing on its
  *   own thread. The test does not wait for it, tries no other model after it (that model could not load until the
- *   decode ends, it would hold the engine's lock), gives the keyboard back at once (`benchmarkRunning` false), and
- *   refuses a new test until that decode has ended ([lingering]). The engine is then left to the keyboard's own
+ *   decode ends, it would hold the engine's lock), gives the keyboard back at once, and no measuring screen starts
+ *   until that decode has ended (`BenchmarkLock.beginLingering`). The engine is then left to the keyboard's own
  *   idle release: releasing it here could free a model the keyboard has started to use.
+ * - **One measuring screen at a time** (issue #66, point 3): the scoring holds `DicteeApp.benchmark`, shared with
+ *   « Comparer les modèles » and the reading test, and only this test's claim can give it back.
  */
 class QuickTestModel(
     private val app: DicteeApp,
@@ -98,8 +100,8 @@ class QuickTestModel(
             return
         }
         if (phase != Phase.READY) return
-        if (lingering) {
-            notice = app.getString(R.string.quick_previous_running)
+        if (app.benchmark.busy) {
+            notice = busyNotice()
             changed()
             return
         }
@@ -157,9 +159,15 @@ class QuickTestModel(
 
     private fun score() {
         val clip = audio ?: return
+        // Another measuring screen may have started during the reading: the reading is then dropped, not scored.
+        val claim = app.benchmark.tryClaim(HOLDER)
+        if (claim == null) {
+            audio = null
+            phase = Phase.READY
+            notice = busyNotice()
+            return
+        }
         phase = Phase.SCORING
-        val token = Any()
-        claimBenchmark(token)
         thread(name = "quick-test-score") {
             val results = LinkedHashMap<String, ModeOutcome>()
             try {
@@ -197,7 +205,7 @@ class QuickTestModel(
             } finally {
                 // Nothing is kept: the reading goes as soon as the scores are known.
                 audio = null
-                releaseBenchmark(token)
+                app.benchmark.release(claim)
             }
             val light = choice.light?.let { results[it.id] } ?: ModeOutcome.NotInstalled
             val best = results[choice.best.id] ?: ModeOutcome.Failed
@@ -216,15 +224,15 @@ class QuickTestModel(
     /**
      * Loads [spec] (untimed) and transcribes [clip] on a thread of its own, waiting at most [leftSeconds] (plus a
      * small grace) for the transcription. Returns the text and the transcription delay, null when it went over
-     * (the decode then goes on alone: [lingering] until it ends), or throws on a failure.
+     * (the decode then goes on alone, counted as lingering until it ends), or throws on a failure.
      */
     private fun transcribe(spec: ModelSpec, clip: PcmAudio, leftSeconds: Double): Pair<String, Double>? {
         app.engines.factory = app.engineFactory()
         val options = app.engineOptions(spec)
         app.engines.load(spec, options).get() // loading does not count
         val job = CompletableFuture<Pair<String, Double>>()
-        lingering = true
-        thread(name = "quick-test-transcribe") {
+        val lingering = app.benchmark.beginLingering()
+        val decode = {
             try {
                 job.complete(
                     app.engines.use(spec, options) { engine ->
@@ -236,9 +244,16 @@ class QuickTestModel(
             } catch (e: Throwable) {
                 job.completeExceptionally(e)
             } finally {
-                lingering = false
+                lingering.end()
                 main.post { onLingeringEnded?.invoke() }
             }
+        }
+        try {
+            thread(name = "quick-test-transcribe") { decode() }
+        } catch (e: Throwable) {
+            // No thread (memory exhausted): no decode will ever end this one.
+            lingering.end()
+            throw e
         }
         return try {
             job.get((leftSeconds * 1000).toLong() + GRACE_MILLIS, TimeUnit.MILLISECONDS)
@@ -277,39 +292,18 @@ class QuickTestModel(
         audio = null
     }
 
-    /** `benchmarkRunning` belongs to this test from now: the keyboard does not load another model meanwhile. */
-    private fun claimBenchmark(token: Any) {
-        synchronized(Companion) {
-            owner = token
-            app.benchmarkRunning = true
-        }
-    }
-
-    /** Gives the keyboard back, unless a newer test (or nothing) owns it already. */
-    private fun releaseBenchmark(token: Any) {
-        synchronized(Companion) {
-            if (owner === token) {
-                owner = null
-                app.benchmarkRunning = false
-            }
-        }
-    }
+    /** Why a test cannot start now: a decode of an earlier test still running, or another measuring screen. */
+    private fun busyNotice(): String =
+        app.getString(if (app.benchmark.lingering) R.string.quick_previous_running else R.string.measure_busy)
 
     companion object {
         /** Margin over the budget before a model is given up (thread hand-over, scoring). */
         const val GRACE_MILLIS = 500L
 
-        /**
-         * A transcription of an earlier quick test is still running (over its budget, it cannot be interrupted).
-         * Process-wide: a new screen refuses to start a test until it ends, so two decodes never fight for the engine.
-         */
-        @Volatile var lingering = false
-            private set
+        /** Who holds `DicteeApp.benchmark` during the scoring. */
+        const val HOLDER = "test rapide"
 
-        /** The screen to tell when [lingering] ends (main thread), so it can let the person start again. */
+        /** The screen to tell when a lingering decode ends (main thread), so it can let the person start again. */
         @Volatile var onLingeringEnded: (() -> Unit)? = null
-
-        /** Which quick test set `benchmarkRunning` (guarded by the companion's monitor). */
-        private var owner: Any? = null
     }
 }
