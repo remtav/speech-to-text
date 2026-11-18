@@ -154,7 +154,6 @@
             android:layout_height="wrap_content"
             android:orientation="horizontal">
 
-
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/key_comma"
                 style="@style/KeyButton"
@@ -215,7 +214,6 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="horizontal">
-
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/kb_symbols"

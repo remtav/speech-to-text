@@ -4812,4 +4812,6 @@ Demandé par Rémi le 2026-11-14. La touche en bas à gauche, qui passait à un 
   total de la rangée ne change pas, donc les touches restantes gardent leur largeur et restent alignées sur les rangées
   du dessus. Dans le pavé, la touche Entrée prend la hauteur libérée (`rows - 1` rangées).
 - **Tests.** `TextKeyboardInstrumentedTest` : `noPreviousKeyboardKeyIn…` (trois vues : les identifiants n'existent plus,
-  « Clavier à touches » reste, les touches de la rangée du bas ont la même hauteur).
+  « Clavier à touches » reste, les touches de la rangée du bas ont la même hauteur à 8 % près), en portrait et en paysage.
+- **Navigation à trois boutons** : le sélecteur de clavier d'Android n'a été vérifié que par gestes (captures de la CI) ; la
+  vérification à trois boutons passe à #70, qui reproduit ce mode sur l'émulateur.

@@ -62,31 +62,66 @@ class TextKeyboardInstrumentedTest : ImeTestBase() {
 
     // Issue #73: the « previous keyboard » key is gone from the three views, so nobody leaves the
     // app's keyboard with one tap. Android's own keyboard picker stays the way out.
-    @Test
-    fun noPreviousKeyboardKeyInTheDictationView() {
-        launchFields()
+    private fun checkDictationViewHasNoSwitchKey() {
         obj(res("mic"), "dictation view")
         assertNull("key_switch", device.findObject(res("key_switch")))
         assertNotNull("the « Clavier à touches » button stays", device.findObject(res("open_keys")))
         assertSameHeights("dictation bottom row", "key_comma", "key_space", "key_enter")
     }
 
-    @Test
-    fun noPreviousKeyboardKeyInTheTextKeyboard() {
-        launchFields()
+    private fun checkTextKeyboardHasNoSwitchKey() {
         showTextKeyboard()
         assertNull("kb_switch", device.findObject(res("kb_switch")))
         assertSameHeights("text bottom row", "kb_symbols", "kb_space", "kb_enter")
     }
 
-    @Test
-    fun noPreviousKeyboardKeyInTheNumberPad() {
-        launchFields()
+    private fun checkPadHasNoSwitchKey() {
         focus(6)
         assertNotNull("pad", device.wait(Until.findObject(res("pad")), 5_000))
         assertNull("pad_switch", device.findObject(res("pad_switch")))
         assertNotNull("backspace", device.findObject(res("pad_backspace")))
         assertNotNull("enter", device.findObject(res("pad_enter")))
+    }
+
+    @Test
+    fun noPreviousKeyboardKeyInTheDictationView() {
+        launchFields()
+        checkDictationViewHasNoSwitchKey()
+    }
+
+    @Test
+    fun noPreviousKeyboardKeyInTheTextKeyboard() {
+        launchFields()
+        checkTextKeyboardHasNoSwitchKey()
+    }
+
+    @Test
+    fun noPreviousKeyboardKeyInTheNumberPad() {
+        launchFields()
+        checkPadHasNoSwitchKey()
+    }
+
+    // The same three checks in landscape (ImeTestBase puts the natural orientation back after each test).
+
+    @Test
+    fun noPreviousKeyboardKeyInTheDictationViewInLandscape() {
+        launchFields()
+        device.setOrientationLeft()
+        checkDictationViewHasNoSwitchKey()
+    }
+
+    @Test
+    fun noPreviousKeyboardKeyInTheTextKeyboardInLandscape() {
+        launchFields()
+        device.setOrientationLeft()
+        checkTextKeyboardHasNoSwitchKey()
+    }
+
+    @Test
+    fun noPreviousKeyboardKeyInTheNumberPadInLandscape() {
+        launchFields()
+        device.setOrientationLeft()
+        checkPadHasNoSwitchKey()
     }
 
     /**
