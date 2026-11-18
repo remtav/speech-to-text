@@ -67,7 +67,7 @@ object Downloads {
             } finally {
                 cancels.remove(item.id)
                 changed()
-                if (cancels.isEmpty()) DownloadService.stop(context)
+                if (cancels.isEmpty()) DownloadService.stop()
             }
         }
     }
@@ -149,7 +149,7 @@ class DownloadService : Service() {
          * startForeground() crashes the app; if it has not started yet, its own
          * onStartCommand() sees there is nothing left to do and stops itself.
          */
-        fun stop(@Suppress("UNUSED_PARAMETER") context: Context) {
+        fun stop() {
             val svc = running ?: return
             android.os.Handler(android.os.Looper.getMainLooper()).post { if (!Downloads.anyBusy()) svc.stopIdle() }
         }

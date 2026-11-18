@@ -69,9 +69,6 @@ data class CommandForm(
 ) {
     /** Folded words used for matching (accents and case removed, hyphens as spaces). */
     internal val words: List<String> = Normalize.words(text).map { Normalize.fold(it.first) }
-
-    /** "A, G", "U"… for the help screen or the docs. */
-    val sourceCodes: String get() = sources.sortedBy { it.ordinal }.joinToString(", ") { it.code }
 }
 
 /**

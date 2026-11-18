@@ -46,7 +46,6 @@ import kotlin.concurrent.thread
 object TestHooks {
     @Volatile var audioSourceFactory: AudioSourceFactory? = null
     @Volatile var engineFactory: SttEngineFactory? = null
-    @Volatile var vadParams: VadParams? = null
     /** Treat every catalog model as installed (scripted engines need no files). */
     @Volatile var assumeInstalled: Boolean = false
     /**
@@ -158,7 +157,7 @@ class DicteeApp : Application() {
         settings.engineOptions(spec) { isInstalled(it) }
 
     fun newVad(): VoiceActivityDetector {
-        val params = TestHooks.vadParams ?: VadParams(minSilenceSeconds = settings.pauseSeconds)
+        val params = VadParams(minSilenceSeconds = settings.pauseSeconds)
         return SileroVad.fromAssets(assets, params)
     }
 

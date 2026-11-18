@@ -387,10 +387,10 @@ class SettingsActivity : AppCompatActivity() {
             card.body(
                 when {
                     Downloads.isBusy(spec.id) && st != null ->
-                        getString(R.string.setup_downloading, st.percent, size(st.downloaded), size(st.total))
+                        getString(R.string.setup_downloading, st.percent, SizeFormat.format(st.downloaded), SizeFormat.format(st.total))
                     st?.error != null -> getString(R.string.setup_download_error, st.error)
-                    installed -> getString(R.string.setup_installed, size(app.store.installedBytes(spec.asDownloadable())))
-                    else -> getString(R.string.setup_not_installed, size(spec.totalBytes))
+                    installed -> getString(R.string.setup_installed, SizeFormat.format(app.store.installedBytes(spec.asDownloadable())))
+                    else -> getString(R.string.setup_not_installed, SizeFormat.format(spec.totalBytes))
                 },
                 small = true,
             ).apply { if (!Downloads.isBusy(spec.id) && st?.error != null) markError() }
@@ -428,10 +428,10 @@ class SettingsActivity : AppCompatActivity() {
             card.body(
                 when {
                     Downloads.isBusy(spec.id) && st != null ->
-                        getString(R.string.setup_downloading, st.percent, size(st.downloaded), size(st.total))
+                        getString(R.string.setup_downloading, st.percent, SizeFormat.format(st.downloaded), SizeFormat.format(st.total))
                     st?.error != null -> getString(R.string.setup_download_error, st.error)
-                    installed -> getString(R.string.setup_installed, size(spec.file.size))
-                    else -> getString(R.string.setup_not_installed, size(spec.file.size))
+                    installed -> getString(R.string.setup_installed, SizeFormat.format(spec.file.size))
+                    else -> getString(R.string.setup_not_installed, SizeFormat.format(spec.file.size))
                 },
                 small = true,
             ).apply { if (!Downloads.isBusy(spec.id) && st?.error != null) markError() }

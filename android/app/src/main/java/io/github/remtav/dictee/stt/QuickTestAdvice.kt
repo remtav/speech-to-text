@@ -77,9 +77,6 @@ object QuickTestAdvice {
         if (delaySeconds > budgetSeconds + EPSILON) ModeOutcome.TooSlow
         else ModeOutcome.Scored(similarity, delaySeconds)
 
-    /** What is left of the transcription budget for the next model, after [spentSeconds] (never negative). */
-    fun remainingBudget(spentSeconds: Double): Double = (TRANSCRIPTION_BUDGET_SECONDS - spentSeconds).coerceAtLeast(0.0)
-
     /**
      * - neither model scored → no recommendation (null);
      * - only the best one scored → the best one;

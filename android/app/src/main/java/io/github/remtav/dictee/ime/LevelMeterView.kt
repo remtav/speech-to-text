@@ -30,7 +30,6 @@ class LevelMeterView @JvmOverloads constructor(
         return tv.data
     }
 
-    fun setActiveColor(color: Int) { bar.color = color; invalidate() }
 
     fun setLevel(level: Float) {
         target = level.coerceIn(0f, 1f)
