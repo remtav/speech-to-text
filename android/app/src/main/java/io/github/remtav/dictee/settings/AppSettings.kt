@@ -2,6 +2,7 @@ package io.github.remtav.dictee.settings
 
 import android.content.Context
 import android.content.SharedPreferences
+import io.github.remtav.dictee.BuildConfig
 import io.github.remtav.dictee.ime.LayoutKind
 import io.github.remtav.dictee.reading.Declaration
 import io.github.remtav.dictee.reading.Participation
@@ -44,7 +45,7 @@ enum class ThemeMode(val label: String) {
  * User preferences. Everything has a safe default: the CPU path, no optional feature.
  * [defaultServerUrl] is the build's server address (issue #23, `-PdefaultServerUrl`), empty by default.
  */
-class AppSettings(context: Context, private val defaultServerUrl: String = io.github.remtav.dictee.BuildConfig.DEFAULT_SERVER_URL) {
+class AppSettings(context: Context, private val defaultServerUrl: String = BuildConfig.DEFAULT_SERVER_URL) {
     val prefs: SharedPreferences = context.getSharedPreferences("dictee", Context.MODE_PRIVATE)
 
     /**

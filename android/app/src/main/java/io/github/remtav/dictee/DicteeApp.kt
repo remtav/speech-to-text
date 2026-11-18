@@ -14,6 +14,7 @@ import io.github.remtav.dictee.cleanup.LlmCleaner
 import io.github.remtav.dictee.dictation.DictationSession
 import io.github.remtav.dictee.dictation.TextCleaner
 import io.github.remtav.dictee.dictation.TextPipeline
+import io.github.remtav.dictee.reading.ContributionArchive
 import io.github.remtav.dictee.settings.AppSettings
 import io.github.remtav.dictee.settings.CleanupMode
 import io.github.remtav.dictee.settings.ThemeMode
@@ -36,6 +37,7 @@ import io.github.remtav.dictee.stt.LentBlockBackend
 import io.github.remtav.dictee.stt.WholeDictationEngine
 import io.github.remtav.dictee.stt.WhisperTuning
 import io.github.remtav.dictee.text.RuleCleaner
+import io.github.remtav.dictee.ui.ContributionShare
 import java.io.File
 import kotlin.concurrent.thread
 
@@ -92,8 +94,8 @@ class DicteeApp : Application() {
         // survived a killed process for more than a day goes now (not younger: the person's mail may still
         // be reading it, and this process also starts for the keyboard).
         thread(name = "contribution-sweep") {
-            io.github.remtav.dictee.reading.ContributionArchive.deleteOlderThan(
-                io.github.remtav.dictee.ui.ContributionShare.archiveDir(this),
+            ContributionArchive.deleteOlderThan(
+                ContributionShare.archiveDir(this),
             )
         }
     }

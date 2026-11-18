@@ -1,5 +1,14 @@
 package io.github.remtav.dictee.stt
 
+import io.github.remtav.dictee.audio.PcmAudio
+import io.github.remtav.dictee.audio.PcmAudioSource
+import io.github.remtav.dictee.audio.VoiceActivityDetector
+import io.github.remtav.dictee.dictation.DictationController
+import io.github.remtav.dictee.dictation.DictationListener
+import io.github.remtav.dictee.dictation.DictationSession
+import io.github.remtav.dictee.dictation.DictationState
+import io.github.remtav.dictee.dictation.StringSink
+import io.github.remtav.dictee.dictation.TextPipeline
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -54,7 +63,7 @@ class ServerDiagnostic(
         var pos = 0
         for (p in parts) { System.arraycopy(p, 0, all, pos, p.size); pos += p.size }
         val chained = BenchSample(
-            "enchaînement", "", io.github.remtav.dictee.audio.PcmAudio(all, SttEngine.SAMPLE_RATE),
+            "enchaînement", "", PcmAudio(all, SttEngine.SAMPLE_RATE),
             samples.mapNotNull { it.reference }.joinToString(" "),
         )
         return samples + chained
@@ -87,17 +96,17 @@ class ServerDiagnostic(
                 System.arraycopy(p, 0, all, pos, n)
                 pos += n
             }
-            BenchSample(name, "", io.github.remtav.dictee.audio.PcmAudio(all, rate), null)
+            BenchSample(name, "", PcmAudio(all, rate), null)
         }
     }
 
     /**
      * Block mode, as on the keyboard: [sample] is played (in real time when [realTime]) through a
-     * [io.github.remtav.dictee.dictation.DictationController] with the given [vad]; blocks go to the server
+     * [DictationController] with the given [vad]; blocks go to the server
      * while it plays, and the time from the end of the audio to the result is recorded. [cancelled] stops it.
      */
     fun runBlocks(
-        sample: BenchSample, vad: io.github.remtav.dictee.audio.VoiceActivityDetector, realTime: Boolean = true,
+        sample: BenchSample, vad: VoiceActivityDetector, realTime: Boolean = true,
         cancelled: () -> Boolean = { false },
     ): Trial {
         val seconds = sample.audio.samples.size / sample.audio.sampleRate.toFloat()
@@ -105,21 +114,21 @@ class ServerDiagnostic(
         var outcome: DictationResult? = null
         var error: String? = null
         val done = java.util.concurrent.CountDownLatch(1)
-        val listener = object : io.github.remtav.dictee.dictation.DictationListener {
+        val listener = object : DictationListener {
             override fun onDictationResult(result: DictationResult, inserted: String) { outcome = result }
-            override fun onState(state: io.github.remtav.dictee.dictation.DictationState, message: String?) {
-                if (state == io.github.remtav.dictee.dictation.DictationState.ERROR) error = message
-                if (state == io.github.remtav.dictee.dictation.DictationState.IDLE ||
-                    state == io.github.remtav.dictee.dictation.DictationState.ERROR) done.countDown()
+            override fun onState(state: DictationState, message: String?) {
+                if (state == DictationState.ERROR) error = message
+                if (state == DictationState.IDLE ||
+                    state == DictationState.ERROR) done.countDown()
             }
         }
-        val sink = io.github.remtav.dictee.dictation.StringSink()
-        val controller = io.github.remtav.dictee.dictation.DictationController({ sink }, { it.run() }, listener)
+        val sink = StringSink()
+        val controller = DictationController({ sink }, { it.run() }, listener)
         controller.start(
-            io.github.remtav.dictee.dictation.DictationSession(
+            DictationSession(
                 ModelCatalog.remote,
-                io.github.remtav.dictee.audio.PcmAudioSource(listOf(sample.audio), realTime = realTime, gapSeconds = 0f, leadSeconds = 0.5f, tailSeconds = 1f),
-                vad, io.github.remtav.dictee.dictation.TextPipeline(),
+                PcmAudioSource(listOf(sample.audio), realTime = realTime, gapSeconds = 0f, leadSeconds = 0.5f, tailSeconds = 1f),
+                vad, TextPipeline(),
                 transcribe = { throw IllegalStateException("pas de transcription par segment") },
                 whole = { audio, segments, control -> engine.transcribeDictation(audio, segments, control) },
                 blocks = { control -> BlockDictation(engine, control) },

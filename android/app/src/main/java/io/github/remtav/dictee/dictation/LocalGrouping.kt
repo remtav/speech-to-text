@@ -1,5 +1,6 @@
 package io.github.remtav.dictee.dictation
 
+import io.github.remtav.dictee.audio.SpeechChunk
 import io.github.remtav.dictee.audio.VoiceActivityDetector
 import io.github.remtav.dictee.stt.AudioBlock
 
@@ -77,7 +78,7 @@ object LocalCut {
             return mine
         }
         val cutter = grouping?.cutter(::history) { b -> out += LocalPiece(b.audio, b.startSample, total, takeEnds(b)) }
-        fun accept(seg: io.github.remtav.dictee.audio.SpeechChunk) {
+        fun accept(seg: SpeechChunk) {
             val end = seg.startSample + seg.samples.size
             if (cutter == null) out += LocalPiece(seg.samples, seg.startSample, total, listOf(end))
             else { ends += end; cutter.onSegment(seg) }
