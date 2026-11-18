@@ -24,6 +24,8 @@ import android.widget.ImageButton
 import android.widget.PopupMenu
 import android.widget.TextView
 import androidx.core.content.ContextCompat
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
 import com.google.android.material.button.MaterialButton
 import io.github.remtav.dictee.DicteeApp
 import io.github.remtav.dictee.R
@@ -156,6 +158,7 @@ class DicteeImeService : InputMethodService(), DictationListener, EngineManager.
     override fun onCreateInputView(): View {
         val v = themedInflater().inflate(R.layout.keyboard_view, null)
         root = v
+        keepAboveNavigationBar(v)
         micButton = v.findViewById<MaterialButton>(R.id.mic).apply { setOnClickListener { onMicTapped() } }
         statusText = v.findViewById(R.id.status)
         meter = v.findViewById(R.id.level)
@@ -175,6 +178,25 @@ class DicteeImeService : InputMethodService(), DictationListener, EngineManager.
         backspace.setOnTouchListener(RepeatListener(main) { haptic(backspace); deleteBackward() })
         render()
         return v
+    }
+
+    /**
+     * Issue #70: from Android 15 an input method draws under the navigation bar (three buttons or
+     * gesture bar), whatever its mode. The bar's size is added to the keyboard's own padding, once per
+     * inset change; when the system already keeps the keyboard clear of the bar it delivers none, so
+     * nothing is doubled.
+     */
+    private fun keepAboveNavigationBar(v: View) {
+        val left = v.paddingLeft
+        val top = v.paddingTop
+        val right = v.paddingRight
+        val bottom = v.paddingBottom
+        ViewCompat.setOnApplyWindowInsetsListener(v) { view, insets ->
+            val bar = insets.getInsets(WindowInsetsCompat.Type.navigationBars())
+            view.setPadding(left + bar.left, top, right + bar.right, bottom + bar.bottom)
+            insets
+        }
+        ViewCompat.requestApplyInsets(v)
     }
 
     /** The text keyboard (issue #21): letters, symbols, and a bottom row that keeps the microphone. */
