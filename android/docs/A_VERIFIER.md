@@ -170,7 +170,7 @@ textes n'ont pas changé.
   les lettres du nom.
 - **Choix fait en attendant** : rien n'est branché ni activé.
 - **Où corriger** : pour proposer « règles + vocabulaire » en option, brancher
-  `android/app/src/main/java/io/github/remtav/dictee/text/polish/PolishRules.kt`
+  `android/app/src/sharedTest/java/io/github/remtav/dictee/text/polish/PolishRules.kt`
   et `ShippedVocabulary.kt` derrière un nouveau réglage ; relire d'abord la
   liste de `ShippedVocabulary.kt` (une forme qui serait un mot ordinaire
   abîmerait du texte) et ajouter de vraies dictées québécoises au jeu

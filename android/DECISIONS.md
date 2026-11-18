@@ -2057,9 +2057,9 @@ aucun fichier hors de `text/polish/` ne mentionne le paquet).
 
 ### Où est le code
 
-- `app/src/main/java/io/github/remtav/dictee/text/polish/PolishRules.kt` :
+- `app/src/sharedTest/java/io/github/remtav/dictee/text/polish/PolishRules.kt` :
   les règles (Kotlin pur, JVM, aucune dépendance Android).
-- `app/src/main/java/io/github/remtav/dictee/text/polish/ShippedVocabulary.kt` :
+- `app/src/sharedTest/java/io/github/remtav/dictee/text/polish/ShippedVocabulary.kt` :
   la liste livrée, appliquée par le mécanisme existant de `text/Vocabulary.kt`
   (corrections `mal entendu -> correct`, insensibles à la casse, sur frontières
   de mots).
@@ -2261,7 +2261,7 @@ inchangée.
 
 Approches 3 (petit LLM local, prompt élargi) et 4 (règles d'abord, LLM sur
 les cas probables). **Code d'évaluation seulement, hors du chemin par
-défaut** : nouveaux fichiers sous `app/src/main/java/io/github/remtav/dictee/cleanup/eval/`,
+défaut** : nouveaux fichiers sous `app/src/sharedTest/java/io/github/remtav/dictee/cleanup/eval/`,
 appelés par aucun écran, aucun réglage, ni `DicteeApp` ni `TextPipeline` ;
 `CleanupMode`, `LlmCleaner`, son prompt et `SafetyCheck` sont inchangés.
 L'application se comporte exactement comme avant.
@@ -2739,7 +2739,7 @@ prendre). Lien depuis `android/README.md`.
 
 ### Raccord de 3.2 et 3.3 (approche 4)
 
-- Nouveau fichier `app/src/main/java/io/github/remtav/dictee/cleanup/eval/WiredCombination.kt` :
+- Nouveau fichier `app/src/sharedTest/java/io/github/remtav/dictee/cleanup/eval/WiredCombination.kt` :
   - `WiredRules.apply` : `PolishRules.polish`, puis `ShippedVocabulary.apply`.
     **Choix** : l'étage déterministe est « règles + vocabulaire », pas les
     règles seules, parce que c'est la meilleure approche sans LLM (55/79,
