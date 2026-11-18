@@ -64,10 +64,18 @@ class GestureTypingInstrumentedTest : ImeTestBase() {
         device.waitForIdle(500)
     }
 
-    /** Slides one finger through the keys of [word], without lifting it. */
+    /**
+     * Slides one finger through the keys of [word], without lifting it. [STEPS] moves from key to key (5 ms each),
+     * about a finger's speed: with fewer, each move jumps more than a key and the emulator's input resampling can
+     * drop the move on a corner, as no finger does (8 steps turned « maison » into « Mézidon » on the CI).
+     */
     private fun trace(word: String) {
         val points = word.map { keyCentre(it) }.fold(ArrayList<Point>()) { acc, p -> if (acc.lastOrNull() != p) acc += p; acc }
-        assertTrue("uiautomator slid the finger", device.swipe(points.toTypedArray(), 8))
+        assertTrue("uiautomator slid the finger", device.swipe(points.toTypedArray(), STEPS))
+    }
+
+    private companion object {
+        const val STEPS = 40
     }
 
     private fun barWords(): List<String> =

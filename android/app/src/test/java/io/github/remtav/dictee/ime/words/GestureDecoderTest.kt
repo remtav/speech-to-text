@@ -102,6 +102,26 @@ class GestureDecoderTest {
         assertEquals(words.toString(), "aujourd'hui", words.firstOrNull())
     }
 
+    /**
+     * Moves sampled every 5 ms, as the emulator or a phone sends them, with the move on each corner lost (input
+     * resampling can drop it): a trace this dense still reads right.
+     */
+    @Test
+    fun aLostMoveOnEachCornerStillReadsTheWord() {
+        val fr = decoder(azerty, "fr")
+        val keys = "maison".map { azerty.centre(it)!! }
+        val steps = 40
+        val points = ArrayList<KeyPoint>()
+        points += keys[0]
+        for (i in 0 until keys.size - 1) for (j in 1..steps) {
+            if (j == steps && i < keys.size - 2) continue
+            val a = keys[i]
+            val b = keys[i + 1]
+            points += KeyPoint(a.x + (b.x - a.x) * j / steps, a.y + (b.y - a.y) * j / steps)
+        }
+        assertEquals("maison", fr.decode(points).firstOrNull())
+    }
+
     @Test
     fun aTapThatMovedIsNoWord() {
         val fr = decoder(qwerty, "fr")
