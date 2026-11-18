@@ -99,7 +99,9 @@ android {
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "io.github.remtav.dictee"
+        // Identifiant Play Store (fixé par la fiche Google Play, ne peut plus changer).
+        // Le namespace (package Kotlin, classe R) reste io.github.remtav.dictee.
+        applicationId = "com.kalmia.stt"
         minSdk = 29
         targetSdk = 36
         // CI passes the workflow run number so each published APK upgrades the previous one.
