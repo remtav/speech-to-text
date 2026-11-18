@@ -616,7 +616,7 @@ speech-to-text/
 
 `android/` holds a separate component: an Android keyboard (IME) for voice
 dictation that runs speech-to-text entirely on the phone with sherpa-onnx
-(Parakeet TDT 0.6b v3, Qwen3-ASR 0.6B, Whisper large-v3-turbo). It shares no
+(Whisper large-v3-turbo, with Parakeet TDT 0.6b v3 as an advanced option). It shares no
 code with the server. See [android/README.md](android/README.md) and
 [android/DECISIONS.md](android/DECISIONS.md); APKs are published as
 `android-v*` GitHub releases.

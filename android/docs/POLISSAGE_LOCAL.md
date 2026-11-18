@@ -385,7 +385,7 @@ combinaison ne peut pas dépasser 56, avec ou sans proximité.
 Ils sont hors de l'évaluation, et un seul change le comportement par défaut.
 
 - **Langue transmise à Qwen3-ASR : changement du comportement par défaut,
-  mesuré ensuite sur sept extraits.** Quand une seule langue de dictée est choisie, Qwen3-ASR reçoit
+  mesuré ensuite sur sept extraits.** *(Retiré par #77 : Qwen3-ASR, `qwen3Language` et le test cité n'existent plus ; historique.)* Quand une seule langue de dictée est choisie, Qwen3-ASR reçoit
   désormais son nom (« French »), comme Whisper reçoit son code. Le choix
   initial étant « Français (Québec) » seul, **toute personne qui utilise
   Qwen3-ASR sans toucher aux langues dicte maintenant en français forcé.**
@@ -405,7 +405,7 @@ Ils sont hors de l'évaluation, et un seul change le comportement par défaut.
 - **Garde-fou du nettoyage par LLM durci, prompt précisé** : effet seulement
   quand le nettoyage est sur « Petit LLM local + garde-fou », qui n'est pas le
   défaut.
-- **Textes affichés** : note « dernier recours » sur la carte de Whisper,
+- **Textes affichés** : note « dernier recours » sur la carte de Whisper (retirée depuis : Whisper est le modèle par défaut),
   raison de recommandation de Whisper (bengali, ourdou) et textes d'aide des
   réglages. Seul l'affichage change, pas la transcription.
 
@@ -416,7 +416,7 @@ Ils sont hors de l'évaluation, et un seul change le comportement par défaut.
 | **A. Rien de plus** (recommandé pour cette itération) | Comportement actuel, aucun risque nouveau sur les mots | « coiffe rimouski point com » reste en toutes lettres |
 | **B. Option « règles » désactivée par défaut**, puis vocabulaire livré | Adresses dites et épellations recollées, noms courants corrigés pour qui l'active | Un réglage de plus ; une liste à entretenir ; non validé sur de vraies dictées |
 | **C. Mesurer le LLM sur le téléphone** (procédure ci-dessus) | Vraies sorties et coût réel de Qwen2.5 | Une à deux heures ; ne peut pas renverser la conclusion sur la qualité (plafond 56 sur 79) |
-| **D. Garder la langue forcée sur Qwen3-ASR ou revenir à la détection automatique** | Garder : 6 erreurs contre 8 sur sept extraits français (mesuré sur ordinateur) ; mots dits seuls non mesurés | Garder : risque de franciser les mots anglais dictés en français |
+| ~~**D. Garder la langue forcée sur Qwen3-ASR ou revenir à la détection automatique**~~ *(sans objet : Qwen3-ASR est retiré, #77)* | Garder : 6 erreurs contre 8 sur sept extraits français (mesuré sur ordinateur) ; mots dits seuls non mesurés | Garder : risque de franciser les mots anglais dictés en français |
 
 À trancher aussi, hors de ce lot : le défaut de « Polissage par le serveur »
 (activé aujourd'hui) et la priorité donnée au modèle de transcription affiné

@@ -1,5 +1,10 @@
 # Whisper large-v3-turbo « français québécois » → sherpa-onnx
 
+> **Mise à jour #77 (lot E).** Le catalogue de l'application ne contient plus ce modèle (`ModelCatalog.whisperQuebec` et
+> son test de mesure n'existent plus). Cet outil et le dépôt Hugging Face restent en place ; les passages ci-dessous qui
+> disent que l'application ou la CI utilisent la conversion sont périmés. Garder ou retirer l'outil : décision de Rémi
+> en attente.
+
 Statut : outil, à lancer à la main (issue #15, demande de l'utilisateur ; voir `android/DECISIONS.md`). La conversion est
 publiée : `https://huggingface.co/remiavelo/sherpa-onnx-whisper-large-v3-turbo-fr-quebecois-int8` (voir « Publication »).
 
@@ -32,18 +37,17 @@ l'application et du serveur) : torch (CPU), openai-whisper, onnx, onnxruntime, o
 | `turbo-decoder.int8.onnx` | 360 961 539 | `9775633c180fa256f096fd97ad8825cfff2d159090d8a6f98542d82ae01e567e` |
 | `turbo-tokens.txt` | 816 730 | `b34b360dbb493e781e479794586d661700670d65564001f23024971d1f2fa126` (identique à celui de Whisper turbo) |
 
-Ces sommes sont celles de `ModelCatalog.whisperQuebec`. La conversion n'est pas garantie reproductible au bit près :
-si on la refait, les sommes sont à reporter dans le catalogue (le test de l'application échoue sinon au téléchargement).
+Ces sommes étaient celles de `ModelCatalog.whisperQuebec` (retiré du catalogue, #77). La conversion n'est pas garantie reproductible au bit près :
+si on la refait, les sommes publiées changent (l'application ne s'en sert plus).
 
 ## Publication
 
 Publiée le 2026-11-12, à la demande de l'utilisateur et sous son compte Hugging Face (dépôt public) :
 `https://huggingface.co/remiavelo/sherpa-onnx-whisper-large-v3-turbo-fr-quebecois-int8`. Les trois fichiers ci-dessus y
-sont tels quels ; `WHISPER_QC` de `ModelCatalog.kt` pointe sur `…/resolve/main`, donc l'application propose le modèle
-(écran d'installation, Réglages, comparaison) et `ModelAccuracyHostTest.whisperQuebec` le télécharge (~1 Go) en CI.
-Si la conversion est refaite et republiée, reporter les nouvelles sommes dans le catalogue.
+sont tels quels ; `WHISPER_QC` de `ModelCatalog.kt` pointait sur `…/resolve/main`, et l'application proposait alors le modèle
+(écran d'installation, Réglages, comparaison) ; elle ne le propose plus (#77), pas plus que la CI ne le télécharge.
 
-Vérifier : `./gradlew testDebugUnitTest` puis, hôte, `-PmodelsDir=… --tests '*ModelAccuracyHostTest*'`.
+Vérifier la conversion : la comparer à `ele-sage/whisper-large-v3-turbo-fr-quebecois` avec un banc d'essai à soi ; le test de l'application qui la téléchargeait n'existe plus.
 
 ## Lite-Whisper large-v3-turbo-acc (2026-11-13, à l'essai)
 

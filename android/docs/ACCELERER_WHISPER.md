@@ -5,6 +5,10 @@ l'exécution de Whisper v3 Turbo »). Le texte de l'enquête a été écrit sans
 ajout de code alors : le test de mesure hôte `app/src/test/java/io/github/remtav/dictee/WhisperSpeedHostTest.kt`
 (sauté sans `-PmodelsDir`).
 
+> **Mise à jour #77 (lot E).** Qwen3-ASR et le Whisper « québécois » (ele-sage) ne sont plus au catalogue, et Lite-Whisper
+> non plus : les mesures qui les concernent (tableaux, sections 7.1 et 7.2) sont gardées comme historique et ne décrivent
+> plus rien d'installable. Le modèle local est Whisper large-v3-turbo.
+
 **Mise à jour 2026-11-12 : faits** (section 11). Pistes 1 et 2 du tableau : plus de texte provisoire avec Whisper (sans
 réglage) ; réglage avancé « Silence ajouté pour Whisper » (`tailPaddings`, entier), **défaut inchangé à 1 000**, choix 600
 et 300 à valider sur le téléphone. L'écran « Comparer les modèles » mesure maintenant Whisper avec les options de la dictée.
@@ -36,8 +40,8 @@ distillations gardent l'encodeur de large-v3, donc ne vont pas plus vite sur des
 (whisper.cpp, CTranslate2). **Déjà en place** : langue forcée quand une seule langue est choisie (gain de vitesse
 négligeable, mais évite une mauvaise détection de la langue sur un mot isolé), cache KV du décodeur, décodage glouton.
 
-Ce qui est inchangé par le modèle québécois en cours d'évaluation (autre enquête) : le modèle communautaire
-`ele-sage/whisper-large-v3-turbo-fr-quebecois` a, selon l'outil de conversion du dépôt, **la même architecture** que
+Ce qui était inchangé par le modèle québécois évalué alors (retiré du catalogue depuis, #77) : le modèle communautaire
+`ele-sage/whisper-large-v3-turbo-fr-quebecois` avait, selon l'outil de conversion du dépôt, **la même architecture** que
 Whisper turbo (`android/tools/whisper-hf-vers-sherpa/README.md`) : mêmes tailles de fichiers, donc **même vitesse**.
 Les leviers de ce rapport s'appliqueraient tels quels à ce modèle ; une meilleure compréhension du français québécois
 ne rend pas le calcul plus rapide, et inversement.
@@ -127,7 +131,7 @@ court. À valider avec la procédure téléphone (enregistrer « friperie » seu
 défaut. Un filtre qui retire une phrase répétée (texte = X + espace + X) serait un filet de sécurité peu coûteux
 [supposé utile à 300, inutile à 600].
 
-Ce que ce réglage ne fait pas : il ne touche pas aux autres modèles (Parakeet et Qwen3 n'ont pas de marge).
+Ce que ce réglage ne fait pas : il ne touche pas aux autres modèles (Parakeet n'a pas de marge ; Qwen3-ASR, qui n'en avait pas non plus, est retiré).
 
 ## 2. Décodages provisoires
 
@@ -341,13 +345,14 @@ Pourquoi medium est plus lent alors qu'il est plus petit [mesuré hôte, métado
 Conclusion : **medium est écarté** (plus lent et pas meilleur en français québécois) et n'est pas ajouté au catalogue.
 Small reste écarté (tableau ci-dessus : 1,1 à 1,3× plus rapide, WER 16 %). Pour réduire la latence, les leviers restent
 la marge de fin (section 1), les threads (section 4) et surtout **le serveur distant** (issue #23). Le modèle à garder en
-local pour le français québécois est le turbo québécois.
+local pour le français québécois était alors le turbo québécois ; il a été retiré du catalogue (#77) et Whisper turbo
+est resté le modèle du téléphone.
 
 Autres tailles de cette famille à ne pas oublier : aucun export sherpa-onnx « turbo » plus petit que l'int8 actuel
 n'existe publiquement [vérifié par la liste des dépôts `csukuangfj/sherpa-onnx-whisper-*`].
 
-**Lien avec l'autre enquête** : la recherche d'un modèle communautaire affiné en français québécois (WER annoncé 6,65 %,
-base turbo) est indépendante de celle-ci. S'il remplace Whisper turbo dans le catalogue, il a **la même vitesse** (même
+**Lien avec l'autre enquête** (modèle québécois, retiré du catalogue depuis, #77) : la recherche d'un modèle communautaire affiné en français québécois (WER annoncé 6,65 %,
+base turbo) était indépendante de celle-ci. S'il avait remplacé Whisper turbo dans le catalogue, il a **la même vitesse** (même
 architecture) : tous les leviers de ce rapport lui sont applicables, et la procédure de mesure ci-dessous est à refaire à
 l'identique avec lui. Si l'on choisit un modèle plus petit pour la vitesse, on perd ce qui motive l'usage de Whisper
 (les mots québécois isolés) : le compromis vitesse/qualité est réel et se joue entre les deux enquêtes.

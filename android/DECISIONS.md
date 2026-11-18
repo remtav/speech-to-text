@@ -29,6 +29,11 @@ sont pas répétées ; chaque entrée ci-dessous donne le choix et sa raison.
 
 ## Bibliothèques et modèles
 
+> **Retiré par #77 (section 2, lot E).** Qwen3-ASR n'est plus au catalogue ni dans le code, et le Whisper « québécois »
+> non plus : il reste Whisper turbo et Parakeet (plus le serveur). Les puces qui parlent de Qwen3-ASR, de ses
+> fichiers (987 Mo) ou de sa détection de langue décrivent un état disparu ; le reste (sherpa-onnx 2.0.1, fichiers pris
+> un par un, VAD Silero, threads) tient.
+
 - **sherpa-onnx 2.0.1** (dernière version au moment du lot). Elle n'est publiée
   sur aucun dépôt Maven (JitPack n'a pas de build de cette version) : Gradle
   télécharge l'AAR depuis la release GitHub et vérifie son SHA-256 avant de
@@ -558,6 +563,9 @@ résumé de pages, non à la main : la couverture est à relire à l'occasion.
 
 ### Règles de la table (`ModelRecommendations.recommend`)
 
+> **Retiré par #72 (partie 2) et #77.** Cette table n'existe plus : `ModelRecommendation.recommend` rend toujours
+> Whisper turbo, sans lire les langues (Qwen3-ASR a quitté le catalogue). #89 revoit la recommandation.
+
 Lues de haut en bas, la première qui s'applique gagne :
 
 1. aucune langue : Parakeet (choix prudent : le plus léger, 671 Mo, et le
@@ -616,6 +624,9 @@ Google). Chaque carte de modèle affiche éditeur, description, licence et
 
 ### Étape « Vos langues »
 
+> **Précision (#77, lot E).** `qwen3Language` et tout ce qui nomme Qwen3 ci-dessous ont disparu avec Qwen3-ASR ;
+> `EngineOptions.language` ne sert plus qu'à Whisper. Le reste de l'étape tient.
+
 - Section 3 de l'écran de configuration, avant « 4. Modèles » : cases à cocher
   pour les onze langues, Québec en tête et présélectionné. Même liste dans les
   Réglages. Pas de « premier lancement » à mémoriser : sans choix enregistré,
@@ -661,6 +672,9 @@ téléchargement restent actifs. Le serveur distant n'est jamais badgé ni signa
   captures à refaire en 1.4.
 
 ### Thème
+
+> **Retiré (#15, retour au style générique ; #77 lot E).** Les couleurs du thème Kalmia dont parle cette section ne
+> sont plus dans l'application : voir « retour au style générique » plus bas.
 
 Aucune couleur ni police en dur : `badge` et `warning` (dans `ui/Ui.kt`)
 utilisent `colorPrimary` et `colorError` du thème, l'étape 1.5 les habillera.
@@ -757,6 +771,10 @@ de clips, ce que les 152 clips « Français du Canada » de la seule partition
 `test` permettraient, après écoute.
 
 ## Issue #15, lot 1 — étape 1.5 : thème Kalmia
+
+> **Retiré par la demande de Rémi (« retour au style générique »), constaté par #77 (lot E).** Palette, polices
+> embarquées, formes, ombre décalée, logo et clavier Kalmia ne sont plus dans l'application. Cette section ne
+> garde que l'historique ; voir « Issue #15 — demande de l'utilisateur : retour au style générique » plus bas.
 
 Étape 1.5 de l'issue #15 : l'application et le clavier prennent l'identité visuelle de Kalmia (couleurs
 claires et sombres, polices embarquées, angles droits, ombre décalée, logo). Source Kalmia lue en lecture
@@ -2812,6 +2830,10 @@ mesure sur le téléphone ne peut pas renverser ce plafond.
 
 ## Issue #15 — demande de l'utilisateur : modèle affiné sur le français québécois
 
+> **Retiré par #77 (section 1).** Le Whisper « québécois » (`whisper-large-v3-turbo-fr-qc-int8`) n'est plus au catalogue
+> et `ModelCatalog.whisperQuebec` n'existe plus, pas plus que ses tests de mesure. Le dépôt Hugging Face et
+> `android/tools/` restent (décision de Rémi en attente). La section ne garde que l'historique.
+
 **Portée.** L'issue classait « l'ajout de nouveaux modèles au catalogue » hors portée. La demande explicite de
 l'utilisateur (« vérifie si tu es capable de trouver ce modèle et si oui, ajoute-le ») la remplace pour ce modèle
 précis seulement ; rien d'autre n'est ajouté.
@@ -3128,6 +3150,9 @@ polissage. Le serveur lit bien `polish=false` (`app/main.py`). Ajouté : `polish
 
 ### Langue transmise à Qwen3-ASR : vérifiée et mesurée
 
+> **Retiré par #77 (section 2, lot A).** Qwen3-ASR et sa langue transmise (`qwen3Language`) ne sont plus dans le code ;
+> le test cité est supprimé. La section ne garde que l'historique.
+
 - `javap` sur `app/libs/sherpa-onnx-2.0.1.aar` : `OfflineStream.setOption(String, String)` existe ;
   `OfflineQwen3AsrModelConfig` n'a pas de champ de langue. Sources au tag `v2.0.1`
   (`offline-recognizer-qwen3-asr-impl.cc`) : l'option de flux `language` est écrite telle quelle dans le prompt
@@ -3138,11 +3163,13 @@ polissage. Le serveur lit bien `polish=false` (`app/main.py`). Ajouté : `polish
 - **Mesure** (hôte x86-64, sherpa-onnx 2.0.1, 4 threads, `fr1` + `frqc1..6`, 75 mots, une exécution) : détection
   automatique **8 erreurs (10,7 %)**, « French » forcé **6 erreurs (8,0 %)**. Écarts : `frqc2` 3 → 2, `frqc3` 4 → 3,
   le reste identique. Pas de dégradation : le défaut est gardé. Trop peu pour parler d'un gain ; les mots dits seuls
-  ne sont pas mesurés. Épinglé par `ModelAccuracyHostTest.qwen3ForcedFrenchDoesNotDegradeTheFrenchReferences`
-  (au plus 2 erreurs de plus que l'automatique), placé dans `ModelAccuracyHostTest` pour que le job `models` de la CI
+  ne sont pas mesurés. Épinglé par `ModelAccuracyHostTest.qwen3ForcedFrenchDoesNotDegradeTheFrenchReferences` (test supprimé avec
+  Qwen3-ASR, #77) : au plus 2 erreurs de plus que l'automatique, placé dans `ModelAccuracyHostTest` pour que le job `models` de la CI
   le lance (il ne sélectionne que `*ModelAccuracyHostTest*` et `*EndToEndHostTest*`).
 
 ### Modèle québécois
+
+> **Retiré par #77 (section 1).** Ce modèle n'est plus au catalogue (voir la section sur le modèle québécois plus haut).
 
 - API publique Hugging Face (`?blobs=true`) : tailles et SHA-256 des deux `.onnx` identiques au catalogue ; dépôt
   public, non restreint ; `turbo-tokens.txt` (hors LFS, sans somme dans l'API) téléchargé et vérifié : `b34b360d…a126`.
@@ -3214,8 +3241,8 @@ délai de grâce de rotation n'est pas allongé : ce serait changer le produit s
 
 ### Vérification
 
-`./gradlew testDebugUnitTest assembleDebug assembleDebugAndroidTest lintDebug` : code de retour 0. Mesure Qwen3 :
-`--tests '*ModelAccuracyHostTest.qwen3Forced*' -PmodelsDir=…`. Les tests instrumentés ne tournent que dans la CI
+`./gradlew testDebugUnitTest assembleDebug assembleDebugAndroidTest lintDebug` : code de retour 0. Mesure Qwen3 (test supprimé
+avec Qwen3-ASR, #77) : `--tests '*ModelAccuracyHostTest.qwen3Forced*' -PmodelsDir=…`. Les tests instrumentés ne tournent que dans la CI
 (pas d'émulateur ici) : `ImeTestBase` modifié compile, son effet se verra à la prochaine exécution.
 
 ### État de la revue
@@ -3226,7 +3253,7 @@ délai de grâce de rotation n'est pas allongé : ce serait changer le produit s
 - Reste : confirmer dans la CI que `ImeTestBase` modifié passe ; corrections à reporter dans `docs/A_VERIFIER.md`
   (listées dans le rapport de revue à l'orchestrateur, ce fichier-là n'est pas modifié par la revue).
 
-`--tests '*ModelAccuracyHostTest.qwen3Forced*' -PmodelsDir=…`.
+`--tests '*ModelAccuracyHostTest.qwen3Forced*' -PmodelsDir=…` (test supprimé avec Qwen3-ASR, #77).
 
 ### Échec de CI : `HowToInstrumentedTest.opensAtTheEndOfTheFirstSetupAndNotTheSecondTime` (« only once »)
 
@@ -4365,6 +4392,11 @@ jargon » ; de #37, tout sauf le serveur préconfiguré.
 
 ### Le test rapide : deux modèles du téléphone
 
+> **Chemin inatteignable (#72, constaté par #77 lot E).** Le catalogue n'offre plus qu'un modèle du téléphone dans le
+> parcours normal : `PhoneModelChoice.light` vaut toujours `null`, et la règle « léger contre meilleur » ne se déclenche
+> jamais. Code et tests gardés pour le retour de Parakeet « Rapide » (#89) ; sa suppression est une décision de Rémi
+> encore ouverte.
+
 - **`QuickTestAdvice` adaptée, pas dupliquée** : mêmes `ModeOutcome` et même budget, la règle devient
   « léger contre meilleur ». Le léger est recommandé seulement s'il fait au moins 90 %, à 5 points ou
   moins du meilleur, **et** si le meilleur a mis plus de 5 s ; sinon le meilleur reste (il est le défaut).
@@ -4631,6 +4663,10 @@ l'autre. Pas mesuré sur le téléphone.
 
 ## Issue #72 (partie 2) — Whisper seul sur le téléphone, et on le nomme
 
+> **Modifié par #77 (section 1) et #89.** Lite-Whisper, le niveau `HIDDEN`, `migrateModels` avec avis et les fichiers
+> d'anciens modèles ont été retirés par #77 (voir « Issue #77, section 1 »). Parakeet « dans Avancé » et le test rapide
+> masqué sont revus par #89, qui remet Parakeet et le serveur dans le parcours normal.
+
 Décisions de Rémi, 2026-11-14 (issue #72, mise à jour du jour comprise).
 
 **Ce qui change.**
@@ -4733,8 +4769,9 @@ se comporte comme avant ; seul ce qui servait à migrer ou à garder un état an
   point 9 de #72 partie 2 tombe, comme décidé le 2026-11-14), avec leurs constantes, leurs lignes de couverture et la
   valeur `ModelVisibility.HIDDEN` : il reste `VISIBLE` et `ADVANCED`. Le catalogue compte deux modèles du téléphone
   (Whisper turbo, Parakeet) plus le serveur. Les tests qui se servaient de Qwen3 comme « deuxième modèle » prennent
-  Whisper turbo ou Parakeet ; les tests de mesure sur l'ordinateur propres à ces modèles (`ModelAccuracyHostTest`,
-  `qwen3ForcedFrench…`) sont supprimés avec eux.
+  Whisper turbo ou Parakeet ; les tests de mesure sur l'ordinateur propres à ces modèles (`ModelAccuracyHostTest.qwen3ForcedFrench…`,
+  `whisperQuebec`, `liteWhisperTurbo`) sont supprimés avec eux ; `ModelAccuracyHostTest` lui-même reste dans
+  `HostModelTest.kt`, avec ses cas `parakeet` et `whisperTurbo`.
 - **Migrations.** Supprimés : `DicteeApp.migrateServerChoice`, `AppSettings.remoteFallbackId` (clé `remote_fallback`),
   `ModelMigration` (fichier, `Notice`, `fallbackId`), `AppSettings.retiredModelNotice` (clé `retired_model_notice`),
   `SetupActivity.renderRetiredNotice` et ses étiquettes `RETIRED_*`, les chaînes `model_notice_*`, la section « Fichiers
