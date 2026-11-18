@@ -213,10 +213,9 @@ class TextKeyboardInstrumentedTest : ImeTestBase() {
         open.click()
         assertNotNull("letters", device.wait(Until.findObject(res("letters")), 5_000))
         assertNotNull("microphone stays in the bottom row", device.findObject(res("mic_small")))
-        assertTrue(app.settings.textKeyboardShown)
         click(res("toggle_view"), "toggle view")
         assertNotNull("microphone back", device.wait(Until.findObject(res("mic")), 5_000))
-        assertFalse(app.settings.textKeyboardShown)
+        assertNull(device.findObject(res("letters")))
     }
 
     @Test
@@ -237,7 +236,6 @@ class TextKeyboardInstrumentedTest : ImeTestBase() {
         focus(3)
         assertNotNull("text view in a password field", device.wait(Until.findObject(res("letters")), 5_000))
         assertNull("no toggle in a password field", device.findObject(res("toggle_view")))
-        assertFalse("stored view untouched", app.settings.textKeyboardShown)
         tap("p", "w")
         waitFor("typed in the password field", 5_000) { var t = ""; scenario.onActivity { t = it.password.text.toString() }; t == "pw" }
         // The microphone key is disabled: nothing starts.

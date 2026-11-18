@@ -4082,6 +4082,7 @@ pendant la dictée ». Le contrat du serveur est celui de la PR #46 (`POST /poli
 - Les chaînes ne parlent plus de « clavier de correction » : « Clavier à touches » (bouton, Réglages, aide).
 - La dernière vue (micro ou touches) était déjà retenue d'un champ à l'autre (`textKeyboardShown`) ; le premier
   usage reste le micro (c'est un clavier vocal d'abord). Un test instrumenté couvre la conservation.
+  **Revu par #90 : voir « Issue #90 » plus bas** (la vue n'est plus retenue entre deux ouvertures).
 
 ## Issues #55 et #57 : les deux étapes du clavier, le serveur hors du parcours (PR 1 du retour de #54)
 
@@ -4793,7 +4794,7 @@ se comporte comme avant ; seul ce qui servait à migrer ou à garder un état an
 - **Gardé tel quel (section 2 de #77).** Le moteur Qwen3 de `SherpaEngine`, `ModelFamily.QWEN3_ASR`,
   `DictationLanguages.qwen3Language`, les étiquettes `qwen3` de `PolishEval` (provenance des fichiers d'évaluation) et la
   compatibilité avec un serveur plus ancien (repli quand `POST /polish` répond 404/405) : ce sont des questions de
-  nettoyage, pas d'anciens usagers. `textKeyboardShown` reste (#90 le retire).
+  nettoyage, pas d'anciens usagers. `textKeyboardShown` reste (#90 le retire, fait).
 - **Hors de la portée.** Le dépôt Hugging Face du Whisper québécois et `android/tools/` ne sont pas touchés.
 
 ## Issue #73 : la touche « Clavier précédent » est retirée
@@ -4845,3 +4846,27 @@ des deux ne regardait si un décodage du test rapide tournait encore (deux gros 
 - **Hors de cette PR** (écran du test rapide masqué par #72, chemin à deux modèles en sommeil) : points 1, 2 et 5 de
   #66 (libération du moteur après un dépassement, phrase finale, test de fermeture d'écran), et le reste du point 6
   (fil de calcul impossible à créer juste après la prise du verrou).
+
+## Issue #90 : le clavier s'ouvre toujours sur le micro
+
+Décision de Rémi du 2026-11-16 ; revient sur la ligne de #54 (« Visibilité du clavier à touches ») qui retenait la
+dernière vue.
+
+- Kalmia Blabla est un clavier vocal d'abord : le clavier à touches sert à corriger, puis on revient au micro.
+  À chaque **réouverture** du clavier (il était caché et réapparaît : retour arrière, autre application, nouveau
+  toucher dans un champ), c'est la vue du micro.
+- La vue n'est plus dans les réglages : `textKeyboardShown` est retiré de `AppSettings` et vit en mémoire dans
+  `DicteeImeService` (`textKeysOn`). La clé `text_keyboard_shown` orpheline des installations existantes est ignorée
+  (pas de migration, cf. #77).
+- La réouverture est détectée par `onWindowHidden` / `onWindowShown` (fenêtre réellement cachée), non par
+  `onFinishInputView`, qui est aussi appelé en passant d'un champ à l'autre.
+- Inchangé : mot de passe → touches, sans micro ; champ numérique, téléphone, montant → pavé (#42).
+- **Rotation** : le clavier se cache et revient sur le même champ en moins de `HIDE_GRACE_MS` (4 s) : la vue en cours
+  est gardée. Différence avec `isSameFieldAfterRotation` : ici on compare la clé du champ sans exiger un identifiant
+  de champ, car perdre les touches en tournant le téléphone est plus gênant que les garder après une fermeture très
+  courte sur un champ sans identifiant.
+- **Passer d'un champ à l'autre sans que le clavier se cache** (« Suivant ») : la vue en cours est gardée
+  (lecture proposée par l'issue). **Décision de Rémi encore ouverte** (à trancher en revue) : revenir au micro aussi
+  dans ce cas ?
+- Tests instrumentés (`TextKeyboardInstrumentedTest`) : réouverture après Back → micro ; rotation sur les touches →
+  touches ; mot de passe et pavé inchangés. Non lancés en local (émulateur seulement en CI).

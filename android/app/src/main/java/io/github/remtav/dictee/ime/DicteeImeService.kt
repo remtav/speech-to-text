@@ -87,6 +87,16 @@ class DicteeImeService : InputMethodService(), DictationListener, EngineManager.
     private var passwordField = false
     /** When the keyboard was last hidden (uptime ms), 0 while shown. */
     private var hiddenAt = 0L
+    /**
+     * The keyboard shows the text keys rather than the microphone (issue #90). Kept in memory only: each time
+     * the keyboard opens again it goes back to the microphone ([onWindowShown]), a rotation excepted.
+     */
+    private var textKeysOn = false
+    /** The window was hidden and has not been shown again: the next [onWindowShown] is a reopening. */
+    private var windowHidden = false
+    /** Field and moment (uptime ms) of the last [onWindowHidden], to tell a rotation from a real closing. */
+    private var windowHiddenField: String? = null
+    private var windowHiddenAt = 0L
 
     private var lastMessage: String? = null
     private var lastMessageIsError = false
@@ -246,11 +256,11 @@ class DicteeImeService : InputMethodService(), DictationListener, EngineManager.
         symbolsButton?.contentDescription = getString(if (symbols) R.string.cd_letters else R.string.cd_symbols)
     }
 
-    /** Text keys are shown in a password field (no dictation there) or when the user last left them open. */
-    private fun textViewShown(): Boolean = passwordField || app.settings.textKeyboardShown
+    /** Text keys are shown in a password field (no dictation there) or when the person switched to them since the keyboard opened. */
+    private fun textViewShown(): Boolean = passwordField || textKeysOn
 
     fun setTextKeyboardShown(shown: Boolean) {
-        app.settings.textKeyboardShown = shown
+        textKeysOn = shown
         applyView()
         render()
     }
@@ -410,6 +420,32 @@ class DicteeImeService : InputMethodService(), DictationListener, EngineManager.
             app.engines.load(spec, app.engineOptions(spec))
         }
         render()
+    }
+
+    override fun onWindowHidden() {
+        super.onWindowHidden()
+        windowHidden = true
+        windowHiddenField = currentField
+        windowHiddenAt = SystemClock.uptimeMillis()
+    }
+
+    /**
+     * The keyboard is back after being hidden: the microphone view again (issue #90). Moving to another field
+     * without the keyboard hiding never comes here, so the view in use is kept ("Next" in a form). A rotation
+     * hides the keyboard and shows it on the same field a moment later: the view is kept then too, or a person
+     * typing would lose the keys by turning the phone.
+     */
+    override fun onWindowShown() {
+        super.onWindowShown()
+        if (!windowHidden) return
+        windowHidden = false
+        val rotation = currentField != null && currentField == windowHiddenField &&
+            SystemClock.uptimeMillis() - windowHiddenAt < HIDE_GRACE_MS
+        if (!rotation && textKeysOn) {
+            textKeysOn = false
+            applyView()
+            render()
+        }
     }
 
     override fun onFinishInputView(finishingInput: Boolean) {
