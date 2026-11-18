@@ -72,9 +72,12 @@ abstract class ImeTestBase {
         TestHooks.engineFactory = null
         TestHooks.assumeInstalled = false
         TestHooks.networkAvailable = null
+        // Natural orientation BEFORE closing the activity (issue #117): closing it brings the launcher to the
+        // front, and Android 14 remembers the rotation lock it finds then, to put it back with the next activity
+        // (see [keepNaturalOrientation]). Closed in landscape, the next tests would all reopen in landscape.
+        device.setOrientationNatural()
         if (::scenario.isInitialized) scenario.close()
         app.engines.release()
-        device.setOrientationNatural()
         device.unfreezeRotation()
     }
 
@@ -127,6 +130,7 @@ abstract class ImeTestBase {
         val intent = android.content.Intent(context, TestFieldActivity::class.java)
         if (focus != null) intent.putExtra(TestFieldActivity.EXTRA_FOCUS, focus)
         scenario = ActivityScenario.launch(intent)
+        keepNaturalOrientation()
         dismissNotRespondingDialogs()
         val shown = {
             val svc = DicteeImeService.instance?.get()
@@ -156,6 +160,29 @@ abstract class ImeTestBase {
             val focus = shell("dumpsys window").lines().filter { "mCurrentFocus" in it || "mFocusedApp" in it }.joinToString("\n")
             fail("keyboard not shown; current IME: ${shell("settings get secure default_input_method").trim()}\n$focus\n$log")
         }
+    }
+
+    /**
+     * The tests start in the natural orientation, whatever an earlier test or class left (issue #117). Android 14
+     * « rotation reversion »: when an activity locked to portrait (the launcher, NOSENSOR) comes to the front
+     * while the rotation is locked in landscape, the system turns the screen to portrait and keeps the landscape
+     * lock aside; it puts it back as soon as an ordinary activity comes to the front, even if the rotation was
+     * set to natural in between (setUpIme runs while the launcher is in front). The test activity then opened
+     * in landscape, where the keyboard leaves no room for the lower fields. Asked again once the test activity
+     * is in front, the natural orientation holds; waits until the activity itself is in portrait.
+     */
+    private fun keepNaturalOrientation() {
+        val portrait = {
+            var p = false
+            scenario.onActivity { p = it.resources.configuration.orientation == android.content.res.Configuration.ORIENTATION_PORTRAIT }
+            device.displayRotation == android.view.Surface.ROTATION_0 && p
+        }
+        val end = SystemClock.uptimeMillis() + 15_000
+        while (!runCatching(portrait).getOrDefault(false) && SystemClock.uptimeMillis() < end) {
+            if (device.displayRotation != android.view.Surface.ROTATION_0) device.setOrientationNatural()
+            SystemClock.sleep(200)
+        }
+        if (!runCatching(portrait).getOrDefault(false)) fail("the test activity did not open in portrait\n${focusDiagnostics()}")
     }
 
     protected val service: DicteeImeService get() = DicteeImeService.instance!!.get()!!
