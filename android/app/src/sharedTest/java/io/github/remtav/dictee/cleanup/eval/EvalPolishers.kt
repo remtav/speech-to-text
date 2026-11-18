@@ -170,7 +170,6 @@ class RulesThenLlmPolisher(
     data class Result(
         val text: String,
         val afterRules: String,
-        val segmentClass: SegmentClass,
         /** Null when the LLM was not called. */
         val llm: GuardedLlmPolisher.Result?,
     )
@@ -182,8 +181,8 @@ class RulesThenLlmPolisher(
         } catch (_: Throwable) {
             if (afterRules == raw) SegmentClass.UNCHANGED else SegmentClass.CORRECTED
         }
-        if (cls != SegmentClass.PROBABLE_CASE) return Result(afterRules, afterRules, cls, null)
+        if (cls != SegmentClass.PROBABLE_CASE) return Result(afterRules, afterRules, null)
         val r = llm.polish(afterRules, language)
-        return Result(r.text, afterRules, cls, r)
+        return Result(r.text, afterRules, r)
     }
 }
