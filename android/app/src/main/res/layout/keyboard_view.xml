@@ -154,11 +154,6 @@
             android:layout_height="wrap_content"
             android:orientation="horizontal">
 
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/key_switch"
-                style="@style/KeyButton"
-                android:contentDescription="@string/cd_switch"
-                app:icon="@drawable/ic_keyboard" />
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/key_comma"
@@ -173,7 +168,7 @@
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/key_space"
                 style="@style/KeyButton"
-                android:layout_weight="2.4"
+                android:layout_weight="3.4"
                 android:contentDescription="@string/cd_space"
                 app:icon="@drawable/ic_space" />
 
@@ -221,11 +216,6 @@
             android:layout_height="wrap_content"
             android:orientation="horizontal">
 
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/kb_switch"
-                style="@style/KeyButton"
-                android:contentDescription="@string/cd_switch"
-                app:icon="@drawable/ic_keyboard" />
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/kb_symbols"
@@ -251,7 +241,7 @@
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/kb_space"
                 style="@style/KeyButton"
-                android:layout_weight="2"
+                android:layout_weight="3"
                 android:contentDescription="@string/cd_space"
                 app:icon="@drawable/ic_space" />
 

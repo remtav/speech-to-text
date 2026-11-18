@@ -60,6 +60,41 @@ class TextKeyboardInstrumentedTest : ImeTestBase() {
         clickFresh({ obj(By.text(accent), "accent '$accent'") })
     }
 
+    // Issue #73: the « previous keyboard » key is gone from the three views, so nobody leaves the
+    // app's keyboard with one tap. Android's own keyboard picker stays the way out.
+    @Test
+    fun noPreviousKeyboardKeyInTheDictationView() {
+        launchFields()
+        obj(res("mic"), "dictation view")
+        assertNull("key_switch", device.findObject(res("key_switch")))
+        assertNotNull("the « Clavier à touches » button stays", device.findObject(res("open_keys")))
+        assertSameHeights("dictation bottom row", "key_comma", "key_space", "key_enter")
+    }
+
+    @Test
+    fun noPreviousKeyboardKeyInTheTextKeyboard() {
+        launchFields()
+        showTextKeyboard()
+        assertNull("kb_switch", device.findObject(res("kb_switch")))
+        assertSameHeights("text bottom row", "kb_symbols", "kb_space", "kb_enter")
+    }
+
+    @Test
+    fun noPreviousKeyboardKeyInTheNumberPad() {
+        launchFields()
+        focus(6)
+        assertNotNull("pad", device.wait(Until.findObject(res("pad")), 5_000))
+        assertNull("pad_switch", device.findObject(res("pad_switch")))
+        assertNotNull("backspace", device.findObject(res("pad_backspace")))
+        assertNotNull("enter", device.findObject(res("pad_enter")))
+    }
+
+    /** No key of a row is smaller than the others: same height. */
+    private fun assertSameHeights(what: String, vararg ids: String) {
+        val heights = ids.map { obj(res(it), it).visibleBounds.height() }
+        assertEquals("$what: keys of different heights $heights", 1, heights.toSet().size)
+    }
+
     @Test
     fun typesElephantWithAccents() {
         launchFields()

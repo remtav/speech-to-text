@@ -27,7 +27,6 @@ class NumberPadView @JvmOverloads constructor(
         /** The decimal key was pressed; the service types the separator the field accepts. */
         fun onDecimal()
         fun onEnter()
-        fun onSwitch()
     }
 
     var listener: Listener? = null
@@ -136,10 +135,9 @@ class NumberPadView @JvmOverloads constructor(
         val backspace = iconKey(R.drawable.ic_backspace, R.string.cd_backspace, R.id.pad_backspace, null)
         backspace.setOnTouchListener(backspaceTouchListener)
         right.addView(backspace, vParams(1f))
-        right.addView(iconKey(R.drawable.ic_keyboard, R.string.cd_switch, R.id.pad_switch) { listener?.onSwitch() }, vParams(1f))
         right.addView(
             iconKey(R.drawable.ic_enter, R.string.cd_enter, R.id.pad_enter) { listener?.onEnter() },
-            vParams((pad.rows.size - 2).coerceAtLeast(1).toFloat()),
+            vParams((pad.rows.size - 1).coerceAtLeast(1).toFloat()),
         )
         addView(right, LayoutParams(0, dp(KEY_HEIGHT_DP) * pad.rows.size, 1f))
     }

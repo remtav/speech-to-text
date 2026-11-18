@@ -20,7 +20,6 @@ import android.view.HapticFeedbackConstants
 import android.view.LayoutInflater
 import android.view.View
 import android.view.inputmethod.EditorInfo
-import android.view.inputmethod.InputMethodManager
 import android.widget.ImageButton
 import android.widget.PopupMenu
 import android.widget.TextView
@@ -167,12 +166,6 @@ class DicteeImeService : InputMethodService(), DictationListener, EngineManager.
         bindTextKeyboard(v)
         v.findViewById<ImageButton>(R.id.settings).setOnClickListener { openSettings() }
         v.findViewById<ImageButton>(R.id.help).setOnClickListener { haptic(it); openHowTo() }
-        v.findViewById<View>(R.id.key_switch).setOnClickListener {
-            haptic(it)
-            if (!switchToPreviousInputMethod()) {
-                getSystemService(InputMethodManager::class.java).showInputMethodPicker()
-            }
-        }
         v.findViewById<View>(R.id.key_space).setOnClickListener { haptic(it); typeText(" ") }
         v.findViewById<View>(R.id.key_enter).setOnClickListener { haptic(it); pressEnter() }
         for ((id, text) in listOf(R.id.key_comma to ",", R.id.key_period to ".", R.id.key_question to "?", R.id.key_exclaim to "!")) {
@@ -215,12 +208,6 @@ class DicteeImeService : InputMethodService(), DictationListener, EngineManager.
                 k.symbols = !k.symbols
                 k.moreSymbols = false
                 updateSymbolsButton()
-            }
-        }
-        v.findViewById<View>(R.id.kb_switch).setOnClickListener {
-            haptic(it)
-            if (!switchToPreviousInputMethod()) {
-                getSystemService(InputMethodManager::class.java).showInputMethodPicker()
             }
         }
         v.findViewById<View>(R.id.kb_space).setOnClickListener { haptic(it); typeKey(" ") }
@@ -272,11 +259,6 @@ class DicteeImeService : InputMethodService(), DictationListener, EngineManager.
             override fun onText(text: String) = typeText(text)
             override fun onDecimal() = typeDecimal()
             override fun onEnter() = pressEnter()
-            override fun onSwitch() {
-                if (!switchToPreviousInputMethod()) {
-                    getSystemService(InputMethodManager::class.java).showInputMethodPicker()
-                }
-            }
         }
         // A pad built after the field started (first input of the service, theme change rebuilding the view)
         // must show the keys the current field asked for, not wait for the next onStartInput.
