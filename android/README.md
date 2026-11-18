@@ -118,7 +118,7 @@ total, ont été transcrits par chaque modèle sur l'ordinateur de la CI :
 |---|---|
 | Parakeet TDT 0.6b v3 | 6,8 % |
 | Whisper large-v3-turbo | 10,2 % |
-| Qwen3-ASR 0.6B | 13,6 % |
+| Qwen3-ASR 0.6B (retiré du catalogue) | 13,6 % |
 
 C'est un indice, pas une preuve : l'échantillon est minuscule (un seul clip
 fait échouer les trois modèles) ; une des erreurs de Whisper est un artefact de
@@ -409,12 +409,12 @@ Limites connues :
 Whisper large-v3-turbo est le modèle par défaut, français québécois compris : aux essais de l'utilisateur, il a
 fait mieux que les autres, et mieux que le Whisper affiné québécois (essayé puis retiré du catalogue). Si le modèle
 actif ne convient plus aux langues choisies, l'application repasse à Whisper turbo (`ModelCatalog.forLanguages`),
-sans avis. Le paragraphe ci-dessous sur Whisper « en dernier recours » date d'avant cette décision.
+sans avis.
 
 Whisper : observé par l'utilisateur sur son téléphone, il comprend bien des
 mots d'ici que Parakeet rate (un mot isolé deviné en anglais,
-par exemple), mais il est trop lent pour un usage courant : à garder en
-dernier recours. Ce n'est pas une mesure sur appareil ; sur l'ordinateur de la
+par exemple), mais il est plus lent (c'est le compromis assumé depuis
+que Whisper est le modèle par défaut). Ce n'est pas une mesure sur appareil ; sur l'ordinateur de la
 CI, le facteur temps réel indicatif est de 0,07 pour Parakeet, 0,3 pour
 Whisper (`DECISIONS.md`, étape 1.2), ce qui ne
 prédit pas l'ordre sur un téléphone. La carte de Whisper le dit. Pour le rendre plus rapide, Whisper n'affiche pas de texte provisoire pendant qu'on parle, et un réglage avancé (Réglages > Avancé, « Silence ajouté pour Whisper », 1 000 par défaut, 600, 300 ou « Automatique ») raccourcit le silence qu'il décode à la fin de chaque segment ; « Automatique » utilise 300 et corrige les phrases que Whisper recommence (« Correction des répétitions (Whisper) » : redécoder à 1 000 ou couper, issue #49). Mesuré sur ordinateur seulement, à valider sur le téléphone (`docs/ACCELERER_WHISPER.md`).
