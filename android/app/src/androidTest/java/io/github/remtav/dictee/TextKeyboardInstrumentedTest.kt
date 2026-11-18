@@ -124,6 +124,13 @@ class TextKeyboardInstrumentedTest : ImeTestBase() {
         // The activity is recreated by the rotation and takes the same extra: it comes back on the number field.
         launchFields(focus = "number")
         device.setOrientationLeft()
+        device.waitForIdle()
+        // The rotation hides the keyboard (ensureKeyboardShown covers that for the other views, but
+        // it would tap the first field): ask for it again on the number field, which keeps the focus.
+        scenario.onActivity {
+            it.number.requestFocus()
+            it.getSystemService(android.view.inputmethod.InputMethodManager::class.java).showSoftInput(it.number, 0)
+        }
         checkPadHasNoSwitchKey()
     }
 
