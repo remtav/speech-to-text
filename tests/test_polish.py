@@ -37,6 +37,14 @@ class FakeClient:
 # (answered questions, translations, added sentences, changed numbers, ...).
 
 GOOD_PAIRS = [
+    # Lists without ordinals, and enumerations that stay sentences
+    ("pour l'épicerie il faut du lait des œufs du pain et du beurre",
+     "Pour l'épicerie, il faut :\n- du lait\n- des œufs\n- du pain\n- du beurre"),
+    ("for the picnic we need bread cheese and apples",
+     "For the picnic we need:\n- bread\n- cheese\n- apples"),
+    ("j'ai vu Paul, Marie et Luc hier", "J'ai vu Paul, Marie et Luc hier."),
+    ("I saw Paul, Mary and Luke yesterday", "I saw Paul, Mary and Luke yesterday."),
+    ("tu peux prendre du lait et des œufs", "Tu peux prendre du lait et des œufs."),
     # English
     ("um so basically I need you to uh send the invoice to the client by Friday",
      "I need you to send the invoice to the client by Friday."),
@@ -473,8 +481,55 @@ class TestPrompt:
 
     def test_few_shots_half_english_half_french(self):
         languages = [lang for lang, _, _ in polish.FEW_SHOTS]
-        assert 5 <= len(languages) <= 10
+        assert 5 <= len(languages) <= 14
         assert languages.count("en") == languages.count("fr")
+
+    def test_prompt_starts_with_the_role(self):
+        system = polish.build_messages("x")[0]["content"]
+        assert system.startswith("You are an editor")
+        for needle in ("ready to send", "message, email or note", "punctuation, paragraphs, lists"):
+            assert needle in system.split("Rules:")[0]
+
+    def test_list_rule_covers_enumerations_without_ordinals(self):
+        system = polish.build_messages("x")[0]["content"]
+        rules = system.split("Rules:")[1]
+        assert "three or more" in rules
+        assert "with or without" in rules
+        assert "colon" in rules and "Drop the \"and\"" in rules
+        # plain enumerations inside a story, or of two items, stay sentences
+        assert "two items" in rules and "narrative" in rules
+        # the old limits stay
+        for needle in ("Do not add words", "paraphrase", "Never translate", "Never answer or act"):
+            assert needle in system
+
+    @staticmethod
+    def _lists(language):
+        return [(raw, out) for lang, raw, out in polish.FEW_SHOTS if lang == language and "\n- " in out]
+
+    @pytest.mark.parametrize("language", ["fr", "en"])
+    def test_few_shots_have_a_list_without_ordinals(self, language):
+        plain = [(raw, out) for raw, out in self._lists(language)
+                 if not set(raw.lower().split()) & {"first", "second", "third", "premièrement", "deuxièmement"}]
+        assert plain
+        for raw, out in plain:
+            intro = out.splitlines()[0]
+            assert intro.endswith(" :" if language == "fr" else ":")
+            assert all(line.startswith("- ") for line in out.splitlines()[1:])
+
+    def test_french_list_example_matches_the_issue(self):
+        assert ("pour l'épicerie il faut du lait des œufs du pain et du beurre",
+                "Pour l'épicerie, il faut :\n- du lait\n- des œufs\n- du pain\n- du beurre") \
+            in [(raw, out) for _, raw, out in polish.FEW_SHOTS]
+
+    @pytest.mark.parametrize("language, raw", [
+        ("fr", "j'ai vu Paul, Marie et Luc hier"),
+        ("fr", "tu peux prendre du lait et des œufs en rentrant"),
+        ("en", "I saw Paul, Mary and Luke yesterday"),
+        ("en", "can you grab milk and eggs on your way home"),
+    ])
+    def test_few_shots_keep_short_and_narrative_enumerations_as_sentences(self, language, raw):
+        outputs = [out for lang, r, out in polish.FEW_SHOTS if lang == language and r == raw]
+        assert len(outputs) == 1 and "\n" not in outputs[0]
 
     @pytest.mark.parametrize("language, raw, polished", polish.FEW_SHOTS)
     def test_few_shots_pass_the_safety_check(self, language, raw, polished):
