@@ -43,8 +43,20 @@ class EmojiInstrumentedTest : ImeTestBase() {
     private fun gone(selector: BySelector, what: String) =
         assertTrue("$what still shown", device.wait(Until.gone(selector), 5_000))
 
-    /** An emoji of the grid, found by what it shows. The tabs show other emojis (🕒 😀 👋 🐻 🍔 🚗 ⚽ 💡 ❤ 🏁): never look for those. */
-    private fun cell(glyph: String): UiObject2 = obj(By.text(glyph), "emoji $glyph in the grid")
+    /**
+     * An emoji of the grid, found by what it shows, inside the panel: the field being typed in shows the same text
+     * once the emoji is in it. The tabs show other emojis (🕒 😀 👋 🐻 🍔 🚗 ⚽ 💡 ❤ 🏁): never look for those.
+     */
+    private fun cell(glyph: String): UiObject2 {
+        val end = android.os.SystemClock.uptimeMillis() + 10_000
+        while (android.os.SystemClock.uptimeMillis() < end) {
+            val found = try { device.findObject(res("emoji_picker"))?.findObject(By.text(glyph)) } catch (_: StaleObjectException) { null }
+            if (found != null) return found
+            android.os.SystemClock.sleep(200)
+        }
+        dismissNotRespondingDialogs()
+        throw AssertionError("emoji $glyph not in the grid\n${windowFocus()}")
+    }
 
     /** The field takes a tap's text a moment after the tap returns: wait for it instead of reading at once. */
     private fun assertField1(expected: String) =
