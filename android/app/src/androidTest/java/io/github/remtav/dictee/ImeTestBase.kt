@@ -186,10 +186,45 @@ abstract class ImeTestBase {
             f.requestFocus()
         }
         instrumentation.waitForIdleSync()
-        waitFor("keyboard told of the focus change to field $which", 10_000) {
+        waitFor("keyboard told of the focus change to field $which", 10_000, details = ::focusDiagnostics) {
             onMain { DicteeImeService.instance?.get()?.currentInputEditorInfo }.let { it != null && it !== before }
         }
     }
+
+    /**
+     * What each side believes about the focus when a focus change did not reach the keyboard (issue #117): the
+     * window manager (focused window per display), the input method service (focused window and served client),
+     * the app's own view of it, and the focus events of the input dispatcher.
+     */
+    protected fun focusDiagnostics(): String = runCatching {
+        val wm = shell("dumpsys window").lines().filter {
+            "WINDOW MANAGER" in it || "mCurrentFocus" in it || "mFocusedApp" in it || "mTopFocusedDisplayId" in it ||
+                "imeLayeringTarget" in it || "imeInputTarget" in it || "imeControlTarget" in it ||
+                "Display: mDisplayId=" in it || "mFocusedWindow" in it
+        }.joinToString("\n")
+        val displays = shell("dumpsys display").lines().filter { "mDisplayId=" in it || "Display Devices" in it }
+            .take(10).joinToString("\n") { it.trim().take(160) }
+        val ims = shell("dumpsys input_method").lines().filter {
+            "mCurFocusedWindow" in it || "mCurClient" in it || "mServedView" in it || "mNextServedView" in it ||
+                "mCurRootView" in it || "mFocusedWindow" in it || "mImeBindingState" in it || "mCurrentRootView" in it
+        }.joinToString("\n") { it.trim() }
+        val rotation = shell("dumpsys window displays").lines().filter { "otation" in it || "mLastOrientation" in it }
+            .take(25).joinToString("\n") { it.trim().take(200) } +
+            "\nuser_rotation=${shell("settings get system user_rotation").trim()} accelerometer_rotation=" +
+            shell("settings get system accelerometer_rotation").trim() + " uiDevice.displayRotation=${device.displayRotation}" +
+            "\n" + shell("dumpsys window displays").substringAfter("RotationHistory", "").lines().take(20).joinToString("\n") { it.trim().take(250) } +
+            "\n--- settings writes\n" + shell("dumpsys settings").lines()
+                .filter { "user_rotation" in it || "accelerometer_rotation" in it }.takeLast(30).joinToString("\n") { it.trim().take(250) }
+        var activity = ""
+        if (::scenario.isInitialized) runCatching {
+            scenario.onActivity {
+                activity = "activity orientation=${it.resources.configuration.orientation} hasWindowFocus=${it.hasWindowFocus()} currentFocus=${it.currentFocus?.let { v -> v.javaClass.simpleName + "#" + v.id }}"
+            }
+        }.onFailure { activity = "activity: $it" }
+        val events = shell("logcat -d -b events -s input_focus:* wm_focus_changed:* wm_on_top_resumed_gained_called:* wm_on_top_resumed_lost_called:* wm_set_resumed_activity:* wm_finish_activity:* wm_destroy_activity:* wm_create_activity:*")
+            .lines().takeLast(30).joinToString("\n")
+        "--- window manager\n$wm\n--- displays\n$displays\n--- rotation\n$rotation\n--- input method service\n$ims\n--- app\n$activity\n--- focus events\n$events"
+    }.getOrDefault("")
 
     /** Waits until the test activity has the window focus, answering "Wait" to a not-responding box. */
     protected fun awaitWindowFocus(timeout: Long = 10_000) {
@@ -229,7 +264,7 @@ abstract class ImeTestBase {
     protected fun awaitIdle(timeout: Long = 30_000) =
         waitFor("dictation finished", timeout) { state() == DictationState.IDLE || state() == DictationState.ERROR }
 
-    protected fun waitFor(what: String, timeout: Long, condition: () -> Boolean) {
+    protected fun waitFor(what: String, timeout: Long, details: (() -> String)? = null, condition: () -> Boolean) {
         val end = SystemClock.uptimeMillis() + timeout
         while (SystemClock.uptimeMillis() < end) {
             if (runCatching(condition).getOrDefault(false)) return
@@ -240,7 +275,8 @@ abstract class ImeTestBase {
         // Enough lines for the keyboard's own lifecycle (startInput, finishInputView, "still hidden: stop"),
         // and which window had the focus: the two causes seen in flaky runs on a loaded emulator.
         val log = runCatching { shell("logcat -d -s DicteeIme:I").lines().takeLast(40).joinToString("\n") }.getOrDefault("")
-        fail("timed out waiting for: $what ($fields $st)\n${windowFocus()}\n$log")
+        val more = details?.let { runCatching(it).getOrDefault("") }.orEmpty()
+        fail("timed out waiting for: $what ($fields $st)\n${windowFocus()}\n$log\n$more")
     }
 
     protected fun assertWithin(actual: Float, expected: Float, tolerance: Float) =
