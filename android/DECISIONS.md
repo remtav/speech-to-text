@@ -4997,6 +4997,12 @@ l'implémentation part de `main` (la branche d'essai `ccr-67305f2c-9rtymc` n'est
 
 Après l'essai du lot 1 par Rémi (2026-11-18, #78). Part de `main` ; la branche d'essai n'est pas reprise.
 
+Décisions de Rémi (2026-11-18, revue de la PR #121) :
+- **Désactivée par défaut** : l'usager active le glissement dans les Réglages. Pas de migration.
+- **On garde le moteur écrit dans le projet** (`GestureDecoder`), pas de port de `GestureTypingDetector`
+  d'AnySoftKeyboard ; rien à ajouter à la page des licences. Si le glissement déçoit à l'essai sur le téléphone, la
+  suite prévue reste CleverKeys (#78).
+
 - **Moteur écrit ici, en Kotlin pur** (`ime/words/GestureDecoder`), sur les listes de mots du lot 1. Le code de
   `GestureTypingDetector` d'AnySoftKeyboard n'est pas recopié : on en garde l'idée générale (candidats tirés du
   dictionnaire, puis comparaison de la forme du tracé avec le tracé idéal du mot), commune à la plupart des claviers.
