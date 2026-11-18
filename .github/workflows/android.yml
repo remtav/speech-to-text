@@ -176,7 +176,10 @@ jobs:
           emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -no-boot-anim -camera-back none
           working-directory: android
           # Keep the app installed after the run so the screenshots can be pulled.
-          script: ./gradlew --no-daemon connectedDebugAndroidTest -Pandroid.injected.androidTest.leaveApksInstalledAfterRun=true; s=$?; mkdir -p screenshots; adb pull /sdcard/Android/data/io.github.remtav.dictee/files/screenshots/. screenshots/ || true; exit $s
+          # hide_error_dialogs (issue #69): a loaded emulator often shows « Pixel Launcher isn't responding »;
+          # the box took the window focus from the test field and failed keyboard tests at random. With it set,
+          # Android closes the stuck launcher instead of showing the box (the CI emulator only, never a phone).
+          script: adb shell settings put global hide_error_dialogs 1; ./gradlew --no-daemon connectedDebugAndroidTest -Pandroid.injected.androidTest.leaveApksInstalledAfterRun=true; s=$?; mkdir -p screenshots; adb pull /sdcard/Android/data/io.github.remtav.dictee/files/screenshots/. screenshots/ || true; exit $s
       - uses: actions/upload-artifact@v4
         if: always()
         with:

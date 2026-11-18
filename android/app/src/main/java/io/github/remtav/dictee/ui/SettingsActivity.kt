@@ -538,22 +538,29 @@ class SettingsActivity : AppCompatActivity() {
             setOnCheckedChangeListener { _, v -> onChange(v) }
         }.also { addView(it) }
 
+    /**
+     * Each button gets an id of its own (issue #69): with the same ids in every group (1000, 1001...), a
+     * recreated screen (rotation) restored one group's saved choice into all the others, and stored it.
+     */
     private fun ViewGroup.radio(labels: List<String>, selected: Int, onChange: (Int) -> Unit): RadioGroup {
         val group = RadioGroup(context)
-        labels.forEachIndexed { i, l ->
-            group.addView(RadioButton(context).apply { id = 1000 + i; text = l })
+        labels.forEach { l ->
+            group.addView(RadioButton(context).apply { id = View.generateViewId(); text = l })
         }
-        group.check(1000 + selected)
-        group.setOnCheckedChangeListener { _, id -> onChange(id - 1000) }
+        group.check(group.getChildAt(selected).id)
+        group.listenByIndex(onChange)
         addView(group)
         return group
     }
 
+    private fun RadioGroup.listenByIndex(onChange: (Int) -> Unit) =
+        setOnCheckedChangeListener { g, id -> onChange(g.indexOfChild(g.findViewById(id))) }
+
     /** Checks [index] without running the change callback (it would store the value as an explicit choice). */
     private fun RadioGroup.checkSilently(index: Int, onChange: (Int) -> Unit) {
         setOnCheckedChangeListener(null)
-        check(1000 + index)
-        setOnCheckedChangeListener { _, id -> onChange(id - 1000) }
+        check(getChildAt(index).id)
+        listenByIndex(onChange)
     }
 
     private fun ViewGroup.slider(

@@ -58,6 +58,16 @@ class ScreenshotTest : ImeTestBase() {
         if (savedAutoRotate == "0" || savedAutoRotate == "1") shell("settings put system accelerometer_rotation $savedAutoRotate")
     }
 
+    /**
+     * The night mode is held by AppCompat for the whole process, not by the settings the next test clears:
+     * back to « Système », so the tests that run after the dark captures do not open their screens in dark (#69).
+     */
+    @org.junit.After
+    fun restoreTheme() {
+        app.settings.theme = ThemeMode.SYSTEM
+        onMain { app.applyTheme() }
+    }
+
     private fun displayIsPortrait() =
         device.displayRotation == android.view.Surface.ROTATION_0 && device.displayHeight > device.displayWidth
 

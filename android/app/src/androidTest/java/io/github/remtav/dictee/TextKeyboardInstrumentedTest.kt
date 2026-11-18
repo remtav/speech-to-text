@@ -3,6 +3,7 @@ package io.github.remtav.dictee
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.uiautomator.By
 import androidx.test.uiautomator.BySelector
+import androidx.test.uiautomator.StaleObjectException
 import androidx.test.uiautomator.UiObject2
 import androidx.test.uiautomator.Until
 import io.github.remtav.dictee.dictation.DictationState
@@ -24,20 +25,39 @@ class TextKeyboardInstrumentedTest : ImeTestBase() {
 
     private fun showTextKeyboard() {
         onMain { service.setTextKeyboardShown(true) }
-        assertNotNull("letters shown", device.wait(Until.findObject(res("letters")), 5_000))
+        obj(res("letters"), "letters shown")
     }
 
-    private fun key(label: String): UiObject2 =
-        device.wait(Until.findObject(By.text(label).pkg(BuildConfig.APPLICATION_ID)), 5_000)
-            ?: throw AssertionError("key '$label' not found")
+    /**
+     * Waits for [selector] on screen (issue #69: the keyboard may still be redrawing, and a launcher
+     * « isn't responding » box may cover it on a loaded emulator). Fails with the focused window, so a
+     * failure says which of the two it was.
+     */
+    private fun obj(selector: BySelector, what: String): UiObject2 {
+        device.wait(Until.findObject(selector), 5_000)?.let { return it }
+        dismissNotRespondingDialogs()
+        return device.wait(Until.findObject(selector), 5_000)
+            ?: throw AssertionError("$what not found\n${windowFocus()}")
+    }
 
-    private fun tap(vararg labels: String) = labels.forEach { key(it).click() }
+    /** Clicks what [find] returns, finding it again if the keyboard was redrawn in between (StaleObjectException). */
+    private fun clickFresh(find: () -> UiObject2, press: (UiObject2) -> Unit = { it.click() }) {
+        repeat(2) {
+            try { press(find()); return } catch (_: StaleObjectException) { device.waitForIdle(500) }
+        }
+        press(find())
+    }
+
+    private fun key(label: String): UiObject2 = obj(By.text(label).pkg(BuildConfig.APPLICATION_ID), "key '$label'")
+
+    private fun tap(vararg labels: String) = labels.forEach { l -> clickFresh({ key(l) }) }
+
+    private fun click(selector: BySelector, what: String) = clickFresh({ obj(selector, what) })
 
     /** Long press on a letter, then a tap on the accent shown above it. */
     private fun accent(base: String, accent: String) {
-        key(base).click(900L)
-        val a = device.wait(Until.findObject(By.text(accent)), 5_000) ?: throw AssertionError("accent '$accent' not shown")
-        a.click()
+        clickFresh({ key(base) }) { it.click(900L) }
+        clickFresh({ obj(By.text(accent), "accent '$accent'") })
     }
 
     @Test
@@ -55,7 +75,7 @@ class TextKeyboardInstrumentedTest : ImeTestBase() {
     fun shiftCapitalisesOneLetterOnly() {
         launchFields()
         showTextKeyboard()
-        device.findObject(By.desc("Majuscule")).click()
+        click(By.desc("Majuscule"), "shift")
         tap("A")
         tap("b")
         waitFor("one capital", 5_000) { field1() == "Ab" }
@@ -68,7 +88,7 @@ class TextKeyboardInstrumentedTest : ImeTestBase() {
         showTextKeyboard()
         tap("a", "b", "c")
         waitFor("abc", 5_000) { field1() == "abc" }
-        device.findObject(res("kb_backspace")).click()
+        click(res("kb_backspace"), "backspace")
         waitFor("one deleted", 5_000) { field1() == "ab" }
     }
 
@@ -89,10 +109,10 @@ class TextKeyboardInstrumentedTest : ImeTestBase() {
     fun symbolsPageTypesDigitsAndSymbols() {
         launchFields()
         showTextKeyboard()
-        device.findObject(res("kb_symbols")).click()
+        click(res("kb_symbols"), "symbols key")
         tap("1", "@", "?")
         waitFor("symbols", 5_000) { field1() == "1@?" }
-        device.findObject(res("kb_symbols")).click()
+        click(res("kb_symbols"), "symbols key")
         tap("a")
         waitFor("back to letters", 5_000) { field1() == "1@?a" }
     }
@@ -110,7 +130,7 @@ class TextKeyboardInstrumentedTest : ImeTestBase() {
         assertNotNull("letters", device.wait(Until.findObject(res("letters")), 5_000))
         assertNotNull("microphone stays in the bottom row", device.findObject(res("mic_small")))
         assertTrue(app.settings.textKeyboardShown)
-        device.findObject(res("toggle_view")).click()
+        click(res("toggle_view"), "toggle view")
         assertNotNull("microphone back", device.wait(Until.findObject(res("mic")), 5_000))
         assertFalse(app.settings.textKeyboardShown)
     }
@@ -180,7 +200,7 @@ class TextKeyboardInstrumentedTest : ImeTestBase() {
         setLanguages(io.github.remtav.dictee.stt.DictationLanguage.SPANISH)
         launchFields()
         showTextKeyboard()
-        device.findObject(res("kb_symbols")).click()
+        click(res("kb_symbols"), "symbols key")
         accent("?", "¿")
         waitFor("inverted question mark", 5_000) { field1() == "¿" }
     }
@@ -200,7 +220,7 @@ class TextKeyboardInstrumentedTest : ImeTestBase() {
         setLanguages(io.github.remtav.dictee.stt.DictationLanguage.PORTUGUESE)
         launchFields()
         showTextKeyboard()
-        key("e").click(900L)
+        clickFresh({ key("e") }) { it.click(900L) }
         assertNotNull("é offered", device.wait(Until.findObject(By.text("é")), 5_000))
         assertNull("è is French", device.findObject(By.text("è")))
         assertNull("ë is French", device.findObject(By.text("ë")))
@@ -210,8 +230,8 @@ class TextKeyboardInstrumentedTest : ImeTestBase() {
     fun secondSymbolsPageTypesBracketsAndEuro() {
         launchFields()
         showTextKeyboard()
-        device.findObject(res("kb_symbols")).click()
-        device.findObject(By.desc("Autres symboles")).click()
+        click(res("kb_symbols"), "symbols key")
+        click(By.desc("Autres symboles"), "second symbols page")
         tap("[", "€", "~")
         waitFor("page 2 typed", 5_000) { field1() == "[€~" }
     }
@@ -226,7 +246,7 @@ class TextKeyboardInstrumentedTest : ImeTestBase() {
         assertNull("no decimal key in a whole-number field", device.findObject(res("pad_decimal")))
         tap("4", "5", "0")
         waitFor("digits typed", 5_000) { fieldText { it.number } == "450" }
-        device.findObject(res("pad_backspace")).click()
+        click(res("pad_backspace"), "pad backspace")
         waitFor("one deleted", 5_000) { fieldText { it.number } == "45" }
         // Back to a text field: the usual view returns.
         focus(1)
@@ -241,7 +261,7 @@ class TextKeyboardInstrumentedTest : ImeTestBase() {
         assertNotNull("pad", device.wait(Until.findObject(res("pad")), 5_000))
         assertNotNull("minus in a signed field", device.findObject(By.text("-").pkg(BuildConfig.APPLICATION_ID)))
         tap("-", "1", "2")
-        device.findObject(res("pad_decimal")).click()
+        click(res("pad_decimal"), "decimal key")
         tap("5")
         // Whichever separator the phone's language prefers, the field ends up with one it accepts.
         waitFor("decimal typed", 5_000) { fieldText { it.decimal }.matches(Regex("-12[.,]5")) }
