@@ -7,6 +7,7 @@ import androidx.test.uiautomator.StaleObjectException
 import androidx.test.uiautomator.UiObject2
 import androidx.test.uiautomator.Until
 import io.github.remtav.dictee.dictation.DictationState
+import io.github.remtav.dictee.ime.DicteeImeService
 import io.github.remtav.dictee.ime.LayoutKind
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -213,10 +214,43 @@ class TextKeyboardInstrumentedTest : ImeTestBase() {
         open.click()
         assertNotNull("letters", device.wait(Until.findObject(res("letters")), 5_000))
         assertNotNull("microphone stays in the bottom row", device.findObject(res("mic_small")))
-        assertTrue(app.settings.textKeyboardShown)
         click(res("toggle_view"), "toggle view")
         assertNotNull("microphone back", device.wait(Until.findObject(res("mic")), 5_000))
-        assertFalse(app.settings.textKeyboardShown)
+        assertNull(device.findObject(res("letters")))
+    }
+
+    /** Hides the keyboard with Back and brings it back on the focused field (the only way a person reopens it). */
+    private fun hideThenReopenKeyboard(waitMs: Long) {
+        device.pressBack()
+        waitFor("keyboard hidden", 5_000) { !onMain { service.isInputViewShown } }
+        android.os.SystemClock.sleep(waitMs)
+        scenario.onActivity {
+            it.getSystemService(android.view.inputmethod.InputMethodManager::class.java)
+                .showSoftInput(it.currentFocus ?: it.field1, 0)
+        }
+        waitFor("keyboard shown again", 10_000) { onMain { service.isInputViewShown } }
+    }
+
+    // Issue #90: the keyboard always opens on the microphone, even when it was left on the keys.
+    @Test
+    fun reopeningTheKeyboardShowsTheMicrophoneEvenIfItWasLeftOnTheKeys() {
+        launchFields()
+        showTextKeyboard()
+        hideThenReopenKeyboard(DicteeImeService.HIDE_GRACE_MS + 1_000)
+        assertNotNull("microphone after reopening", device.wait(Until.findObject(res("mic")), 5_000))
+        assertNull("no keys after reopening", device.findObject(res("letters")))
+    }
+
+    // Issue #90: a rotation hides and shows the keyboard on the same field; the keys stay.
+    @Test
+    fun rotationOnTheTextKeysKeepsTheKeys() {
+        launchFields()
+        showTextKeyboard()
+        device.setOrientationLeft()
+        device.waitForIdle()
+        ensureKeyboardShown()
+        assertNotNull("keys kept after the rotation", device.wait(Until.findObject(res("letters")), 10_000))
+        assertNull(device.findObject(res("mic")))
     }
 
     @Test
@@ -237,7 +271,6 @@ class TextKeyboardInstrumentedTest : ImeTestBase() {
         focus(3)
         assertNotNull("text view in a password field", device.wait(Until.findObject(res("letters")), 5_000))
         assertNull("no toggle in a password field", device.findObject(res("toggle_view")))
-        assertFalse("stored view untouched", app.settings.textKeyboardShown)
         tap("p", "w")
         waitFor("typed in the password field", 5_000) { var t = ""; scenario.onActivity { t = it.password.text.toString() }; t == "pw" }
         // The microphone key is disabled: nothing starts.

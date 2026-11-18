@@ -160,11 +160,6 @@ class AppSettings(context: Context, private val defaultServerUrl: String = Build
             ?: LayoutKind.defaultFor(languages)
         set(v) = prefs.edit().putString("keyboard_layout", v.name).apply()
 
-    /** The keyboard shows the text keys rather than the microphone (last view used, kept between fields). */
-    var textKeyboardShown: Boolean
-        get() = prefs.getBoolean("text_keyboard_shown", false)
-        set(v) = prefs.edit().putBoolean("text_keyboard_shown", v).apply()
-
     var haptics: Boolean
         get() = prefs.getBoolean("haptics", true)
         set(v) = prefs.edit().putBoolean("haptics", v).apply()
