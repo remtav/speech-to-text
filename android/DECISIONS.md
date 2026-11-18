@@ -4034,8 +4034,8 @@ pendant la dictée ». Le contrat du serveur est celui de la PR #46 (`POST /poli
 - **Micro dans les champs numériques : retiré.** Dicter « quatre cent cinquante » pour obtenir `450` exige une
   conversion des nombres en chiffres, hors de portée de cette issue. Un micro qui insérerait « quatre cent
   cinquante » en lettres dans un champ de chiffres serait refusé par le champ ou trompeur. Le pavé n'a donc
-  pas de micro ; il a une touche « clavier précédent » (sinon on ne pourrait pas en sortir) et pas d'en-tête
-  (modèle, réglages, aide). À reprendre quand les nombres dictés seront convertis.
+  pas de micro ; il n'a pas d'en-tête (modèle, réglages, aide). *(Il avait aussi une touche « clavier précédent », « sinon
+  on ne pourrait pas en sortir » ; retirée par #73, voir plus bas.)* À reprendre quand les nombres dictés seront convertis.
 - **Séparateur décimal : ce que le champ accepte.** Android laisse chaque champ filtrer ce qu'il prend, et
   beaucoup de champs décimaux n'acceptent que le point. La touche s'affiche avec le séparateur de la langue
   du téléphone (`DecimalSeparator.order`). Si le champ laisse le texte inchangé après la frappe, le service
@@ -4065,7 +4065,7 @@ pendant la dictée ». Le contrat du serveur est celui de la PR #46 (`POST /poli
   défaut suit toujours les langues.
 - **Limites connues du pavé** (relecture indépendante) : il est plus étroit que ce que certains champs acceptent
   (heure sur 12 h avec « pm », dates en « jj.mm.aaaa »), et on ne rejoint pas le clavier à lettres depuis le pavé
-  (seulement « clavier précédent »). Le pavé suit `inputType` à la lettre ; un champ de texte reste un champ de texte.
+  (seulement par le sélecteur de clavier d'Android depuis #73). Le pavé suit `inputType` à la lettre ; un champ de texte reste un champ de texte.
 - **Accessibilité** : une touche gère aussi l'action « cliquer » de TalkBack (en plus du toucher, que la vue consomme).
 - **Séparateur** : succès reconnu seulement si le texte avant le curseur grandit exactement du séparateur ; ordre
   appris conservé au redémarrage du même champ (rotation) ; jamais de lecture du texte dans un mot de passe numérique.
@@ -4795,6 +4795,26 @@ se comporte comme avant ; seul ce qui servait à migrer ou à garder un état an
   compatibilité avec un serveur plus ancien (repli quand `POST /polish` répond 404/405) : ce sont des questions de
   nettoyage, pas d'anciens usagers. `textKeyboardShown` reste (#90 le retire).
 - **Hors de la portée.** Le dépôt Hugging Face du Whisper québécois et `android/tools/` ne sont pas touchés.
+
+## Issue #73 : la touche « Clavier précédent » est retirée
+
+Demandé par Rémi le 2026-11-14. La touche en bas à gauche, qui passait à un autre clavier du téléphone
+(`switchToPreviousInputMethod()`, sinon le sélecteur d'Android), est retirée des trois vues : `key_switch` (dictée),
+`kb_switch` (clavier à touches) et `pad_switch` (pavé numérique), avec `NumberPadView.Listener.onSwitch` et la chaîne
+`cd_switch`.
+
+- **Raisons.** (1) Garder la personne sur le clavier de l'application : un seul appui l'en faisait sortir. (2) Elle se
+  confondait avec le bouton « Clavier à touches » (#42), qui porte la même icône `ic_keyboard` mais reste dans l'application.
+- **Le pavé perd aussi sa touche**, par cohérence (lecture de l'assistante dans l'issue, à corriger par Rémi s'il préfère
+  la garder sur le pavé). Sortir du clavier reste possible par le sélecteur de clavier d'Android ; `SetupActivity`
+  (étape « Choisir le clavier ») est inchangée.
+- **Mise en page.** La place libérée va à la barre d'espace (poids 2,4 → 3,4 en dictée, 2 → 3 au clavier à touches) : le
+  total de la rangée ne change pas, donc les touches restantes gardent leur largeur et restent alignées sur les rangées
+  du dessus. Dans le pavé, la touche Entrée prend la hauteur libérée (`rows - 1` rangées).
+- **Tests.** `TextKeyboardInstrumentedTest` : `noPreviousKeyboardKeyIn…` (trois vues : les identifiants n'existent plus,
+  « Clavier à touches » reste, les touches de la rangée du bas ont la même hauteur à 8 % près), en portrait et en paysage.
+- **Navigation à trois boutons** : le sélecteur de clavier d'Android n'a été vérifié que par gestes (captures de la CI) ; la
+  vérification à trois boutons passe à #70, qui reproduit ce mode sur l'émulateur.
 
 ## Issue #66, point 3 : un seul verrou pour les trois écrans de mesure
 

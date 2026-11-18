@@ -60,6 +60,90 @@ class TextKeyboardInstrumentedTest : ImeTestBase() {
         clickFresh({ obj(By.text(accent), "accent '$accent'") })
     }
 
+    // Issue #73: the « previous keyboard » key is gone from the three views, so nobody leaves the
+    // app's keyboard with one tap. Android's own keyboard picker stays the way out.
+    private fun checkDictationViewHasNoSwitchKey() {
+        obj(res("mic"), "dictation view")
+        assertNull("key_switch", device.findObject(res("key_switch")))
+        assertNotNull("the « Clavier à touches » button stays", device.findObject(res("open_keys")))
+        assertSameHeights("dictation bottom row", "key_comma", "key_space", "key_enter")
+    }
+
+    private fun checkTextKeyboardHasNoSwitchKey() {
+        showTextKeyboard()
+        assertNull("kb_switch", device.findObject(res("kb_switch")))
+        assertSameHeights("text bottom row", "kb_symbols", "kb_space", "kb_enter")
+    }
+
+    /** The test activity must have been launched on the number field (`launchFields(focus = "number")`). */
+    private fun checkPadHasNoSwitchKey() {
+        assertNotNull("pad", device.wait(Until.findObject(res("pad")), 10_000))
+        assertNull("pad_switch", device.findObject(res("pad_switch")))
+        assertNotNull("backspace", device.findObject(res("pad_backspace")))
+        assertNotNull("enter", device.findObject(res("pad_enter")))
+    }
+
+    @Test
+    fun noPreviousKeyboardKeyInTheDictationView() {
+        launchFields()
+        checkDictationViewHasNoSwitchKey()
+    }
+
+    @Test
+    fun noPreviousKeyboardKeyInTheTextKeyboard() {
+        launchFields()
+        checkTextKeyboardHasNoSwitchKey()
+    }
+
+    @Test
+    fun noPreviousKeyboardKeyInTheNumberPad() {
+        launchFields(focus = "number")
+        checkPadHasNoSwitchKey()
+    }
+
+    // The same three checks in landscape (ImeTestBase puts the natural orientation back after each test).
+
+    @Test
+    fun noPreviousKeyboardKeyInTheDictationViewInLandscape() {
+        launchFields()
+        device.setOrientationLeft()
+        ensureKeyboardShown()
+        checkDictationViewHasNoSwitchKey()
+    }
+
+    @Test
+    fun noPreviousKeyboardKeyInTheTextKeyboardInLandscape() {
+        launchFields()
+        device.setOrientationLeft()
+        ensureKeyboardShown()
+        checkTextKeyboardHasNoSwitchKey()
+    }
+
+    @Test
+    fun noPreviousKeyboardKeyInTheNumberPadInLandscape() {
+        // The activity is recreated by the rotation and takes the same extra: it comes back on the number field.
+        launchFields(focus = "number")
+        device.setOrientationLeft()
+        device.waitForIdle()
+        // The rotation hides the keyboard (ensureKeyboardShown covers that for the other views, but
+        // it would tap the first field): ask for it again on the number field, which keeps the focus.
+        scenario.onActivity {
+            it.number.requestFocus()
+            it.getSystemService(android.view.inputmethod.InputMethodManager::class.java).showSoftInput(it.number, 0)
+        }
+        checkPadHasNoSwitchKey()
+    }
+
+    /**
+     * No key of a row is smaller than the others: heights within 8 %. CI measured 131 px for « 123 » against
+     * 137 px for the space bar and Enter (a text key against icon keys, already so before #73), so an exact
+     * match is too strict; a key that was really smaller would be well past 8 %.
+     */
+    private fun assertSameHeights(what: String, vararg ids: String) {
+        val heights = ids.map { obj(res(it), it).visibleBounds.height() }
+        assertTrue("$what: keys of different heights $heights", heights.max() - heights.min() <= heights.max() * 0.08)
+    }
+
     @Test
     fun typesElephantWithAccents() {
         launchFields()

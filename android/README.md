@@ -309,8 +309,10 @@ un verdict ».
   s'insère à chaque pause.
 - Bouton du modèle (en haut à gauche) : changer de modèle sans quitter le champ. Les
   modèles y sont nommés par leur effet (« Précis », « Léger » ; issue #37).
-- Touches : clavier précédent, `,` `.` espace `?` `!`, effacer (maintenir pour
-  répéter), entrée.
+- Touches : `,` `.` espace `?` `!`, effacer (maintenir pour répéter), entrée.
+  Il n'y a pas de touche « clavier précédent » (issue #73) : pour changer de
+  clavier, utiliser le sélecteur d'Android (icône dans la barre de navigation
+  pendant la saisie, ou Paramètres du téléphone).
 - **Clavier à touches** : le bouton « Clavier à touches », à côté du micro, ouvre
   de vraies touches (QWERTY, ou AZERTY si « Français (France) » est choisi à
   l'installation ; modifiable dans les Réglages). Appui long sur une touche :
