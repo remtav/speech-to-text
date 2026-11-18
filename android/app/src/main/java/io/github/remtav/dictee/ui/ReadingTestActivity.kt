@@ -22,7 +22,6 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import io.github.remtav.dictee.DicteeApp
 import io.github.remtav.dictee.R
-import io.github.remtav.dictee.reading.ArchiveAudio
 import io.github.remtav.dictee.reading.ArchiveField
 import io.github.remtav.dictee.reading.ContributionContent
 import io.github.remtav.dictee.reading.Contribution
@@ -359,7 +358,7 @@ class ReadingTestActivity : AppCompatActivity() {
         var regionValue: android.widget.TextView? = null
         for (item in content.fields) {
             card.label(ContributionShare.fieldLabel(this, item.field, modelLabel)).tag = fieldTag(item.field)
-            val v = card.body(describe(item.field, content), small = true)
+            val v = card.body(ContributionShare.describe(this, item.field, content), small = true)
             if (item.field == ArchiveField.REGION) regionValue = v
         }
         if (result.globalScores.size > 1) card.body(getString(R.string.contrib_share_only_recommended), small = true)
@@ -397,7 +396,7 @@ class ReadingTestActivity : AppCompatActivity() {
                     override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) = Unit
                     override fun afterTextChanged(s: Editable?) {
                         model.setRegion(s?.toString().orEmpty())
-                        regionValue?.text = describe(ArchiveField.REGION, offer.preview(facts) ?: return)
+                        regionValue?.text = ContributionShare.describe(this@ReadingTestActivity, ArchiveField.REGION, offer.preview(facts) ?: return)
                     }
                 })
             })
@@ -440,30 +439,6 @@ class ReadingTestActivity : AppCompatActivity() {
             model.shareNotice = getString(R.string.contrib_share_no_email_app)
         }
         render()
-    }
-
-    /** The value of one element of the archive, as shown before consent (from the content the archive is written from). */
-    private fun describe(field: ArchiveField, content: ContributionContent): String {
-        val value = content[field]
-        return when (field) {
-            ArchiveField.AUDIO -> {
-                val tenths = content.audio.sumOf(ArchiveAudio::tenths)
-                getString(R.string.contrib_value_audio, content.audio.size, tenths / 10) + "\n" +
-                    content.audio.joinToString(", ") { it.name }
-            }
-            ArchiveField.TEXT, ArchiveField.TRANSCRIPTION -> (value as List<*>).joinToString("\n") { p ->
-                val m = p as Map<*, *>
-                getString(R.string.contrib_value_paragraph, m["paragraphe"] as Int, m["texte"] as String)
-            }
-            ArchiveField.SCORE -> {
-                val m = value as Map<*, *>
-                getString(R.string.contrib_value_score, m["ressemblance_pourcent"] as Int, m["erreurs"] as Int, m["mots"] as Int)
-            }
-            ArchiveField.MODEL -> (value as Map<*, *>)["nom"] as String
-            ArchiveField.REGION -> (value as String?) ?: getString(R.string.contrib_value_region_none)
-            ArchiveField.TEXT_VERSION, ArchiveField.APP_VERSION, ArchiveField.PHONE_MODEL,
-            ArchiveField.DECLARATION, ArchiveField.DATE -> value as String
-        }
     }
 
     companion object {
