@@ -393,7 +393,7 @@ class DicteeImeService : InputMethodService(), DictationListener, EngineManager.
         app.wordLists.decodeGesture(KeyLanguage.forDictation(app.settings.languages), geometry, trace) { words ->
             // The trace in key widths (a dozen points) and the guesses: what to look at when a word comes out wrong.
             val path = GestureDecoder.resampleCount(trace, 12).joinToString(" ") { "%.1f,%.1f".format(java.util.Locale.ROOT, it.x, it.y) }
-            val keys = "aqmn".joinToString(" ") { c -> geometry.centre(c)?.let { "$c=%.1f,%.1f".format(java.util.Locale.ROOT, it.x, it.y) } ?: "$c=?" }
+            val keys = "aqmn".toList().joinToString(" ") { c -> geometry.centre(c)?.let { "$c=%.1f,%.1f".format(java.util.Locale.ROOT, it.x, it.y) } ?: "$c=?" }
             Log.i(TAG, "gesture: ${trace.size} points [$path] keys [$keys] -> $words")
             main.post { if (request == gestureRequest) writeGesture(words, shift) }
         }
