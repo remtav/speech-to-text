@@ -32,6 +32,7 @@ class GestureTypingInstrumentedTest : ImeTestBase() {
     private fun showTextKeyboard() {
         onMain { service.setTextKeyboardShown(true) }
         obj(res("letters"), "letters shown")
+        awaitLayout(app.settings.keyboardLayout)
     }
 
     /** Centre of the letter key [c], looked for inside the keys only. */
@@ -46,6 +47,21 @@ class GestureTypingInstrumentedTest : ImeTestBase() {
             }
         }
         throw AssertionError("key '$c' kept changing")
+    }
+
+    /**
+     * Waits until the keys show [kind]: the view kept from the previous test is rebuilt when the field starts, and
+     * key positions read before that would be traced on the other layout. On AZERTY, `a` is on the top row.
+     */
+    private fun awaitLayout(kind: LayoutKind) {
+        waitFor("$kind keys", 5_000, details = { windowFocus() }) {
+            try {
+                (keyCentre('a').y < keyCentre('s').y) == (kind == LayoutKind.AZERTY)
+            } catch (_: AssertionError) {
+                false
+            }
+        }
+        device.waitForIdle(500)
     }
 
     /** Slides one finger through the keys of [word], without lifting it. */
