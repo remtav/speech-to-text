@@ -267,16 +267,16 @@ class ContributionInstrumentedTest : ImeTestBase() {
 
     @Test
     fun withConsentTheArchiveHoldsExactlyTheListedElementsAndTheMailIntentIsRight() {
-        // Whisper (recommended) loses a quarter of the words. Parakeet is installed but not offered:
-        // it is never used, so no result of it can reach the archive.
+        // Whisper (recommended) loses a quarter of the words. Parakeet is installed and, since #89, offered and
+        // measured too: its result is shown on screen but must never reach the archive.
         app.settings.languages = setOf(DictationLanguage.ENGLISH)
         useModels(recommended, other) { model, _, text -> if (model == recommended) ScriptedReadingModels.dropEveryFourthWord(text) else text }
         ActivityScenario.launch(ReadingTestActivity::class.java).use { s ->
             val d = ReadingDriver(instrumentation, s, material)
             readAndScore(d)
             d.awaitTag(ReadingTestActivity.TAG_SHARE_CONSENT)
-            // One model measured (#72): the sentence about « the other models' results » is not shown.
-            assertFalse(d.allText().contains(context.getString(R.string.contrib_share_only_recommended)))
+            // Two models measured (#89): the sentence saying that only the recommended model's result is sent is shown.
+            assertTrue(d.allText().contains(context.getString(R.string.contrib_share_only_recommended)))
             val listed = listedKeys(d)
             s.onActivity { a ->
                 a.window.decorView.findViewWithTag<EditText>(ReadingTestActivity.TAG_SHARE_REGION).setText(" Bas-Saint-Laurent ")

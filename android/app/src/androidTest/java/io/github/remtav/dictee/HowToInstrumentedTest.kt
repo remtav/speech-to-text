@@ -314,7 +314,7 @@ class HowToInstrumentedTest : ImeTestBase() {
         ActivityScenario.launch(HowToActivity::class.java).use { s ->
             val privacy = s.textsTagged(HowToActivity.PRIVACY_TAG).single()
             assertEquals(context.getString(R.string.howto_privacy_server), privacy)
-            assertTrue(privacy.contains("serveur distant"))
+            assertTrue(privacy.contains("Kalmia Pro"))
             assertFalse("never the phone-only claim", privacy.contains("n'est envoyée à personne"))
         }
     }

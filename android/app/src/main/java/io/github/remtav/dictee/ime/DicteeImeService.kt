@@ -45,7 +45,7 @@ import io.github.remtav.dictee.stt.ModelSpec
 import io.github.remtav.dictee.stt.RemoteApi
 import io.github.remtav.dictee.stt.Transcription
 import io.github.remtav.dictee.ui.HowToActivity
-import io.github.remtav.dictee.ui.SettingsActivity
+import io.github.remtav.dictee.ui.ProActivity
 import io.github.remtav.dictee.ui.SetupActivity
 import java.lang.ref.WeakReference
 
@@ -693,30 +693,35 @@ class DicteeImeService : InputMethodService(), DictationListener, EngineManager.
 
     private fun pressEnter() { currentInputConnection?.pressEnter(currentInputEditorInfo) }
 
-    /** What the model button's menu can list (issue #72): Whisper, an « Avancé » model only while active, the configured server. */
-    private fun modelChoices(): List<ModelSpec> =
-        (ModelCatalog.forKeyboard(app.settings.languages, app.settings.activeModelId) + ModelCatalog.remote)
-            .filter { it.family != ModelFamily.REMOTE || app.isInstalled(it) }
+    /**
+     * What the model button's menu lists (issue #89), in this order: Parakeet, Whisper, Kalmia Pro. A phone model that
+     * is not downloaded is listed all the same (it leads to the main screen); Kalmia Pro is always listed.
+     */
+    private fun modelChoices(): List<ModelSpec> = ModelCatalog.offered(app.settings.languages) + ModelCatalog.remote
 
     private fun showModelMenu(anchor: View) {
         val menu = PopupMenu(anchor.context, anchor)
-        // Issue #72: offered for the languages (Whisper), an « Avancé » model only while active, then the user's server.
-        val installed = modelChoices().filter { app.isInstalled(it) }
-        if (installed.isEmpty()) {
-            showMessage(getString(R.string.msg_no_model), error = true)
-            return
-        }
+        val choices = modelChoices()
         val shown = app.shownSpec()
-        installed.forEachIndexed { i, spec ->
-            // Issue #72: « Whisper » in the keyboard; a lone entry is kept (reported in the PR).
-            menu.menu.add(0, i, i, ModelPlainNames.of(spec)).apply {
+        choices.forEachIndexed { i, spec ->
+            // « Parakeet · Rapide », « Whisper · Précis », « Kalmia Pro · Pro »; the plain name only for Pro.
+            val label = if (spec.family == ModelFamily.REMOTE) ModelPlainNames.of(spec)
+            else "${ModelPlainNames.of(spec)} · ${ModelPlainNames.short(spec)}"
+            menu.menu.add(0, i, i, label).apply {
                 isCheckable = true
                 isChecked = spec.id == shown.id
             }
         }
         menu.setOnMenuItemClickListener { item ->
-            val spec = installed[item.itemId]
-            if (spec.id != app.shownSpec().id) switchModel(spec.id)
+            val spec = choices[item.itemId]
+            when {
+                // Not downloaded: the main screen is where it is downloaded.
+                spec.family != ModelFamily.REMOTE && !app.isInstalled(spec) -> {
+                    showMessage(getString(R.string.msg_model_to_download, ModelPlainNames.inSentence(spec)), error = false)
+                    openSettings()
+                }
+                spec.id != shown.id -> switchModel(spec.id)
+            }
             true
         }
         menu.show()
@@ -733,13 +738,11 @@ class DicteeImeService : InputMethodService(), DictationListener, EngineManager.
         }
         val s = app.settings
         if (spec.family == ModelFamily.REMOTE) {
-            // Issue #23: the "server" mode is the consent to send the audio; it is only recorded where its text
-            // is shown (the folded server section of the advanced settings, issue #57), never by a tap in this menu.
-            // The server is in this menu as soon as an address is configured (typed in that section, or compiled in
-            // with -PdefaultServerUrl); without the "server" mode, this tap only opens that section.
-            if (s.transcriptionMode != TranscriptionMode.SERVER) {
-                showMessage(getString(R.string.msg_server_mode_in_settings), error = false)
-                openSettingsScreen()
+            // Issue #23: the "server" mode is the consent to send the audio; it is only recorded on the Kalmia Pro
+            // screen, next to its text (issue #89), never by a tap in this menu. A tap here opens that screen
+            // unless Pro is already the mode (then there is nothing to change).
+            if (s.transcriptionMode != TranscriptionMode.SERVER || !s.remoteConfig().isConfigured) {
+                openProScreen()
                 return
             }
         } else {
@@ -758,13 +761,9 @@ class DicteeImeService : InputMethodService(), DictationListener, EngineManager.
         startActivity(Intent(this, HowToActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
     }
 
-    /** The settings screen, at the "Envoi au serveur" choice. */
-    private fun openSettingsScreen() {
-        startActivity(
-            Intent(this, SettingsActivity::class.java)
-                .putExtra(SettingsActivity.EXTRA_SCROLL_TO_SERVER_MODE, true)
-                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
-        )
+    /** The « Kalmia Pro » screen (issue #89): information, and activation under the consent text. */
+    private fun openProScreen() {
+        startActivity(Intent(this, ProActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
     }
 
     private fun openSettings() {
@@ -784,8 +783,8 @@ class DicteeImeService : InputMethodService(), DictationListener, EngineManager.
         val status = statusText ?: return
         val spec = app.shownSpec()
         modelButton?.text = ModelPlainNames.short(spec)
-        // Issue #72: with a single entry (Whisper alone: no server, no « Avancé » model active) the button has nothing to offer.
-        modelButton?.visibility = if (modelChoices().size > 1) View.VISIBLE else View.GONE
+        // Issue #89: three entries, always (Parakeet, Whisper, Kalmia Pro): the button is never alone with one.
+        modelButton?.visibility = View.VISIBLE
         val state = controller.state
         val listening = state == DictationState.LISTENING
         mic.setIconResource(if (listening) R.drawable.ic_stop else R.drawable.ic_mic)

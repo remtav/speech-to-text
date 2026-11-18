@@ -5,6 +5,8 @@ import io.github.remtav.dictee.stt.EngineChoice
 import io.github.remtav.dictee.stt.EngineRoute
 import io.github.remtav.dictee.stt.FallbackEngine
 import io.github.remtav.dictee.stt.ModelCatalog
+import io.github.remtav.dictee.stt.ProOffer
+import io.github.remtav.dictee.stt.ProState
 import io.github.remtav.dictee.stt.RemoteConfig
 import io.github.remtav.dictee.stt.RemoteEngine
 import io.github.remtav.dictee.stt.ServerTimeout
@@ -12,6 +14,7 @@ import io.github.remtav.dictee.stt.TranscriptionMode
 import io.github.remtav.dictee.stt.WaitControl
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.net.ServerSocket
@@ -52,6 +55,44 @@ class EngineChoiceTest {
         val r = EngineChoice.route(serverConfigured = true, mode = TranscriptionMode.UNSET)
         assertEquals(EngineRoute.LOCAL, r)
         assertEquals(local, EngineChoice.spec(r, local))
+    }
+
+    // ------------------------------------------------------------ Kalmia Pro (issue #89)
+
+    @Test fun proWithoutServerIsUnavailableWhateverTheMode() {
+        for (mode in TranscriptionMode.entries) {
+            assertEquals(ProState.UNAVAILABLE, ProOffer.state(serverConfigured = false, mode = mode))
+            // Not even a recorded "server" mode sends anything without an address.
+            assertEquals(EngineRoute.LOCAL, EngineChoice.route(serverConfigured = false, mode = mode))
+        }
+    }
+
+    @Test fun proWithServerIsReadyUntilTheConsentIsRecorded() {
+        assertEquals(ProState.READY, ProOffer.state(true, TranscriptionMode.UNSET))
+        assertEquals(ProState.READY, ProOffer.state(true, TranscriptionMode.PHONE))
+        assertEquals(ProState.ACTIVE, ProOffer.state(true, TranscriptionMode.SERVER))
+    }
+
+    /** The review's question: the Pro card sends no audio without the consent of #23. */
+    @Test fun noAudioIsSentUnlessProIsActive() {
+        for (configured in listOf(false, true)) for (mode in TranscriptionMode.entries) for (network in listOf(false, true)) {
+            val goesToServer = EngineChoice.route(configured, mode, network) == EngineRoute.SERVER
+            val active = ProOffer.state(configured, mode) == ProState.ACTIVE
+            // The server is used only when Pro is active (address + recorded "server" mode) and the network is there.
+            assertEquals("$configured $mode $network", active && network, goesToServer)
+        }
+    }
+
+    @Test fun onlyTheConsentWithAServerRecordsTheServerMode() {
+        assertEquals(TranscriptionMode.SERVER, ProOffer.modeAfterConsent(serverConfigured = true, consentGiven = true))
+        assertNull(ProOffer.modeAfterConsent(serverConfigured = true, consentGiven = false))
+        assertNull(ProOffer.modeAfterConsent(serverConfigured = false, consentGiven = true))
+        assertNull(ProOffer.modeAfterConsent(serverConfigured = false, consentGiven = false))
+    }
+
+    @Test fun proIsNamedKalmiaPro() {
+        assertEquals("Kalmia Pro", io.github.remtav.dictee.stt.ModelPlainNames.of(ModelCatalog.remote))
+        assertEquals("Pro", io.github.remtav.dictee.stt.ModelPlainNames.short(ModelCatalog.remote))
     }
 
     @Test fun noNetworkMeansLocal() {

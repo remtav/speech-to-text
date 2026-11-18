@@ -265,17 +265,20 @@ class SetupStepsInstrumentedTest {
         return y
     }
 
-    /** Issue #57: without a server address, not a card, not a button, not a word about a server. */
+    /**
+     * Issue #57, revised by #89: without a server address there is no « Transcription : Kalmia Pro » line and no
+     * address; the Kalmia Pro card is shown, informs, and offers nothing to turn on.
+     */
     @Test
-    fun noServerAnywhereWithoutAnAddress() {
+    fun noServerLineWithoutAnAddressButTheProCardIsThere() {
         assertEquals("", app.settings.remoteUrl)
         for (enabled in listOf(false, true)) {
             state(enabled = enabled, chosen = enabled, mic = enabled)
             ActivityScenario.launch(SetupActivity::class.java).use { s ->
-                val text = s.allText().lowercase()
-                assertFalse(text, text.contains("serveur"))
-                assertFalse(text.contains("server"))
+                val text = s.allText()
+                assertFalse(text, text.contains(context.getString(R.string.setup_server_in_use)))
                 assertFalse(s.hasTag(SetupActivity.SERVER_STATUS_TAG))
+                assertTrue(s.hasTag(io.github.remtav.dictee.ui.ProActivity.CARD_TAG))
                 assertTrue(text.contains("n'est envoyée à personne"))
             }
         }
@@ -289,7 +292,7 @@ class SetupStepsInstrumentedTest {
         ActivityScenario.launch(SetupActivity::class.java).use { s ->
             assertEquals(TranscriptionMode.UNSET, app.settings.transcriptionMode)
             assertFalse(s.hasTag(SetupActivity.SERVER_STATUS_TAG))
-            assertFalse(s.allText().lowercase().contains("serveur"))
+            assertFalse(s.allText().contains(context.getString(R.string.setup_server_in_use)))
         }
     }
 

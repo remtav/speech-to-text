@@ -66,11 +66,11 @@
     <string name="download_running">Téléchargement des modèles…</string>
     <string name="download_channel">Téléchargements</string>
 
-    <string name="setup_intro">Un clavier vocal développé au Québec, pour le français d\'ici.\nVotre voix est transcrite sur votre téléphone : elle n\'est envoyée à personne. Le réseau sert à télécharger le modèle de transcription.\nPas de compte, pas de publicité, pas de télémétrie.\nCode ouvert : tout le monde peut vérifier ce que l\'application fait de votre voix. Le code est public ; vos dictées, elles, restent privées.\nLe modèle de transcription vient d\'un éditeur étranger, nommé plus bas.</string>
+    <string name="setup_intro">Un clavier vocal développé au Québec, pour le français d\'ici.\nVotre voix est transcrite sur votre téléphone : elle n\'est envoyée à personne, sauf si vous activez Kalmia Pro. Le réseau sert à télécharger le modèle de transcription.\nPas de compte, pas de publicité, pas de télémétrie.\nCode ouvert : tout le monde peut vérifier ce que l\'application fait de votre voix. Le code est public ; vos dictées, elles, restent privées.\nLe modèle de transcription vient d\'un éditeur étranger, nommé plus bas.</string>
     <string name="setup_open_ime_settings">Activer le clavier</string>
     <string name="setup_pick_ime">Choisir Kalmia Blabla</string>
     <!-- Issue #55: the two keyboard steps, then the microphone. -->
-    <string name="setup_intro_server">Un clavier vocal développé au Québec, pour le français d\'ici.\nVous avez configuré un serveur distant dans les réglages avancés : vos dictées y sont envoyées pour être transcrites (voir ci-dessous).\nPas de compte, pas de publicité, pas de télémétrie.\nCode ouvert : tout le monde peut vérifier ce que l\'application fait de votre voix. Le code est public.\nLe modèle de transcription vient d\'un éditeur étranger, nommé plus bas.</string>
+    <string name="setup_intro_server">Un clavier vocal développé au Québec, pour le français d\'ici.\nVous utilisez Kalmia Pro : vos dictées sont envoyées au serveur pour être transcrites (voir ci-dessous).\nPas de compte, pas de publicité, pas de télémétrie.\nCode ouvert : tout le monde peut vérifier ce que l\'application fait de votre voix. Le code est public.\nLe modèle de transcription vient d\'un éditeur étranger, nommé plus bas.</string>
     <string name="setup_step_enable_title">1. Activer Kalmia Blabla</string>
     <string name="setup_step_enable_text">Android ouvre la liste des claviers. Cochez « Kalmia Blabla (voix) », puis revenez ici.</string>
     <string name="setup_step_enable_warning">Android affiche alors un avertissement, le même pour tous les claviers : votre voix, elle, reste sur votre téléphone.</string>
@@ -82,11 +82,11 @@
     <string name="setup_step_todo">À faire</string>
     <string name="setup_step_after_previous">À faire après l\'étape précédente</string>
     <!-- Issue #57: shown only when dictations go to a server configured in the advanced settings. -->
-    <string name="setup_server_in_use">Transcription : serveur distant</string>
-    <string name="setup_server_in_use_text">Vos dictées sont envoyées pour être transcrites au serveur que vous avez configuré dans les réglages avancés (%1$s).</string>
+    <string name="setup_server_in_use">Transcription : Kalmia Pro</string>
+    <string name="setup_server_in_use_text">Vos dictées sont envoyées à Kalmia Pro pour être transcrites (%1$s).</string>
     <string name="setup_server_fallback">Le modèle du téléphone sert de repli.</string>
     <string name="setup_server_no_fallback">Aucun modèle n\'est installé sur le téléphone : si le serveur ne répond pas, la dictée est perdue.</string>
-    <string name="setup_server_open_setting">Voir le réglage</string>
+    <string name="setup_server_open_setting">Voir Kalmia Pro</string>
     <string name="setup_step_mic">3. Autoriser le micro</string>
     <string name="setup_grant_mic">Autoriser le micro</string>
     <string name="setup_mic_missing">Le clavier ne peut pas demander le micro lui-même : autorisez-le ici.</string>
@@ -94,12 +94,28 @@
     <string name="setup_languages_help">Cochez les langues que vous dictez. Elles servent à recommander un modèle et à régler la langue de la transcription : avec une seule langue, elle est imposée ; avec plusieurs, elle est détectée automatiquement. Au moins une langue reste cochée.</string>
     <string name="setup_languages_supported">Kalmia Blabla comprend le français, l\'anglais, l\'espagnol et le portugais.</string>
     <string name="languages_keep_one">Au moins une langue doit rester cochée.</string>
-    <string name="setup_models">5. Modèle</string>
+    <string name="setup_models">5. Choix de transcription</string>
     <string name="model_publisher">Éditeur : %1$s</string>
     <string name="model_recommended_badge">Recommandé pour vos langues</string>
     <string name="model_license_runs_local">Licence %1$s · s\'exécute sur votre téléphone</string>
     <string name="model_warning_uncovered">Attention : ce modèle ne couvre pas %1$s. Il reste téléchargeable.</string>
-    <string name="setup_models_note">Whisper se télécharge une fois (Wi-Fi conseillé), puis tout se passe sur votre téléphone, même hors ligne.</string>
+    <string name="setup_models_note">Parakeet et Whisper se téléchargent une fois (Wi-Fi conseillé), puis tout se passe sur votre téléphone, même hors ligne. Parakeet va plus vite, Whisper est plus précis. Kalmia Pro transcrit sur un serveur.</string>
+    <!-- Issue #89: « Kalmia Pro », the third choice, after the two phone models. -->
+    <string name="pro_title">Kalmia Pro</string>
+    <string name="pro_badge">Pro</string>
+    <string name="pro_brings">Rapide et précis, sans charger le téléphone.</string>
+    <string name="pro_audio_sent">L\'audio est envoyé au serveur pour être transcrit, puis supprimé dès la transcription.</string>
+    <string name="pro_subscription_soon">Abonnement bientôt disponible. Aucun paiement n\'est demandé pour l\'instant.</string>
+    <string name="pro_card_line">Abonnement · bientôt disponible</string>
+    <string name="pro_card_active">Utilisé pour vos dictées : l\'audio est envoyé au serveur.</string>
+    <string name="pro_card_open">Découvrir Kalmia Pro</string>
+    <string name="pro_unavailable">Kalmia Pro n\'est pas encore disponible : rien n\'est envoyé, vos dictées restent sur votre téléphone.</string>
+    <string name="pro_consent_title">Envoi de l\'audio</string>
+    <string name="pro_consent">En activant Kalmia Pro, l\'audio de vos dictées est envoyé au serveur configuré, puis supprimé dès la transcription. Tant que vous n\'activez pas, rien n\'est envoyé.</string>
+    <string name="pro_activate">Activer Kalmia Pro</string>
+    <string name="pro_active">Kalmia Pro est actif : vos dictées sont transcrites sur le serveur.</string>
+    <string name="pro_back_to_phone">Revenir à la transcription sur le téléphone</string>
+    <string name="pro_close">Fermer</string>
     <string name="settings_advanced_models">Autre modèle du téléphone</string>
     <string name="settings_advanced_models_help">Jamais recommandé : à essayer et à comparer sur votre téléphone (« Comparer les modèles », ci-dessus).</string>
     <string name="setup_downloading">Téléchargement : %1$d %% (%2$s / %3$s)</string>
@@ -157,7 +173,7 @@
     <!-- Issue #57: the server is a developer setting, folded inside « Avancé ». -->
     <!-- Issue #37: technical model choices, folded inside « Avancé ». -->
     <string name="settings_models_section">Modèles et performances</string>
-    <string name="settings_models_names">Sur l\'écran principal, « Whisper » est %1$s (%2$s), quantifié en int8 pour le téléphone.</string>
+    <string name="settings_models_names">Sur l\'écran principal, « Whisper » est %1$s (%2$s) et « Parakeet » est %3$s (%4$s), tous deux quantifiés en int8 pour le téléphone.</string>
     <string name="settings_server_section">Serveur distant, pour essais (développeurs)</string>
     <string name="settings_server_section_help">Pour développer et déboguer. Kalmia Blabla transcrit votre voix sur votre téléphone ; ces réglages ne servent qu\'à qui héberge son propre serveur de transcription.</string>
     <string name="collapsible_open">déplié</string>
@@ -176,7 +192,7 @@
     <string name="settings_mode_phone">Toujours transcrire sur le téléphone : rien n\'est envoyé</string>
     <string name="settings_mode_unset">Pas encore choisi : vos dictées restent sur le téléphone.</string>
     <string name="settings_mode_no_address">Sans adresse de serveur ci-dessus, vos dictées restent sur le téléphone, quel que soit ce choix.</string>
-    <string name="msg_server_mode_in_settings">Choisissez « Sur le serveur configuré » dans les réglages avancés pour l\'utiliser</string>
+    <string name="msg_model_to_download">%1$s n\'est pas téléchargé : ouvrez Kalmia Blabla pour le télécharger</string>
     <string name="settings_server_timeout">Délai avant repli sur le téléphone</string>
     <string name="settings_server_timeout_help">Si le serveur est injoignable ou ne répond pas dans ce délai après la fin de la dictée (plus un quart de sa durée), elle est transcrite sur le téléphone avec %1$s. Le bouton « Annuler » le fait tout de suite.</string>
     <string name="settings_remote_test">Tester la connexion</string>
@@ -220,7 +236,7 @@
     <string name="setup_howto">Comment dicter</string>
     <string name="howto_title">Comment dicter</string>
     <string name="howto_rule">Dites le nom du signe au milieu de votre phrase : il s\'écrit tout seul.</string>
-    <string name="howto_privacy_server">Vos dictées sont envoyées au serveur distant que vous avez configuré dans les réglages avancés, pour y être transcrites.</string>
+    <string name="howto_privacy_server">Vos dictées sont envoyées à Kalmia Pro, pour y être transcrites.</string>
     <string name="howto_privacy">Tout se passe sur votre téléphone : votre voix y est transcrite et n\'est envoyée à personne.</string>
     <string name="howto_say">Dites :</string>
     <string name="howto_say_in">Dites (%1$s) :</string>
@@ -417,7 +433,7 @@
     <string name="quick_interrupted">Lecture interrompue (l\'application est passée en arrière-plan) : elle n\'est pas notée. Recommencez quand vous voulez.</string>
     <string name="measure_busy">Une autre mesure de modèle est en cours (test rapide, comparaison ou test de lecture). Réessayez quand elle sera terminée.</string>
     <string name="quick_previous_running">Le calcul d\'un test précédent se termine. Réessayez dans un instant.</string>
-    <string name="quick_server_note">Vos dictées passent par le serveur distant configuré dans les réglages avancés : le modèle du téléphone ne sert qu\'en repli tant que ce réglage est actif.</string>
+    <string name="quick_server_note">Vos dictées passent par Kalmia Pro : le modèle du téléphone ne sert qu\'en repli tant que Kalmia Pro est actif.</string>
     <string name="quick_adopt">Utiliser %1$s</string>
     <string name="quick_already">C\'est déjà votre modèle.</string>
     <string name="quick_light_note">Vous pourrez toujours revenir à Whisper sur l\'écran principal.</string>

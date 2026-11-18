@@ -23,6 +23,8 @@ import io.github.remtav.dictee.TestHooks
 import io.github.remtav.dictee.stt.DictationLanguage
 import io.github.remtav.dictee.stt.ModelCatalog
 import io.github.remtav.dictee.stt.ModelFamily
+import io.github.remtav.dictee.stt.ProOffer
+import io.github.remtav.dictee.stt.ProState
 import io.github.remtav.dictee.stt.TranscriptionMode
 import io.github.remtav.dictee.stt.ModelRecommendation
 import io.github.remtav.dictee.stt.ModelRecommendations
@@ -33,9 +35,9 @@ import io.github.remtav.dictee.stt.asDownloadable
 
 /**
  * Launcher screen: enable and choose the keyboard (two steps, issue #55), grant the microphone (an IME cannot
- * ask for it itself), choose the languages and get a model. Everything happens on the phone (issue #57): the
- * remote server is a developer setting, in « Avancé » of the settings, and this screen only mentions it when the
- * person set it up there and dictations really go to it.
+ * ask for it itself), choose the languages and get a model. Three choices (issue #89): Parakeet and Whisper on the
+ * phone, and « Kalmia Pro » (the server, subscription announced): its card is always shown, and the screen says so
+ * when dictations really go to it. Its technical settings (address, token…) stay in « Avancé ».
  *
  * One filled button at most (issue #55): the button of [SetupProgress.nextStep]; every other button is outlined.
  */
@@ -76,7 +78,7 @@ class SetupActivity : AppCompatActivity() {
         col.title(getString(R.string.app_name))
         intro = col.body()
         intro.tag = INTRO_TAG
-        // Only when the person configured a server in the advanced settings and chose it (issue #57, point 4).
+        // Only when dictations really go to Kalmia Pro (issue #57, point 4; issue #89).
         serverBox = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         col.addView(serverBox)
 
@@ -228,7 +230,7 @@ class SetupActivity : AppCompatActivity() {
         card.alpha = if (available) 1f else DIMMED_ALPHA
     }
 
-    /** The line « Transcription : serveur distant » with a link to the setting (issue #57, point 4); nothing otherwise. */
+    /** The line « Transcription : Kalmia Pro » with a link to its screen (issue #57, point 4; issue #89); nothing otherwise. */
     private fun renderServer(serverInUse: Boolean) {
         serverBox.removeAllViews()
         if (!serverInUse) return
@@ -242,9 +244,7 @@ class SetupActivity : AppCompatActivity() {
             small = true,
         )
         card.button(getString(R.string.setup_server_open_setting), outlined = true) {
-            startActivity(
-                Intent(this, SettingsActivity::class.java).putExtra(SettingsActivity.EXTRA_SCROLL_TO_SERVER_MODE, true),
-            )
+            startActivity(Intent(this, ProActivity::class.java))
         }.tag = SERVER_SETTING_BUTTON_TAG
     }
 
@@ -324,11 +324,33 @@ class SetupActivity : AppCompatActivity() {
         modelsBox.removeAllViews()
         val chosen = app.settings.languages
         val recommendation = ModelRecommendations.recommend(chosen)
-        // Issue #22: only the models offered for the chosen languages (Parakeet is in « Avancé » of the settings).
+        // Issue #22: only the models offered for the chosen languages (issue #89: Parakeet and Whisper, for all five).
         val modelIsNext = currentStep() == SetupStep.GET_MODEL
         for (spec in ModelCatalog.offered(chosen)) renderModel(spec, chosen, recommendation, modelIsNext && spec == recommendation.model)
+        // Issue #89: Kalmia Pro, after the two phone models.
+        renderPro()
         // Issue #72: the quick test is not offered at installation (see QuickTestActivity.OFFERED_AT_SETUP).
         if (QuickTestActivity.OFFERED_AT_SETUP) renderQuickTest(chosen)
+    }
+
+    /**
+     * The « Kalmia Pro » card (issue #89), after the phone models: always visible, marked « Pro » and « bientôt
+     * disponible ». It only informs: its button opens [ProActivity], where Pro is turned on (with a server, after
+     * the consent of issue #23). Touching the card never sends audio.
+     */
+    private fun renderPro() {
+        val card = modelsBox.card()
+        card.tag = ProActivity.CARD_TAG
+        card.heading(getString(R.string.pro_title)).setPadding(0, 0, 0, dp(6))
+        card.badge(getString(R.string.pro_badge))
+        card.body(ModelCatalog.PRO_NOTE, small = true)
+        card.body(getString(R.string.pro_card_line), small = true)
+        if (ProOffer.state(app.settings.remoteConfig().isConfigured, app.settings.transcriptionMode) == ProState.ACTIVE) {
+            card.value(getString(R.string.pro_card_active))
+        }
+        card.button(getString(R.string.pro_card_open), outlined = true) {
+            startActivity(Intent(this, ProActivity::class.java))
+        }.tag = ProActivity.CARD_BUTTON_TAG
     }
 
     /**
@@ -353,8 +375,8 @@ class SetupActivity : AppCompatActivity() {
         val installed = app.store.isInstalled(spec)
         val active = app.settings.activeModelId == spec.id && app.shownSpec().family != ModelFamily.REMOTE
         card.addView(RadioButton(this).apply {
-            // Issue #72: « Whisper », nothing more technical (the variant is in « Avancé »).
-            text = ModelPlainNames.of(spec)
+            // Issue #89: « Parakeet · Rapide », « Whisper · Précis »; nothing more technical (variants are in « Avancé »).
+            text = "${ModelPlainNames.of(spec)} · ${ModelPlainNames.short(spec)}"
             isChecked = active
             isEnabled = installed
             setOnClickListener {

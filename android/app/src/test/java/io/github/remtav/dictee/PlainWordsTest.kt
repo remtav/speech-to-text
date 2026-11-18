@@ -29,6 +29,8 @@ class PlainWordsTest {
             "setup_", "quick_", "model_recommended", "model_publisher", "model_warning", "status_", "delete_",
             // Review of #65: the tutorial, the reading test, the keyboard's messages and the first-level dictation help.
             "howto_", "reading_", "contrib_", "msg_", "cd_", "settings_partials",
+            // Issue #89: the Kalmia Pro card and screen.
+            "pro_",
         ).any { name.startsWith(it) }
     }
 
@@ -63,27 +65,38 @@ class PlainWordsTest {
         assertEquals(emptyList<String>(), problems)
     }
 
+    /** Issue #89: three plain names, each with its short label; nothing more technical in the normal path. */
     @Test
-    fun thePhoneModelIsNamedWhisperAndNothingMoreTechnical() {
-        val whisper = ModelCatalog.whisperTurbo
-        assertEquals("Whisper", ModelPlainNames.of(whisper))
-        assertEquals("Whisper", ModelPlainNames.inSentence(whisper))
-        assertEquals("Whisper", ModelPlainNames.short(whisper))
-        for (name in listOf(ModelPlainNames.of(whisper), ModelPlainNames.inSentence(whisper), ModelPlainNames.short(whisper))) {
-            for (word in ModelPlainNames.technicalWords) assertFalse("$name contains $word", name.contains(word, ignoreCase = true))
+    fun theChoicesAreNamedParakeetWhisperAndKalmiaProAndNothingMoreTechnical() {
+        val choices = listOf(
+            Triple(ModelCatalog.parakeet, "Parakeet", "Rapide"),
+            Triple(ModelCatalog.whisperTurbo, "Whisper", "Précis"),
+            Triple(ModelCatalog.remote, "Kalmia Pro", "Pro"),
+        )
+        for ((spec, name, short) in choices) {
+            assertEquals(name, ModelPlainNames.of(spec))
+            assertEquals(name, ModelPlainNames.inSentence(spec))
+            assertEquals(short, ModelPlainNames.short(spec))
+            for (n in listOf(ModelPlainNames.of(spec), ModelPlainNames.inSentence(spec), ModelPlainNames.short(spec))) {
+                for (word in ModelPlainNames.technicalWords) assertFalse("$n contains $word", n.contains(word, ignoreCase = true))
+            }
         }
-        // « Whisper » is the one technical word the normal path now says; the others stay forbidden.
+        // « Parakeet » and « Whisper » are the technical words the normal path now says; the others stay forbidden.
         assertFalse("Whisper" in ModelPlainNames.technicalWords)
-        for (word in listOf("Parakeet", "large-v3", "turbo", "int8", "quantification", "Qwen", "Hugging Face", "SHA-256")) {
+        assertFalse("Parakeet" in ModelPlainNames.technicalWords)
+        for (word in listOf("TDT", "large-v3", "turbo", "int8", "quantification", "Qwen", "Hugging Face", "SHA-256")) {
             assertTrue(word, word in ModelPlainNames.technicalWords)
         }
+        // « TDT 0.6b v3 » stays reserved to « Avancé »: it is the technical name, never the plain one.
+        assertTrue(ModelCatalog.parakeet.displayName.contains("TDT 0.6b v3"))
+        assertFalse(ModelPlainNames.of(ModelCatalog.parakeet).contains("TDT"))
     }
 
-    /** Issue #72: no model is named « Plus précis », « Plus léger »… any more (the retired names). */
+    /** Issue #72 (still true): the retired names « Plus précis », « Plus léger »… are gone. */
     @Test
     fun theRetiredNamesAreGoneFromPlainNamesAndFromTheNormalPathStrings() {
-        val retired = listOf("Plus précis", "modèle plus précis", "Précis")
-        val names = listOf(ModelCatalog.whisperTurbo, ModelCatalog.remote).flatMap {
+        val retired = listOf("Plus précis", "modèle plus précis")
+        val names = listOf(ModelCatalog.parakeet, ModelCatalog.whisperTurbo, ModelCatalog.remote).flatMap {
             listOf(ModelPlainNames.of(it), ModelPlainNames.inSentence(it), ModelPlainNames.short(it))
         }
         for (r in retired) for (n in names) assertFalse("$n : $r", n.contains(r))
@@ -93,6 +106,19 @@ class PlainWordsTest {
         for ((key, text) in strings) {
             for (r in listOf("modèle plus précis", "Plus précis")) assertFalse("$key : $r", text.contains(r))
         }
+    }
+
+    /** Issue #89: the server is « Kalmia Pro » where the person reads it in the normal path, not « serveur distant ». */
+    @Test
+    fun theNormalPathSaysKalmiaProNotRemoteServer() {
+        for ((name, text) in normalPath) {
+            assertFalse("$name : « serveur distant »", text.contains("serveur distant", ignoreCase = true))
+        }
+        for (key in listOf("setup_server_in_use", "setup_server_in_use_text", "howto_privacy_server", "setup_intro_server")) {
+            assertTrue(key, strings.getValue(key).contains("Kalmia Pro"))
+        }
+        // The title of the developers' section of « Avancé » stays as it was.
+        assertEquals("Serveur distant, pour essais (développeurs)", strings.getValue("settings_server_section"))
     }
 
     @Test

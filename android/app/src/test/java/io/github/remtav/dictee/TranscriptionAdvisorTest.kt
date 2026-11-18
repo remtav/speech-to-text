@@ -31,14 +31,16 @@ class TranscriptionAdvisorTest {
         }
     }
 
-    /** Issue #72: one phone model, whatever the languages: no light model, no second candidate. */
-    @Test fun thereIsNeverASecondPhoneModel() {
+    /**
+     * Issue #72, kept by #89 for the quick test (still hidden): no light model, no second candidate. Parakeet is offered
+     * on the screens (#89) but is not a quick-test candidate.
+     */
+    @Test fun thereIsNeverASecondQuickTestCandidate() {
         for (c in combos + listOf(emptySet())) {
             val choice = TranscriptionAdvisor.choice(c)
             assertNull(c.toString(), choice.light)
             assertEquals(c.toString(), listOf(ModelCatalog.whisperTurbo), choice.candidates)
-            assertEquals(c.toString(), listOf(ModelCatalog.whisperTurbo), ModelCatalog.offered(c))
-            assertFalse(c.toString(), ModelCatalog.parakeet in ModelCatalog.offered(c))
+            assertEquals(c.toString(), listOf(ModelCatalog.parakeet, ModelCatalog.whisperTurbo), ModelCatalog.offered(c))
         }
     }
 

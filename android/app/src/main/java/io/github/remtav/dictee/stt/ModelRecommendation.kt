@@ -67,16 +67,17 @@ object ModelRecommendations {
         DictationLanguage.entries.filter { it in chosen && !covers(model, it) }
 
     /**
-     * Issue #22: Whisper large-v3-turbo is always the recommended model. It did best in the user's tests,
-     * Quebec French included, and it covers all five languages. Advanced models are never
-     * recommended.
+     * Issue #22: Whisper large-v3-turbo is always the preselected model. It did best in the user's tests, Quebec
+     * French included, and it covers all five languages.
      *
-     * Issue #72: the model is named « Whisper », in one sentence that mentions no second model.
+     * Issue #89: Parakeet is offered next to it, never recommended unprompted; the sentence speaks of both and
+     * never of the quick test (still hidden).
      */
     @Suppress("UNUSED_PARAMETER")
     fun recommend(chosen: Set<DictationLanguage>): ModelRecommendation =
         ModelRecommendation(
             ModelCatalog.whisperTurbo,
-            "Whisper : le modèle qui comprend le mieux le français d'ici aux essais (1,04 Go).",
+            "Whisper, présélectionné : plus lent que Parakeet, mais le seul à bien transcrire " +
+                "le français québécois aux essais (1,04 Go).",
         )
 }
