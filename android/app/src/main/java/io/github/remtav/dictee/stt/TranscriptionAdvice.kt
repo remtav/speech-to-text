@@ -7,12 +7,11 @@ import io.github.remtav.dictee.stt.DictationLanguage.PORTUGUESE
 import io.github.remtav.dictee.stt.DictationLanguage.SPANISH
 
 /**
- * The phone model of a choice of languages (issue #36, recentred on the phone on 2026-11-13; since issue #72
- * there is only one: Whisper).
+ * The phone model of a choice of languages (there is only one: Whisper).
  *
  * @property best The model of the app's choice: Whisper large-v3-turbo.
- * @property light A lighter and faster second model. Always null since issue #72 (Parakeet is in « Avancé » only);
- *   the field stays, with the quick test's two-model code ([QuickTestAdvice]), for the day a second model comes back.
+ * @property light A lighter and faster second model. Always null today (Parakeet is in « Avancé » only);
+ *   the field stays, with the quick test's two-model code ([QuickTestAdvice]), for a second model.
  */
 data class PhoneModelChoice(val best: ModelSpec, val light: ModelSpec? = null) {
     /** The models the quick test transcribes with, the best first. */

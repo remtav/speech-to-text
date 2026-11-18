@@ -89,7 +89,6 @@ class SetupActivity : AppCompatActivity() {
             startActivity(Intent(this@SetupActivity, HowToActivity::class.java))
         }.tag = HOWTO_BUTTON_TAG
 
-        // Issue #60: the one-time notice sits right above the languages it is about.
         col.heading(getString(R.string.setup_step_languages))
         col.body(getString(R.string.setup_languages_help), small = true)
         col.body(getString(R.string.setup_languages_supported), small = true)
@@ -281,15 +280,15 @@ class SetupActivity : AppCompatActivity() {
     }
 
     /**
-     * Only a model the keyboard can use counts (a hidden model's files may still be on the phone); a configured
+     * Only a model the keyboard can use counts (the files of an « Avancé » model may be on the phone); a configured
      * server counts only when dictations really go to it.
      */
     private fun isModelReady(): Boolean =
         isActiveLocalModelReady() || app.settings.serverInUse
 
     /**
-     * The model dictation would use on the phone is installed (review of #72: a downloaded Parakeet that is not the
-     * active model, or files of a hidden model, do not make the phone ready: dictation says « … n'est pas installé »).
+     * The model dictation would use on the phone is installed (a downloaded Parakeet that is not the
+     * active model does not make the phone ready: dictation says « … n'est pas installé »).
      */
     private fun isActiveLocalModelReady(): Boolean {
         val active = app.settings.activeModel

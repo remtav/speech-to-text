@@ -330,7 +330,7 @@ object VoiceCommands {
     }
 
     /**
-     * Adds the text between two commands. As before step 2.2, commas, colons and
+     * Adds the text between two commands. Commas, colons and
      * semicolons at a segment edge or next to a line break are the model's
      * boundary marks and go; next to a sign, [TextAssembler.sign] decides.
      */

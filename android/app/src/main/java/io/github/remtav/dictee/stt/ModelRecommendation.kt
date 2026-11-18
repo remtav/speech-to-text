@@ -13,8 +13,7 @@ enum class DictationLanguage(
     /** Name shown to the user. */
     val label: String,
 ) {
-    // Order of the list shown to the user; Quebec French comes first. Five choices since issue #60:
-    // Mandarin, Hindi, Arabic, Bengali, Russian and Urdu were removed (DECISIONS.md).
+    // Order of the list shown to the user; Quebec French comes first. Five choices.
     FRENCH_QUEBEC("fr", "Français (Québec)"),
     FRENCH_FRANCE("fr", "Français (France)"),
     ENGLISH("en", "Anglais"),
@@ -69,8 +68,8 @@ object ModelRecommendations {
 
     /**
      * Issue #22: Whisper large-v3-turbo is always the recommended model. It did best in the user's tests,
-     * Quebec French included, and it covers all five languages. Hidden and advanced models are
-     * never recommended.
+     * Quebec French included, and it covers all five languages. Advanced models are never
+     * recommended.
      *
      * Issue #72: the model is named « Whisper » (a step back from #37), in one sentence that mentions no second model.
      */

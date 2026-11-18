@@ -1,5 +1,7 @@
 package io.github.remtav.dictee.text
 
+import io.github.remtav.dictee.cleanup.SafetyCheck
+import io.github.remtav.dictee.stt.SherpaEngine
 import java.text.Normalizer
 import java.util.Locale
 
@@ -8,8 +10,8 @@ import java.util.Locale
  * instead of 1 000, Whisper turbo is ~30 % faster but sometimes misses the end of a segment and starts
  * the sentence again (« Je m'étonne également. Je m'étonne également. »). This object detects that
  * defect and, for the « cut » correction, removes the repeated text. It is deliberately separate from
- * [io.github.remtav.dictee.cleanup.SafetyCheck], whose rule « a repetition never spans a sentence end »
- * stays as it is, and is called by [io.github.remtav.dictee.stt.SherpaEngine] for the Whisper family only.
+ * [SafetyCheck], whose rule « a repetition never spans a sentence end »
+ * stays as it is, and is called by [SherpaEngine] for the Whisper family only.
  *
  * Detection follows `repetition()` of `android/tools/whisper-turbo-rapide/reprise.py` (issue #40), with
  * guards for short texts (see [Rule] and DECISIONS.md, « Issue #49 »). Words are compared after the same

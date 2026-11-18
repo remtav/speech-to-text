@@ -172,7 +172,7 @@ class DicteeApp : Application() {
         CleanupMode.RULES -> TextCleaner { RuleCleaner.clean(it) }
         CleanupMode.LLM -> {
             val spec = LlmCatalog.byId(settings.llmModelId) ?: LlmCatalog.qwen15
-            val key = spec.id // the guard no longer takes the vocabulary: no reload when it changes
+            val key = spec.id // the guard does not take the vocabulary: no reload when it changes
             if (llmKey != key) {
                 llmCleaner?.close()
                 llmCleaner = LlmCleaner.create(this, store, spec)

@@ -1,6 +1,7 @@
 package io.github.remtav.dictee.reading
 
 import io.github.remtav.dictee.audio.AudioSource
+import io.github.remtav.dictee.audio.AudioSourceException
 import io.github.remtav.dictee.audio.PcmAudio
 
 /**
@@ -19,7 +20,7 @@ object ParagraphRecorder {
 
     /**
      * @return the recording, or null when it is shorter than [MIN_SECONDS].
-     * @throws io.github.remtav.dictee.audio.AudioSourceException when the source cannot start.
+     * @throws AudioSourceException when the source cannot start.
      */
     fun record(
         source: AudioSource,

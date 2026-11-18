@@ -171,7 +171,7 @@ object SafetyCheck : CleanupGuard {
         return a < b && SENTENCE_END.containsMatchIn(raw.substring(rw[a].range.last + 1, rw[b].range.first))
     }
 
-    /** Loose tokens, only for counting negations (as before). */
+    /** Loose tokens, only for counting negations. */
     private fun looseTokens(s: String) = Normalize.fold(s)
         .replace(Regex("[^\\p{L}\\p{N}' ]+"), " ")
         .split(Regex("[\\s']+")).filter { it.isNotBlank() }

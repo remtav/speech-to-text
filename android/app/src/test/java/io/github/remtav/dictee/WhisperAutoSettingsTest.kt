@@ -73,7 +73,7 @@ class WhisperAutoSettingsTest {
             assertEquals(spec.id, 1000, o.whisperTailPaddings)
             assertNull(spec.id, o.whisperRepetitionFix)
         }
-        // The engine options of a fresh install are exactly those before issue #49.
+        // The engine options of a fresh install carry no repetition filter.
         assertNull(EngineOptions().whisperRepetitionFix)
     }
 
@@ -84,7 +84,7 @@ class WhisperAutoSettingsTest {
             assertFalse(s.whisperTailAuto)
             val o = s.engineOptions(ModelCatalog.whisperTurbo)
             assertEquals(stored, o.whisperTailPaddings)
-            assertNull("a fixed padding has no filter, as before #49", o.whisperRepetitionFix)
+            assertNull("a fixed padding has no filter", o.whisperRepetitionFix)
         }
     }
 

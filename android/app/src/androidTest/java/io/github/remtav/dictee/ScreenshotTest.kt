@@ -331,7 +331,7 @@ class ScreenshotTest : ImeTestBase() {
 
     /**
      * Issue #72: « Modèles et performances » in « Avancé »: Whisper (with its variant), Parakeet's card and the
-     * comparison, under their technical names. (The quick test is hidden: it is no longer captured.)
+     * comparison, under their technical names. (The quick test is not offered at installation, so it is not captured.)
      */
     @Test
     fun advancedModels() {

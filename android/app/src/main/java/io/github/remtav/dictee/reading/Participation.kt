@@ -1,5 +1,6 @@
 package io.github.remtav.dictee.reading
 
+import io.github.remtav.dictee.settings.AppSettings
 import io.github.remtav.dictee.stt.DictationLanguage
 
 /** The person's answer to « Parlez-vous un français québécois ? » (issue #15, lot 4). Self-declared, never checked. */
@@ -16,7 +17,7 @@ enum class ReadingEntry { DECLARE, ACCEPT, DECLINED }
 
 /**
  * Who is offered the reading test and where (issue #15, lot 4, "Offre" and "Déclaration"), as a value the
- * screens read and the tests drive. Pure Kotlin: [AppSettings][io.github.remtav.dictee.settings.AppSettings]
+ * screens read and the tests drive. Pure Kotlin: [AppSettings]
  * stores the three inputs, nothing else decides.
  *
  * - The offer exists only when "Français (Québec)" is among the chosen languages.

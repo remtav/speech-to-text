@@ -181,7 +181,7 @@ class HowToInstrumentedTest : ImeTestBase() {
                     }.toList()
                 }
                 assertEquals(listOf("rule", "example", "try", "all"), order)
-                // no longer on the first screen: the model section, "Si le champ contient", the "Commandes :" line
+                // not on the first screen: the model section, "Si le champ contient", the "Commandes :" line
                 var shownText = ""
                 s.onActivity { a -> shownText = a.window.decorView.allViews().filterIsInstance<TextView>().filter { it.isShown }.joinToString("\n") { it.text } }
                 assertFalse(shownText.contains("Votre modèle"))

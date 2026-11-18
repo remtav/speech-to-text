@@ -24,14 +24,12 @@ import java.util.Locale
 import kotlin.math.roundToInt
 
 /**
- * « Test rapide (1 minute) » (issue #36, recentred on the phone).
- *
- * **Since issue #72 it is a simple check of Whisper**, the only phone model: it reads a short text and says « Whisper
- * vous a compris à X % ». It is opened from the settings only, no longer from the installation
- * ([OFFERED_AT_SETUP] is false: with one model there is nothing to choose between). The two-model code stays
- * ([QuickTestModel], [QuickTestAdvice], their verdict strings and tests, `reading/QuickReading.kt`) for the day a
- * second model comes back, or to compare local Whisper and remote Whisper (a later issue: it will need a consent,
- * since this test is built to send nothing off the phone, and new verdicts). Draws [QuickTestModel].
+ * « Test rapide (1 minute) »: a simple check of Whisper, the only phone model. The person reads a short text and the
+ * screen says « Whisper vous a compris à X % ». It is opened from the settings only, not from the installation
+ * ([OFFERED_AT_SETUP] is false: with one model there is nothing to choose between). The two-model code is kept
+ * ([QuickTestModel], [QuickTestAdvice], their verdict strings and tests, `reading/QuickReading.kt`) for a second
+ * model, or to compare local Whisper and remote Whisper (that would need a consent, since this test is built to send
+ * nothing off the phone, and new verdicts). Draws [QuickTestModel].
  */
 class QuickTestActivity : AppCompatActivity() {
     private lateinit var app: DicteeApp
