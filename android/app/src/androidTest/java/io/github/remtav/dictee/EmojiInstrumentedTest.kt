@@ -6,7 +6,9 @@ import androidx.test.uiautomator.BySelector
 import androidx.test.uiautomator.StaleObjectException
 import androidx.test.uiautomator.UiObject2
 import androidx.test.uiautomator.Until
+import io.github.remtav.dictee.ime.DicteeImeService
 import io.github.remtav.dictee.ime.emoji.Emoji
+import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
@@ -44,6 +46,22 @@ class EmojiInstrumentedTest : ImeTestBase() {
     /** An emoji of the grid, found by what it shows. The tabs show other emojis (🕒 😀 👋 🐻 🍔 🚗 ⚽ 💡 ❤ 🏁): never look for those. */
     private fun cell(glyph: String): UiObject2 = obj(By.text(glyph), "emoji $glyph in the grid")
 
+    /** The field takes a tap's text a moment after the tap returns: wait for it instead of reading at once. */
+    private fun assertField1(expected: String) =
+        waitFor("field 1 is « $expected »", 5_000, details = { field1().map { it.code.toString(16) }.toString() }) { field1() == expected }
+
+    private fun assertRecents(expected: List<String>) =
+        waitFor("recents are $expected", 5_000, details = { app.settings.recentEmojis.toString() }) { app.settings.recentEmojis == expected }
+
+    /**
+     * The keyboard keeps its view for a rotation, and a test that starts the same field again within a few seconds looks
+     * like one: close the panel, so a failing test cannot leave it open over the next one.
+     */
+    @After
+    fun closeThePanel() {
+        onMain { DicteeImeService.instance?.get()?.setEmojiShown(false) }
+    }
+
     private fun typeInTheGrid(glyph: String) = clickFresh { cell(glyph) }
 
     private fun openFromDictation() {
@@ -60,14 +78,14 @@ class EmojiInstrumentedTest : ImeTestBase() {
         assertNull("the dictation view is replaced by the panel", device.findObject(res("mic")))
         // Without recents the panel opens on the smileys: the second one is 😃.
         typeInTheGrid("😃")
-        assertEquals("😃", field1())
+        assertField1("😃")
         assertNotNull("the panel stays open", device.findObject(res("emoji_picker")))
         typeInTheGrid("😃")
-        assertEquals("😃😃", field1())
+        assertField1("😃😃")
         clickFresh { obj(res("emoji_back"), "back key") }
         assertNotNull("the dictation is back", device.wait(Until.findObject(res("mic")), 5_000))
         gone(res("emoji_picker"), "emoji panel")
-        assertEquals(listOf("😃"), app.settings.recentEmojis)
+        assertRecents(listOf("😃"))
     }
 
     @Test
@@ -77,7 +95,7 @@ class EmojiInstrumentedTest : ImeTestBase() {
         openFromDictation()
         waitFor("the recents tab is shown", 5_000) { onMain { service.emojiPickerForTest()?.currentCategory } == null }
         typeInTheGrid("😄")
-        assertEquals(listOf("😄", "😃"), app.settings.recentEmojis)
+        assertRecents(listOf("😄", "😃"))
     }
 
     @Test
@@ -87,11 +105,11 @@ class EmojiInstrumentedTest : ImeTestBase() {
         launchFields()
         openFromDictation()
         typeInTheGrid(family)
-        assertEquals(family, field1())
+        assertField1(family)
         typeInTheGrid(flagFr)
-        assertEquals(family + flagFr, field1())
+        assertField1(family + flagFr)
         typeInTheGrid(rainbowFlag)
-        assertEquals(family + flagFr + rainbowFlag, field1())
+        assertField1(family + flagFr + rainbowFlag)
         clickFresh { obj(res("emoji_backspace"), "backspace") }
         waitFor("rainbow flag removed whole", 5_000, details = { field1().map { it.code.toString(16) }.toString() }) { field1() == family + flagFr }
         clickFresh { obj(res("emoji_backspace"), "backspace") }
@@ -107,7 +125,7 @@ class EmojiInstrumentedTest : ImeTestBase() {
         scenario.onActivity { it.field1.setText("ab"); it.field1.setSelection(1) }
         openFromDictation()
         typeInTheGrid("😃")
-        assertEquals("a😃b", field1())
+        assertField1("a😃b")
     }
 
     @Test
@@ -119,7 +137,7 @@ class EmojiInstrumentedTest : ImeTestBase() {
         clickFresh { obj(res("open_emoji_header"), "emoji button of the text keys") }
         obj(res("emoji_picker"), "emoji panel")
         typeInTheGrid("😃")
-        assertEquals("😃", field1())
+        assertField1("😃")
         clickFresh { obj(res("emoji_back"), "back key") }
         obj(res("letters"), "the text keys are back")
         assertNull("no emoji panel", device.findObject(res("emoji_picker")))
