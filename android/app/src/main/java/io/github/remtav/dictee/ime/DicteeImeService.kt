@@ -81,6 +81,8 @@ class DicteeImeService : InputMethodService(), DictationListener, EngineManager.
     private var decimalOrder: List<String> = DecimalSeparator.order(java.util.Locale.getDefault())
 
     private var sink: ImeTextSink? = null
+    /** Sink set aside while a placeholder input has no editor: it holds where the dictated text ends (#81). */
+    private var parkedSink: ImeTextSink? = null
     /** Field the current dictation types into: package + field id. */
     private var dictationField: String? = null
     private var currentField: String? = null
@@ -367,6 +369,7 @@ class DicteeImeService : InputMethodService(), DictationListener, EngineManager.
             // Placeholder input with no editor (during an activity recreation, or a screen
             // without text field): not a field change. Results wait until a field is back.
             currentField = null
+            sink?.let { parkedSink = it }
             sink = null
             return
         }
@@ -384,7 +387,10 @@ class DicteeImeService : InputMethodService(), DictationListener, EngineManager.
             reset()
         }
         applyView()
-        currentInputConnection?.let { sink = ImeTextSink(it) } ?: run { sink = null }
+        // A new connection to the field of the dictation (rotation, restart) keeps where the dictated text ends.
+        val previous = (sink ?: parkedSink).takeIf { field == dictationField }
+        parkedSink = null
+        sink = currentInputConnection?.let { ImeTextSink(it, attribute.initialSelStart, attribute.initialSelEnd, previous) }
         if (controller.isActive && !restarting && !isSameFieldAfterRotation(attribute, field)) {
             // Focus moved to another field mid-dictation: never type into the wrong one.
             // The key alone cannot tell fields apart (WebView inputs and fields without an
@@ -462,6 +468,13 @@ class DicteeImeService : InputMethodService(), DictationListener, EngineManager.
         main.postDelayed(idleRelease, minutes * 60_000L)
     }
 
+    override fun onUpdateSelection(
+        oldSelStart: Int, oldSelEnd: Int, newSelStart: Int, newSelEnd: Int, candidatesStart: Int, candidatesEnd: Int,
+    ) {
+        super.onUpdateSelection(oldSelStart, oldSelEnd, newSelStart, newSelEnd, candidatesStart, candidatesEnd)
+        sink?.onUpdateSelection(newSelStart, newSelEnd)
+    }
+
     override fun onFinishInput() {
         super.onFinishInput()
         sink?.clearComposing()
@@ -502,6 +515,7 @@ class DicteeImeService : InputMethodService(), DictationListener, EngineManager.
             return
         }
         dictationField = currentField
+        sink?.beginDictation()
         lastMessage = null
         controller.start(session)
     }

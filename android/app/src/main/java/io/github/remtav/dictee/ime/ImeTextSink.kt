@@ -4,8 +4,18 @@ import android.view.inputmethod.InputConnection
 import io.github.remtav.dictee.dictation.TextSink
 
 /** [TextSink] over the focused field's [InputConnection]. Main thread only. */
-class ImeTextSink(private val ic: InputConnection) : TextSink {
+class ImeTextSink(
+    private val ic: InputConnection,
+    @Suppress("UNUSED_PARAMETER") selStart: Int = -1,
+    @Suppress("UNUSED_PARAMETER") selEnd: Int = selStart,
+    @Suppress("UNUSED_PARAMETER") previous: ImeTextSink? = null,
+) : TextSink {
     private var hasComposing = false
+
+    @Suppress("UNUSED_PARAMETER")
+    fun onUpdateSelection(newSelStart: Int, newSelEnd: Int) {}
+
+    fun beginDictation() {}
 
     override fun textBeforeCursor(max: Int): String =
         ic.getTextBeforeCursor(max, 0)?.toString() ?: ""
