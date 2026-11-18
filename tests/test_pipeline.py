@@ -367,3 +367,97 @@ class TestLoadAudio:
             bad = tmp_path / "bad.wav"
             bad.write_bytes(b"not audio")
             load_audio(bad, "/usr/bin/ffmpeg")
+
+
+class TestKyutai:
+    """Issue #124: Kyutai STT through Transformers, with the model faked (no download, no torch)."""
+
+    @pytest.fixture
+    def kyutai(self, engine, monkeypatch):
+        class FakeKyutai(pipeline.KyutaiModel):
+            def __init__(self):  # no weights
+                self.name, self.device, self.calls = "kyutai-stt-1b-en_fr", "cpu", []
+
+            def transcribe(self, audio, progress_callback=None):
+                self.calls.append(len(audio))
+                progress_callback(100.0)
+                return {"segments": [{"start": 0.0, "end": 2.0, "text": " Bonjour. Ça va"}]}
+
+        engine.model = FakeKyutai()
+        engine.model_name = "kyutai-stt-1b-en_fr"
+        engine.align_models["fr"] = ("align-model", {"language": "fr"})
+        return engine
+
+    def test_language_is_the_users_first_it_knows_never_whispers_detection(self, kyutai):
+        data = kyutai.transcribe("a.wav", {"languages": ["es", "fr", "en"]})
+        assert data["language"] == "fr"
+        assert data["language_probability"] is None
+        assert data["text"] == "Bonjour. Ça va"
+        assert data["aligned"] is True
+        assert [w["word"] for w in data["segments"][0]["words"]] == ["Bonjour.", "Ça", "va"]
+        assert kyutai.model.calls == [32000]  # transcribed once, the whole 2 s
+
+    def test_forced_language_wins(self, kyutai):
+        kyutai.align_models["en"] = ("align-model", {"language": "en"})
+        assert kyutai.transcribe("a.wav", {"language": "en", "languages": ["fr"]})["language"] == "en"
+
+    def test_unknown_language_skips_alignment_with_a_warning(self, kyutai):
+        data = kyutai.transcribe("a.wav")
+        assert data["language"] == ""
+        assert data["aligned"] is False
+        assert "language is unknown" in data["warnings"][0]
+        assert data["text"] == "Bonjour. Ça va"
+
+    def test_quick(self, kyutai):
+        data = kyutai.transcribe("a.wav", {"quick": True, "languages": ["en"]})
+        assert data == {"text": "Bonjour. Ça va", "language": "en", "language_probability": None,
+                        "task": "transcribe"}
+
+    def test_prompt_is_ignored(self, kyutai):
+        assert kyutai.transcribe("a.wav", {"quick": True, "prompt": "Contexte"})["text"] == "Bonjour. Ça va"
+
+    def test_load_goes_through_transformers_repo(self, engine, monkeypatch):
+        loaded = []
+        monkeypatch.setattr(engine, "_download_hub_repo", lambda name, repo, progress: f"/cache/{repo}")
+        monkeypatch.setattr(pipeline, "KyutaiModel", lambda name, path, device: loaded.append((name, path, device))
+                            or MagicMock())
+        state = engine.load("kyutai-stt-1b-en_fr", "cuda")
+        assert loaded == [("kyutai-stt-1b-en_fr", "/cache/kyutai/stt-1b-en_fr-trfs", "cuda")]
+        assert state["model"] == "kyutai-stt-1b-en_fr" and state["device"] == "cuda"
+
+    def test_load_failure_is_a_model_load_error(self, engine, monkeypatch):
+        monkeypatch.setattr(engine, "_download_hub_repo", lambda name, repo, progress: "/cache")
+
+        def fail(*a):
+            raise ImportError("cannot import name 'KyutaiSpeechToTextProcessor' from 'transformers'")
+        monkeypatch.setattr(pipeline, "KyutaiModel", fail)
+        with pytest.raises(ModelLoadError, match="transformers >= 4.53"):
+            engine.load("kyutai-stt-1b-en_fr", "cpu")
+
+    def test_kyutai_is_a_valid_model(self):
+        assert "kyutai-stt-1b-en_fr" in VALID_MODELS
+
+
+class TestKyutaiChunks:
+    from app import kyutai as k
+
+    def test_short_audio_is_one_piece(self):
+        assert self.k.chunk_bounds(np.zeros(16000 * 25, np.float32)) == [(0, 16000 * 25)]
+        assert self.k.chunk_bounds(np.zeros(0, np.float32)) == []
+
+    def test_long_audio_is_cut_in_the_pause_before_the_limit(self):
+        rate = 16000
+        audio = np.full(rate * 100, 0.5, np.float32)  # loud everywhere...
+        audio[int(rate * 20.0):int(rate * 20.3)] = 0.0  # ...but a pause at 20 s
+        bounds = self.k.chunk_bounds(audio)
+        assert bounds[0][0] == 0 and bounds[-1][1] == len(audio)
+        assert all(a[1] == b[0] for a, b in zip(bounds, bounds[1:]))  # contiguous, nothing lost
+        assert all(end - start <= 25 * rate for start, end in bounds)
+        assert 20.0 * rate <= bounds[0][1] <= 20.3 * rate
+
+    def test_language_for(self):
+        name = "kyutai-stt-1b-en_fr"
+        assert self.k.language_for(name, "en", ["fr"]) == "en"
+        assert self.k.language_for(name, None, ["es", "en", "fr"]) == "en"
+        assert self.k.language_for(name, None, ["es"]) == ""
+        assert self.k.language_for(name) == ""

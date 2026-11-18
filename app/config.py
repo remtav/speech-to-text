@@ -12,7 +12,9 @@ from app.security import parse_tokens
 
 log = logging.getLogger(__name__)
 
-VALID_MODELS = ["tiny", "base", "small", "medium", "large", "large-v2", "large-v3", "large-v3-turbo"]
+WHISPER_MODELS = ["tiny", "base", "small", "medium", "large", "large-v2", "large-v3", "large-v3-turbo"]
+# Kyutai STT through Transformers (issue #124, see app/kyutai.py)
+VALID_MODELS = WHISPER_MODELS + ["kyutai-stt-1b-en_fr"]
 VALID_DEVICES = ["cpu", "cuda"]
 DEFAULT_DIARIZE_MODEL = "pyannote/speaker-diarization-community-1"
 WORKER_MODES = ["process", "inline"]

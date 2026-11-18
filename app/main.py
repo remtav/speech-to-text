@@ -357,9 +357,14 @@ def create_app(settings=None, backend=None, polish_client=None):
     # --------------------------------------------------- transcription
 
     async def submit_transcription(request, file, diarize, num_speakers, min_speakers, max_speakers,
-                                   language, quick=False, polish=None, prompt=None, languages=None):
+                                   language, quick=False, polish=None, prompt=None, languages=None, model=None):
         params = {"quick": quick, "language": _validate_language(language),
                   "polish": settings.polish_default if polish is None else bool(polish)}
+        model = (model or "").strip()
+        if model:  # issue #124: the model of this request only; without it, the server's
+            if model not in VALID_MODELS:
+                raise HTTPException(status_code=400, detail=f"Invalid model. Choose from: {VALID_MODELS}")
+            params["model"] = model
         languages = _validate_languages(languages)
         if languages:
             params["languages"] = languages
@@ -390,6 +395,7 @@ def create_app(settings=None, backend=None, polish_client=None):
         language: Optional[str] = Form(None),
         polish: Optional[bool] = Form(None),
         languages: Optional[str] = Form(None),
+        model: Optional[str] = Form(None),
     ):
         """Transcribe audio with word timestamps, optionally labelling speakers. Waits for the result.
 
@@ -401,7 +407,7 @@ def create_app(settings=None, backend=None, polish_client=None):
         polish step succeeded, and a ``polish`` status; ``text`` is always the raw transcript.
         """
         job = await submit_transcription(request, file, diarize, num_speakers, min_speakers, max_speakers, language,
-                                         polish=polish, languages=languages)
+                                         polish=polish, languages=languages, model=model)
         await _wait(job)
         _raise_for_job(job)
         return job.result
@@ -410,10 +416,11 @@ def create_app(settings=None, backend=None, polish_client=None):
     async def transcribe_streaming(request: Request, file: UploadFile = File(...),
                                    language: Optional[str] = Form(None),
                                    polish: Optional[bool] = Form(None),
-                                   languages: Optional[str] = Form(None)):
+                                   languages: Optional[str] = Form(None),
+                                   model: Optional[str] = Form(None)):
         """Fast transcription with language detection, skipping alignment and diarization."""
         job = await submit_transcription(request, file, None, None, None, None, language, quick=True, polish=polish,
-                                         languages=languages)
+                                         languages=languages, model=model)
         await _wait(job)
         _raise_for_job(job)
         return job.result
@@ -455,15 +462,17 @@ def create_app(settings=None, backend=None, polish_client=None):
         polish: Optional[bool] = Form(None),
         prompt: Optional[str] = Form(None),
         languages: Optional[str] = Form(None),
+        model: Optional[str] = Form(None),
     ):
         """Queue a transcription and return immediately; poll GET /jobs/{id} for progress and result.
 
         ``prompt`` (optional): text given to Whisper as context (``initial_prompt``), e.g. the end of the
-        previous block of a long dictation. It is never logged. ``languages`` (optional, "fr,en"): see
-        ``POST /transcribe``.
+        previous block of a long dictation. It is never logged (Kyutai takes none). ``languages`` (optional,
+        "fr,en"): see ``POST /transcribe``. ``model`` (optional, one of ``valid_models``): the model of this job
+        only (issue #124); without it, the server's current model.
         """
         job = await submit_transcription(request, file, diarize, num_speakers, min_speakers, max_speakers,
-                                         language, quick, polish, prompt, languages)
+                                         language, quick, polish, prompt, languages, model)
         return job.to_dict()
 
     @app.get("/jobs")

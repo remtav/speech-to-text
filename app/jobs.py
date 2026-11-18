@@ -246,7 +246,8 @@ class JobManager:
             if job.kind == "transcribe":
                 polishing = bool(job.params.get("polish"))
                 options = {k: v for k, v in job.params.items() if k != "polish"}
-                options.update(model=self.model, device=self.device)
+                # A request may name its model (issue #124: the phone's « Modèle du serveur »); else the server's.
+                options.update(model=job.params.get("model") or self.model, device=self.device)
                 whisper_progress = progress
                 if polishing:  # leave the end of the bar to the polish stage
                     def whisper_progress(fraction, message, stage):

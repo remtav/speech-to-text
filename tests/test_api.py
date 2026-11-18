@@ -198,6 +198,32 @@ class TestTranscribe:
             _wait_job(client, response.json()["id"])
         assert client.engine.calls[-1][2]["languages"] == ["fr", "en"]
 
+    @pytest.mark.parametrize("path", ["/transcribe", "/transcribe/streaming", "/jobs"])
+    def test_model_of_one_request(self, client, path):
+        # Issue #124: the phone's « Modèle du serveur » names the model of its request; the server's stays.
+        response = _post_audio(client, path, data={"model": "kyutai-stt-1b-en_fr"})
+        assert response.status_code in (200, 202)
+        if path == "/jobs":
+            _wait_job(client, response.json()["id"])
+        assert client.engine.calls[-1][2]["model"] == "kyutai-stt-1b-en_fr"
+        assert client.get("/health").json()["model"] == "base"
+        _post_audio(client)
+        assert client.engine.calls[-1][2]["model"] == "base"
+
+    def test_blank_model_is_the_servers(self, client):
+        _post_audio(client, data={"model": " "})
+        assert client.engine.calls[-1][2]["model"] == "base"
+
+    def test_invalid_model(self, client):
+        response = _post_audio(client, data={"model": "gpt-4"})
+        assert response.status_code == 400
+        assert "kyutai-stt-1b-en_fr" in response.json()["detail"]
+        assert not any(call[0] == "transcribe" for call in client.engine.calls)
+
+    def test_kyutai_is_a_valid_model(self, client):
+        assert "kyutai-stt-1b-en_fr" in client.get("/health").json()["valid_models"]
+        assert client.post("/switch-model", json={"model": "kyutai-stt-1b-en_fr", "device": "cpu"}).status_code == 200
+
     def test_no_languages_by_default(self, client):
         _post_audio(client, data={"languages": " "})
         assert "languages" not in client.engine.calls[-1][2]

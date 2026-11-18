@@ -85,6 +85,7 @@ Transcribe an audio file, optionally identifying speakers.
 | `prompt`       | `string`| `POST /jobs` only: context given to Whisper as `initial_prompt` (≤ 1000 characters, optional) |
 | `language`     | `string`| Whisper language code such as `fr`, or `auto` / absent to detect it (optional) |
 | `languages`    | `string`| With detection: the speaker's languages, comma-separated (`fr,en`); detection only chooses among them (optional) |
+| `model`        | `string`| One of `valid_models` (`GET /health`): the model of this request only; absent: the server's current model (optional) |
 
 **Language.** A forced `language` is imposed: Whisper *translates* into it anything said in another language. Without
 it, the language is detected on the first 30 s of the audio; on very short audio the detection is unreliable, and a
@@ -433,6 +434,13 @@ Whisper models run through faster-whisper (CTranslate2), which is faster and lig
 | `large-v3-turbo` | 809M | Fast | Near large-v3 |
 | `large-v2`| 1550M  | Slowest | Best     |
 | `large` / `large-v3`| 1550M  | Slowest | Best     |
+| `kyutai-stt-1b-en_fr` | ~1B | Fast on GPU | French & English only |
+
+**Kyutai STT** (`kyutai-stt-1b-en_fr`, issue #124) runs through Hugging Face Transformers
+([`kyutai/stt-1b-en_fr-trfs`](https://huggingface.co/kyutai/stt-1b-en_fr-trfs), the same weights as
+`kyutai/stt-1b-en_fr`, bf16 on the GPU, ~2.6 GB download). It has no language detection: the language is the forced
+`language`, else the first of `languages` it knows (`fr`, `en`), else unknown (word alignment is then skipped, with a
+warning). It takes no `prompt`. Audio is transcribed in pieces of at most 25 s, cut in pauses.
 
 Word alignment additionally downloads a ~360 MB–1.2 GB wav2vec2 model per language (first use), and diarization a ~30 MB pyannote pipeline.
 

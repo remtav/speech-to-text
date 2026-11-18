@@ -19,6 +19,7 @@ from app import hf
 from app.audio import load_audio
 from app.config import DEFAULT_DIARIZE_MODEL
 from app.errors import Cancelled, DiarizationUnavailable, ModelLoadError
+from app.kyutai import KYUTAI_MODELS, KyutaiModel, is_kyutai, language_for
 from app.speakers import format_speaker_transcript, list_speakers, split_segments_by_speaker, to_builtin
 
 log = logging.getLogger(__name__)
@@ -76,7 +77,7 @@ class Engine:
         self.ffmpeg_path = ffmpeg_path
         self.ffmpeg_timeout = ffmpeg_timeout
 
-        self.model = None  # whisperx FasterWhisperPipeline
+        self.model = None  # whisperx FasterWhisperPipeline, or app.kyutai.KyutaiModel
         self.model_name = None
         self.device = None
         self.align_models = {}  # language -> (align_model, metadata) or None if unsupported
@@ -188,8 +189,40 @@ class Engine:
             except Exception:  # e.g. Cancelled: the download itself is stopped by the caller
                 return
 
+    def _download_hub_repo(self, name, repo_id, progress):
+        """Download (or find in cache) a whole Hugging Face repository, reporting progress (Kyutai)."""
+        from huggingface_hub import model_info, snapshot_download
+
+        cache_dir = model_cache_dir()
+        os.makedirs(cache_dir, exist_ok=True)
+        try:
+            return snapshot_download(repo_id, cache_dir=cache_dir, local_files_only=True)
+        except Exception:
+            pass  # not cached yet
+        try:
+            total = sum(s.size or 0 for s in model_info(repo_id, files_metadata=True).siblings)
+        except Exception as e:
+            log.debug("Could not get the size of %s: %s", repo_id, e)
+            total = 0
+        size_text = f" ({format_bytes(total)})" if total else ""
+        progress(0.05, f"Downloading model '{name}'{size_text}…", "download")
+        stop = threading.Event()
+        repo_dir = os.path.join(cache_dir, "models--" + repo_id.replace("/", "--"))
+        watcher = threading.Thread(target=self._watch_download, daemon=True,
+                                   args=(repo_dir, total, name, progress, stop))
+        watcher.start()
+        try:
+            path = snapshot_download(repo_id, cache_dir=cache_dir)
+        except Exception as e:
+            raise ModelLoadError(f"Failed to download model '{name}': {e}") from e
+        finally:
+            stop.set()
+            watcher.join(timeout=2)
+        progress(0.45, f"Model '{name}' downloaded", "download")
+        return path
+
     def load(self, name, device, progress=_noop_progress):
-        """Load the requested Whisper model on `device`, replacing the current one."""
+        """Load the requested model (Whisper or Kyutai) on `device`, replacing the current one."""
         if self.model is not None and self.model_name == name and self.device == device:
             progress(1.0, f"Model '{name}' ready on {device}", "load")
             return self.state()
@@ -198,6 +231,9 @@ class Engine:
         if device != self.device:
             self._unload_aux()  # alignment / diarization models live on the old device
         self._free_device_memory()
+
+        if is_kyutai(name):
+            return self._load_kyutai(name, device, progress)
 
         compute_type = compute_type_for(device, self.compute_type)
         progress(0.02, f"Preparing model '{name}' on {device} ({compute_type})…", "load")
@@ -223,6 +259,40 @@ class Engine:
         self.device = device
         progress(1.0, f"Model '{name}' ready on {device}", "load")
         return self.state()
+
+    def _load_kyutai(self, name, device, progress):
+        progress(0.02, f"Preparing model '{name}' on {device}…", "load")
+        try:
+            path = self._download_hub_repo(name, KYUTAI_MODELS[name], progress)
+            progress(0.5, f"Loading '{name}' weights on {device}…", "load")
+            self.model = KyutaiModel(name, path, device)
+        except ModelLoadError:
+            raise
+        except Exception as e:
+            log.exception("Error loading model %s on %s", name, device)
+            text = str(e).lower()
+            hint = ""
+            if device == "cuda" and "out of memory" in text:
+                hint = " — not enough GPU memory: free VRAM or use the CPU"
+            elif "kyutai" in text and ("import" in text or "attribute" in text):
+                hint = " — Kyutai STT needs transformers >= 4.53"
+            raise ModelLoadError(f"Failed to load model '{name}' on {device}: {e}{hint}") from e
+        self.model_name = name
+        self.device = device
+        progress(1.0, f"Model '{name}' ready on {device}", "load")
+        return self.state()
+
+    @property
+    def _kyutai(self):
+        return isinstance(self.model, KyutaiModel)
+
+    def _run_model(self, audio, language, progress, start, end, message):
+        """{"segments": [...]} of the loaded model, Whisper (VAD-batched) or Kyutai (pieces of <= 25 s)."""
+        callback = _progress_range(progress, start, end, message, "transcribe")
+        if self._kyutai:
+            return self.model.transcribe(audio, progress_callback=callback)
+        return self.model.transcribe(audio, batch_size=self.batch_size, language=language,
+                                     progress_callback=callback)
 
     def _align_model(self, language):
         """Cached (align_model, metadata) for `language`, or None when the language has no model."""
@@ -286,7 +356,10 @@ class Engine:
 
         language = options.get("language") or None
         probability = None
-        if language is None:
+        if self._kyutai:
+            # No language detection in Kyutai: the forced language, else the user's first one it knows, else "".
+            language = language_for(self.model_name, language, options.get("languages"))
+        elif language is None:
             language, probability = self._detect_language(audio, options.get("languages"))
         options = dict(options, language=language, language_probability=probability)
 
@@ -342,10 +415,7 @@ class Engine:
     def _quick(self, audio, options, progress):
         """Transcription only (no alignment / diarization), for low-latency use."""
         progress(0.15, "Transcribing (quick)…", "transcribe")
-        result = self.model.transcribe(
-            audio, batch_size=self.batch_size, language=options["language"],
-            progress_callback=_progress_range(progress, 0.15, 0.95, "Transcribing", "transcribe"),
-        )
+        result = self._run_model(audio, options["language"], progress, 0.15, 0.95, "Transcribing")
         return to_builtin({
             "text": " ".join(seg["text"].strip() for seg in result["segments"]).strip(),
             "language": options["language"],
@@ -361,17 +431,18 @@ class Engine:
             self._diarizer()  # fail fast, before the long transcription, if it can't be loaded
 
         # Phase 1: transcribe (VAD-batched faster-whisper)
-        progress(0.15, "Running Whisper transcription…", "transcribe")
-        result = self.model.transcribe(
-            audio, batch_size=self.batch_size, language=options["language"],
-            progress_callback=_progress_range(progress, 0.15, 0.55, "Transcribing", "transcribe"),
-        )
+        progress(0.15, "Running Kyutai transcription…" if self._kyutai else "Running Whisper transcription…",
+                 "transcribe")
+        result = self._run_model(audio, options["language"], progress, 0.15, 0.55, "Transcribing")
         language = options["language"]
 
         # Phase 2: word-level alignment (wav2vec2). Optional: on failure, keep segment timestamps.
         aligned = False
         warnings = []
-        if result["segments"]:
+        if result["segments"] and not language:
+            warnings.append("Word timestamps skipped: the language is unknown (Kyutai does not detect it; "
+                            "pass language or languages)")
+        elif result["segments"]:
             progress(0.55, f"Loading alignment model ({language})…", "align")
             try:
                 align = self._align_model(language)
