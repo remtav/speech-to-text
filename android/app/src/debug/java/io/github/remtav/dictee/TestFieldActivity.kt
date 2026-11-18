@@ -5,6 +5,7 @@ import android.os.Bundle
 import android.text.InputType
 import android.widget.EditText
 import android.widget.LinearLayout
+import android.widget.ScrollView
 
 /** Two text fields and a password field, for the instrumented IME tests (debug builds only). */
 class TestFieldActivity : AppCompatActivity() {
@@ -58,7 +59,9 @@ class TestFieldActivity : AppCompatActivity() {
         col.addView(number)
         col.addView(decimal)
         col.addView(phone)
-        setContentView(col)
+        // In a scroll view, like a real form (issue #117): in landscape the keyboard leaves room for two fields,
+        // and in a plain column the lower ones were squeezed to no height, which refuses the focus.
+        setContentView(ScrollView(this).apply { addView(col) })
         // A test can start on another field: the keyboard's very first input is then that field's.
         when (intent.getStringExtra(EXTRA_FOCUS)) {
             "number" -> number.requestFocus()

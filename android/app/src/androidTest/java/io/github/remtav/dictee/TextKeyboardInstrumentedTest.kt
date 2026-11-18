@@ -77,7 +77,7 @@ class TextKeyboardInstrumentedTest : ImeTestBase() {
 
     /** The test activity must have been launched on the number field (`launchFields(focus = "number")`). */
     private fun checkPadHasNoSwitchKey() {
-        assertNotNull("pad", device.wait(Until.findObject(res("pad")), 10_000))
+        device.wait(Until.findObject(res("pad")), 10_000) ?: throw AssertionError("pad\n${windowFocus()}\n${focusDiagnostics()}")
         assertNull("pad_switch", device.findObject(res("pad_switch")))
         assertNotNull("backspace", device.findObject(res("pad_backspace")))
         assertNotNull("enter", device.findObject(res("pad_enter")))

@@ -72,9 +72,12 @@ abstract class ImeTestBase {
         TestHooks.engineFactory = null
         TestHooks.assumeInstalled = false
         TestHooks.networkAvailable = null
+        // Natural orientation BEFORE closing the activity (issue #117): closing it brings the launcher to the
+        // front, and Android 14 remembers the rotation lock it finds then, to put it back with the next activity
+        // (see [keepNaturalOrientation]). Closed in landscape, the next tests would all reopen in landscape.
+        device.setOrientationNatural()
         if (::scenario.isInitialized) scenario.close()
         app.engines.release()
-        device.setOrientationNatural()
         device.unfreezeRotation()
     }
 
@@ -127,6 +130,7 @@ abstract class ImeTestBase {
         val intent = android.content.Intent(context, TestFieldActivity::class.java)
         if (focus != null) intent.putExtra(TestFieldActivity.EXTRA_FOCUS, focus)
         scenario = ActivityScenario.launch(intent)
+        keepNaturalOrientation()
         dismissNotRespondingDialogs()
         val shown = {
             val svc = DicteeImeService.instance?.get()
@@ -158,6 +162,29 @@ abstract class ImeTestBase {
         }
     }
 
+    /**
+     * The tests start in the natural orientation, whatever an earlier test or class left (issue #117). Android 14
+     * « rotation reversion »: when an activity locked to portrait (the launcher, NOSENSOR) comes to the front
+     * while the rotation is locked in landscape, the system turns the screen to portrait and keeps the landscape
+     * lock aside; it puts it back as soon as an ordinary activity comes to the front, even if the rotation was
+     * set to natural in between (setUpIme runs while the launcher is in front). The test activity then opened
+     * in landscape, where the keyboard leaves no room for the lower fields. Asked again once the test activity
+     * is in front, the natural orientation holds; waits until the activity itself is in portrait.
+     */
+    private fun keepNaturalOrientation() {
+        val portrait = {
+            var p = false
+            scenario.onActivity { p = it.resources.configuration.orientation == android.content.res.Configuration.ORIENTATION_PORTRAIT }
+            device.displayRotation == android.view.Surface.ROTATION_0 && p
+        }
+        val end = SystemClock.uptimeMillis() + 15_000
+        while (!runCatching(portrait).getOrDefault(false) && SystemClock.uptimeMillis() < end) {
+            if (device.displayRotation != android.view.Surface.ROTATION_0) device.setOrientationNatural()
+            SystemClock.sleep(200)
+        }
+        if (!runCatching(portrait).getOrDefault(false)) fail("the test activity did not open in portrait\n${focusDiagnostics()}")
+    }
+
     protected val service: DicteeImeService get() = DicteeImeService.instance!!.get()!!
 
     protected fun <T> onMain(block: () -> T): T {
@@ -186,10 +213,45 @@ abstract class ImeTestBase {
             f.requestFocus()
         }
         instrumentation.waitForIdleSync()
-        waitFor("keyboard told of the focus change to field $which", 10_000) {
+        waitFor("keyboard told of the focus change to field $which", 10_000, details = ::focusDiagnostics) {
             onMain { DicteeImeService.instance?.get()?.currentInputEditorInfo }.let { it != null && it !== before }
         }
     }
+
+    /**
+     * What each side believes about the focus when a focus change did not reach the keyboard (issue #117): the
+     * window manager (focused window per display), the input method service (focused window and served client),
+     * the app's own view of it, and the focus events of the input dispatcher.
+     */
+    protected fun focusDiagnostics(): String = runCatching {
+        val wm = shell("dumpsys window").lines().filter {
+            "WINDOW MANAGER" in it || "mCurrentFocus" in it || "mFocusedApp" in it || "mTopFocusedDisplayId" in it ||
+                "imeLayeringTarget" in it || "imeInputTarget" in it || "imeControlTarget" in it ||
+                "Display: mDisplayId=" in it || "mFocusedWindow" in it
+        }.joinToString("\n")
+        val displays = shell("dumpsys display").lines().filter { "mDisplayId=" in it || "Display Devices" in it }
+            .take(10).joinToString("\n") { it.trim().take(160) }
+        val ims = shell("dumpsys input_method").lines().filter {
+            "mCurFocusedWindow" in it || "mCurClient" in it || "mServedView" in it || "mNextServedView" in it ||
+                "mCurRootView" in it || "mFocusedWindow" in it || "mImeBindingState" in it || "mCurrentRootView" in it
+        }.joinToString("\n") { it.trim() }
+        val rotation = shell("dumpsys window displays").lines().filter { "otation" in it || "mLastOrientation" in it }
+            .take(25).joinToString("\n") { it.trim().take(200) } +
+            "\nuser_rotation=${shell("settings get system user_rotation").trim()} accelerometer_rotation=" +
+            shell("settings get system accelerometer_rotation").trim() + " uiDevice.displayRotation=${device.displayRotation}" +
+            "\n" + shell("dumpsys window displays").substringAfter("RotationHistory", "").lines().take(20).joinToString("\n") { it.trim().take(250) } +
+            "\n--- settings writes\n" + shell("dumpsys settings").lines()
+                .filter { "user_rotation" in it || "accelerometer_rotation" in it }.takeLast(30).joinToString("\n") { it.trim().take(250) }
+        var activity = ""
+        if (::scenario.isInitialized) runCatching {
+            scenario.onActivity {
+                activity = "activity orientation=${it.resources.configuration.orientation} hasWindowFocus=${it.hasWindowFocus()} currentFocus=${it.currentFocus?.let { v -> v.javaClass.simpleName + "#" + v.id }}"
+            }
+        }.onFailure { activity = "activity: $it" }
+        val events = shell("logcat -d -b events -s input_focus:* wm_focus_changed:* wm_on_top_resumed_gained_called:* wm_on_top_resumed_lost_called:* wm_set_resumed_activity:* wm_finish_activity:* wm_destroy_activity:* wm_create_activity:*")
+            .lines().takeLast(30).joinToString("\n")
+        "--- window manager\n$wm\n--- displays\n$displays\n--- rotation\n$rotation\n--- input method service\n$ims\n--- app\n$activity\n--- focus events\n$events"
+    }.getOrDefault("")
 
     /** Waits until the test activity has the window focus, answering "Wait" to a not-responding box. */
     protected fun awaitWindowFocus(timeout: Long = 10_000) {
@@ -229,7 +291,7 @@ abstract class ImeTestBase {
     protected fun awaitIdle(timeout: Long = 30_000) =
         waitFor("dictation finished", timeout) { state() == DictationState.IDLE || state() == DictationState.ERROR }
 
-    protected fun waitFor(what: String, timeout: Long, condition: () -> Boolean) {
+    protected fun waitFor(what: String, timeout: Long, details: (() -> String)? = null, condition: () -> Boolean) {
         val end = SystemClock.uptimeMillis() + timeout
         while (SystemClock.uptimeMillis() < end) {
             if (runCatching(condition).getOrDefault(false)) return
@@ -240,7 +302,8 @@ abstract class ImeTestBase {
         // Enough lines for the keyboard's own lifecycle (startInput, finishInputView, "still hidden: stop"),
         // and which window had the focus: the two causes seen in flaky runs on a loaded emulator.
         val log = runCatching { shell("logcat -d -s DicteeIme:I").lines().takeLast(40).joinToString("\n") }.getOrDefault("")
-        fail("timed out waiting for: $what ($fields $st)\n${windowFocus()}\n$log")
+        val more = details?.let { runCatching(it).getOrDefault("") }.orEmpty()
+        fail("timed out waiting for: $what ($fields $st)\n${windowFocus()}\n$log\n$more")
     }
 
     protected fun assertWithin(actual: Float, expected: Float, tolerance: Float) =
