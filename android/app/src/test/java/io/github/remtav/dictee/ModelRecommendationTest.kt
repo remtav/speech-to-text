@@ -122,8 +122,10 @@ class ModelRecommendationTest {
         assertEquals("portugais", DictationLanguage.PORTUGUESE.inSentence)
     }
 
-    @Test fun whisperNoteIsAnObservationAndNoLongerALastResort() {
-        assertTrue(ModelCatalog.whisperTurbo.note.startsWith("Observé"))
+    @Test fun whisperNoteOpposesSpeedAndPrecisionAndIsNoLongerALastResort() {
+        // Issue #89: « Plus lent, plus précis. » (the earlier « Observé… » wording is replaced).
+        assertEquals(ModelCatalog.WHISPER_NOTE, ModelCatalog.whisperTurbo.note)
+        assertTrue(ModelCatalog.whisperTurbo.note.startsWith("Plus lent, plus précis"))
         assertFalse(ModelCatalog.whisperTurbo.note.contains("dernier recours"))
     }
 
