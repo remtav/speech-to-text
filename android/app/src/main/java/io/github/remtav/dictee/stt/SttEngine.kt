@@ -72,7 +72,7 @@ data class EngineOptions(
     val whisperTailPaddings: Int = WhisperTuning.DEFAULT_TAIL_PADDINGS,
     /**
      * Whisper only, « Automatique » padding (issue #49): what to do when the repetition filter fires;
-     * null = no filter (fixed padding, the behaviour before #49).
+     * null = no filter (fixed padding).
      */
     val whisperRepetitionFix: RepetitionFix? = null,
 ) {

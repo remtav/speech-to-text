@@ -11,7 +11,7 @@ object ModelPlainNames {
     fun of(spec: ModelSpec): String = when (spec.id) {
         ModelCatalog.whisperTurbo.id -> "Whisper"
         ModelCatalog.remote.id -> "Serveur distant"
-        // Advanced and hidden models are reached only from « Avancé »: their own name is fine there.
+        // Advanced models are reached only from « Avancé »: their own name is fine there.
         else -> spec.displayName
     }
 

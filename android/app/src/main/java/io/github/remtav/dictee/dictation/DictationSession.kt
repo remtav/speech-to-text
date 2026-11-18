@@ -40,7 +40,7 @@ class DictationSession(
     val canFallBack: Boolean = true,
     /**
      * Local dictation (issue #53, « Regrouper les énoncés (Whisper) »): the VAD's utterances are grouped before being
-     * transcribed, see [LocalGrouping]. Null (the default): one transcription per utterance, as before.
+     * transcribed, see [LocalGrouping]. Null (the default): one transcription per utterance.
      */
     val localGrouping: LocalGrouping? = null,
 )

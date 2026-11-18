@@ -484,7 +484,7 @@ class BlockDictationTest {
             setUp()
             polishCode = code
             val run = dictate(remote(), before = {})
-            // No block was sent: one request with the whole audio and polish, as before issue #35.
+            // No block was sent: one request with the whole audio and polish.
             val post = jobPosts().single()
             assertEquals("true", field(post.body, "polish"))
             assertNull(field(post.body, "prompt"))

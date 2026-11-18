@@ -12,8 +12,8 @@ import org.junit.Test
 import org.junit.runner.RunWith
 
 /**
- * Issue #23: no dictation reaches the server until the "server" mode is recorded in the settings (since issue #57,
- * only in the folded server section of « Avancé »), and the settings choice is respected. Issue #57: a server
+ * Issue #23: no dictation reaches the server until the "server" mode is recorded in the settings (only in the folded
+ * server section of « Avancé »), and the settings choice is respected. Issue #57: a server
  * set up with its mode receives the dictations, and the main screen says so.
  */
 @RunWith(AndroidJUnit4::class)

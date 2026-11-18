@@ -45,7 +45,7 @@ class BlockDictation(
 
     /**
      * Before the first block: false when the server has no `POST /polish` (404/405, an older server), the
-     * dictation then goes whole, as before. Asked only when the final polish is wanted; any other answer
+     * dictation then goes whole. Asked only when the final polish is wanted; any other answer
      * (failure, timeout) keeps the blocks, whose own fallback covers a dead server.
      */
     fun prepare(): Boolean {

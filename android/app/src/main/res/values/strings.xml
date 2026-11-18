@@ -376,7 +376,7 @@
     <string name="reading_better_chosen">%1$s est maintenant votre modèle pour la dictée.</string>
     <string name="reading_result_kept">Votre lecture n\'est conservée nulle part : l\'enregistrement est effacé dès que vous fermez cet écran.</string>
     <string name="reading_close">Fermer</string>
-    <!-- Issue #36, recentred on the phone: the quick test compares two phone models (issue #37: named by their effect). -->
+    <!-- Issue #36, recentred on the phone: the quick test checks Whisper, the phone model. -->
     <string name="quick_title">Test rapide</string>
     <string name="quick_open">Faire le test (1 minute)</string>
     <string name="quick_open_help">Facultatif : lisez une quarantaine de mots à voix haute, et l\'application vous dit quel modèle vous comprend le mieux.</string>

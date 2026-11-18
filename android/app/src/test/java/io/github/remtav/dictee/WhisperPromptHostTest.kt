@@ -20,7 +20,7 @@ import java.lang.reflect.Modifier
  *    métadonnée `sot_sequence` lue dans le fichier ONNX au chargement, n'y change que la langue et la tâche, et
  *    ajoute `no_timestamps` : aucune autre entrée ;
  *  - `OfflineStream::SetOption` existe, mais l'implémentation Whisper ne lit aucune option du flux
- *    (`GetOption` n'apparaît que chez Qwen3-ASR, FunASR-nano, Canary, SenseVoice, FireRedASR…).
+ *    (`GetOption` n'apparaît que chez FunASR-nano, Canary, SenseVoice, FireRedASR…).
  *
  * Ce test le vérifie sur le JAR Linux x86-64 de la même version :
  *  - sans modèle (donc aussi sur la CI) : la classe de configuration n'a pas de champ d'amorce ; si une version

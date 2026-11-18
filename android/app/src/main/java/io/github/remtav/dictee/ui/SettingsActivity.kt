@@ -41,7 +41,7 @@ class SettingsActivity : AppCompatActivity() {
     private lateinit var participationBox: LinearLayout
     /** « Avancé » section (issue #49): generic, other advanced settings are added to it (#37). */
     private lateinit var advancedBox: LinearLayout
-    /** The « Avancé » models (Parakeet) and the files of withdrawn models (issue #72). */
+    /** The « Avancé » models (Parakeet): choose, download, delete. */
     private lateinit var otherModelsBox: LinearLayout
     /** « Serveur distant, pour essais (développeurs) », folded inside « Avancé » (issue #57). */
     private lateinit var serverSection: Collapsible

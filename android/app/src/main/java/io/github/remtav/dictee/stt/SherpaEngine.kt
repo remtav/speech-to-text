@@ -98,7 +98,7 @@ class SherpaEngine(
      * the user: « … mais on dirait que j » instead of « … que j'ai mis les réglages et que ça ne marche
      * pas. »). The ceiling counts the samples given, so the same audio followed by as much silence doubles
      * it. The longer decode is kept only if it ended by itself, under its own ceiling; one that runs into
-     * it again is a loop (issue #40), not speech, and the first decode is kept as before.
+     * it again is a loop (issue #40), not speech, and the first decode is kept.
      */
     private fun decode(rec: OfflineRecognizer, samples: FloatArray, sampleRate: Int): Decoded {
         val first = decodeOnce(rec, samples, sampleRate)

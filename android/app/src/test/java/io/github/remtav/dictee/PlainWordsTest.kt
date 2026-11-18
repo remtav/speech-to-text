@@ -26,7 +26,7 @@ class PlainWordsTest {
     /** The strings of the normal path: the installation screen, the quick test, the model cards and notices, the keyboard. */
     private val normalPath: Map<String, String> get() = strings.filterKeys { name ->
         listOf(
-            "setup_", "quick_", "model_notice_", "model_recommended", "model_publisher", "model_warning", "status_", "delete_",
+            "setup_", "quick_", "model_recommended", "model_publisher", "model_warning", "status_", "delete_",
             // Review of #65: the tutorial, the reading test, the keyboard's messages and the first-level dictation help.
             "howto_", "reading_", "contrib_", "msg_", "cd_", "settings_partials",
         ).any { name.startsWith(it) }
@@ -39,7 +39,7 @@ class PlainWordsTest {
     private val normalPathSources = listOf(
         "ui/SetupActivity.kt", "ui/QuickTestActivity.kt", "ui/QuickTestModel.kt", "ui/HowToActivity.kt",
         "ui/ReadingTestActivity.kt", "ui/ReadingTestModel.kt", "ime/DicteeImeService.kt", "DicteeApp.kt",
-        "stt/EngineManager.kt",
+        "stt/EngineManager.kt", "ui/ContributionShare.kt",
     )
 
     /**
@@ -89,7 +89,7 @@ class PlainWordsTest {
         for (r in retired) for (n in names) assertFalse("$n : $r", n.contains(r))
         val source = main.resolve("java/io/github/remtav/dictee/stt/ModelPlainNames.kt").readText()
         for (r in retired) assertFalse("ModelPlainNames.kt : $r", source.substringAfter("object ModelPlainNames").contains("\"$r\""))
-        // The strings of the hidden quick test too: Whisper, not the old name (their verdicts are not rewritten).
+        // The quick test's strings too (reached from the settings only): none uses the retired names.
         for ((key, text) in strings) {
             for (r in listOf("modèle plus précis", "Plus précis")) assertFalse("$key : $r", text.contains(r))
         }
