@@ -4,6 +4,7 @@ import io.github.remtav.dictee.ime.KeyLanguage
 import io.github.remtav.dictee.ime.LayoutKind
 import io.github.remtav.dictee.ui.Licences
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -18,6 +19,23 @@ class WordListsTest {
     @Test
     fun everyKeyboardLanguageHasItsList() {
         for (l in KeyLanguage.entries) assertTrue(l.name, File(assets, WordLists.assetName(l)).isFile)
+    }
+
+    /**
+     * The Android Gradle plugin unpacks an asset named `*.gz` and drops the suffix when it builds the APK: a list
+     * opened under that name is missing on the phone (CI of PR #119, empty bar). The names must not end with `.gz`.
+     */
+    @Test
+    fun assetNamesSurviveThePackaging() {
+        for (l in KeyLanguage.entries) assertFalse(WordLists.assetName(l), WordLists.assetName(l).endsWith(".gz"))
+    }
+
+    /** A list read as plain text (unpacked) works too, should a build tool unpack it anyway. */
+    @Test
+    fun aPlainTextListIsReadToo() {
+        val lex = Lexicon.read("chat\t180\nchien\t170\n".byteInputStream())
+        assertEquals(2, lex.size)
+        assertEquals("chat", lex.word(lex.prefixRange("chat").first))
     }
 
     @Test

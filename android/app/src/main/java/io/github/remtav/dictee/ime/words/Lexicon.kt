@@ -1,5 +1,6 @@
 package io.github.remtav.dictee.ime.words
 
+import java.io.BufferedInputStream
 import java.io.InputStream
 import java.util.zip.GZIPInputStream
 
@@ -84,8 +85,19 @@ class Lexicon private constructor(
     }
 
     companion object {
-        /** Reads a list as written by `tools/listes-de-mots/construire.py` (gzip, one `word<TAB>freq[<TAB>x]` per line). */
-        fun read(input: InputStream): Lexicon = GZIPInputStream(input, 1 shl 16).bufferedReader(Charsets.UTF_8).use { r ->
+        private fun unpacked(input: InputStream): InputStream {
+            val buffered = BufferedInputStream(input, 1 shl 16)
+            buffered.mark(2)
+            val gzip = buffered.read() == 0x1f && buffered.read() == 0x8b
+            buffered.reset()
+            return if (gzip) GZIPInputStream(buffered, 1 shl 16) else buffered
+        }
+
+        /**
+         * Reads a list as written by `tools/listes-de-mots/construire.py`: one `word<TAB>freq[<TAB>x]` per line,
+         * gzip-compressed or, if a build tool unpacked it, plain.
+         */
+        fun read(input: InputStream): Lexicon = unpacked(input).bufferedReader(Charsets.UTF_8).use { r ->
             val words = StringBuilder(1 shl 21)
             val keys = java.io.ByteArrayOutputStream(1 shl 21)
             val wordStart = IntArrayBuilder()

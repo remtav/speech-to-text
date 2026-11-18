@@ -59,6 +59,16 @@ class SuggestionsInstrumentedTest : ImeTestBase() {
         app.settings.languages = setOf(DictationLanguage.FRENCH_QUEBEC)
     }
 
+    /** Each word list opens from the APK under the name the keyboard asks for (CI of PR #119: `*.gz` was renamed). */
+    @Test
+    fun everyWordListOpensFromTheApk() {
+        for (l in io.github.remtav.dictee.ime.KeyLanguage.entries) {
+            val name = io.github.remtav.dictee.ime.words.WordLists.assetName(l)
+            val lex = context.assets.open(name).use { io.github.remtav.dictee.ime.words.Lexicon.read(it) }
+            assertTrue("$name: ${lex.size} words", lex.size > 150_000)
+        }
+    }
+
     @Test
     fun barOffersTheWordBeingTypedAndATapWritesIt() {
         french()

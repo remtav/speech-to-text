@@ -5,7 +5,8 @@ Source: the AOSP "combined" word lists shipped in AnySoftKeyboard's language pac
 read at a fixed commit. Each line of a source looks like ` word=maison,f=180,flags=,originalFreq=180`;
 `possibly_offensive=true` marks a word never offered as a suggestion.
 
-Output, one file per keyboard language: app/src/main/assets/words/<lang>.txt.gz, UTF-8 lines
+Output, one file per keyboard language: app/src/main/assets/words/<lang>.txt.gzip (gzip; not `.gz`, which the
+Android Gradle plugin unpacks and renames in the APK), UTF-8 lines
 
     word<TAB>frequency            frequency 1-255, as in the source
     word<TAB>frequency<TAB>x      x: possibly offensive
@@ -83,7 +84,7 @@ def main() -> None:
         with gzip.GzipFile(filename="", fileobj=buf, mode="wb", compresslevel=9, mtime=0) as gz:
             for word, (freq, offensive) in rows:
                 gz.write(f"{word}\t{freq}{chr(9) + 'x' if offensive else ''}\n".encode("utf-8"))
-        (out / f"{lang}.txt.gz").write_bytes(buf.getvalue())
+        (out / f"{lang}.txt.gzip").write_bytes(buf.getvalue())
         print(f"{lang}: {len(rows)} words, {len(buf.getvalue()) / 1e6:.2f} MB")
 
 

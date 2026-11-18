@@ -75,7 +75,10 @@ class WordLists(private val open: (String) -> InputStream) {
     companion object {
         private const val TAG = "WordLists"
 
-        /** The file of [language] in the assets, written by `tools/listes-de-mots/construire.py`. */
-        fun assetName(language: KeyLanguage): String = "words/${language.wordList}.txt.gz"
+        /**
+         * The file of [language] in the assets, written by `tools/listes-de-mots/construire.py`. Not `.gz`: the
+         * Android Gradle plugin unpacks such assets and drops the suffix, so the name would not exist in the APK.
+         */
+        fun assetName(language: KeyLanguage): String = "words/${language.wordList}.txt.gzip"
     }
 }

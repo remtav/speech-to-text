@@ -4919,7 +4919,8 @@ l'implémentation part de `main` (la branche d'essai `ccr-67305f2c-9rtymc` n'est
 - **Ce qui vient d'AnySoftKeyboard** : seulement ses listes de mots (les listes « combined » d'AOSP de ses paquets de
   langue, commit `1ee43e7f`). `tools/listes-de-mots/construire.py` les réduit à `mot<TAB>fréquence[<TAB>x]`
   (x : possiblement offensant), triées par mot replié (minuscules, sans accents, `œ` → `oe`) :
-  `assets/words/{fr,en,es,pt}.txt.gz`, 3,6 Mo en tout. Portugais : Brésil et Portugal réunis. Son moteur de
+  `assets/words/{fr,en,es,pt}.txt.gzip`, 3,6 Mo en tout (pas `.gz` : le plugin Android décompresse ces fichiers
+  et retire l'extension dans l'APK, le nom ouvert n'y existait plus). Portugais : Brésil et Portugal réunis. Son moteur de
   suggestions (C++, JNI, format binaire à lui) n'est pas repris : pas de compilation native ajoutée.
 - **Moteur** (`ime/words`, Kotlin pur, testé sur la JVM avec les vraies listes) : `Lexicon` garde une liste dans
   quelques tableaux (une chaîne pour tous les mots, un octet par lettre repliée), quelques Mo par langue ;

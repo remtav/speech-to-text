@@ -1,7 +1,7 @@
 Listes de mots des suggestions du clavier à touches (fr, en, es, pt) — issue #71
 ================================================================================
 
-Les fichiers *.txt.gz de ce dossier sont tirés des listes de mots « combined » du projet
+Les fichiers *.txt.gzip de ce dossier sont tirés des listes de mots « combined » du projet
 Android Open Source (dictionnaires de LatinIME), telles que distribuées dans les paquets de
 langue d'AnySoftKeyboard (https://github.com/AnySoftKeyboard/AnySoftKeyboard, commit
 1ee43e7f037b905e1c762e3beceac1c0178797b6) :

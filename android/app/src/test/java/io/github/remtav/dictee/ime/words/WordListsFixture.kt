@@ -10,7 +10,7 @@ object WordListsFixture {
     private val dir = File(System.getProperty("dictee.assetsDir") ?: "src/main/assets", "words")
     private val cache = HashMap<String, Lexicon>()
 
-    fun file(code: String) = File(dir, "$code.txt.gz")
+    fun file(code: String) = File(dir, "$code.txt.gzip")
 
     @Synchronized
     fun real(code: String): Lexicon = cache.getOrPut(code) { file(code).inputStream().use { Lexicon.read(it) } }
