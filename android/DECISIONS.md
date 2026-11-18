@@ -3714,6 +3714,10 @@ Vérification locale : `./gradlew testDebugUnitTest assembleDebug assembleDebugA
 
 ## Issue #22 : Whisper turbo par défaut, modèles cachés, Lite-Whisper expérimental
 
+> **Retiré par #77 (section 1).** Plus de modèle caché (`HIDDEN`), de `ModelMigration`, d'avis « modèle remplacé », de
+> `remoteFallbackId` ni de fichiers d'anciens modèles. Reste la règle `ModelCatalog.forLanguages` : un modèle actif qui
+> ne convient plus aux langues cède la place à Whisper turbo, sans avis. Voir « Issue #77, section 1 » plus bas.
+
 - `ModelSpec.visibility` (`VISIBLE`, `EXPERIMENTAL`, `HIDDEN`) : on cache sans supprimer. `ModelCatalog.all` garde
   tout (cinq modèles) ; `offered(langues)` = visibles, couvrant les langues, Parakeet seulement pour l'anglais seul ;
   `experimental` = Lite-Whisper ; `listed(langues)` = les deux.
@@ -4030,7 +4034,8 @@ pendant la dictée ». Le contrat du serveur est celui de la PR #46 (`POST /poli
 - **Disposition par défaut** : AZERTY si « Français (France) » est dans les langues choisies, QWERTY sinon, tant
   que l'utilisateur n'a pas choisi lui-même (`AppSettings.keyboardLayout`). **Nouvelles installations seulement** :
   une installation qui a déjà des réglages mais jamais choisi de disposition garde QWERTY, inscrit une fois au
-  premier démarrage de cette version (`LayoutDefault`, testé sur la JVM et sur l'appareil).
+  premier démarrage de cette version (`LayoutDefault`, testé sur la JVM et sur l'appareil). **Retiré par #77** : plus de réglage figé, la disposition par
+  défaut suit toujours les langues.
 - **Limites connues du pavé** (relecture indépendante) : il est plus étroit que ce que certains champs acceptent
   (heure sur 12 h avec « pm », dates en « jj.mm.aaaa »), et on ne rejoint pas le clavier à lettres depuis le pavé
   (seulement « clavier précédent »). Le pavé suit `inputType` à la lettre ; un champ de texte reste un champ de texte.
@@ -4679,6 +4684,9 @@ de l'application.
 
 ## Cinq langues seulement (#60, #72 partie 1)
 
+> **Migration retirée par #77.** `migrateLanguages`, `DictationLanguages.cleaned` et l'avis « quatre langues » n'existent
+> plus : `DictationLanguages.parse` ignore déjà un nom inconnu et rend « Français (Québec) » s'il ne reste rien.
+
 **Décision de Rémi (2026-11-13 et 2026-11-14).** L'application ne propose plus que cinq cases à « Vos langues » :
 Français (Québec), Français (France), Anglais, Espagnol, Portugais. Mandarin, hindi, arabe, bengali, russe et ourdou sont
 retirés de `DictationLanguage`, avec leurs lignes dans `parakeetLanguages`, `qwen3Languages` et `qwen3Names` (la couverture
@@ -4715,3 +4723,38 @@ et `en`).
 **Non vérifié ici.** Les tests unitaires (JVM) passent. Aucun émulateur n'était disponible : les tests instrumentés
 (`SetupLanguageTest`, etc.) ont été mis à jour et compilent, mais n'ont pas tourné (ils sont déjà en échec sur `main`, #69), et
 les captures `ScreenshotTest` n'ont pas été produites.
+
+## Issue #77, section 1 : retrait des adaptations pour anciens usagers
+
+Personne n'utilisait l'application : aucune installation existante à protéger (décision de Rémi, #78). Une installation neuve
+se comporte comme avant ; seul ce qui servait à migrer ou à garder un état ancien est parti.
+
+- **Modèles.** `qwen3-asr-0.6b-int8`, `whisper-large-v3-turbo-fr-qc-int8` et Lite-Whisper sortent de `ModelCatalog` (le
+  point 9 de #72 partie 2 tombe, comme décidé le 2026-11-14), avec leurs constantes, leurs lignes de couverture et la
+  valeur `ModelVisibility.HIDDEN` : il reste `VISIBLE` et `ADVANCED`. Le catalogue compte deux modèles du téléphone
+  (Whisper turbo, Parakeet) plus le serveur. Les tests qui se servaient de Qwen3 comme « deuxième modèle » prennent
+  Whisper turbo ou Parakeet ; les tests de mesure sur l'ordinateur propres à ces modèles (`ModelAccuracyHostTest`,
+  `qwen3ForcedFrench…`) sont supprimés avec eux.
+- **Migrations.** Supprimés : `DicteeApp.migrateServerChoice`, `AppSettings.remoteFallbackId` (clé `remote_fallback`),
+  `ModelMigration` (fichier, `Notice`, `fallbackId`), `AppSettings.retiredModelNotice` (clé `retired_model_notice`),
+  `SetupActivity.renderRetiredNotice` et ses étiquettes `RETIRED_*`, les chaînes `model_notice_*`, la section « Fichiers
+  d'anciens modèles » des Réglages (`settings_old_models*`), `LayoutDefault` et le bloc `init` d'`AppSettings`
+  (clé `layout_default_checked`), `AppSettings.migrateLanguages`, `languagesNotice`, `DictationLanguages.cleaned`, l'avis
+  « quatre langues » de #74/#60 (`languages_notice`, `LANGUAGES_NOTICE_*`). Les clés restées dans le stockage d'une
+  installation existante sont simplement ignorées.
+- **Règle gardée, simplifiée.** `DicteeApp.migrateModels` devient `ensureModelSuitsLanguages` (appelée au démarrage et
+  quand les langues changent, depuis `ui/Ui.kt`) ; la décision est `ModelCatalog.forLanguages(actif, langues)` : le modèle
+  actif tant qu'il convient (`suits`), Whisper turbo sinon. Aucun avis. Elle ne se déclenche aujourd'hui pour aucune
+  combinaison (Whisper couvre tout, Parakeet est toujours permis) : elle reste pour #89, qui change la place de Parakeet.
+  Test JVM : `anActiveModelThatNoLongerSuitsGivesWayToTheDefault`.
+- **Tests supprimés** (le mécanisme n'existe plus) : `ModelMigrationTest`, `LayoutDefaultTest`, les fiches de Lite-Whisper
+  et de Whisper québécois dans `StoreTest`, `hiddenModelsAreNeverOffered` et consorts dans `ModelRecommendationTest`,
+  les cas de mise à jour de `SetupLanguageTest` (langues retirées, avis, Lite-Whisper actif, modèle caché actif, repli du
+  serveur) et `DictationLanguagesTest` (`cleaned`, remplacé par un cas sur `parse`).
+  Aucun test n'est désactivé ni affaibli : `aServerSetUpBeforeTheUpdateKeepsWorkingAndIsShown` devient
+  `aServerSetUpIsUsedAndShownOnTheMainScreen` (même vérifications, sans l'appel à la migration).
+- **Gardé tel quel (section 2 de #77).** Le moteur Qwen3 de `SherpaEngine`, `ModelFamily.QWEN3_ASR`,
+  `DictationLanguages.qwen3Language`, les étiquettes `qwen3` de `PolishEval` (provenance des fichiers d'évaluation) et la
+  compatibilité avec un serveur plus ancien (repli quand `POST /polish` répond 404/405) : ce sont des questions de
+  nettoyage, pas d'anciens usagers. `textKeyboardShown` reste (#90 le retire).
+- **Hors de la portée.** Le dépôt Hugging Face du Whisper québécois et `android/tools/` ne sont pas touchés.

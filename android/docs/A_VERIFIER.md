@@ -76,8 +76,7 @@ textes n'ont pas changé.
 
 ### 5. La table de recommandation te convient-elle ?
 
-- **Règle** : Parakeet si toutes les langues choisies sont parmi ses 25 ;
-  sinon Qwen3-ASR s'il les couvre toutes ; sinon Whisper. Depuis #60, l'application ne
+- **Règle** : toujours Whisper (depuis #72 ; Qwen3-ASR a quitté le catalogue avec #77). Depuis #60, l'application ne
   propose que cinq langues (français Québec et France, anglais, espagnol, portugais).
 - **Non mesuré** : l'effet de la langue forcée sur Whisper quand une seule langue est choisie.
 - **Où corriger** : `android/app/src/main/java/io/github/remtav/dictee/stt/ModelRecommendation.kt`.
@@ -179,33 +178,15 @@ textes n'ont pas changé.
 - **Facultatif** : mesurer le LLM sur le téléphone avec la procédure du
   rapport. Elle n'a jamais été exécutée : signaler toute étape fausse.
 
-### 11. Le modèle Whisper affiné sur le français québécois
+### 11. Le modèle Whisper affiné sur le français québécois (retiré)
 
-- **Ce que c'est** : `ele-sage/whisper-large-v3-turbo-fr-quebecois` (MIT),
-  converti et publié sous ton compte :
-  https://huggingface.co/remiavelo/sherpa-onnx-whisper-large-v3-turbo-fr-quebecois-int8.
-  Relire la fiche de ce dépôt : elle est sous ton nom.
-- **Quoi faire** : le télécharger depuis l'écran de configuration, dicter
-  « friperie » seul et les autres mots d'ici qui échouaient, puis le comparer
-  aux autres dans « Comparer les modèles » avec ta voix.
-- **Mesuré ici** : 5 erreurs sur 59 mots sur les six extraits québécois
-  (Parakeet 4, Whisper turbo 6, Qwen3-ASR 8). Trop peu pour conclure ; les
-  mots isolés n'ont pas été mesurés. Ce score est peut-être flatté : le modèle
-  a été entraîné en partie sur Common Voice « Français du Canada », d'où
-  viennent ces six extraits ; il a pu les entendre. Le WER de 6,65 % est celui annoncé par
-  l'auteur sur son propre jeu.
-- **À savoir** : même taille et même coût que Whisper turbo, donc aussi lent ;
-  français seulement. Parakeet reste le modèle recommandé.
-- **Non vérifié** : le téléchargement sans compte depuis un téléphone (le
-  dépôt est public d'après Hugging Face, mais l'essai fait ici passait par ton
-  jeton) ; les conditions des données d'entraînement de l'auteur pour la
-  redistribution d'un dérivé.
-- **Où corriger** : `android/app/src/main/java/io/github/remtav/dictee/stt/ModelCatalog.kt`
-  (entrée `whisperQuebec`) ; la recommandation est dans `stt/ModelRecommendation.kt`.
-- **Jeton** : le jeton Hugging Face est enregistré sur ton environnement
-  « Default » de Claude Code ; le retirer s'il ne sert plus.
+- Le modèle `ele-sage/whisper-large-v3-turbo-fr-quebecois` a quitté le catalogue (#77) : l'application ne le propose
+  plus et ne sait plus supprimer ses fichiers (aucune installation existante à protéger). Le dépôt Hugging Face
+  `remiavelo/sherpa-onnx-whisper-large-v3-turbo-fr-quebecois-int8` et `android/tools/whisper-hf-vers-sherpa/` ne sont pas
+  touchés : à toi de décider de les garder. Le jeton Hugging Face de ton environnement « Default » de Claude Code peut
+  être retiré s'il ne sert plus.
 
-### 12. Vitesse de Whisper (turbo et québécois)
+### 12. Vitesse de Whisper
 
 - **Changé pour tous** : avec un modèle Whisper, plus de texte provisoire
   pendant qu'on parle (il retardait le résultat final). Vérifier dans le
@@ -226,22 +207,11 @@ textes n'ont pas changé.
 - **Où corriger** : `stt/WhisperTuning.kt` (texte provisoire),
   `settings/AppSettings.kt` (`whisperTailPaddings`, défaut).
 
-### 13. Langue transmise à Qwen3-ASR (changement de défaut)
+### 13. Langue transmise à Qwen3-ASR (changement de défaut ; modèle retiré du catalogue par #77)
 
-- **Ce qui a changé** : quand une seule langue est cochée — c'est le cas du
-  choix initial, « Français (Québec) » —, Qwen3-ASR reçoit maintenant cette
-  langue, comme Whisper. Parakeet n'accepte aucune langue : il devine toujours,
-  ce qui explique qu'un mot dit seul parte vers l'anglais.
-- **Mesuré par la revue** (ordinateur, 7 extraits français, 75 mots) :
-  6 erreurs avec « French » forcé contre 8 en détection automatique. Pas de
-  dégradation ; trop peu pour parler de gain, et les mots dits seuls n'ont pas
-  été mesurés.
-- **Quoi faire** : avec Qwen3-ASR, dicter des mots d'ici dits seuls, puis une
-  phrase française contenant quelques mots anglais ; vérifier que rien n'est
-  francisé à tort.
-- **Où corriger** : `DictationLanguages.qwen3Language` dans
-  `android/app/src/main/java/io/github/remtav/dictee/stt/DictationLanguages.kt`
-  et `AppSettings.engineOptions`.
+- Qwen3-ASR n'est plus un modèle que l'on peut choisir (#77). Le code qui lui passe la langue
+  (`DictationLanguages.qwen3Language`, branche de `SherpaEngine`) reste en attendant le nettoyage de la section 2 de #77.
+  Rien à vérifier sur un téléphone.
 
 ### 14. Polissage : ce qui peut encore repasser sur le texte
 

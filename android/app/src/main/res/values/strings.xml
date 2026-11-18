@@ -94,7 +94,6 @@
     <string name="setup_step_languages">4. Vos langues</string>
     <string name="setup_languages_help">Cochez les langues que vous dictez. Elles servent à recommander un modèle et à régler la langue de la transcription : avec une seule langue, elle est imposée ; avec plusieurs, elle est détectée automatiquement. Au moins une langue reste cochée.</string>
     <string name="setup_languages_supported">Kalmia Blabla comprend le français, l\'anglais, l\'espagnol et le portugais.</string>
-    <string name="languages_notice">Kalmia Blabla se concentre maintenant sur quatre langues. Vérifiez vos langues.</string>
     <string name="languages_keep_one">Au moins une langue doit rester cochée.</string>
     <string name="setup_models">5. Modèle</string>
     <string name="model_publisher">Éditeur : %1$s</string>
@@ -103,15 +102,6 @@
     <string name="model_warning_uncovered">Attention : ce modèle ne couvre pas %1$s. Il reste téléchargeable.</string>
     <string name="setup_models_note">Whisper se télécharge une fois (Wi-Fi conseillé), puis tout se passe sur votre téléphone, même hors ligne.</string>
     <string name="setup_default_suffix"> (par défaut)</string>
-    <string name="model_notice_title">Modèle remplacé</string>
-    <string name="model_notice_replaced">Le modèle que vous utilisiez n\'est plus proposé : la dictée utilise maintenant %1$s.</string>
-    <string name="model_notice_download">Il n\'est pas encore téléchargé : téléchargez-le pour dicter.</string>
-    <string name="model_notice_download_button">Télécharger (%1$s)</string>
-    <string name="model_notice_delete_button">Supprimer les fichiers de l\'ancien modèle (%1$s)</string>
-    <string name="model_notice_deleted">Fichiers de l\'ancien modèle supprimés.</string>
-    <string name="model_notice_ok">J\'ai compris</string>
-    <string name="settings_old_models">Fichiers d\'anciens modèles</string>
-    <string name="settings_old_models_delete">Supprimer les fichiers (%1$s)</string>
     <string name="settings_advanced_models">Autre modèle du téléphone</string>
     <string name="settings_advanced_models_help">Jamais recommandé : à essayer et à comparer sur votre téléphone (« Comparer les modèles », ci-dessus).</string>
     <string name="setup_downloading">Téléchargement : %1$d %% (%2$s / %3$s)</string>

@@ -35,8 +35,7 @@ bascule vers celui-ci pour dicter.
 | **Développée au Québec** | Affirmation de l'auteur. |
 
 **Origine des modèles.** Les modèles ne sont pas québécois : Parakeet vient de
-NVIDIA, Qwen3-ASR d'Alibaba, Whisper d'OpenAI (et sa variante affinée sur le français québécois, de
-ele-sage, une personne de la communauté), et le petit LLM facultatif de
+NVIDIA, Whisper d'OpenAI, et le petit LLM facultatif de
 nettoyage du texte (désactivé par défaut) passe par MediaPipe, une
 bibliothèque de Google. La souveraineté offerte porte sur les **données** (la
 voix reste sur le téléphone par défaut) et sur le **logiciel** (code public,
@@ -96,7 +95,7 @@ langue cochée. Le choix se modifie aussi dans les Réglages. Il sert à :
   couvre pas une langue cochée affiche un avertissement écrit ; rien n'est
   bloqué, tous les modèles restent téléchargeables ;
 - **régler la langue des moteurs** : avec une seule langue (Québec et France
-  comptent pour `fr`), Whisper local, Qwen3-ASR et le serveur distant la
+  comptent pour `fr`), Whisper local et le serveur distant la
   reçoivent ; avec plusieurs, la langue est détectée automatiquement.
   Parakeet ne prend aucune langue (sherpa-onnx 2.0.1 n'a pas d'entrée pour
   elle) : il la devine, ce qui peut mal tourner sur un mot dicté seul.
@@ -105,13 +104,6 @@ Depuis l'issue #72, la recommandation (`stt/ModelRecommendation.kt`) est toujour
 Whisper, et c'est le seul modèle du téléphone proposé à l'installation. La
 couverture des langues vient des fiches des modèles (détail et sources dans `DECISIONS.md`).
 « Couvert » ne veut pas dire « bien transcrit ».
-
-**Mise à jour d'une installation existante.** Mandarin, hindi, arabe, bengali,
-russe et ourdou ont été retirés. Au premier démarrage après la mise à jour, une
-langue retirée disparaît du choix enregistré ; s'il ne reste rien, « Français
-(Québec) » est repris. Si le choix a changé, l'écran principal affiche une fois
-l'avis « Kalmia Blabla se concentre maintenant sur quatre langues. Vérifiez vos
-langues. » (fermé avec « OK », il ne revient pas).
 
 **Limite connue.** Quand plusieurs langues sont cochées, le modèle détecte la
 langue lui-même, parmi toutes celles qu'il connaît, pas seulement les cinq :
@@ -413,36 +405,19 @@ Limites connues :
 |---|---|---|---|
 | Whisper large-v3-turbo (défaut) | OpenAI | 1,04 Go | Toujours proposé et recommandé |
 | Parakeet TDT 0.6b v3 | NVIDIA | 671 Mo | « Avancé » et « Comparer les modèles » seulement, quelles que soient les langues (issue #72) ; au clavier, seulement s'il est le modèle actif ; jamais recommandé |
-| Lite-Whisper large-v3-turbo | efficient-speech (LiteASR), d'après OpenAI | 1,16 Go | Retiré (issue #72) : affiché nulle part, gardé dans le catalogue pour supprimer ses fichiers |
-| Qwen3-ASR 0.6B | Alibaba (Qwen) | 987 Mo | Caché (gardé dans le catalogue) |
-| Whisper large-v3-turbo, français québécois | ele-sage (communauté), d'après OpenAI | 1,04 Go | Caché (gardé dans le catalogue) |
 
-Depuis l'issue #22, Whisper large-v3-turbo est le modèle par défaut, français québécois compris : aux essais de
-l'utilisateur, il a fait mieux que les autres, et mieux que le Whisper affiné québécois. Si le modèle actif est caché
-(Qwen3-ASR, Whisper québécois, Lite-Whisper depuis l'issue #72 ; Parakeet, lui, reste permis dans « Avancé » et n'est
-pas remplacé), l'application passe à Whisper
-turbo au démarrage et le dit une fois sur l'écran principal (invitation à le télécharger s'il manque, bouton pour
-supprimer les fichiers d'un modèle caché : rien n'est supprimé sans clic). Le paragraphe ci-dessous sur Whisper
-« en dernier recours » date d'avant cette décision.
+Whisper large-v3-turbo est le modèle par défaut, français québécois compris : aux essais de l'utilisateur, il a
+fait mieux que les autres, et mieux que le Whisper affiné québécois (essayé puis retiré du catalogue). Si le modèle
+actif ne convient plus aux langues choisies, l'application repasse à Whisper turbo (`ModelCatalog.forLanguages`),
+sans avis. Le paragraphe ci-dessous sur Whisper « en dernier recours » date d'avant cette décision.
 
 Whisper : observé par l'utilisateur sur son téléphone, il comprend bien des
-mots d'ici que Parakeet et Qwen3-ASR ratent (un mot isolé deviné en anglais,
+mots d'ici que Parakeet rate (un mot isolé deviné en anglais,
 par exemple), mais il est trop lent pour un usage courant : à garder en
 dernier recours. Ce n'est pas une mesure sur appareil ; sur l'ordinateur de la
 CI, le facteur temps réel indicatif est de 0,07 pour Parakeet, 0,3 pour
-Whisper et 0,6 à 0,9 pour Qwen3-ASR (`DECISIONS.md`, étape 1.2), ce qui ne
+Whisper (`DECISIONS.md`, étape 1.2), ce qui ne
 prédit pas l'ordre sur un téléphone. La carte de Whisper le dit. Pour le rendre plus rapide, Whisper n'affiche pas de texte provisoire pendant qu'on parle, et un réglage avancé (Réglages > Avancé, « Silence ajouté pour Whisper », 1 000 par défaut, 600, 300 ou « Automatique ») raccourcit le silence qu'il décode à la fin de chaque segment ; « Automatique » utilise 300 et corrige les phrases que Whisper recommence (« Correction des répétitions (Whisper) » : redécoder à 1 000 ou couper, issue #49). Mesuré sur ordinateur seulement, à valider sur le téléphone (`docs/ACCELERER_WHISPER.md`).
-
-**Whisper large-v3-turbo, français québécois** (1,04 Go) est le quatrième modèle proposé : c'est
-`ele-sage/whisper-large-v3-turbo-fr-quebecois` (communauté, MIT, d'après OpenAI), affiné sur du français québécois
-(débats de l'Assemblée nationale, Common Voice). Il ne couvre que le français : choisir l'anglais en plus
-affiche « ce modèle ne couvre pas anglais » sur sa carte. Il n'existait aucune conversion sherpa-onnx publique : la
-conversion int8 (`android/tools/whisper-hf-vers-sherpa/`) est hébergée par l'auteur de l'application, à sa demande, sur
-`huggingface.co/remiavelo/sherpa-onnx-whisper-large-v3-turbo-fr-quebecois-int8` ; l'application la télécharge de là,
-fichier par fichier, vérifiée par SHA-256. WER annoncé par son auteur : 6,65 % sur son jeu de validation. Mesuré ici :
-5 erreurs sur 59 mots (8,5 %) sur six courts extraits québécois, contre 4 pour Parakeet et 6 pour Whisper turbo :
-un indice, pas une preuve (ces extraits viennent de Common Voice, une des sources de son affinage : il a pu les entendre). Il a la même taille et le même coût de calcul que Whisper large-v3-turbo, donc il est plus
-lent sur le téléphone (observation de l'utilisateur sur Whisper turbo, pas une mesure sur appareil). Ce modèle est caché depuis l'issue #22.
 
 Dans le parcours normal, le modèle du téléphone s'appelle **« Whisper »** (issue #72, marche arrière sur #37 qui
 l'appelait « Plus précis ») : l'écran principal, le clavier et le test de lecture le disent ainsi, sans la variante.
@@ -481,8 +456,7 @@ HTTPS ou un VPN (WireGuard, Tailscale).
 - **Visible tant qu'il sert.** Avec une adresse et le mode « serveur », l'écran
   principal affiche « Transcription : serveur distant » et un bouton « Voir le
   réglage » ; l'accueil et « Comment dicter » disent alors que les dictées vont au
-  serveur, au lieu de « n'est envoyée à personne ». Une adresse et un mode « serveur »
-  enregistrés avant la mise à jour restent actifs.
+  serveur, au lieu de « n'est envoyée à personne ».
 - **Repli sur le téléphone.** Le modèle choisi sur l'écran principal (Whisper turbo par
   défaut) sert de repli : si le serveur est injoignable ou ne répond pas dans le délai
   (8 s par défaut, plus un quart de la durée de la dictée ; réglage « Délai avant repli

@@ -25,7 +25,6 @@ import io.github.remtav.dictee.stt.EngineChoice
 import io.github.remtav.dictee.stt.EngineRoute
 import io.github.remtav.dictee.stt.ModelCatalog
 import io.github.remtav.dictee.stt.ModelFamily
-import io.github.remtav.dictee.stt.ModelMigration
 import io.github.remtav.dictee.stt.ModelSpec
 import io.github.remtav.dictee.stt.ModelPlainNames
 import io.github.remtav.dictee.stt.SttEngineFactory
@@ -89,8 +88,7 @@ class DicteeApp : Application() {
         // Messages are redacted by RemoteEngine: no token or Cloudflare secret reaches logcat.
         RemoteEngine.defaultLog = RemoteLog { android.util.Log.i("DicteeRemote", it) }
         applyTheme()
-        settings.migrateLanguages()
-        migrateModels()
+        ensureModelSuitsLanguages()
         // Reading-test contribution (issue #15, step 4.3): an archive is deleted with its screen; one that
         // survived a killed process for more than a day goes now (not younger: the person's mail may still
         // be reading it, and this process also starts for the keyboard).
@@ -112,32 +110,15 @@ class DicteeApp : Application() {
     }
 
     /**
-     * Issue #22: an active model that is hidden or no longer suits the chosen languages
-     * is replaced by Whisper turbo (issue #72: Lite-Whisper, withdrawn), and the main screen tells the user once
-     * (inviting to download Whisper turbo if it is missing, offering to delete the hidden model's
-     * files: nothing is deleted without a click). Run at start-up and when the languages change.
+     * An active model that no longer suits the chosen languages is replaced by the default (Whisper turbo).
+     * Run at start-up and when the languages change.
      */
-    fun migrateModels() {
-        migrateServerChoice()
-        // A notice left by an earlier version about a model that is allowed again (Parakeet, #72) would be false.
-        ModelCatalog.byId(settings.retiredModelNotice)?.let {
-            if (ModelCatalog.suits(it, settings.languages)) settings.retiredModelNotice = ""
-        }
-        val notice = ModelMigration.plan(settings.activeModelId, settings.languages) { isInstalled(it) } ?: return
-        settings.activeModelId = notice.replacement.id
-        settings.retiredModelNotice = notice.retired.id
-        if (engines.current()?.spec?.id == notice.retired.id) engines.release()
-    }
-
-    /**
-     * Issue #23: the server is no longer a model to pick but a mode (server / phone). A user whose active model
-     * was the server gets their old fallback as the on-device model; the mode stays "not chosen" (so: phone)
-     * until they choose "server" again (#36 or the settings), whose text says what happens to the audio,
-     * which the old choice never did.
-     */
-    private fun migrateServerChoice() {
-        if (settings.activeModelId != ModelCatalog.remote.id) return
-        settings.activeModelId = settings.remoteFallbackId.ifEmpty { ModelCatalog.default.id }
+    fun ensureModelSuitsLanguages() {
+        val active = settings.activeModel
+        val suitable = ModelCatalog.forLanguages(active, settings.languages)
+        if (suitable == active) return
+        settings.activeModelId = suitable.id
+        if (engines.current()?.spec?.id == active.id) engines.release()
     }
 
     /** Whether the phone has a network (any: a LAN server needs no internet). */

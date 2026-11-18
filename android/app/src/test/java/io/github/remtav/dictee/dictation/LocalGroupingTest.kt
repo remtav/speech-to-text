@@ -116,10 +116,9 @@ class LocalGroupingTest {
         assertEquals(listOf(0, 5, 10), WhisperTuning.GROUP_CHOICES)
         assertNull("off by default", WhisperTuning.groupingFor(ModelCatalog.whisperTurbo, 0))
         assertEquals(LocalGrouping(5f), WhisperTuning.groupingFor(ModelCatalog.whisperTurbo, 5))
-        assertEquals(LocalGrouping(10f), WhisperTuning.groupingFor(ModelCatalog.whisperQuebec, 10))
-        // Only Whisper (issue scope): Parakeet, Qwen3-ASR and the server are left as they are.
+        assertEquals(LocalGrouping(10f), WhisperTuning.groupingFor(ModelCatalog.whisperTurbo, 10))
+        // Only Whisper (issue scope): Parakeet and the server are left as they are.
         assertNull(WhisperTuning.groupingFor(ModelCatalog.parakeet, 5))
-        assertNull(WhisperTuning.groupingFor(ModelCatalog.qwen3, 5))
         assertNull(WhisperTuning.groupingFor(ModelCatalog.remote, 5))
         // A stored value outside the choices reads as off.
         assertEquals(0, WhisperTuning.sanitizeGroupSeconds(7))

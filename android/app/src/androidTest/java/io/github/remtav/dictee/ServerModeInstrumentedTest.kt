@@ -14,7 +14,7 @@ import org.junit.runner.RunWith
 /**
  * Issue #23: no dictation reaches the server until the "server" mode is recorded in the settings (since issue #57,
  * only in the folded server section of « Avancé »), and the settings choice is respected. Issue #57: a server
- * already set up before the update keeps receiving the dictations, and the main screen says so.
+ * set up with its mode receives the dictations, and the main screen says so.
  */
 @RunWith(AndroidJUnit4::class)
 class ServerModeInstrumentedTest : ImeTestBase() {
@@ -102,16 +102,15 @@ class ServerModeInstrumentedTest : ImeTestBase() {
     }
 
     /**
-     * Issue #57: an address and the "server" mode recorded before the update (no new choice made): the dictations
-     * still go to the server, and the main screen shows « Transcription : serveur distant ».
+     * Issue #57: an address and the "server" mode recorded: the dictations go to the server, and the main screen
+     * shows « Transcription : serveur distant ».
      */
     @Test
-    fun aServerSetUpBeforeTheUpdateKeepsWorkingAndIsShown() {
+    fun aServerSetUpIsUsedAndShownOnTheMainScreen() {
         server().use { server ->
             app.settings.remoteUrl = "http://127.0.0.1:${server.port}"
             app.settings.transcriptionMode = TranscriptionMode.SERVER
             TestHooks.networkAvailable = true
-            app.migrateModels() // what the app does at start-up after an update
             assertEquals(TranscriptionMode.SERVER, app.settings.transcriptionMode)
             ActivityScenario.launch(io.github.remtav.dictee.ui.SetupActivity::class.java).use { s ->
                 var shown = false

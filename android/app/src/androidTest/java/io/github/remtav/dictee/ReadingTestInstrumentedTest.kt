@@ -298,12 +298,11 @@ class ReadingTestInstrumentedTest : ImeTestBase() {
     fun withSeveralModelsEachIsScoredAndABetterOneIsSuggested() {
         val parakeet = ModelCatalog.parakeet.id
         val whisper = ModelCatalog.whisperTurbo.id
-        // Issue #22: English alone, so both Whisper turbo and Parakeet are offered (hidden models never are,
-        // even installed: Qwen3-ASR is installed here and must not be used).
+        // Issue #22: English alone, so both Whisper turbo and Parakeet are offered.
         // Active model: Parakeet, which loses every fourth word; Whisper turbo (recommended) hears everything.
         app.settings.languages = setOf(DictationLanguage.ENGLISH)
         app.settings.activeModelId = parakeet
-        useModels(parakeet, whisper, ModelCatalog.qwen3.id) { model, _, text ->
+        useModels(parakeet, whisper) { model, _, text ->
             if (model == parakeet) ScriptedReadingModels.dropEveryFourthWord(text) else text
         }
         ActivityScenario.launch<ReadingTestActivity>(Intent(context, ReadingTestActivity::class.java)).use { s ->
@@ -313,7 +312,6 @@ class ReadingTestInstrumentedTest : ImeTestBase() {
             d.awaitTag(ReadingTestActivity.TAG_ACCEPT_START)
             val used = d.allText()
             for (id in listOf(parakeet, whisper)) assertTrue(used.contains(io.github.remtav.dictee.stt.ModelPlainNames.of(ModelCatalog.byId(id)!!)))
-            assertFalse("hidden model not used", used.contains(ModelCatalog.qwen3.displayName))
             d.click(ReadingTestActivity.TAG_ACCEPT_START)
             d.awaitTag(ReadingTestActivity.TAG_PARAGRAPH)
             d.readAllParagraphs(redoLabel)
@@ -327,7 +325,6 @@ class ReadingTestInstrumentedTest : ImeTestBase() {
             assertTrue("a quarter of the words lost", worsePercent < 80)
             // One chooser line per model, with its global percent; the active model's detail is shown first.
             for (id in listOf(parakeet, whisper)) assertTrue(d.has(ReadingTestActivity.modelChoiceTag(id)))
-            assertFalse(d.has(ReadingTestActivity.modelChoiceTag(ModelCatalog.qwen3.id)))
             assertEquals(
                 context.getString(R.string.reading_result_model_line, io.github.remtav.dictee.stt.ModelPlainNames.of(ModelCatalog.parakeet), worsePercent),
                 d.text(ReadingTestActivity.modelChoiceTag(parakeet)),

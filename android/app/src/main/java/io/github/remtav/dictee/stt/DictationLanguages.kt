@@ -51,19 +51,6 @@ object DictationLanguages {
         return if (found.isEmpty()) setOf(DictationLanguage.default) else found.toSet()
     }
 
-    /**
-     * Issue #60: a stored choice that names a language since removed. Null when nothing is stored (a fresh
-     * install) or when the choice is already clean; otherwise the clean choice that replaces it (the
-     * remaining languages, or [DictationLanguage.default] when none remain). The caller stores it and
-     * tells the person once.
-     */
-    fun cleaned(stored: Collection<String>?): Set<DictationLanguage>? {
-        if (stored == null) return null
-        // Only an unknown name changes the choice: an empty stored set already read as the default.
-        if (stored.all { n -> DictationLanguage.entries.any { it.name == n } }) return null
-        return parse(stored)
-    }
-
     /** Names to store; an empty selection is stored as the default. */
     fun serialize(chosen: Set<DictationLanguage>): Set<String> =
         parse(chosen.map { it.name }).map { it.name }.toSet()
