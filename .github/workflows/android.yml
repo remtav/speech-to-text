@@ -240,9 +240,13 @@ jobs:
 
   emulator:
     # Issue #76: the ~130 instrumented tests (10-11 min alone) are split over three
-    # emulators running side by side (AndroidJUnitRunner numShards/shardIndex). Every
-    # test still runs, in exactly one shard. Room for #70 (3-button navigation bar):
-    # add a dimension to this matrix, or a shard, rather than lengthening one emulator.
+    # emulators running side by side, by whole classes (a class keeps its order and
+    # its setup). Shards 1 and 2 name their classes, about a third of the time each
+    # (measured on PR #93); shard 3 runs every OTHER class, so a new test class always
+    # runs, and a class renamed without updating this list fails loudly (class not
+    # found) instead of being skipped. Rebalance with the "Test duration per class"
+    # table of each shard's summary. Room for #70 (3-button navigation bar): add a
+    # dimension to this matrix, or a shard, rather than lengthening one emulator.
     name: Instrumented keyboard tests (emulator ${{ matrix.shard }}/3)
     needs: changes
     if: ${{ needs.changes.outputs.emulator == 'true' && !(github.event_name == 'workflow_dispatch' && inputs.skip_slow_tests) }}
@@ -251,15 +255,11 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # shardIndex counts from 0; "shard" is what the job names show.
-        include:
-          - { shard: 1, index: 0 }
-          - { shard: 2, index: 1 }
-          - { shard: 3, index: 2 }
+        shard: [1, 2, 3]
     env:
-      SHARD_ARGS: >-
-        -Pandroid.testInstrumentationRunnerArguments.numShards=3
-        -Pandroid.testInstrumentationRunnerArguments.shardIndex=${{ matrix.index }}
+      # Classes of shards 1 and 2 (package io.github.remtav.dictee); shard 3 = all the others.
+      SHARD1_CLASSES: TextKeyboardInstrumentedTest ReadingTestInstrumentedTest DictationEndToEndTest
+      SHARD2_CLASSES: ScreenshotTest HowToInstrumentedTest ContributionInstrumentedTest SetupLanguageTest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
@@ -267,6 +267,18 @@ jobs:
           distribution: temurin
           java-version: "17"
       - uses: gradle/actions/setup-gradle@v4
+      - name: Classes of this shard
+        env:
+          SHARD: ${{ matrix.shard }}
+        run: |
+          qualify() { for c in $1; do printf 'io.github.remtav.dictee.%s,' "$c"; done | sed 's/,$//'; }
+          case "$SHARD" in
+            1) filter="class=$(qualify "$SHARD1_CLASSES")" ;;
+            2) filter="class=$(qualify "$SHARD2_CLASSES")" ;;
+            3) filter="notClass=$(qualify "$SHARD1_CLASSES $SHARD2_CLASSES")" ;;
+          esac
+          echo "Shard $SHARD: $filter"
+          echo "SHARD_ARGS=-Pandroid.testInstrumentationRunnerArguments.$filter" >> "$GITHUB_ENV"
       - name: Enable KVM
         working-directory: .
         run: |
