@@ -34,6 +34,9 @@ import io.github.remtav.dictee.dictation.DictationController
 import io.github.remtav.dictee.dictation.DictationListener
 import io.github.remtav.dictee.dictation.DictationState
 import io.github.remtav.dictee.dictation.TextSink
+import io.github.remtav.dictee.ime.emoji.EmojiCatalogue
+import io.github.remtav.dictee.ime.emoji.EmojiPickerView
+import io.github.remtav.dictee.ime.emoji.RecentEmojis
 import io.github.remtav.dictee.settings.ThemeMode
 import io.github.remtav.dictee.stt.EngineManager
 import io.github.remtav.dictee.stt.ModelPlainNames
@@ -78,6 +81,13 @@ class DicteeImeService : InputMethodService(), DictationListener, EngineManager.
     private var pad: NumberPadView? = null
     private var openKeys: View? = null
     private var strip: SuggestionStripView? = null
+    private var emojiGroup: View? = null
+    private var emojiPicker: EmojiPickerView? = null
+    private var emojiBack: MaterialButton? = null
+    private var openEmojiHeader: View? = null
+    /** The emoji panel is shown (issue #80), over the dictation or the text view it was opened from. */
+    private var emojiOn = false
+    private var emojiCatalogue: EmojiCatalogue? = null
     /** Issue #71: the word before the cursor, its replacement by a suggestion, the automatic correction. */
     private val wordTyping = WordTyping()
     /** The suggestions shown, and a counter that drops results computed for an older word. */
@@ -235,6 +245,7 @@ class DicteeImeService : InputMethodService(), DictationListener, EngineManager.
             setOnClickListener { haptic(it); setTextKeyboardShown(true) }
         }
         bindPad(v.findViewById(R.id.pad))
+        bindEmojiPanel(v)
         micSmall = v.findViewById<MaterialButton>(R.id.mic_small).apply { setOnClickListener { onMicTapped() } }
         val keys = v.findViewById<LetterKeyboardView>(R.id.letters)
         letters = keys
@@ -265,6 +276,61 @@ class DicteeImeService : InputMethodService(), DictationListener, EngineManager.
         applyView()
     }
 
+    /** The emoji panel (issue #80): from the microphone view and from the text keys; a tap inserts and the panel stays open. */
+    @SuppressLint("ClickableViewAccessibility")
+    private fun bindEmojiPanel(v: View) {
+        emojiGroup = v.findViewById(R.id.emoji_group)
+        v.findViewById<View>(R.id.open_emoji).setOnClickListener { haptic(it); setEmojiShown(true) }
+        openEmojiHeader = v.findViewById<View>(R.id.open_emoji_header).apply {
+            setOnClickListener { haptic(it); setEmojiShown(true) }
+        }
+        emojiBack = v.findViewById<MaterialButton>(R.id.emoji_back).apply {
+            setOnClickListener { haptic(it); setEmojiShown(false) }
+        }
+        v.findViewById<View>(R.id.emoji_space).setOnClickListener { haptic(it); typeKey(" ") }
+        val backspace = v.findViewById<View>(R.id.emoji_backspace)
+        backspace.setOnTouchListener(RepeatListener(main) { haptic(backspace); typedBackspace() })
+        emojiPicker = v.findViewById<EmojiPickerView>(R.id.emoji_picker).apply {
+            recents = { app.settings.recentEmojis }
+            onEmoji = { glyph -> haptic(this); typeEmoji(glyph) }
+        }
+        // The list is read in the background: the first opening of the panel does not wait for it.
+        val known = emojiCatalogue
+        if (known != null) {
+            emojiPicker?.setCatalogue(known)
+        } else {
+            val picker = emojiPicker
+            Thread({
+                val loaded = EmojiCatalogue.load(applicationContext)
+                main.post { emojiCatalogue = loaded; (if (emojiPicker === picker) picker else emojiPicker)?.setCatalogue(loaded) }
+            }, "emoji-catalogue").start()
+        }
+    }
+
+    /** The panel's picker: for the tests. */
+    internal fun emojiPickerForTest(): EmojiPickerView? = emojiPicker
+
+    fun setEmojiShown(shown: Boolean) {
+        emojiOn = shown
+        // The panel hides the microphone and the header: nothing on screen would say the recording goes on. What was
+        // said is inserted before the panel opens.
+        if (shown) {
+            stopDictationForTyping()
+            emojiPicker?.open()
+        }
+        applyView()
+        render()
+    }
+
+    /** Inserts [glyph] at the cursor, whole, and puts it first in the recents. */
+    private fun typeEmoji(glyph: String) {
+        stopDictationForTyping()
+        val ic = currentInputConnection ?: return
+        wordTyping.forget()
+        ic.commitText(glyph, 1)
+        app.settings.recentEmojis = RecentEmojis.add(app.settings.recentEmojis, glyph)
+    }
+
     private fun updateSymbolsButton() {
         val symbols = letters?.symbols == true
         symbolsButton?.text = if (symbols) "ABC" else "123"
@@ -283,11 +349,19 @@ class DicteeImeService : InputMethodService(), DictationListener, EngineManager.
     /** Shows the dictation view or the text view, as [textViewShown] says. */
     private fun applyView() {
         val padPage = inputPage as? InputPage.Pad
+        val emoji = padPage == null && emojiOn
         val text = padPage == null && textViewShown()
-        header?.visibility = if (padPage != null) View.GONE else View.VISIBLE
+        header?.visibility = if (padPage != null || emoji) View.GONE else View.VISIBLE
         pad?.visibility = if (padPage != null) View.VISIBLE else View.GONE
-        dictationGroup?.visibility = if (text || padPage != null) View.GONE else View.VISIBLE
-        textGroup?.visibility = if (text) View.VISIBLE else View.GONE
+        dictationGroup?.visibility = if (text || emoji || padPage != null) View.GONE else View.VISIBLE
+        textGroup?.visibility = if (text && !emoji) View.VISIBLE else View.GONE
+        emojiGroup?.visibility = if (emoji) View.VISIBLE else View.GONE
+        openEmojiHeader?.visibility = if (text && !emoji) View.VISIBLE else View.GONE
+        // The way back leads to the view the panel was opened from.
+        emojiBack?.apply {
+            setIconResource(if (text) R.drawable.ic_keyboard else R.drawable.ic_mic)
+            contentDescription = getString(if (text) R.string.cd_emoji_to_keys else R.string.cd_emoji_to_dictation)
+        }
         toggleView?.apply {
             // Only in the text view, to go back to the microphone; in a password field the microphone is refused.
             visibility = if (text && !passwordField) View.VISIBLE else View.GONE
@@ -528,8 +602,9 @@ class DicteeImeService : InputMethodService(), DictationListener, EngineManager.
         windowHidden = false
         val rotation = currentField != null && currentField == windowHiddenField &&
             SystemClock.uptimeMillis() - windowHiddenAt < HIDE_GRACE_MS
-        if (!rotation && textKeysOn) {
+        if (!rotation && (textKeysOn || emojiOn)) {
             textKeysOn = false
+            emojiOn = false
             applyView()
             render()
         }

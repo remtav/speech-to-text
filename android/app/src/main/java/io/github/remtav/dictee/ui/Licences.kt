@@ -29,5 +29,16 @@ object Licences {
             licence = "Licence Apache, version 2.0",
             licenceAsset = "licences/AnySoftKeyboard-LICENSE.txt",
         ),
+        Component(
+            name = "Unicode et CLDR",
+            use = "Liste des émojis du panneau d'émojis (ordre, groupes) et leurs noms en français et en anglais, lus par TalkBack, " +
+                "tirés du fichier emoji-test.txt d'Unicode 18.0 et des annotations CLDR.",
+            notice = "Copyright © 2001–2026 Unicode, Inc.\n" +
+                "Sources : unicode.org/Public/emoji/latest/emoji-test.txt, github.com/unicode-org/cldr-json (annotations fr et en).\n" +
+                "Modifications : émojis complets seulement, sans les variantes de couleur de peau ; une ligne par émoji " +
+                "(groupe, émoji, nom anglais, nom français). Fichier produit par android/tools/emojis/build_emojis.py.",
+            licence = "Licence Unicode, version 3",
+            licenceAsset = "licences/Unicode-LICENSE.txt",
+        ),
     )
 }

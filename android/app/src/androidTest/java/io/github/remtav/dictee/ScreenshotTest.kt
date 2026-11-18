@@ -157,6 +157,30 @@ class ScreenshotTest : ImeTestBase() {
         }
     }
 
+    /**
+     * Issue #80: the dictation view with its emoji button, then the emoji panel (recents first, then a group of
+     * the grid), in light and dark. Pictures: `emoji-dictation-*`, `emoji-panel-*`, `emoji-panel-flags-*`.
+     */
+    @Test
+    fun emojiPanel() {
+        for (mode in listOf(ThemeMode.LIGHT, ThemeMode.DARK)) {
+            val suffix = mode.name.lowercase()
+            app.settings.theme = mode
+            onMain { app.applyTheme() }
+            app.settings.recentEmojis = listOf("😃", "👨\u200D👩\u200D👧\u200D👦", "\uD83C\uDDEB\uD83C\uDDF7", "❤\uFE0F", "👍")
+            launchFields()
+            onMain { service.rebuildInputView() }
+            shot("emoji-dictation-$suffix", scenario)
+            onMain { service.setEmojiShown(true) }
+            waitFor("emojis loaded", 10_000) { onMain { service.emojiPickerForTest()?.isReady == true } }
+            shot("emoji-panel-$suffix", scenario)
+            onMain { service.emojiPickerForTest()?.select(io.github.remtav.dictee.ime.emoji.EmojiCategory.FLAGS) }
+            shot("emoji-panel-flags-$suffix", scenario)
+            onMain { service.setEmojiShown(false) }
+            scenario.close()
+        }
+    }
+
     /** Issue #89: the keyboard's model menu with its three entries, Parakeet, Whisper and Kalmia Pro. */
     @Test
     fun keyboardModelMenu() {

@@ -56,8 +56,17 @@ class WordListsTest {
     fun licencesAndNoticeAreShipped() {
         for (c in Licences.components) {
             val text = File(assets, c.licenceAsset).readText()
-            assertTrue(c.name, "Apache License" in text && "Version 2.0" in text)
+            // Each component's own full licence text, by the licence it names (issue #80 added Unicode's).
+            val markers = when (c.licence) {
+                "Licence Apache, version 2.0" -> listOf("Apache License", "Version 2.0")
+                "Licence Unicode, version 3" -> listOf("UNICODE LICENSE V3", "Permission is hereby granted, free of charge")
+                else -> throw AssertionError("${c.name}: no check for the licence « ${c.licence} »")
+            }
+            for (m in markers) assertTrue("${c.name}: « $m » missing from ${c.licenceAsset}", m in text)
         }
+        val unicode = Licences.components.single { it.name == "Unicode et CLDR" }
+        assertTrue("Unicode's copyright in the notice", "Unicode, Inc." in unicode.notice)
+        assertTrue("changes stated", "Modifications" in unicode.notice)
         val ask = Licences.components.single { it.name == "AnySoftKeyboard" }
         assertTrue("copyright of AnySoftKeyboard in the notice", "Menny Even-Danan" in ask.notice)
         assertTrue("changes stated", "Modifications" in ask.notice)

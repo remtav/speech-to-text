@@ -174,6 +174,11 @@ class AppSettings(context: Context, private val defaultServerUrl: String = Build
         get() = prefs.getBoolean("auto_correct", false)
         set(v) = prefs.edit().putBoolean("auto_correct", v).apply()
 
+    /** Issue #80: the emojis used last, most recent first, for the « récents » tab of the emoji panel. */
+    var recentEmojis: List<String>
+        get() = io.github.remtav.dictee.ime.emoji.RecentEmojis.decode(prefs.getString("recent_emojis", null))
+        set(v) = prefs.edit().putString("recent_emojis", io.github.remtav.dictee.ime.emoji.RecentEmojis.encode(v)).apply()
+
     /** Pause (seconds) that ends a segment. */
     var pauseSeconds: Float
         get() = prefs.getFloat("pause_seconds", 0.5f)
