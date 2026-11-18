@@ -4,15 +4,12 @@ import android.os.Bundle
 import android.text.InputType
 import android.view.Gravity
 import android.view.View
-import android.view.ViewGroup
 import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.RadioButton
 import android.widget.RadioGroup
 import android.widget.ScrollView
 import androidx.appcompat.app.AppCompatActivity
-import com.google.android.material.materialswitch.MaterialSwitch
-import com.google.android.material.slider.Slider
 import io.github.remtav.dictee.DicteeApp
 import io.github.remtav.dictee.R
 import io.github.remtav.dictee.cleanup.LlmCatalog
@@ -24,10 +21,8 @@ import io.github.remtav.dictee.stt.Acceleration
 import io.github.remtav.dictee.stt.ModelCatalog
 import io.github.remtav.dictee.stt.RemoteApi
 import io.github.remtav.dictee.stt.RemoteEngine
-import io.github.remtav.dictee.stt.RepetitionFix
 import io.github.remtav.dictee.stt.TranscriptionMode
 import io.github.remtav.dictee.stt.ServerTimeout
-import io.github.remtav.dictee.stt.WhisperTuning
 import io.github.remtav.dictee.stt.asDownloadable
 import java.util.Locale
 
@@ -111,8 +106,6 @@ class SettingsActivity : AppCompatActivity() {
         col.radio(LayoutKind.entries.map { it.label }, s.keyboardLayout.ordinal) { s.keyboardLayout = LayoutKind.entries[it] }
         col.body(getString(R.string.settings_layout_help), small = true)
 
-
-
         col.heading(getString(R.string.settings_cleanup))
         col.body(getString(R.string.settings_cleanup_help), small = true)
         col.radio(CleanupMode.entries.map { it.label }, s.cleanupMode.ordinal) {
@@ -129,7 +122,7 @@ class SettingsActivity : AppCompatActivity() {
         col.addView(advancedBox)
         advancedBox.heading(getString(R.string.settings_advanced))
         advancedBox.body(getString(R.string.settings_advanced_help), small = true)
-        buildWhisperAdvanced(advancedBox)
+        advancedBox.whisperAdvanced(s)
         // Issue #37: the technical model choices and the performance settings, folded, in one block.
         buildModelsAdvanced(advancedBox.collapsible(getString(R.string.settings_models_section), MODELS_SECTION_TAG, MODELS_CONTENT_TAG).content)
         // Issue #57: the remote server, a developer setting, folded at opening, last in « Avancé ».
@@ -286,57 +279,6 @@ class SettingsActivity : AppCompatActivity() {
         }
         remoteStatus = col.body("", small = true)
         updateRemoteWarning()
-    }
-
-    /**
-     * Whisper's padding (issue #15) and, since issue #49, its « Automatique » choice and the repetition
-     * correction, which only applies in automatic mode (greyed out otherwise).
-     */
-    private fun buildWhisperAdvanced(box: LinearLayout) {
-        val s = app.settings
-        box.body(getString(R.string.settings_whisper_tail), small = false)
-        val tailLabels = listOf(
-            R.string.settings_whisper_tail_1000, R.string.settings_whisper_tail_600, R.string.settings_whisper_tail_300,
-            R.string.settings_whisper_tail_auto,
-        ).map { getString(it) }
-        // Fixed paddings first (TAIL_PADDING_CHOICES order), then « Automatique ».
-        val autoIndex = WhisperTuning.TAIL_PADDING_CHOICES.size
-        val tailIndex = if (s.whisperTailAuto) autoIndex else WhisperTuning.TAIL_PADDING_CHOICES.indexOf(s.whisperTailPaddings).coerceAtLeast(0)
-        lateinit var fixGroup: RadioGroup
-        lateinit var fixNote: android.widget.TextView
-        val renderFix = {
-            for (i in 0 until fixGroup.childCount) fixGroup.getChildAt(i).isEnabled = s.whisperTailAuto
-            fixNote.visibility = if (s.whisperTailAuto) View.GONE else View.VISIBLE
-        }
-        box.radio(tailLabels, tailIndex) {
-            if (it == autoIndex) {
-                // The stored fixed value is kept: it comes back if the user leaves « Automatique ».
-                s.whisperTailAuto = true
-            } else {
-                s.whisperTailAuto = false
-                s.whisperTailPaddings = WhisperTuning.TAIL_PADDING_CHOICES[it]
-            }
-            renderFix()
-        }.tag = WHISPER_TAIL_TAG
-        box.body(getString(R.string.settings_whisper_tail_help), small = true)
-        box.body(getString(R.string.settings_whisper_repetition), small = false)
-        val fixes = listOf(RepetitionFix.REDECODE, RepetitionFix.CUT)
-        val fixLabels = listOf(R.string.settings_whisper_repetition_redecode, R.string.settings_whisper_repetition_cut).map { getString(it) }
-        fixGroup = box.radio(fixLabels, fixes.indexOf(s.whisperRepetitionFix).coerceAtLeast(0)) {
-            s.whisperRepetitionFix = fixes[it]
-        }
-        fixGroup.tag = WHISPER_REPETITION_TAG
-        fixNote = box.body(getString(R.string.settings_whisper_repetition_inactive), small = true)
-        box.body(getString(R.string.settings_whisper_repetition_help), small = true)
-        renderFix()
-        // Issue #53: off by default, then the two group lengths to try.
-        box.body(getString(R.string.settings_whisper_group), small = false)
-        val groupLabels = listOf(R.string.settings_whisper_group_off, R.string.settings_whisper_group_5, R.string.settings_whisper_group_10)
-            .map { getString(it) }
-        box.radio(groupLabels, WhisperTuning.GROUP_CHOICES.indexOf(s.whisperGroupSeconds).coerceAtLeast(0)) {
-            s.whisperGroupSeconds = WhisperTuning.GROUP_CHOICES[it]
-        }.tag = WHISPER_GROUP_TAG
-        box.body(getString(R.string.settings_whisper_group_help), small = true)
     }
 
     /**
@@ -507,56 +449,6 @@ class SettingsActivity : AppCompatActivity() {
             }
         }
         llmBox.body(getString(R.string.settings_llm_note), small = true)
-    }
-
-    private fun ViewGroup.switch(label: String, value: Boolean, onChange: (Boolean) -> Unit): MaterialSwitch =
-        MaterialSwitch(context).apply {
-            text = label
-            isChecked = value
-            setOnCheckedChangeListener { _, v -> onChange(v) }
-        }.also { addView(it) }
-
-    /**
-     * Each button gets an id of its own (issue #69): with the same ids in every group (1000, 1001...), a
-     * recreated screen (rotation) restored one group's saved choice into all the others, and stored it.
-     */
-    private fun ViewGroup.radio(labels: List<String>, selected: Int, onChange: (Int) -> Unit): RadioGroup {
-        val group = RadioGroup(context)
-        labels.forEach { l ->
-            group.addView(RadioButton(context).apply { id = View.generateViewId(); text = l })
-        }
-        group.check(group.getChildAt(selected).id)
-        group.listenByIndex(onChange)
-        addView(group)
-        return group
-    }
-
-    private fun RadioGroup.listenByIndex(onChange: (Int) -> Unit) =
-        setOnCheckedChangeListener { g, id -> onChange(g.indexOfChild(g.findViewById(id))) }
-
-    /** Checks [index] without running the change callback (it would store the value as an explicit choice). */
-    private fun RadioGroup.checkSilently(index: Int, onChange: (Int) -> Unit) {
-        setOnCheckedChangeListener(null)
-        check(getChildAt(index).id)
-        listenByIndex(onChange)
-    }
-
-    private fun ViewGroup.slider(
-        label: String, from: Float, to: Float, step: Float, value: Float,
-        format: (Float) -> String, onChange: (Float) -> Unit,
-    ) {
-        val text = body("$label : ${format(value)}")
-        addView(Slider(context).apply {
-            valueFrom = from
-            valueTo = to
-            stepSize = step
-            this.value = (Math.round(value.coerceIn(from, to) / step) * step).coerceIn(from, to)
-            setLabelFormatter { format(it) }
-            addOnChangeListener { _, v, fromUser ->
-                text.text = "$label : ${format(v)}"
-                if (fromUser) onChange(v)
-            }
-        })
     }
 
     companion object {

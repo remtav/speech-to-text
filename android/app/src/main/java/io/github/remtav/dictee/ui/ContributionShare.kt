@@ -9,8 +9,10 @@ import androidx.core.content.FileProvider
 import androidx.core.net.toUri
 import io.github.remtav.dictee.BuildConfig
 import io.github.remtav.dictee.R
+import io.github.remtav.dictee.reading.ArchiveAudio
 import io.github.remtav.dictee.reading.ArchiveField
 import io.github.remtav.dictee.reading.Contribution
+import io.github.remtav.dictee.reading.ContributionContent
 import io.github.remtav.dictee.reading.DeviceFacts
 import java.io.File
 import java.time.LocalDate
@@ -52,6 +54,30 @@ object ContributionShare {
         ArchiveField.DECLARATION -> context.getString(R.string.contrib_field_declaration)
         ArchiveField.DATE -> context.getString(R.string.contrib_field_date)
         ArchiveField.REGION -> context.getString(R.string.contrib_field_region)
+    }
+
+    /** The value of one element of the archive, as shown before consent (from the content the archive is written from). */
+    fun describe(context: Context, field: ArchiveField, content: ContributionContent): String {
+        val value = content[field]
+        return when (field) {
+            ArchiveField.AUDIO -> {
+                val tenths = content.audio.sumOf(ArchiveAudio::tenths)
+                context.getString(R.string.contrib_value_audio, content.audio.size, tenths / 10) + "\n" +
+                    content.audio.joinToString(", ") { it.name }
+            }
+            ArchiveField.TEXT, ArchiveField.TRANSCRIPTION -> (value as List<*>).joinToString("\n") { p ->
+                val m = p as Map<*, *>
+                context.getString(R.string.contrib_value_paragraph, m["paragraphe"] as Int, m["texte"] as String)
+            }
+            ArchiveField.SCORE -> {
+                val m = value as Map<*, *>
+                context.getString(R.string.contrib_value_score, m["ressemblance_pourcent"] as Int, m["erreurs"] as Int, m["mots"] as Int)
+            }
+            ArchiveField.MODEL -> (value as Map<*, *>)["nom"] as String
+            ArchiveField.REGION -> (value as String?) ?: context.getString(R.string.contrib_value_region_none)
+            ArchiveField.TEXT_VERSION, ArchiveField.APP_VERSION, ArchiveField.PHONE_MODEL,
+            ArchiveField.DECLARATION, ArchiveField.DATE -> value as String
+        }
     }
 
     private fun subject(context: Context, textVersion: String) = context.getString(R.string.contrib_email_subject, textVersion)

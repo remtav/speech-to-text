@@ -17,9 +17,7 @@ import android.text.InputType
 import android.util.Log
 import android.view.ContextThemeWrapper
 import android.view.HapticFeedbackConstants
-import android.view.KeyEvent
 import android.view.LayoutInflater
-import android.view.MotionEvent
 import android.view.View
 import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.InputMethodManager
@@ -178,7 +176,7 @@ class DicteeImeService : InputMethodService(), DictationListener, EngineManager.
             v.findViewById<View>(id).setOnClickListener { haptic(it); typePunctuation(text) }
         }
         val backspace = v.findViewById<View>(R.id.key_backspace)
-        backspace.setOnTouchListener(RepeatListener { haptic(backspace); deleteBackward() })
+        backspace.setOnTouchListener(RepeatListener(main) { haptic(backspace); deleteBackward() })
         render()
         return v
     }
@@ -206,7 +204,7 @@ class DicteeImeService : InputMethodService(), DictationListener, EngineManager.
         keys.listener = object : LetterKeyboardView.Listener {
             override fun onText(text: String) = typeKey(text)
         }
-        keys.backspaceTouchListener = RepeatListener { typedBackspace() }
+        keys.backspaceTouchListener = RepeatListener(main) { typedBackspace() }
         symbolsButton = v.findViewById<MaterialButton>(R.id.kb_symbols).apply {
             setOnClickListener {
                 haptic(it)
@@ -266,7 +264,7 @@ class DicteeImeService : InputMethodService(), DictationListener, EngineManager.
     private fun bindPad(p: NumberPadView) {
         pad = p
         p.onKeyPressed = { haptic(it) }
-        p.backspaceTouchListener = RepeatListener { deleteBackward() }
+        p.backspaceTouchListener = RepeatListener(main) { deleteBackward() }
         p.listener = object : NumberPadView.Listener {
             override fun onText(text: String) = typeText(text)
             override fun onDecimal() = typeDecimal()
@@ -347,7 +345,7 @@ class DicteeImeService : InputMethodService(), DictationListener, EngineManager.
     override fun onStartInput(attribute: EditorInfo?, restarting: Boolean) {
         super.onStartInput(attribute, restarting)
         val realEditor = attribute != null && attribute.inputType != InputType.TYPE_NULL
-        Log.i(TAG, "startInput field=${attribute?.let { fieldKey(it) }} restarting=$restarting dictation=$dictationField")
+        Log.i(TAG, "startInput field=${attribute?.fieldKey()} restarting=$restarting dictation=$dictationField")
         if (!realEditor) {
             // Placeholder input with no editor (during an activity recreation, or a screen
             // without text field): not a field change. Results wait until a field is back.
@@ -355,10 +353,10 @@ class DicteeImeService : InputMethodService(), DictationListener, EngineManager.
             sink = null
             return
         }
-        val field = fieldKey(attribute!!)
+        val field = attribute!!.fieldKey()
         val sameField = field == currentField
         currentField = field
-        passwordField = isPassword(attribute)
+        passwordField = attribute.isPassword()
         inputPage = InputPages.forInputType(attribute.inputType)
         // The separator learned in this field stays through a restart of the same field (rotation).
         if (!sameField) decimalOrder = DecimalSeparator.order(java.util.Locale.getDefault())
@@ -382,9 +380,6 @@ class DicteeImeService : InputMethodService(), DictationListener, EngineManager.
             controller.deliverPending()
         }
     }
-
-    private fun fieldKey(info: EditorInfo) =
-        "${info.packageName}#${info.fieldId}#${info.fieldName}#${info.inputType}#${info.hintText}"
 
     private fun isSameFieldAfterRotation(info: EditorInfo, field: String): Boolean =
         field == dictationField && info.fieldId != View.NO_ID &&
@@ -427,16 +422,6 @@ class DicteeImeService : InputMethodService(), DictationListener, EngineManager.
     override fun onFinishInput() {
         super.onFinishInput()
         sink?.clearComposing()
-    }
-
-    private fun isPassword(info: EditorInfo): Boolean {
-        val cls = info.inputType and InputType.TYPE_MASK_CLASS
-        val variation = info.inputType and InputType.TYPE_MASK_VARIATION
-        return (cls == InputType.TYPE_CLASS_TEXT && (
-            variation == InputType.TYPE_TEXT_VARIATION_PASSWORD ||
-                variation == InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD ||
-                variation == InputType.TYPE_TEXT_VARIATION_WEB_PASSWORD
-            )) || (cls == InputType.TYPE_CLASS_NUMBER && variation == InputType.TYPE_NUMBER_VARIATION_PASSWORD)
     }
 
     private fun currentSink(): TextSink? {
@@ -645,36 +630,11 @@ class DicteeImeService : InputMethodService(), DictationListener, EngineManager.
         currentInputConnection?.commitText(text, 1)
     }
 
-    private fun typePunctuation(p: String) {
-        val ic = currentInputConnection ?: return
-        val before = ic.getTextBeforeCursor(1, 0)?.toString() ?: ""
-        if ((p == "," || p == ".") && before == " ") ic.deleteSurroundingText(1, 0)
-        ic.commitText(p, 1)
-    }
+    private fun typePunctuation(p: String) { currentInputConnection?.typePunctuation(p) }
 
-    private fun deleteBackward() {
-        val ic = currentInputConnection ?: return
-        val selected = ic.getSelectedText(0)
-        if (!selected.isNullOrEmpty()) {
-            ic.commitText("", 1)
-        } else {
-            ic.sendKeyEvent(KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_DEL))
-            ic.sendKeyEvent(KeyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_DEL))
-        }
-    }
+    private fun deleteBackward() { currentInputConnection?.deleteBackward() }
 
-    private fun pressEnter() {
-        val info = currentInputEditorInfo
-        val ic = currentInputConnection ?: return
-        val action = (info?.imeOptions ?: 0) and EditorInfo.IME_MASK_ACTION
-        val noEnterAction = (info?.imeOptions ?: 0) and EditorInfo.IME_FLAG_NO_ENTER_ACTION != 0
-        val multiLine = (info?.inputType ?: 0) and InputType.TYPE_TEXT_FLAG_MULTI_LINE != 0
-        if (!multiLine && !noEnterAction && action != EditorInfo.IME_ACTION_NONE && action != EditorInfo.IME_ACTION_UNSPECIFIED) {
-            ic.performEditorAction(action)
-        } else {
-            ic.commitText("\n", 1)
-        }
-    }
+    private fun pressEnter() { currentInputConnection?.pressEnter(currentInputEditorInfo) }
 
     /** What the model button's menu can list (issue #72): Whisper, an « Avancé » model only while active, the configured server. */
     private fun modelChoices(): List<ModelSpec> =
@@ -818,22 +778,6 @@ class DicteeImeService : InputMethodService(), DictationListener, EngineManager.
         val c = if (strong && Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) HapticFeedbackConstants.CONFIRM
         else HapticFeedbackConstants.KEYBOARD_TAP
         v.performHapticFeedback(c)
-    }
-
-    /** Repeats an action while the key is held (backspace). */
-    private inner class RepeatListener(private val action: () -> Unit) : View.OnTouchListener {
-        private val repeat = object : Runnable {
-            override fun run() { action(); main.postDelayed(this, 60) }
-        }
-
-        @SuppressLint("ClickableViewAccessibility")
-        override fun onTouch(v: View, e: MotionEvent): Boolean {
-            when (e.actionMasked) {
-                MotionEvent.ACTION_DOWN -> { v.isPressed = true; action(); main.postDelayed(repeat, 400) }
-                MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> { v.isPressed = false; main.removeCallbacks(repeat) }
-            }
-            return true
-        }
     }
 
     companion object {
