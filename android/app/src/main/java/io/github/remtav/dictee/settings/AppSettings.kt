@@ -164,6 +164,16 @@ class AppSettings(context: Context, private val defaultServerUrl: String = Build
         get() = prefs.getBoolean("haptics", true)
         set(v) = prefs.edit().putBoolean("haptics", v).apply()
 
+    /** Issue #71: three words offered above the text keys while typing. On by default. */
+    var wordSuggestions: Boolean
+        get() = prefs.getBoolean("word_suggestions", true)
+        set(v) = prefs.edit().putBoolean("word_suggestions", v).apply()
+
+    /** Issue #71: the typed word replaced by the bold suggestion at a space or a punctuation mark. Off by default (#78). */
+    var autoCorrect: Boolean
+        get() = prefs.getBoolean("auto_correct", false)
+        set(v) = prefs.edit().putBoolean("auto_correct", v).apply()
+
     /** Pause (seconds) that ends a segment. */
     var pauseSeconds: Float
         get() = prefs.getFloat("pause_seconds", 0.5f)

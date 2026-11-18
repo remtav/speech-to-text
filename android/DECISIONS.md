@@ -4909,3 +4909,49 @@ développeur. **La raison** : laisser la personne choisir entre vitesse et préc
   fait tourner un modèle plus gros que celui du téléphone (#13, #88), la PR garde donc « Rapide et précis, sans charger
   le téléphone » ; (2) le sort du code dormant du test rapide à deux modèles (#107) : non touché ici ; (3) le
   `@Ignore` de `ScreenshotTest.readingTest`, posé par #72 faute d'un deuxième modèle offert, n'est pas levé ici.
+
+## Issue #71, lot 1 : suggestions et correction (listes d'AnySoftKeyboard)
+
+Décisions de Rémi (2026-11-14, #78) : AnySoftKeyboard (Apache-2.0) ; correction automatique **désactivée par
+défaut** ; aucun mot québécois dans cette première passe ; page des licences des composants dans les Réglages ;
+l'implémentation part de `main` (la branche d'essai `ccr-67305f2c-9rtymc` n'est pas reprise).
+
+- **Ce qui vient d'AnySoftKeyboard** : seulement ses listes de mots (les listes « combined » d'AOSP de ses paquets de
+  langue, commit `1ee43e7f`). `tools/listes-de-mots/construire.py` les réduit à `mot<TAB>fréquence[<TAB>x]`
+  (x : possiblement offensant), triées par mot replié (minuscules, sans accents, `œ` → `oe`) :
+  `assets/words/{fr,en,es,pt}.txt.gzip`, 3,6 Mo en tout (pas `.gz` : le plugin Android décompresse ces fichiers
+  et retire l'extension dans l'APK, le nom ouvert n'y existait plus). Portugais : Brésil et Portugal réunis. Son moteur de
+  suggestions (C++, JNI, format binaire à lui) n'est pas repris : pas de compilation native ajoutée.
+- **Moteur** (`ime/words`, Kotlin pur, testé sur la JVM avec les vraies listes) : `Lexicon` garde une liste dans
+  quelques tableaux (une chaîne pour tous les mots, un octet par lettre repliée), quelques Mo par langue ;
+  `Suggester` parcourt la liste comme un arbre de préfixes avec une ligne de distance d'édition par préfixe (lettre
+  en trop, en moins, fausse ou inversée : 1 ; touche voisine sur QWERTY ou AZERTY : 0,5 ; accent : 0). Une ou deux
+  fautes permises selon la longueur, aucune sous trois lettres. Les mots qui commencent exactement comme le mot tapé
+  passent avant ceux qu'on atteint par une faute (« bonj » → « bonjour » avant « bon »). Environ 6 à 9 ms par touche
+  sur l'ordinateur de développement, avec le français et l'anglais chargés (`SuggesterTest`).
+- **Lecture des listes** : à la première ouverture d'un champ texte, sur un fil à part (`WordLists`), seulement pour
+  les langues choisies ; le calcul des suggestions passe par le même fil. Une touche n'attend jamais : tant qu'une
+  liste se lit, la barre reste vide et l'espace n'applique aucune correction.
+- **Dans le champ** : aucun texte en composition, seulement du texte validé (`WordTyping`). La dictée compose ses
+  résultats partiels ; garder les touches hors de la région de composition évite que les deux se marchent dessus.
+  Le mot courant est relu avant le curseur à chaque `onUpdateSelection`.
+- **Barre** : 48 dp au-dessus des lettres, dans la vue des touches seulement (pas sous le micro), toujours de la même
+  hauteur, vide ou non, et dans tous les champs : le clavier ne saute pas en tapant ni d'un champ à l'autre. Elle
+  disparaît si les suggestions sont coupées dans les Réglages. Le meilleur mot au milieu ; avec la correction
+  automatique, la correction en gras au milieu et le mot tapé à gauche (le toucher le garde tel quel).
+- **Pas de suggestion** dans un mot de passe, une adresse courriel ou web, un champ de filtre, un champ qui refuse les
+  suggestions (`TYPE_TEXT_FLAG_NO_SUGGESTIONS`), ni pendant une dictée. Jamais de mot marqué offensant.
+- **Correction automatique** (réglage, désactivée par défaut) : à l'espace ou à une ponctuation des touches, le mot
+  tapé est remplacé si ce n'est pas un mot des listes et qu'un mot proche est assez fréquent ; jamais un mot en
+  capitales ni avec une capitale au milieu. Retour arrière juste après : le mot tapé revient (l'espace reste).
+- **Mots québécois** : rien dans cette passe (décision de Rémi). « chu », « tsé », « faque » ne sont pas proposés ;
+  avec la correction activée, ils peuvent être remplacés. À revoir après l'essai du lot 1.
+- **Licences** : Réglages → « Licences des composants » (`LicencesActivity`, liste dans `ui/Licences.kt`) : nom,
+  usage, avis (copyright d'AnySoftKeyboard et d'AOSP, modifications faites) et texte complet de la licence
+  (`assets/licences/AnySoftKeyboard-LICENSE.txt`, le fichier `LICENSE` d'AnySoftKeyboard tel quel). Avis aussi dans
+  `assets/words/NOTICE.txt`. Seul AnySoftKeyboard y figure pour l'instant : les autres composants de l'APK
+  (sherpa-onnx, ONNX Runtime, Silero VAD, AndroidX, Material, MediaPipe) sont à ajouter, une entrée chacun.
+- **Hors de ce lot** : saisie par glissement (lot 2), prédiction du mot suivant (les listes n'ont pas de paires de
+  mots), mots appris.
+- Tests instrumentés (`SuggestionsInstrumentedTest`) : barre et toucher, correction désactivée par défaut, correction
+  activée puis annulée, mot de passe, barre retirée, écran des licences. Non lancés en local (émulateur en CI).

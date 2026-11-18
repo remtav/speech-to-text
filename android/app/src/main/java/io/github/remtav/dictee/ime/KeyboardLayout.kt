@@ -49,6 +49,8 @@ enum class KeyLanguage(
     val accents: Map<String, List<String>>,
     /** Punctuation reached by a long press on a key of the symbols page. */
     val marks: Map<String, List<String>>,
+    /** Name of its word list in `assets/words` (issue #71). */
+    val wordList: String,
 ) {
     FRENCH(
         setOf(DictationLanguage.FRENCH_QUEBEC, DictationLanguage.FRENCH_FRANCE),
@@ -62,11 +64,13 @@ enum class KeyLanguage(
             "y" to listOf("ÿ"),
         ),
         mapOf("'" to listOf("’"), "\"" to listOf("«", "»"), "." to listOf("…")),
+        "fr",
     ),
     ENGLISH(
         setOf(DictationLanguage.ENGLISH),
         emptyMap(),
         mapOf("'" to listOf("’"), "\"" to listOf("“", "”"), "." to listOf("…")),
+        "en",
     ),
     SPANISH(
         setOf(DictationLanguage.SPANISH),
@@ -79,6 +83,7 @@ enum class KeyLanguage(
             "n" to listOf("ñ"),
         ),
         mapOf("?" to listOf("¿"), "!" to listOf("¡"), "\"" to listOf("«", "»", "“", "”"), "." to listOf("…")),
+        "es",
     ),
     PORTUGUESE(
         setOf(DictationLanguage.PORTUGUESE),
@@ -91,6 +96,7 @@ enum class KeyLanguage(
             "c" to listOf("ç"),
         ),
         mapOf("\"" to listOf("“", "”", "«", "»"), "." to listOf("…")),
+        "pt",
     );
 
     companion object {

@@ -79,6 +79,11 @@ class DicteeApp : Application() {
     lateinit var engines: EngineManager
         private set
 
+    /** Issue #71: word lists of the text keys' suggestions, read from the APK on first use and kept. */
+    val wordLists: io.github.remtav.dictee.ime.words.WordLists by lazy {
+        io.github.remtav.dictee.ime.words.WordLists { name -> assets.open(name) }
+    }
+
     private var llmCleaner: LlmCleaner? = null
     private var llmKey: String? = null
 

@@ -204,6 +204,12 @@
         android:orientation="vertical"
         android:visibility="gone">
 
+        <!-- Issue #71: three words for the word being typed; gone when the suggestions are turned off. -->
+        <io.github.remtav.dictee.ime.SuggestionStripView
+            android:id="@+id/suggestions"
+            android:layout_width="match_parent"
+            android:layout_height="48dp" />
+
         <io.github.remtav.dictee.ime.LetterKeyboardView
             android:id="@+id/letters"
             android:layout_width="match_parent"
