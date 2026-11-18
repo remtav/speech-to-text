@@ -25,7 +25,11 @@ import org.junit.runner.RunWith
 @RunWith(AndroidJUnit4::class)
 class AdvancedSettingsInstrumentedTest {
     private val settings get() = DicteeApp.from(ApplicationProvider.getApplicationContext()).settings
-    private val keys = listOf("whisper_tail_paddings", "whisper_tail_auto", "whisper_repetition_fix")
+    // Every setting stored by a radio group of the screen: a rotation must leave them all as they were (#69).
+    private val keys = listOf(
+        "whisper_tail_paddings", "whisper_tail_auto", "whisper_repetition_fix", "whisper_group_seconds",
+        "theme", "keyboard_layout", "cleanup", "acceleration",
+    )
     private var saved: Map<String, Any?> = emptyMap()
 
     @Before fun save() {
@@ -81,6 +85,32 @@ class AdvancedSettingsInstrumentedTest {
             s.onActivity { assertFalse(fix.getChildAt(0).isEnabled) }
             assertEquals(null, settings.engineOptions(io.github.remtav.dictee.stt.ModelCatalog.whisperTurbo).whisperRepetitionFix)
         }
+    }
+
+    /**
+     * Issue #69: the radio buttons of every group had the same ids (1000, 1001...). When the screen was
+     * recreated (rotation, or a configuration change on a loaded CI emulator), Android restored the state
+     * saved under one id into every button carrying it: the groups showed another group's choice and stored
+     * it (« Silence ajouté » opened on 600 in CI, `expected:<1000> but was:<1001>`).
+     */
+    @Test fun recreatingTheScreenKeepsEveryChoiceAndStoresNothing() {
+        settings.whisperTailPaddings = 600
+        settings.whisperGroupSeconds = io.github.remtav.dictee.stt.WhisperTuning.GROUP_CHOICES[2]
+        settings.prefs.edit().remove("theme").remove("keyboard_layout").remove("cleanup").remove("acceleration").commit()
+        val before = settings.prefs.all.filterKeys { it in keys }
+        ActivityScenario.launch(SettingsActivity::class.java).use { s ->
+            s.recreate()
+            InstrumentationRegistry.getInstrumentation().waitForIdleSync()
+            s.onActivity { a ->
+                val root = a.window.decorView
+                val tail = root.findViewWithTag<RadioGroup>(SettingsActivity.WHISPER_TAIL_TAG)
+                val group = root.findViewWithTag<RadioGroup>(SettingsActivity.WHISPER_GROUP_TAG)
+                assertEquals("600 still checked", tail.getChildAt(1).id, tail.checkedRadioButtonId)
+                assertEquals("10 s still checked", group.getChildAt(2).id, group.checkedRadioButtonId)
+            }
+        }
+        assertEquals("nothing stored by the rotation", before, settings.prefs.all.filterKeys { it in keys })
+        assertEquals(600, settings.whisperTailPaddings)
     }
 
     @Test fun noWhisperPaddingLeftInPerformance() {
