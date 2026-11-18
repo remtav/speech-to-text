@@ -330,7 +330,7 @@ jobs:
           # the box took the window focus from the test field and failed keyboard tests at random. With it set,
           # Android closes the stuck launcher instead of showing the box (the CI emulator only, never a phone).
           # One line on purpose: the action runs each line of the script as its own command.
-          script: adb shell settings put global hide_error_dialogs 1; ./gradlew --no-daemon connectedDebugAndroidTest $SHARD_ARGS -Pandroid.injected.androidTest.leaveApksInstalledAfterRun=true; s=$?; mkdir -p screenshots; adb pull /sdcard/Android/data/io.github.remtav.dictee/files/screenshots/. screenshots/ || true; exit $s
+          script: adb shell settings put global hide_error_dialogs 1; ./gradlew --no-daemon connectedDebugAndroidTest $SHARD_ARGS -Pandroid.injected.androidTest.leaveApksInstalledAfterRun=true; s=$?; mkdir -p screenshots; adb pull /sdcard/Android/data/com.kalmia.stt/files/screenshots/. screenshots/ || true; exit $s
       - name: Test duration per class
         if: always()
         working-directory: .
