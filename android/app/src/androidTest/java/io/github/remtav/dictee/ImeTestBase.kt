@@ -199,7 +199,7 @@ abstract class ImeTestBase {
         fail("the test activity never got the window focus\n${windowFocus()}")
     }
 
-    private fun windowFocus(): String = runCatching {
+    protected fun windowFocus(): String = runCatching {
         shell("dumpsys window").lines().filter { "mCurrentFocus" in it || "mFocusedApp" in it }.joinToString("\n")
     }.getOrDefault("")
 
