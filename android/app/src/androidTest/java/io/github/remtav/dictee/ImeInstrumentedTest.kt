@@ -171,6 +171,22 @@ class RobustnessInstrumentedTest : ImeTestBase() {
         awaitIdle()
     }
 
+    /** Issue #81: the cursor moved mid-dictation (to reread the start): the rest still goes at the end. */
+    @Test
+    fun touchingTheFieldMidDictationKeepsTheTextAtTheEnd() {
+        useAudio("en1", "fr1", realTime = true)
+        useScript("first part.", "second part.")
+        launchFields()
+        tapMic()
+        waitFor("first segment", 20_000) { field1() == "First part." }
+        scenario.onActivity { it.field1.setSelection(0) }
+        waitFor("second segment at the end", 25_000) { field1() == "First part. Second part." }
+        awaitIdle()
+        var cursor = -1
+        scenario.onActivity { cursor = it.field1.selectionStart }
+        assertEquals("the cursor stays where it was put", 0, cursor)
+    }
+
     @Test
     fun changingFieldMidDictationStopsAndNeverTypesIntoTheNewField() {
         useAudio("en1", "fr1", realTime = true)
