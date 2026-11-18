@@ -2,6 +2,10 @@ package io.github.remtav.dictee.ime
 
 import android.annotation.SuppressLint
 import android.content.Context
+import android.graphics.Canvas
+import android.graphics.Paint
+import android.graphics.Path
+import android.graphics.Rect
 import android.graphics.drawable.GradientDrawable
 import android.os.Handler
 import android.os.Looper
@@ -16,11 +20,17 @@ import android.widget.LinearLayout
 import android.widget.PopupWindow
 import android.widget.TextView
 import io.github.remtav.dictee.R
+import io.github.remtav.dictee.ime.words.KeyGeometry
+import io.github.remtav.dictee.ime.words.KeyPoint
 
 /**
  * The text keyboard's keys (letters or symbols page, Shift, Backspace), built from [KeyboardLayout]
  * with plain views. A long press on a letter opens a window of its accents above the key.
  * The bottom row (keyboard switch, symbols, microphone, space, Enter) lives in the layout of the service.
+ *
+ * With [gestureTyping] on, a finger that slides from a letter onto other keys traces a word (issue #71, lot 2):
+ * the keys stop seeing that touch, the trace is drawn over them and handed to [Listener.onGesture] when the
+ * finger lifts.
  */
 class LetterKeyboardView @JvmOverloads constructor(
     context: Context,
@@ -30,6 +40,12 @@ class LetterKeyboardView @JvmOverloads constructor(
     interface Listener {
         /** A character (letter, accent, symbol) was chosen. */
         fun onText(text: String)
+
+        /**
+         * A word was traced (issue #71, lot 2): [trace] in key widths over [geometry], [shift] the Shift state when
+         * the finger lifted. The keys then drop a single capital, as after a letter.
+         */
+        fun onGesture(trace: List<KeyPoint>, geometry: KeyGeometry, shift: ShiftState) {}
     }
 
     var listener: Listener? = null
@@ -57,6 +73,10 @@ class LetterKeyboardView @JvmOverloads constructor(
     var shift: ShiftState = ShiftState.OFF
         private set
 
+    /** Issue #71, lot 2: sliding from letter to letter types a word. Letters page only. */
+    var gestureTyping: Boolean = false
+        set(v) { field = v; if (!v) cancelGesture() }
+
     private val handler = Handler(Looper.getMainLooper())
     private var popup: PopupWindow? = null
     private var lastShiftTap = 0L
@@ -83,6 +103,7 @@ class LetterKeyboardView @JvmOverloads constructor(
 
     /** Back to lowercase and the letters page (new field). */
     fun reset() {
+        cancelGesture()
         shift = ShiftState.OFF
         moreSymbols = false
         symbols = false
@@ -275,6 +296,132 @@ class LetterKeyboardView @JvmOverloads constructor(
         }
     }
 
+    // ----------------------------------------------------------------- gesture typing (issue #71, lot 2)
+
+    /** The finger went down on a letter and may still trace a word. */
+    private var tracking = false
+    /** The touch was taken from the keys: it is a trace. */
+    private var gesturing = false
+    private var trackedPointer = -1
+    private var downX = 0f
+    private var downY = 0f
+    /** The trace, in pixels of this view: x0, y0, x1, y1… */
+    private val tracePx = ArrayList<Float>()
+    private val trail = Path()
+    private val trailPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.STROKE
+        strokeCap = Paint.Cap.ROUND
+        strokeJoin = Paint.Join.ROUND
+        strokeWidth = dp(TRAIL_WIDTH_DP).toFloat()
+    }
+
+    /** Bounds of each letter key in this view, from the keys as laid out. */
+    private fun letterBounds(): Map<Char, Rect> {
+        val out = HashMap<Char, Rect>()
+        for ((base, key) in letterKeys) {
+            if (!base[0].isLetter() || key.width == 0) continue
+            val r = Rect()
+            key.getDrawingRect(r)
+            offsetDescendantRectToMyCoords(key, r)
+            out[base[0]] = r
+        }
+        return out
+    }
+
+    private fun onLetterKey(x: Float, y: Float): Boolean {
+        val slack = dp(2)
+        return letterBounds().values.any { r -> x >= r.left - slack && x < r.right + slack && y >= r.top - slack && y < r.bottom + slack }
+    }
+
+    private fun keyWidth(): Float = letterKeys.firstOrNull { it.first == "e" }?.second?.width?.toFloat() ?: 0f
+
+    private fun addPoints(e: MotionEvent) {
+        val i = e.findPointerIndex(trackedPointer)
+        if (i < 0) return
+        for (h in 0 until e.historySize) addPoint(e.getHistoricalX(i, h), e.getHistoricalY(i, h))
+        addPoint(e.getX(i), e.getY(i))
+    }
+
+    private fun addPoint(x: Float, y: Float) {
+        if (tracePx.isEmpty()) trail.moveTo(x, y) else trail.lineTo(x, y)
+        tracePx += x
+        tracePx += y
+    }
+
+    override fun onInterceptTouchEvent(e: MotionEvent): Boolean {
+        if (!gestureTyping || symbols) {
+            tracking = false
+            return false
+        }
+        when (e.actionMasked) {
+            MotionEvent.ACTION_DOWN -> {
+                cancelGesture()
+                trackedPointer = e.getPointerId(0)
+                downX = e.x
+                downY = e.y
+                tracking = popup == null && onLetterKey(e.x, e.y)
+                if (tracking) addPoint(e.x, e.y)
+            }
+            // A second finger: two thumbs typing, each touch is a tap.
+            MotionEvent.ACTION_POINTER_DOWN -> tracking = false
+            MotionEvent.ACTION_MOVE -> if (tracking) {
+                // The window of accents is open: the finger is choosing one.
+                if (popup != null) { tracking = false; return false }
+                addPoints(e)
+                val dx = e.x - downX
+                val dy = e.y - downY
+                val start = maxOf(keyWidth() * GESTURE_START_KEYS, dp(12).toFloat())
+                if (dx * dx + dy * dy > start * start) {
+                    gesturing = true
+                    trailPaint.color = color(androidx.appcompat.R.attr.colorPrimary)
+                    trailPaint.alpha = TRAIL_ALPHA
+                    invalidate()
+                    return true
+                }
+            }
+            MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> tracking = false
+        }
+        return false
+    }
+
+    @SuppressLint("ClickableViewAccessibility")
+    override fun onTouchEvent(e: MotionEvent): Boolean {
+        if (!gesturing) return super.onTouchEvent(e)
+        when (e.actionMasked) {
+            MotionEvent.ACTION_MOVE -> { addPoints(e); invalidate() }
+            MotionEvent.ACTION_UP -> { addPoints(e); finishGesture() }
+            MotionEvent.ACTION_POINTER_UP -> if (e.getPointerId(e.actionIndex) == trackedPointer) finishGesture()
+            MotionEvent.ACTION_CANCEL -> cancelGesture()
+        }
+        return true
+    }
+
+    private fun finishGesture() {
+        val unit = keyWidth()
+        val bounds = letterBounds()
+        val geometry = KeyGeometry.fromBounds(bounds.mapValues { (_, r) -> floatArrayOf(r.left.toFloat(), r.top.toFloat(), r.right.toFloat(), r.bottom.toFloat()) })
+        val trace = if (unit > 0f) List(tracePx.size / 2) { KeyPoint(tracePx[2 * it] / unit, tracePx[2 * it + 1] / unit) } else emptyList()
+        val used = shift
+        cancelGesture()
+        if (geometry == null || trace.size < 2) return
+        afterLetter()
+        listener?.onGesture(trace, geometry, used)
+    }
+
+    private fun cancelGesture() {
+        val drawn = gesturing
+        tracking = false
+        gesturing = false
+        tracePx.clear()
+        trail.reset()
+        if (drawn) invalidate()
+    }
+
+    override fun dispatchDraw(canvas: Canvas) {
+        super.dispatchDraw(canvas)
+        if (gesturing) canvas.drawPath(trail, trailPaint)
+    }
+
     // ----------------------------------------------------------------- accents
 
     private var accentViews: List<TextView> = emptyList()
@@ -358,5 +505,9 @@ class LetterKeyboardView @JvmOverloads constructor(
         /** Keys are at least 48 dp tall (touch target). */
         const val KEY_HEIGHT_DP = 48
         const val LONG_PRESS_MS = 400L
+        /** A finger that moves this many key widths from where it went down traces a word instead of tapping. */
+        const val GESTURE_START_KEYS = 0.6f
+        const val TRAIL_WIDTH_DP = 6
+        const val TRAIL_ALPHA = 160
     }
 }

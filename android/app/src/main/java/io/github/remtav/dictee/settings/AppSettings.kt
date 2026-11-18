@@ -169,6 +169,11 @@ class AppSettings(context: Context, private val defaultServerUrl: String = Build
         get() = prefs.getBoolean("word_suggestions", true)
         set(v) = prefs.edit().putBoolean("word_suggestions", v).apply()
 
+    /** Issue #71, lot 2: sliding from letter to letter types a word. On by default. */
+    var gestureTyping: Boolean
+        get() = prefs.getBoolean("gesture_typing", true)
+        set(v) = prefs.edit().putBoolean("gesture_typing", v).apply()
+
     /** Issue #71: the typed word replaced by the bold suggestion at a space or a punctuation mark. Off by default (#78). */
     var autoCorrect: Boolean
         get() = prefs.getBoolean("auto_correct", false)

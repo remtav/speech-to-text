@@ -40,6 +40,22 @@ class WordLists(private val open: (String) -> InputStream) {
     }
 
     /**
+     * Guesses the word of a gesture ([trace], in key widths, over [geometry]) in the background and hands the
+     * words, best first, to [done] (on that thread). Issue #71, lot 2.
+     */
+    fun decodeGesture(languages: Set<KeyLanguage>, geometry: KeyGeometry, trace: List<KeyPoint>, done: (List<String>) -> Unit) {
+        worker.execute {
+            val result = try {
+                GestureDecoder(languages.sortedBy { it.ordinal }.mapNotNull { lexicon(it) }, geometry).decode(trace)
+            } catch (e: Exception) {
+                Log.w(TAG, "gesture failed", e)
+                emptyList()
+            }
+            done(result)
+        }
+    }
+
+    /**
      * The suggestions for [typed] right away, on the caller's thread, or null while a list is still being read
      * (then the word is typed as is: the automatic correction never makes a key wait).
      */
