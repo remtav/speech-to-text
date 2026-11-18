@@ -22,6 +22,19 @@
     <string name="cd_period">Point</string>
     <string name="settings_layout">Disposition du clavier à touches</string>
     <string name="settings_layout_help">Lettres du clavier à touches, ouvert par le bouton « Clavier à touches » à côté du micro. AZERTY si « Français (France) » a été choisi à l\'installation, QWERTY sinon. Appui long sur une touche : accents et ponctuation des langues choisies.</string>
+    <!-- Issue #71: suggestions and automatic correction of the text keys. -->
+    <string name="settings_suggestions">Suggestions de mots</string>
+    <string name="settings_suggestions_help">Trois mots proposés au-dessus des touches pendant que vous tapez ; touchez-en un pour l\'écrire. Français, anglais, espagnol et portugais, selon les langues choisies. Tout reste sur le téléphone.</string>
+    <string name="settings_autocorrect">Correction automatique</string>
+    <string name="settings_autocorrect_help">Désactivée par défaut. Quand elle est activée, le mot en gras au milieu de la barre remplace le mot tapé dès que vous tapez une espace ou une ponctuation. Retour arrière juste après : le mot tapé revient.</string>
+    <string name="cd_suggestion">Suggestion : %1$s</string>
+    <string name="cd_suggestion_correction">Correction : %1$s</string>
+    <string name="cd_suggestion_keep">Garder « %1$s »</string>
+    <!-- Issue #71: licences of the components shipped in the app. -->
+    <string name="licences_open">Licences des composants</string>
+    <string name="licences_title">Licences des composants</string>
+    <string name="licences_intro">Composants d\'autres projets inclus dans l\'application, avec leur licence et leur avis.</string>
+    <string name="licences_full_text">Texte de la licence</string>
     <string name="cd_enter">Entrée</string>
     <!-- Issue #42 / #54: the text keys, the second symbols page and the number pad. -->
     <string name="keys_open">Clavier à touches</string>

@@ -47,6 +47,8 @@ import io.github.remtav.dictee.stt.Transcription
 import io.github.remtav.dictee.ui.HowToActivity
 import io.github.remtav.dictee.ui.ProActivity
 import io.github.remtav.dictee.ui.SetupActivity
+import io.github.remtav.dictee.ime.words.Suggestions
+import io.github.remtav.dictee.ime.words.WordTyping
 import java.lang.ref.WeakReference
 
 /**
@@ -75,6 +77,14 @@ class DicteeImeService : InputMethodService(), DictationListener, EngineManager.
     private var header: View? = null
     private var pad: NumberPadView? = null
     private var openKeys: View? = null
+    private var strip: SuggestionStripView? = null
+    /** Issue #71: the word before the cursor, its replacement by a suggestion, the automatic correction. */
+    private val wordTyping = WordTyping()
+    /** The suggestions shown, and a counter that drops results computed for an older word. */
+    private var suggestions: Suggestions = Suggestions.NONE
+    private var suggestionRequest = 0
+    /** The current field takes suggestions (plain text, see [suggestionsWanted]). */
+    private var suggestionField = false
     /** Page the current field asked for (text views or a number pad), from its `inputType`. */
     private var inputPage: InputPage = InputPage.Text
     /** Decimal separators to try in the current pad, preferred first (see [typeDecimal]). */
@@ -248,7 +258,10 @@ class DicteeImeService : InputMethodService(), DictationListener, EngineManager.
         v.findViewById<View>(R.id.kb_comma).setOnClickListener { haptic(it); typeKey(",") }
         // Long press on the period: the ellipsis. The same long-press window as the keys of the symbols page.
         v.findViewById<View>(R.id.kb_period).also { keys.installKeyTouch(it, ".") { haptic(it); typeKey(".") } }
-        v.findViewById<View>(R.id.kb_enter).setOnClickListener { haptic(it); stopDictationForTyping(); pressEnter() }
+        v.findViewById<View>(R.id.kb_enter).setOnClickListener { haptic(it); stopDictationForTyping(); wordTyping.forget(); pressEnter() }
+        strip = v.findViewById<SuggestionStripView>(R.id.suggestions).apply {
+            onPick = { word -> pickSuggestion(word) }
+        }
         applyView()
     }
 
@@ -281,6 +294,59 @@ class DicteeImeService : InputMethodService(), DictationListener, EngineManager.
             contentDescription = getString(R.string.cd_to_dictation)
         }
         updateSymbolsButton()
+        // The bar keeps its place whatever the field, so the keys do not move from one field to the next.
+        strip?.visibility = if (text && app.settings.wordSuggestions) View.VISIBLE else View.GONE
+        refreshSuggestions()
+    }
+
+    // ------------------------------------------------------------ suggestions (issue #71)
+
+    private fun suggestionsOn(): Boolean =
+        strip?.visibility == View.VISIBLE && suggestionField && !passwordField && !controller.isActive
+
+    /** Asks for the suggestions of the word before the cursor; they are shown when they come back, if still current. */
+    private fun refreshSuggestions() {
+        val bar = strip ?: return
+        val request = ++suggestionRequest
+        val ic = currentInputConnection
+        val word = if (suggestionsOn() && ic != null) wordTyping.currentWord(ic) else ""
+        if (word.isEmpty()) {
+            showSuggestions(Suggestions.NONE)
+            return
+        }
+        if (word == suggestions.typed) return
+        val languages = KeyLanguage.forDictation(app.settings.languages)
+        app.wordLists.suggest(languages, app.settings.keyboardLayout, word) { result ->
+            main.post { if (request == suggestionRequest && strip === bar) showSuggestions(result) }
+        }
+    }
+
+    private fun showSuggestions(s: Suggestions) {
+        // Without the automatic correction, nothing is shown in bold and nothing replaces the typed word.
+        suggestions = if (app.settings.autoCorrect || s.autoCorrect == null) s else s.copy(autoCorrect = null)
+        strip?.show(suggestions)
+    }
+
+    /** A tap on a word of the bar: it replaces the word before the cursor, followed by a space. */
+    private fun pickSuggestion(word: String) {
+        val ic = currentInputConnection ?: return
+        strip?.let { haptic(it) }
+        wordTyping.pick(ic, suggestions.typed, word)
+    }
+
+    /**
+     * A space or a punctuation mark from the text keys: with the automatic correction on, the word before the
+     * cursor is replaced first by the correction shown in bold. Computed on the spot when the bar is behind
+     * (fast typing); skipped while the word lists are still being read.
+     */
+    private fun typeSeparator(ic: android.view.inputmethod.InputConnection, text: String) {
+        val word = if (suggestionsOn() && app.settings.autoCorrect) wordTyping.currentWord(ic) else ""
+        val correction = when {
+            word.isEmpty() -> null
+            suggestions.typed == word -> suggestions.autoCorrect
+            else -> app.wordLists.suggestNow(KeyLanguage.forDictation(app.settings.languages), app.settings.keyboardLayout, word)?.autoCorrect
+        }
+        wordTyping.typeSeparator(ic, text, word, correction)
     }
 
     /** The number pad (issue #42): digits go to the field, Enter acts as in the other views. */
@@ -339,12 +405,20 @@ class DicteeImeService : InputMethodService(), DictationListener, EngineManager.
 
     private fun typeKey(text: String) {
         stopDictationForTyping()
-        typeText(text)
+        val ic = currentInputConnection ?: return
+        if (WordTyping.isSeparator(text)) {
+            typeSeparator(ic, text)
+        } else {
+            wordTyping.forget()
+            ic.commitText(text, 1)
+        }
     }
 
     private fun typedBackspace() {
         stopDictationForTyping()
-        deleteBackward()
+        val ic = currentInputConnection ?: return
+        // Right after an automatic correction, Backspace puts back the word as typed (issue #71).
+        if (!wordTyping.undoCorrection(ic)) ic.deleteBackward()
     }
 
     override fun onEvaluateFullscreenMode(): Boolean = false
@@ -369,6 +443,7 @@ class DicteeImeService : InputMethodService(), DictationListener, EngineManager.
             // Placeholder input with no editor (during an activity recreation, or a screen
             // without text field): not a field change. Results wait until a field is back.
             currentField = null
+            suggestionField = false
             sink?.let { parkedSink = it }
             sink = null
             return
@@ -377,6 +452,9 @@ class DicteeImeService : InputMethodService(), DictationListener, EngineManager.
         val sameField = field == currentField
         currentField = field
         passwordField = attribute.isPassword()
+        suggestionField = suggestionsWanted(attribute.inputType)
+        wordTyping.forget()
+        suggestions = Suggestions.NONE
         inputPage = InputPages.forInputType(attribute.inputType)
         // The separator learned in this field stays through a restart of the same field (rotation).
         if (!sameField) decimalOrder = DecimalSeparator.order(java.util.Locale.getDefault())
@@ -419,6 +497,9 @@ class DicteeImeService : InputMethodService(), DictationListener, EngineManager.
         // rebuild it, so the keyboard follows the setting like the screens do.
         if (inflatedTheme != null && inflatedTheme != app.settings.theme) rebuildInputView()
         if (passwordField && controller.isActive) controller.cancel()
+        // Issue #71: the word lists are read in the background before the first key; the setting may have changed.
+        if (app.settings.wordSuggestions && suggestionField) app.wordLists.preload(KeyLanguage.forDictation(app.settings.languages))
+        applyView()
         // Preload the model so the first tap is fast.
         val spec = app.dictationSpec()
         if (!passwordField && inputPage is InputPage.Text && !app.benchmarkRunning && app.isInstalled(spec)) {
@@ -473,6 +554,7 @@ class DicteeImeService : InputMethodService(), DictationListener, EngineManager.
     ) {
         super.onUpdateSelection(oldSelStart, oldSelEnd, newSelStart, newSelEnd, candidatesStart, candidatesEnd)
         sink?.onUpdateSelection(newSelStart, newSelEnd)
+        refreshSuggestions()
     }
 
     override fun onFinishInput() {
@@ -533,6 +615,8 @@ class DicteeImeService : InputMethodService(), DictationListener, EngineManager.
             DictationState.FINISHING -> if (message != null) showMessage(message, error = true, rerender = false)
         }
         if (state == DictationState.ERROR) root?.let { haptic(it, strong = true) }
+        // No suggestion while the dictation types; back once it is done (issue #71).
+        refreshSuggestions()
         render()
     }
 

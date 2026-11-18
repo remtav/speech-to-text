@@ -8,4 +8,8 @@
     <item name="open_keys" type="id" />
     <!-- Tag key: whether a button built by Ui.button is outlined (issue #55: one filled button at most). -->
     <item name="button_outlined" type="id" />
+    <!-- Suggestion bar of the text keys (issue #71). -->
+    <item name="suggestion_left" type="id" />
+    <item name="suggestion_middle" type="id" />
+    <item name="suggestion_right" type="id" />
 </resources>

@@ -1,0 +1,16 @@
+Listes de mots des suggestions du clavier à touches (fr, en, es, pt) — issue #71
+================================================================================
+
+Les fichiers *.txt.gz de ce dossier sont tirés des listes de mots « combined » du projet
+Android Open Source (dictionnaires de LatinIME), telles que distribuées dans les paquets de
+langue d'AnySoftKeyboard (https://github.com/AnySoftKeyboard/AnySoftKeyboard, commit
+1ee43e7f037b905e1c762e3beceac1c0178797b6) :
+
+    Copyright 2009 Menny Even-Danan et les contributeurs d'AnySoftKeyboard
+    Copyright The Android Open Source Project
+    Licence Apache, version 2.0 (texte complet : ../licences/AnySoftKeyboard-LICENSE.txt)
+
+Modifications : entrées réduites au mot, à sa fréquence et à la mention « possiblement
+offensant » ; mots qui contiennent des chiffres ou d'autres signes retirés ; listes portugaises
+du Brésil et du Portugal réunies ; lignes triées par mot sans accents. Faites par
+android/tools/listes-de-mots/construire.py.

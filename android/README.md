@@ -328,6 +328,16 @@ un verdict ».
   (`[ ] { } # + = _ \ | ~ € £`). Le clavier s'ouvre toujours sur le micro, même
   si on l'avait laissé sur les touches ; il garde la vue en cours à la rotation et d'un champ à l'autre tant qu'il
   reste affiché.
+- **Suggestions de mots** (issue #71) : au-dessus des touches, une barre propose
+  trois mots pendant qu'on tape (le meilleur au milieu) ; un toucher l'écrit, suivi
+  d'une espace. Accents rétablis (`ecole` → `école`), fautes de frappe corrigées
+  (touche voisine, lettre en trop, en moins ou inversée). Listes de mots
+  d'AnySoftKeyboard (Apache-2.0) pour le français, l'anglais, l'espagnol et le
+  portugais, selon les langues choisies ; tout reste sur le téléphone. Rien dans
+  un champ de mot de passe, d'adresse courriel ou web. **Correction automatique**
+  désactivée par défaut (Réglages) : activée, le mot en gras remplace le mot tapé
+  à l'espace ou à la ponctuation, et retour arrière juste après le remet.
+  Licences des composants : Réglages → « Licences des composants ».
 - **Champs de chiffres** (nombre, montant, téléphone, date, heure, code) : le
   clavier ouvre directement un pavé numérique aux grandes touches, avec
   seulement les signes que le champ accepte. Pas de micro sur ce pavé.

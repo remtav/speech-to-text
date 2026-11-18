@@ -105,6 +105,14 @@ class SettingsActivity : AppCompatActivity() {
         col.body(getString(R.string.settings_layout), small = false)
         col.radio(LayoutKind.entries.map { it.label }, s.keyboardLayout.ordinal) { s.keyboardLayout = LayoutKind.entries[it] }
         col.body(getString(R.string.settings_layout_help), small = true)
+        // Issue #71: suggestions on by default, automatic correction off by default (#78).
+        col.switch(getString(R.string.settings_suggestions), s.wordSuggestions) { s.wordSuggestions = it }.tag = SUGGESTIONS_TAG
+        col.body(getString(R.string.settings_suggestions_help), small = true)
+        col.switch(getString(R.string.settings_autocorrect), s.autoCorrect) { s.autoCorrect = it }.tag = AUTOCORRECT_TAG
+        col.body(getString(R.string.settings_autocorrect_help), small = true)
+        col.button(getString(R.string.licences_open), outlined = true) {
+            startActivity(android.content.Intent(this, LicencesActivity::class.java))
+        }.tag = LICENCES_TAG
 
         col.heading(getString(R.string.settings_cleanup))
         col.body(getString(R.string.settings_cleanup_help), small = true)
@@ -413,6 +421,9 @@ class SettingsActivity : AppCompatActivity() {
         const val PARTICIPATION_EXCLUDED_TAG = "settings_participation_excluded"
         /** « Avancé » section and its Whisper settings (issue #49), for tests. */
         const val ADVANCED_TAG = "settings_advanced"
+        const val SUGGESTIONS_TAG = "settings_suggestions"
+        const val AUTOCORRECT_TAG = "settings_autocorrect"
+        const val LICENCES_TAG = "settings_licences"
         const val WHISPER_TAIL_TAG = "settings_whisper_tail"
         const val WHISPER_REPETITION_TAG = "settings_whisper_repetition"
         /** « Regrouper les énoncés (Whisper) », issue #53. */

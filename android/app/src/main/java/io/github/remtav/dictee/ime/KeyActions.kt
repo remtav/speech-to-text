@@ -49,3 +49,23 @@ internal fun EditorInfo.isPassword(): Boolean {
             variation == InputType.TYPE_TEXT_VARIATION_WEB_PASSWORD
         )) || (cls == InputType.TYPE_CLASS_NUMBER && variation == InputType.TYPE_NUMBER_VARIATION_PASSWORD)
 }
+
+/**
+ * Whether a field of [inputType] gets word suggestions (issue #71): plain text only. Not in a password, an e-mail
+ * address, a web address or a field that asks for none (`TYPE_TEXT_FLAG_NO_SUGGESTIONS`), nor in a number field.
+ */
+internal fun suggestionsWanted(inputType: Int): Boolean {
+    if (inputType and InputType.TYPE_MASK_CLASS != InputType.TYPE_CLASS_TEXT) return false
+    if (inputType and InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS != 0) return false
+    return when (inputType and InputType.TYPE_MASK_VARIATION) {
+        InputType.TYPE_TEXT_VARIATION_PASSWORD,
+        InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD,
+        InputType.TYPE_TEXT_VARIATION_WEB_PASSWORD,
+        InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS,
+        InputType.TYPE_TEXT_VARIATION_WEB_EMAIL_ADDRESS,
+        InputType.TYPE_TEXT_VARIATION_URI,
+        InputType.TYPE_TEXT_VARIATION_FILTER,
+        -> false
+        else -> true
+    }
+}
