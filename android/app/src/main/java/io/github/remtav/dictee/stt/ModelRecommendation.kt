@@ -43,6 +43,12 @@ object ModelRecommendations {
     // Whisper's tokenizer lists all five (and many more).
     private val whisperLanguages = DictationLanguage.entries.toSet()
 
+    // Kyutai STT 1B: French and English only (model card of kyutai/stt-1b-en_fr, issue #123). Its card does not
+    // single out Quebec French; like Parakeet's "French", it counts for both. To be measured (lot 3).
+    private val kyutaiLanguages = setOf(
+        DictationLanguage.FRENCH_QUEBEC, DictationLanguage.FRENCH_FRANCE, DictationLanguage.ENGLISH,
+    )
+
     /**
      * Languages each downloadable model covers, from the official sources
      * listed in DECISIONS.md. "Not confirmed" counts as not covered.
@@ -50,6 +56,7 @@ object ModelRecommendations {
     val coverage: Map<String, Set<DictationLanguage>> = mapOf(
         ModelCatalog.parakeet.id to parakeetLanguages,
         ModelCatalog.whisperTurbo.id to whisperLanguages,
+        ModelCatalog.kyutaiStt.id to kyutaiLanguages,
     )
 
     /**

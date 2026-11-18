@@ -11,7 +11,16 @@ package io.github.remtav.dictee.stt
  * .tar.bz2 release archives: no 1 GB bzip2 to unpack on the phone, and a
  * download can resume file by file.
  */
-enum class ModelFamily { NEMO_TRANSDUCER, WHISPER, REMOTE }
+enum class ModelFamily {
+    NEMO_TRANSDUCER,
+    WHISPER,
+    REMOTE,
+    /**
+     * Kyutai STT (Mimi codec + causal transformer, issue #123). Not a sherpa-onnx model: it needs its own native
+     * engine, which does not exist yet ([KyutaiEngine]).
+     */
+    KYUTAI_STT,
+}
 
 data class ModelFile(
     /** Path relative to the model directory. */
@@ -50,6 +59,8 @@ object ModelCatalog {
         "https://huggingface.co/csukuangfj/sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8/resolve/main"
     private const val WHISPER =
         "https://huggingface.co/csukuangfj/sherpa-onnx-whisper-turbo/resolve/main"
+    private const val KYUTAI =
+        "https://huggingface.co/kyutai/stt-1b-en_fr/resolve/main"
     val parakeet = ModelSpec(
         id = "parakeet-tdt-0.6b-v3-int8",
         displayName = "Parakeet TDT 0.6b v3",
@@ -91,6 +102,34 @@ object ModelCatalog {
                 "b34b360dbb493e781e479794586d661700670d65564001f23024971d1f2fa126", 816730),
         ),
     )
+
+    /**
+     * Kyutai STT 1B, French and English, streaming (issue #123). Files of the official repository, PyTorch
+     * format (bf16, ~2.36 GB); they may give way to a quantized GGUF once the engine is chosen (lot 2).
+     *
+     * Not in [all] yet: no engine can load it on the phone ([KyutaiEngine]), so no screen offers a 2.36 GB
+     * download that would then fail. It joins [all] with its engine (lot 3).
+     */
+    val kyutaiStt = ModelSpec(
+        id = "kyutai-stt-1b-en-fr",
+        displayName = "Kyutai STT 1B",
+        shortName = "Kyutai",
+        publisher = "Kyutai",
+        family = ModelFamily.KYUTAI_STT,
+        description = "Codec Mimi et transformeur, en continu. Français et anglais.",
+        license = "CC-BY-4.0",
+        files = listOf(
+            ModelFile("model.safetensors", "$KYUTAI/model.safetensors",
+                "8f6e244d44baf63c6fa3587d25a4e8d3627ecbafe177cf34a736e697bb725116", 1978423520),
+            ModelFile("mimi-pytorch-e351c8d8@125.safetensors", "$KYUTAI/mimi-pytorch-e351c8d8@125.safetensors",
+                "09b782f0629851a271227fb9d36db65c041790365f11bbe5d3d59369cf863f50", 384644900),
+            ModelFile("tokenizer_en_fr_audio_8000.model", "$KYUTAI/tokenizer_en_fr_audio_8000.model",
+                "cd87dd5d17169151782ac700280ec057e5d658a9afbe238a048ea5ff318cce69", 120378),
+        ),
+    )
+
+    /** Models in the catalogue that no screen offers yet, each waiting for its engine (issue #123). */
+    val upcoming: List<ModelSpec> = listOf(kyutaiStt)
 
     /**
      * Every downloadable on-device model, in the order shown (issue #89: Parakeet, Whisper, then Kalmia Pro,

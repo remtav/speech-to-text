@@ -102,11 +102,12 @@ fun interface SttEngineFactory {
 }
 
 /**
- * The app's engine factory: sherpa-onnx for on-device models, [RemoteEngine]
+ * The app's engine factory: sherpa-onnx for on-device models, [KyutaiEngine] for Kyutai STT, [RemoteEngine]
  * (optionally behind a [FallbackEngine]) for the user's server.
  */
 class DefaultEngineFactory(private val dirFor: (ModelSpec) -> File) : SttEngineFactory {
     override fun create(spec: ModelSpec, modelDir: File, options: EngineOptions): SttEngine {
+        if (spec.family == ModelFamily.KYUTAI_STT) return KyutaiEngine(spec, modelDir, options)
         if (spec.family != ModelFamily.REMOTE) return SherpaEngine(spec, modelDir, options)
         val config = options.remote ?: throw IllegalStateException("Serveur distant non configuré")
         val remote = RemoteEngine(spec, config, options.hotwords)

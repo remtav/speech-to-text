@@ -144,7 +144,8 @@ class SherpaEngine(
                     tokens = path("tokens.txt"),
                     modelType = "nemo_transducer",
                 )
-                ModelFamily.REMOTE -> throw IllegalArgumentException("${spec.id} is not a sherpa-onnx model")
+                ModelFamily.REMOTE, ModelFamily.KYUTAI_STT ->
+                    throw IllegalArgumentException("${spec.id} is not a sherpa-onnx model")
                 ModelFamily.WHISPER -> OfflineModelConfig(
                     whisper = OfflineWhisperModelConfig(
                         encoder = path("turbo-encoder.int8.onnx"),
