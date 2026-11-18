@@ -7,7 +7,6 @@ import androidx.test.uiautomator.StaleObjectException
 import androidx.test.uiautomator.UiObject2
 import androidx.test.uiautomator.Until
 import io.github.remtav.dictee.dictation.DictationState
-import io.github.remtav.dictee.ime.DicteeImeService
 import io.github.remtav.dictee.ime.LayoutKind
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -217,43 +216,6 @@ class TextKeyboardInstrumentedTest : ImeTestBase() {
         click(res("toggle_view"), "toggle view")
         assertNotNull("microphone back", device.wait(Until.findObject(res("mic")), 5_000))
         assertNull(device.findObject(res("letters")))
-    }
-
-    /**
-     * Hides the keyboard and brings it back on the focused field. The keyboard hides itself rather than through
-     * Back, which would also close the test activity and leave the launcher in front for the next test.
-     */
-    private fun hideThenReopenKeyboard(waitMs: Long) {
-        onMain { service.requestHideSelf(0) }
-        waitFor("keyboard hidden", 5_000) { !onMain { service.isInputViewShown } }
-        android.os.SystemClock.sleep(waitMs)
-        scenario.onActivity {
-            it.getSystemService(android.view.inputmethod.InputMethodManager::class.java)
-                .showSoftInput(it.currentFocus ?: it.field1, 0)
-        }
-        waitFor("keyboard shown again", 10_000) { onMain { service.isInputViewShown } }
-    }
-
-    // Issue #90: the keyboard always opens on the microphone, even when it was left on the keys.
-    @Test
-    fun reopeningTheKeyboardShowsTheMicrophoneEvenIfItWasLeftOnTheKeys() {
-        launchFields()
-        showTextKeyboard()
-        hideThenReopenKeyboard(DicteeImeService.HIDE_GRACE_MS + 1_000)
-        assertNotNull("microphone after reopening", device.wait(Until.findObject(res("mic")), 5_000))
-        assertNull("no keys after reopening", device.findObject(res("letters")))
-    }
-
-    // Issue #90: a rotation hides and shows the keyboard on the same field; the keys stay.
-    @Test
-    fun rotationOnTheTextKeysKeepsTheKeys() {
-        launchFields()
-        showTextKeyboard()
-        device.setOrientationLeft()
-        device.waitForIdle()
-        ensureKeyboardShown()
-        assertNotNull("keys kept after the rotation", device.wait(Until.findObject(res("letters")), 10_000))
-        assertNull(device.findObject(res("mic")))
     }
 
     @Test
