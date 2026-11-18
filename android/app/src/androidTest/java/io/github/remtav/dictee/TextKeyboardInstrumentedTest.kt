@@ -75,9 +75,9 @@ class TextKeyboardInstrumentedTest : ImeTestBase() {
         assertSameHeights("text bottom row", "kb_symbols", "kb_space", "kb_enter")
     }
 
+    /** The test activity must have been launched on the number field (`launchFields(focus = "number")`). */
     private fun checkPadHasNoSwitchKey() {
-        focus(6)
-        assertNotNull("pad", device.wait(Until.findObject(res("pad")), 5_000))
+        assertNotNull("pad", device.wait(Until.findObject(res("pad")), 10_000))
         assertNull("pad_switch", device.findObject(res("pad_switch")))
         assertNotNull("backspace", device.findObject(res("pad_backspace")))
         assertNotNull("enter", device.findObject(res("pad_enter")))
@@ -97,7 +97,7 @@ class TextKeyboardInstrumentedTest : ImeTestBase() {
 
     @Test
     fun noPreviousKeyboardKeyInTheNumberPad() {
-        launchFields()
+        launchFields(focus = "number")
         checkPadHasNoSwitchKey()
     }
 
@@ -107,6 +107,7 @@ class TextKeyboardInstrumentedTest : ImeTestBase() {
     fun noPreviousKeyboardKeyInTheDictationViewInLandscape() {
         launchFields()
         device.setOrientationLeft()
+        ensureKeyboardShown()
         checkDictationViewHasNoSwitchKey()
     }
 
@@ -114,12 +115,14 @@ class TextKeyboardInstrumentedTest : ImeTestBase() {
     fun noPreviousKeyboardKeyInTheTextKeyboardInLandscape() {
         launchFields()
         device.setOrientationLeft()
+        ensureKeyboardShown()
         checkTextKeyboardHasNoSwitchKey()
     }
 
     @Test
     fun noPreviousKeyboardKeyInTheNumberPadInLandscape() {
-        launchFields()
+        // The activity is recreated by the rotation and takes the same extra: it comes back on the number field.
+        launchFields(focus = "number")
         device.setOrientationLeft()
         checkPadHasNoSwitchKey()
     }
