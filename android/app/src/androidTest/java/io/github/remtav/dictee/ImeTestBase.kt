@@ -54,6 +54,7 @@ abstract class ImeTestBase {
         TestHooks.assumeInstalled = true
         app.engines.release()
         waitUntilImeIsKnown()
+        DicteeImeService.instance?.get()?.let { svc -> instrumentation.runOnMainSync { svc.setTextKeyboardShown(false) } }
         selectIme()
         device.setOrientationNatural()
         dismissNotRespondingDialogs()
@@ -61,7 +62,12 @@ abstract class ImeTestBase {
 
     @After
     fun tearDownIme() {
-        DicteeImeService.instance?.get()?.let { svc -> instrumentation.runOnMainSync { svc.controller.cancel() } }
+        // The view (microphone or keys) lives in the service since #90, no longer in the settings cleared by
+        // setUpIme: a test that left the keys open must not decide the view of the next one, which reopens
+        // the same field within the rotation grace period.
+        DicteeImeService.instance?.get()?.let { svc ->
+            instrumentation.runOnMainSync { svc.controller.cancel(); svc.setTextKeyboardShown(false) }
+        }
         TestHooks.audioSourceFactory = null
         TestHooks.engineFactory = null
         TestHooks.assumeInstalled = false
