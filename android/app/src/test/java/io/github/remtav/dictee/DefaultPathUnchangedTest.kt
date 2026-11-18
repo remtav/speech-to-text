@@ -38,14 +38,30 @@ class DefaultPathUnchangedTest {
             .walkTopDown().filter { it.isFile && it.extension == "kt" }.toList()
     }
 
+    private val sharedTestSources by lazy {
+        File(System.getProperty("dictee.assetsDir") ?: "src/main/assets").parentFile.parentFile
+            .resolve("sharedTest/java").walkTopDown().filter { it.isFile && it.extension == "kt" }.toList()
+    }
+
+    /** The polishing rules must not depend on the LLM evaluation code (layering rule, still valid in sharedTest). */
+    @Test fun polishRulesDoNotDependOnTheLlmEvaluation() {
+        val polish = sharedTestSources.filter { "/text/polish/" in it.path }
+        assertTrue("text/polish not found in src/sharedTest", polish.isNotEmpty())
+        assertTrue("the polish rules must not depend on the LLM evaluation", polish.none { "cleanup.eval" in it.readText() })
+    }
+
     /** The polishing rules and the LLM evaluation code are test-only sources (src/sharedTest), not in the APK. */
     @Test fun evaluationPackagesAreNotInTheApp() {
+        assertTrue("no source found in src/main/java", mainSources.isNotEmpty())
+        assertTrue("evaluation sources not found in src/sharedTest",
+            sharedTestSources.any { "/cleanup/eval/" in it.path } && sharedTestSources.any { "/text/polish/" in it.path })
         val inMain = mainSources.filter { "/text/polish/" in it.path || "/cleanup/eval/" in it.path }.map { it.name }
         assertTrue("evaluation code shipped in main: $inMain", inMain.isEmpty())
     }
 
     /** Nothing in the app refers to the polishing rules or to the LLM evaluation code. */
     @Test fun nothingInTheAppCallsThePolishOrEvaluationPackages() {
+        assertTrue("no source found in src/main/java", mainSources.isNotEmpty())
         val names = listOf(
             "text.polish", "PolishRules", "ShippedVocabulary",
             "cleanup.eval", "RelaxedSafetyCheck", "GuardedLlmPolisher", "RulesThenLlmPolisher", "WidePrompt",
