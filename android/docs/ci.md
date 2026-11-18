@@ -17,17 +17,27 @@ filtres (`dorny/paths-filter`) et écrit son choix dans le résumé du run (tabl
 « Jobs picked from the changed files »). Un job sauté compte comme réussi pour les vérifications
 requises.
 
+Réserve pour le jour où des vérifications requises seront ajoutées : quand l'émulateur est sauté,
+GitHub rapporte un seul job au nom non développé, « Instrumented keyboard tests (emulator
+${{ matrix.shard }}/3) », au lieu des trois « 1/3 », « 2/3 », « 3/3 ». Exiger ces trois noms
+bloquerait les PR qui ne lancent pas l'émulateur (documentation comprise).
+
 | Fichiers changés | Build et tests unitaires | Tests des modèles | Émulateur (3 parts) |
 |---|---|---|---|
 | Documentation seule : `android/**/*.md`, `android/docs/**` | non | non | non |
-| Code de transcription : `audio/`, `dictation/`, `stt/`, `text/`, `ui/CompareActivity.kt`, `assets/reference/`, `HostModelTest.kt` | oui | oui | oui (ce sont aussi des fichiers de `src/main/**`) |
+| Code de transcription : `audio/`, `dictation/`, `stt/`, `text/`, `ui/CompareActivity.kt`, `assets/reference/` | oui | oui | oui (ce sont aussi des fichiers de `src/main/**`) |
+| `src/test/java/…/HostModelTest.kt` | oui | oui | non |
 | Reste de l'application : `src/main/**`, `src/debug/**` | oui | non | oui |
 | Tests instrumentés : `src/androidTest/**`, `src/test/resources/polissage/**` | oui | non | oui |
 | Autres tests JVM (`src/test/**` hors cas ci-dessus) | oui | non | non |
 | Build : `android/*.gradle.kts`, `android/app/*.gradle.kts`, `gradle.properties`, `gradle/**` | oui | oui | oui |
 | `android/keystore/**` | oui | non | oui |
 | Le workflow lui-même | oui | oui | oui |
-| `.github/scripts/test_durations.py` | non | non | oui |
+
+`.github/scripts/test_durations.py` est un cas à part : il n'est pas dans les chemins du
+déclencheur (`on.pull_request.paths`), donc une PR qui ne change que ce script **ne lance pas** le
+workflow Android. Changé avec d'autres fichiers sous `android/`, il compte comme du code : le build
+tourne, et l'émulateur aussi (il est dans le filtre `emulator`).
 
 Règle du build : il tourne dès qu'un fichier changé sous `android/` n'est **pas** de la
 documentation (le job compte les fichiers sous `android/` et ceux de documentation ; s'ils sont
