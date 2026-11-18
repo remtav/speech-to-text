@@ -88,12 +88,14 @@ jobs:
               - "android/gradle.properties"
               - "android/gradle/**"
               - ".github/workflows/android.yml"
-            # The app (code, resources, assets, manifest), the instrumented tests and their
-            # assets (src/test/resources/polissage is an androidTest asset dir), the build.
+            # The app (code, resources, assets, manifest), the instrumented tests, the sources
+            # shared by the JVM and instrumented tests (src/sharedTest) and their assets
+            # (src/test/resources/polissage is an androidTest asset dir), the build.
             emulator:
               - "android/app/src/main/**"
               - "android/app/src/debug/**"
               - "android/app/src/androidTest/**"
+              - "android/app/src/sharedTest/**"
               - "android/app/src/test/resources/polissage/**"
               - "android/*.gradle.kts"
               - "android/app/*.gradle.kts"

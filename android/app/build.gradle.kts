@@ -164,6 +164,12 @@ android {
     // the TEST APK only (androidTest assets), for LlmPolishRecordingTest on a phone. Not in the app.
     sourceSets.getByName("androidTest").assets.srcDir("src/test/resources/polissage")
 
+    // The polishing rules and the LLM evaluation code (text/polish, cleanup/eval) are used only by
+    // tests: they live in src/sharedTest, compiled for both the JVM tests and the instrumented tests,
+    // and are not in the APK.
+    sourceSets.getByName("test").java.srcDir("src/sharedTest/java")
+    sourceSets.getByName("androidTest").java.srcDir("src/sharedTest/java")
+
     packaging {
         jniLibs { useLegacyPackaging = true }
     }

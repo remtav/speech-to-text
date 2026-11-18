@@ -12,9 +12,9 @@ import org.junit.Test
 import java.io.File
 
 /**
- * Issue #15, lot 3: nothing is activated by default. The polishing rules and the
- * shipped vocabulary exist (text/polish/) but the dictation pipeline neither
- * calls them nor has a setting for them.
+ * Nothing is activated by default. The polishing rules and the shipped vocabulary
+ * (text/polish/) and the LLM evaluation code (cleanup/eval/) are test-only sources in
+ * src/sharedTest; the dictation pipeline neither calls them nor has a setting for them.
  */
 class DefaultPathUnchangedTest {
     private val samples = listOf(
@@ -38,26 +38,20 @@ class DefaultPathUnchangedTest {
             .walkTopDown().filter { it.isFile && it.extension == "kt" }.toList()
     }
 
-    /** Only the evaluation-only package (cleanup/eval, step 3.4 wiring) may use the polishing rules. */
-    @Test fun nothingInTheAppCallsThePolishPackage() {
-        val offenders = mainSources
-            .filter { !it.path.contains("/text/polish/") && !it.path.contains("/cleanup/eval/") }
-            .filter { f -> f.readText().let { "text.polish" in it || "PolishRules" in it || "ShippedVocabulary" in it } }
-            .map { it.name }
-        assertTrue("wired into the app: $offenders", offenders.isEmpty())
-        assertTrue("the polish rules must not depend on the LLM evaluation", mainSources
-            .filter { it.path.contains("/text/polish/") }.none { "cleanup.eval" in it.readText() })
+    /** The polishing rules and the LLM evaluation code are test-only sources (src/sharedTest), not in the APK. */
+    @Test fun evaluationPackagesAreNotInTheApp() {
+        val inMain = mainSources.filter { "/text/polish/" in it.path || "/cleanup/eval/" in it.path }.map { it.name }
+        assertTrue("evaluation code shipped in main: $inMain", inMain.isEmpty())
     }
 
-    /** The LLM evaluation variants (approaches 3 and 4) are reachable from no screen, setting or pipeline. */
-    @Test fun nothingInTheAppCallsTheLlmEvaluationPackage() {
+    /** Nothing in the app refers to the polishing rules or to the LLM evaluation code. */
+    @Test fun nothingInTheAppCallsThePolishOrEvaluationPackages() {
         val names = listOf(
+            "text.polish", "PolishRules", "ShippedVocabulary",
             "cleanup.eval", "RelaxedSafetyCheck", "GuardedLlmPolisher", "RulesThenLlmPolisher", "WidePrompt",
             "RuleSignalDetector", "WiredRules", "ShippedLexicon", "wiredCombination", "ProvisionalProbableCaseDetector",
         )
-        val offenders = mainSources.filter { !it.path.contains("/cleanup/eval/") }
-            .filter { f -> f.readText().let { text -> names.any { it in text } } }
-            .map { it.name }
-        assertTrue("LLM evaluation wired into the app: $offenders", offenders.isEmpty())
+        val offenders = mainSources.filter { f -> f.readText().let { text -> names.any { it in text } } }.map { it.name }
+        assertTrue("wired into the app: $offenders", offenders.isEmpty())
     }
 }
