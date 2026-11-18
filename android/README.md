@@ -660,25 +660,63 @@ la durée de ses tests par classe dans le résumé.
 
 ### Play Store
 
-Le Play Store n'accepte pas d'APK pour une nouvelle application : il demande un
-bundle (`.aab`). La CI le construit avec l'APK, le signe avec la même clé privée et
-le joint à chaque release (`dictee-0.1.<run>.aab`, aussi dans l'artefact `dictee-aab`
-du run). Pour un test interne :
+Décisions du premier lancement : `android/DECISIONS.md`, « Issue #122 ».
 
-1. Lancer Actions → Android → Run workflow sur `main` (au besoin avec
-   « skip_slow_tests »), puis télécharger le `.aab` de la release `android-v…`.
-2. Play Console → Tests et publication → Tests internes → Créer une version →
-   téléverser le `.aab`.
+**Identifiant.** L'application s'appelle `com.kalmia.stt` pour Google Play (`applicationId`) ;
+le `namespace` (package Kotlin) reste `io.github.remtav.dictee`. L'identifiant ne peut
+plus changer après la première publication. Pour Android, c'est une autre application que
+les anciens APK `io.github.remtav.dictee` : ceux qui les ont installés doivent les
+désinstaller (réglages et modèles perdus). Dans les commandes `adb`, utiliser `com.kalmia.stt`.
 
-À la première version, Play propose sa signature d'application (Play App Signing) :
-le `.aab` est signé par la clé d'importation (ici `dictee-release.p12`) et Google
-re-signe ce qu'il distribue. Si Google génère sa propre clé de signature, la version
-du Play Store et l'APK des releases GitHub portent des signatures différentes : on
-ne peut pas installer l'une par-dessus l'autre (désinstaller d'abord). Pour garder
-une seule signature, choisir à cette étape « utiliser ma propre clé » et téléverser
-`dictee-release.p12` chiffrée avec l'outil PEPK que la console fournit.
+**Fichiers.** Le Play Store n'accepte pas d'APK pour une nouvelle application : il demande
+un bundle (`.aab`). La CI construit le bundle avec l'APK, les signe avec la même clé privée
+et les joint à chaque release GitHub : `kalmia-blabla-0.1.<run>.apk` (pour installer sur un
+téléphone) et `kalmia-blabla-0.1.<run>.aab` (pour la Play Console). Ils sont aussi dans les
+artefacts `kalmia-blabla-apk` et `kalmia-blabla-aab` du run.
 
-Chaque version envoyée au Play Store doit avoir un `versionCode` plus grand que la
-précédente : le numéro du run de la CI s'en charge. Play exige aussi un `targetSdk`
-récent (36 depuis le 31 août 2026) et des bibliothèques natives alignées sur 16 Ko
-(c'est le cas de sherpa-onnx 2.0.1, onnxruntime et MediaPipe).
+**Signature (Play App Signing).** À la première version, la Console demande qui détient la
+clé de signature de l'application ; ce choix ne se défait pas. Choisir **« Utiliser ma
+propre clé »** : téléverser `dictee-release.p12` chiffrée avec l'outil PEPK que la Console
+fournit (suivre les instructions affichées à cette étape). L'APK de GitHub et la version
+Play portent alors la même signature et s'installent l'un par-dessus l'autre. Avec une clé
+générée par Google, ils seraient incompatibles (désinstaller d'abord). Une clé
+d'importation distincte est possible plus tard ; la CI devrait alors signer le `.aab` avec
+elle (nouveau secret). Dans tous les cas, `dictee-release.p12` et son mot de passe se
+sauvegardent hors de GitHub.
+
+**Première version (à la main).**
+
+1. Lancer Actions → Android → Run workflow sur `main` (au besoin avec « skip_slow_tests »),
+   puis télécharger `kalmia-blabla-<version>.aab` de la release `android-v…`.
+2. Play Console → Tests et publication → Tests internes → Créer une version → choisir la
+   signature (ci-dessus) → téléverser le `.aab` → notes de version → Enregistrer, puis publier.
+
+**Mises à jour (automatiques, une fois la première version faite).** Chaque release de `main`
+est aussi envoyée à la piste **Tests internes** (étape `upload-google-play` du job
+« Publish APK »). Rien n'est public : la promotion vers les tests fermés ou la production
+reste un clic dans la Console. Notes de version : écrites à la main dans la Console (les
+messages de commit sont techniques). Pour la mise en place :
+
+1. Google Cloud : créer un compte de service, activer l'API « Google Play Android Developer »
+   et créer une clé JSON pour ce compte.
+2. Play Console → Utilisateurs et autorisations → inviter l'adresse du compte de service, avec
+   le droit de publier des versions sur cette application seulement.
+3. Dépôt GitHub → Settings → Secrets : `PLAY_SERVICE_ACCOUNT_JSON` = contenu de la clé JSON.
+   Sans ce secret, l'étape est sautée et on téléverse à la main comme ci-dessus.
+4. Tant que l'application n'a jamais été publiée, Play n'accepte que le statut `draft` : la
+   version arrive en brouillon et un clic dans la Console la déploie. C'est le réglage par
+   défaut. Pour déployer sans clic (piste interne), créer la variable de dépôt
+   `PLAY_RELEASE_STATUS` = `completed`.
+
+**Versions.** Chaque version envoyée à Play doit avoir un `versionCode` plus grand que la
+précédente : le numéro du run de la CI s'en charge. Deux pièges :
+
+- **« Re-run jobs » garde le même numéro**, donc Play refuse le téléversement (`versionCode`
+  déjà utilisé). Pour renvoyer, lancer un nouveau run (Run workflow), jamais un re-run.
+- Renommer ou recréer `android.yml` remet le compteur à 1 : il faudrait alors ajouter un
+  décalage dans `VERSION_CODE` du workflow (par exemple `1000 + run_number`).
+
+`versionName` est `0.1.<run>` (visible sur la fiche Play) ; le passage à `1.0` se fera à la
+sortie en production. Play exige aussi un `targetSdk` récent (36 depuis le 31 août 2026) et
+des bibliothèques natives alignées sur 16 Ko (c'est le cas de sherpa-onnx 2.0.1,
+onnxruntime et MediaPipe).

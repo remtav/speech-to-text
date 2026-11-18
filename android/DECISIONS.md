@@ -4992,3 +4992,35 @@ l'implémentation part de `main` (la branche d'essai `ccr-67305f2c-9rtymc` n'est
 - **Tests** : `EmojiTest` (JVM : effacement, données, récents et leur conservation), `EmojiInstrumentedTest`
   (ouverture et retour, insertion au curseur, émojis de plusieurs caractères et effacement en un appui, noms lus, bouton
   distinct, rangée du bas en portrait et en paysage), `ScreenshotTest.emojiPanel` (clair et sombre).
+
+## Issue #122 — Premier lancement sur Google Play
+
+La Play Console refusait le `.aab` : la fiche existe sous `com.kalmia.stt`, `main` compilait `io.github.remtav.dictee`.
+
+- **Identifiant : `com.kalmia.stt`** (🔒, fixé par la fiche déjà créée ; créer une autre fiche ne gagnerait rien). Seul
+  `applicationId` change ; le `namespace` reste `io.github.remtav.dictee`, donc aucun fichier source ne bouge (les
+  fournisseurs et autorités passent par `${applicationId}`). Conséquence : les APK GitHub déjà installés sont une autre
+  application pour Android (désinstaller, réglages et modèles perdus) ; coût faible avant un premier lancement. Les chemins
+  `adb` de la CI et des documents suivent le nouvel identifiant. Un `stt` à côté de « Kalmia Blabla » est accepté ; changer
+  obligerait à créer une nouvelle fiche.
+- **Noms de fichiers : `kalmia-blabla-<version>.apk/.aab`** (et artefacts `kalmia-blabla-apk/-aab`), à la place de
+  `dictee-…` : c'est le fichier qu'on manipule à chaque version. Le nom de la clé (`dictee-release.p12`, secrets
+  `DICTEE_KEYSTORE_*`) ne change pas : le renommer n'apporterait rien.
+- **Signature : « Utiliser ma propre clé »** (🔒, à choisir dans la Console à la première version, avec PEPK). Les deux
+  canaux (APK GitHub et Play) restent alors interchangeables et la CI n'a pas de second secret. Google garde alors une copie de la
+  clé de signature : la perdre ne bloquerait pas les mises à jour Play, mais bloquerait celles de l'APK GitHub (désinstaller,
+  réglages perdus) ; la sauvegarde hors de GitHub reste donc exigée.
+- **Versions** : `versionCode` = numéro du run (inchangé, pas de décalage tant que `android.yml` garde son nom) ;
+  les pièges (re-run, renommage du workflow) sont documentés dans le README. `versionName` reste `0.1.<run>` : le premier
+  lancement passe par les tests internes puis fermés, `1.0` viendra avec la production (changer plus tard est gratuit).
+- **Mise à jour automatique : oui, vers la piste « Tests internes » seulement**, à chaque release de `main` (donc aussi
+  à chaque lancement manuel qui publie), avec `r0adkll/upload-google-play@v1`. Garde-fous : étape sautée si le secret
+  `PLAY_SERVICE_ACCOUNT_JSON` manque ; statut `draft` par défaut (obligatoire avant la première publication, et un clic
+  humain reste nécessaire), `completed` seulement si la variable de dépôt `PLAY_RELEASE_STATUS` le dit ; la promotion
+  vers la production reste un geste dans la Console. La première version est téléversée à la main (l'API ne le permet pas).
+- **Notes de version écrites à la main** dans la Console : les messages de commit sont techniques et en français de
+  développeur, pas des notes pour le public.
+- **Reste hors du dépôt** (issue #122, liste « Exigences de Play ») : test fermé de 12 testeurs pendant 14 jours si le compte
+  personnel date d'après novembre 2023, politique de confidentialité à une adresse publique, formulaire « Sécurité des
+  données », déclaration du service de premier plan, classification, captures.
+
