@@ -4955,3 +4955,40 @@ l'implémentation part de `main` (la branche d'essai `ccr-67305f2c-9rtymc` n'est
   mots), mots appris.
 - Tests instrumentés (`SuggestionsInstrumentedTest`) : barre et toucher, correction désactivée par défaut, correction
   activée puis annulée, mot de passe, barre retirée, écran des licences. Non lancés en local (émulateur en CI).
+
+## Issue #80 — Émojis depuis l'écran de dictée
+
+- **Source des données : Unicode, pas AnySoftKeyboard.** L'issue laissait le choix. Les émojis d'AnySoftKeyboard sont des
+  tableaux de code sans noms en français ; Unicode donne la liste complète et ordonnée (`emoji-test.txt`, version 18.0)
+  et le CLDR donne les noms en français et en anglais pour TalkBack, y compris pour les drapeaux et les familles.
+  **Licence Unicode v3** (permissive, avis à reproduire) : texte dans `assets/licences/Unicode-LICENSE.txt`, entrée
+  « Unicode et CLDR » dans la page des licences des composants (`ui/Licences.kt`). Le fichier de l'APK
+  (`assets/emojis/emojis.tsv`, 1 923 émojis, 97 Ko) est produit par `android/tools/emojis/build_emojis.py` à partir des
+  sources ; le script dit où les télécharger.
+- **Emplacement du bouton : de l'autre côté du micro**, dans la rangée du micro, à la place de l'espace vide qui
+  équilibrait le bouton « Clavier à touches ». Contour (« outlined ») et visage souriant, contre bouton tonal et clavier :
+  les deux ne se confondent pas. **La rangée du bas n'est pas touchée** : aucune touche n'est ajoutée ni rétrécie (règle de
+  #73). Dans la vue des touches, un seul bouton de plus (visage, 48 dp) dans la barre du haut, entre le bouton du modèle
+  et la bascule vers le micro : la rangée du bas des touches n'est pas touchée non plus. Captures dans l'artefact de la CI.
+- **Le panneau remplace la vue en cours** (barre du haut masquée, comme le pavé numérique) : onglets (récents, neuf groupes),
+  grille défilante de 164 dp, rangée de trois touches (retour, espace, effacer). Le retour mène à la vue d'où le panneau
+  a été ouvert (icône du micro ou du clavier, nom lu en conséquence). Le clavier qui se rouvre revient toujours au micro
+  (#90) : le panneau se ferme aussi.
+- **Récents** : 32 au plus, le dernier utilisé en premier, dans `AppSettings.recentEmojis` (une chaîne, espaces entre les
+  émojis). Le panneau s'ouvre sur les récents s'il y en a, sur les smileys sinon. La liste n'est pas réordonnée pendant
+  qu'on la regarde : elle se met à jour à la réouverture ou en revenant sur l'onglet.
+- **Un émoji de plusieurs caractères part d'un seul appui** : `EmojiCluster.lengthBefore` découpe le texte avant le curseur
+  (drapeau = deux indicateurs régionaux, jointures U+200D, couleur de peau, sélecteur de variante, `keycap`) et
+  `deleteBackward()` efface le tout avec `deleteSurroundingText`. Cela vaut pour toutes les touches d'effacement du
+  clavier, pas seulement le panneau. Un chiffre seul, une lettre ou une jointure sans émoji derrière gardent l'effacement
+  habituel du champ.
+- **Variantes de couleur de peau : laissées de côté pour ce premier lot** (permis par l'issue). Les 1 923 émojis sont les
+  formes de base ; les variantes sont dans les données du CLDR, un appui long pourra les offrir dans un autre lot. Un
+  émoji déjà de plusieurs caractères se comporte, lui, comme un seul (voir ci-dessus).
+- **Émojis non affichables** : `Paint.hasGlyph` au chargement (`EmojiCatalogue.load`), dans un fil à part, pour ne pas
+  ralentir la première ouverture. Un émoji absent de la police n'est pas montré, et n'est pas non plus rendu depuis les récents.
+- **Accessibilité** : chaque case porte le nom de l'émoji (français si la langue du téléphone est le français, anglais
+  sinon : l'interface de l'application est en français seulement) ; chaque onglet porte le nom de son groupe.
+- **Tests** : `EmojiTest` (JVM : effacement, données, récents et leur conservation), `EmojiInstrumentedTest`
+  (ouverture et retour, insertion au curseur, émojis de plusieurs caractères et effacement en un appui, noms lus, bouton
+  distinct, rangée du bas en portrait et en paysage), `ScreenshotTest.emojiPanel` (clair et sombre).

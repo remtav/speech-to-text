@@ -316,7 +316,7 @@ un verdict ».
   s'insère à chaque pause.
 - Bouton du modèle (en haut à gauche) : changer de modèle sans quitter le champ. Les
   modèles y sont nommés par leur effet (« Précis », « Léger » ; issue #37).
-- Touches : `,` `.` espace `?` `!`, effacer (maintenir pour répéter), entrée.
+- Touches : `,` `.` espace `?` `!`, effacer (maintenir pour répéter), entrée. Bouton « Émojis » à gauche du micro.
   Il n'y a pas de touche « clavier précédent » (issue #73) : pour changer de
   clavier, utiliser le sélecteur d'Android (icône dans la barre de navigation
   pendant la saisie, ou Paramètres du téléphone).
@@ -338,6 +338,16 @@ un verdict ».
   désactivée par défaut (Réglages) : activée, le mot en gras remplace le mot tapé
   à l'espace ou à la ponctuation, et retour arrière juste après le remet.
   Licences des composants : Réglages → « Licences des composants ».
+- **Émojis** (issue #80) : le bouton « Émojis » (visage souriant, contour), de l'autre côté du micro par rapport à
+  « Clavier à touches », ouvre un panneau : onglet « Récents » (les derniers émojis utilisés, gardés après la
+  fermeture du clavier), puis les neuf groupes d'Unicode (smileys, personnes, animaux, nourriture, voyages, activités,
+  objets, symboles, drapeaux), dans une grille qui défile. Un toucher insère l'émoji à la position du curseur, entier
+  (drapeau, famille, `❤️`), et le panneau reste ouvert. Touches du bas : retour (à la dictée, ou aux touches si le panneau
+  a été ouvert depuis elles), espace, effacer (un émoji de plusieurs caractères part d'un seul appui). Dans la vue des
+  touches, le même panneau s'ouvre par le bouton à visage de la barre du haut. Seuls les émojis que la police du téléphone
+  sait dessiner sont montrés. TalkBack lit le nom de chaque émoji, en français si le téléphone est en français, en
+  anglais sinon. Pas de variantes de couleur de peau pour l'instant. Source des données : Unicode et CLDR
+  (« Licences des composants »).
 - **Champs de chiffres** (nombre, montant, téléphone, date, heure, code) : le
   clavier ouvre directement un pavé numérique aux grandes touches, avec
   seulement les signes que le champ accepte. Pas de micro sur ce pavé.

@@ -4,6 +4,7 @@ import android.text.InputType
 import android.view.KeyEvent
 import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.InputConnection
+import io.github.remtav.dictee.ime.emoji.EmojiCluster
 
 // What the keys of the keyboard do to the field, apart from typing text.
 
@@ -14,14 +15,19 @@ internal fun InputConnection.typePunctuation(p: String) {
     commitText(p, 1)
 }
 
-/** Deletes the selection, or the character before the cursor. */
+/** Deletes the selection, or the character before the cursor; an emoji of several characters goes whole (issue #80). */
 internal fun InputConnection.deleteBackward() {
     val selected = getSelectedText(0)
     if (!selected.isNullOrEmpty()) {
         commitText("", 1)
     } else {
-        sendKeyEvent(KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_DEL))
-        sendKeyEvent(KeyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_DEL))
+        val emoji = EmojiCluster.lengthBefore(getTextBeforeCursor(EmojiCluster.WINDOW, 0) ?: "")
+        if (emoji > 1) {
+            deleteSurroundingText(emoji, 0)
+        } else {
+            sendKeyEvent(KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_DEL))
+            sendKeyEvent(KeyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_DEL))
+        }
     }
 }
 

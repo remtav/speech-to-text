@@ -453,4 +453,21 @@
     <string name="quick_hint">Une idée, pas un verdict : sur une quarantaine de mots, un mot raté vaut 2,5 points, et un texte lu n\'est pas une dictée spontanée.</string>
     <string name="quick_redo">Refaire le test</string>
     <string name="quick_close">Terminer</string>
+    <!-- Issue #80: the emoji panel -->
+    <string name="emoji_open">Émojis</string>
+    <string name="cd_emoji_open">Ouvrir les émojis</string>
+    <string name="cd_emoji_panel">Panneau d’émojis</string>
+    <string name="cd_emoji_to_dictation">Revenir à la dictée</string>
+    <string name="cd_emoji_to_keys">Revenir au clavier à touches</string>
+    <string name="emoji_none_recent">Aucun émoji récent</string>
+    <string name="emoji_tab_recent">Récents</string>
+    <string name="emoji_tab_smileys">Smileys et émotions</string>
+    <string name="emoji_tab_people">Personnes et corps</string>
+    <string name="emoji_tab_animals">Animaux et nature</string>
+    <string name="emoji_tab_food">Nourriture et boissons</string>
+    <string name="emoji_tab_travel">Voyages et lieux</string>
+    <string name="emoji_tab_activities">Activités</string>
+    <string name="emoji_tab_objects">Objets</string>
+    <string name="emoji_tab_symbols">Symboles</string>
+    <string name="emoji_tab_flags">Drapeaux</string>
 </resources>
