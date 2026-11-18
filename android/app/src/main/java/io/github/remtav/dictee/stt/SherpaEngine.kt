@@ -2,7 +2,6 @@ package io.github.remtav.dictee.stt
 
 import com.k2fsa.sherpa.onnx.FeatureConfig
 import com.k2fsa.sherpa.onnx.OfflineModelConfig
-import com.k2fsa.sherpa.onnx.OfflineQwen3AsrModelConfig
 import com.k2fsa.sherpa.onnx.OfflineRecognizer
 import com.k2fsa.sherpa.onnx.OfflineRecognizerConfig
 import com.k2fsa.sherpa.onnx.OfflineTransducerModelConfig
@@ -35,9 +34,6 @@ class SherpaEngine(
     } else null
 
     override val provider: String = options.acceleration.provider
-
-    /** Qwen3-ASR reads the forced language per stream, not from its model config. */
-    private val streamLanguage: String = if (spec.family == ModelFamily.QWEN3_ASR) options.language else ""
 
     @Synchronized
     override fun transcribe(samples: FloatArray, sampleRate: Int): Transcription {
@@ -118,9 +114,6 @@ class SherpaEngine(
     private fun decodeOnce(rec: OfflineRecognizer, samples: FloatArray, sampleRate: Int): Decoded {
         val stream = rec.createStream()
         try {
-            // "language French" is then written into the prompt instead of being guessed
-            // (offline-recognizer-qwen3-asr-impl.cc, BuildSourceIds).
-            if (streamLanguage.isNotEmpty()) stream.setOption("language", streamLanguage)
             stream.acceptWaveform(samples, sampleRate)
             rec.decode(stream)
             val result = rec.getResult(stream)
@@ -151,21 +144,6 @@ class SherpaEngine(
                     tokens = path("tokens.txt"),
                     modelType = "nemo_transducer",
                 )
-                ModelFamily.QWEN3_ASR -> OfflineModelConfig(
-                    qwen3Asr = OfflineQwen3AsrModelConfig(
-                        convFrontend = path("conv_frontend.onnx"),
-                        encoder = path("encoder.int8.onnx"),
-                        decoder = path("decoder.int8.onnx"),
-                        tokenizer = path("tokenizer"),
-                        // Comma-separated words the decoder is biased towards.
-                        hotwords = options.hotwords
-                            .map { it.replace(",", " ").trim() }
-                            .filter { it.isNotEmpty() }
-                            .take(MAX_HOTWORDS)
-                            .joinToString(","),
-                    ),
-                    tokens = "",
-                )
                 ModelFamily.REMOTE -> throw IllegalArgumentException("${spec.id} is not a sherpa-onnx model")
                 ModelFamily.WHISPER -> OfflineModelConfig(
                     whisper = OfflineWhisperModelConfig(
@@ -192,6 +170,5 @@ class SherpaEngine(
             )
         }
 
-        private const val MAX_HOTWORDS = 100
     }
 }

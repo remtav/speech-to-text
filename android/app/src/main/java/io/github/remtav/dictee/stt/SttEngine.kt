@@ -13,10 +13,7 @@ data class Transcription(
     val repetition: RepetitionOutcome = RepetitionOutcome.NONE,
     /** Whisper ran into sherpa-onnx's token ceiling and was decoded again with silence added ([WhisperTuning.ceilingSilence]). */
     val ceilingExtended: Boolean = false,
-) {
-    val realTimeFactor: Float
-        get() = if (audioSeconds > 0f) decodeMillis / 1000f / audioSeconds else 0f
-}
+)
 
 /** Result of the Whisper repetition filter on one segment (issue #49). */
 enum class RepetitionOutcome {
@@ -55,13 +52,13 @@ data class EngineOptions(
     val numThreads: Int = defaultThreads(),
     /**
      * Language forced on the model ("" for automatic detection), in the model's
-     * own form: a code for Whisper ("fr"), a name for Qwen3-ASR ("French").
+     * own form: a code for Whisper ("fr").
      * Parakeet has no such input.
      */
     val language: String = "",
     /** Requested execution provider, see [Acceleration]. */
     val acceleration: Acceleration = Acceleration.CPU,
-    /** Words to favour, for models that accept them (Qwen3-ASR, OpenAI-compatible servers). */
+    /** Words to favour, for models that accept them (OpenAI-compatible servers). */
     val hotwords: List<String> = emptyList(),
     /** Server settings, used only by the remote model. */
     val remote: RemoteConfig? = null,

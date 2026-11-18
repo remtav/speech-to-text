@@ -32,20 +32,6 @@ class DictationLanguagesTest {
     }
 
     @Test
-    fun qwen3GetsALanguageNameOnlyForOneCoveredCode() {
-        assertEquals("French", DictationLanguages.qwen3Language(setOf(FRENCH_QUEBEC)))
-        assertEquals("French", DictationLanguages.qwen3Language(setOf(FRENCH_QUEBEC, FRENCH_FRANCE)))
-        assertEquals("English", DictationLanguages.qwen3Language(setOf(ENGLISH)))
-        assertEquals("", DictationLanguages.qwen3Language(setOf(FRENCH_QUEBEC, ENGLISH)))
-        assertEquals("Spanish", DictationLanguages.qwen3Language(setOf(SPANISH)))
-        assertEquals("Portuguese", DictationLanguages.qwen3Language(setOf(PORTUGUESE)))
-        for (l in DictationLanguage.entries) {
-            val name = DictationLanguages.qwen3Language(setOf(l))
-            assertTrue("$l -> $name", name.isEmpty() || name.first().isUpperCase())
-        }
-    }
-
-    @Test
     fun serverOnlyAcceptsEmptyFrenchOrEnglish() {
         for (l in DictationLanguage.entries) {
             val code = DictationLanguages.remoteLanguage(setOf(l))
