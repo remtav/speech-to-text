@@ -44,9 +44,6 @@ internal class BlockCutter(
     /** Length of the open block when that utterance ended: where a close on silence cuts it. */
     private var lenAtPop = 0
 
-    /** Blocks emitted so far. */
-    val emitted: Int get() = index
-
     /** Samples held by the open block. */
     val pendingSamples: Int get() = if (inBlock) len else 0
 

@@ -177,10 +177,6 @@ internal fun topWithin(ancestor: View, view: View): Int {
     return y
 }
 
-/** A size in French units (Mo, Go), whatever the language of the phone. */
-@Suppress("UnusedReceiverParameter")
-internal fun Context.size(bytes: Long): String = SizeFormat.format(bytes)
-
 internal fun View.spaced(start: Int = 0, end: Int = 8): View {
     (layoutParams as? ViewGroup.MarginLayoutParams)?.let {
         it.marginStart = context.dp(start); it.marginEnd = context.dp(end)

@@ -64,7 +64,6 @@ abstract class ImeTestBase {
         DicteeImeService.instance?.get()?.let { svc -> instrumentation.runOnMainSync { svc.controller.cancel() } }
         TestHooks.audioSourceFactory = null
         TestHooks.engineFactory = null
-        TestHooks.vadParams = null
         TestHooks.assumeInstalled = false
         TestHooks.networkAvailable = null
         if (::scenario.isInitialized) scenario.close()

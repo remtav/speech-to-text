@@ -7,10 +7,10 @@ import io.github.remtav.dictee.text.Levenshtein
  * [range] is in the paragraph text, [word] the text shown there, [heard] what the transcription
  * had instead (null when the word is missing).
  */
-data class MisheardWord(val referenceIndex: Int, val range: IntRange, val word: String, val heard: String?)
+data class MisheardWord(val range: IntRange, val word: String, val heard: String?)
 
-/** A word of the transcription that matches nothing in the text, placed before reference token [beforeReferenceIndex]. */
-data class ExtraWord(val beforeReferenceIndex: Int, val heard: String)
+/** A word of the transcription that matches nothing in the text. */
+data class ExtraWord(val heard: String)
 
 /** Score of one paragraph read with one model. */
 data class ParagraphScore(
@@ -47,20 +47,18 @@ object ReadingScoring {
         val steps = Levenshtein.align(ref.map { it.text }, hyp.map { it.text })
         val misheard = mutableListOf<MisheardWord>()
         val extra = mutableListOf<ExtraWord>()
-        var nextRef = 0
         for (s in steps) {
             when (s.op) {
-                Levenshtein.Op.MATCH -> nextRef = s.ai + 1
+                Levenshtein.Op.MATCH -> {}
                 Levenshtein.Op.SUBSTITUTE, Levenshtein.Op.DELETE -> {
                     val r = ref[s.ai]
                     val heard = if (s.op == Levenshtein.Op.DELETE) null else transcription.substring(hyp[s.bi].range)
                     // Two tokens can share a range (a number spelled in several words): highlight it once.
                     if (misheard.lastOrNull()?.range != r.range) {
-                        misheard += MisheardWord(s.ai, r.range, paragraph.substring(r.range), heard)
+                        misheard += MisheardWord(r.range, paragraph.substring(r.range), heard)
                     }
-                    nextRef = s.ai + 1
                 }
-                Levenshtein.Op.INSERT -> extra += ExtraWord(nextRef, transcription.substring(hyp[s.bi].range))
+                Levenshtein.Op.INSERT -> extra += ExtraWord(transcription.substring(hyp[s.bi].range))
             }
         }
         val errors = steps.count { it.op != Levenshtein.Op.MATCH }
@@ -83,7 +81,6 @@ object ReadingThresholds {
 
     /** "Très éloigné": sharing is offered when the WER of the recommended model is ABOVE this percentage. */
     const val SHARE_WER_THRESHOLD_PERCENT = 20
-    const val SHARE_WER_THRESHOLD = SHARE_WER_THRESHOLD_PERCENT / 100.0
 
     /**
      * "Nettement mieux", both conditions together, on the complete text read once (same recordings):

@@ -137,14 +137,6 @@ class DictationController(
         setState(DictationState.IDLE)
     }
 
-    fun toggle(sessionFactory: () -> DictationSession?) {
-        when (state) {
-            DictationState.LISTENING -> stop()
-            DictationState.FINISHING -> {}
-            else -> sessionFactory()?.let { start(it) }
-        }
-    }
-
     /** One dictation session: its own job queue and threads. */
     private inner class Run(val id: Int, val s: DictationSession) {
         private val jobs = LinkedBlockingDeque<Job>()

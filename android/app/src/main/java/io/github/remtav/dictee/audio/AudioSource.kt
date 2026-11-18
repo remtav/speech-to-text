@@ -56,8 +56,6 @@ class PcmAudioSource(
         for (p in parts) { p.copyInto(data, o); o += p.size }
     }
 
-    val totalSeconds: Float get() = data.size / sampleRate.toFloat()
-
     override fun start() {
         pos = 0
         stopped = false

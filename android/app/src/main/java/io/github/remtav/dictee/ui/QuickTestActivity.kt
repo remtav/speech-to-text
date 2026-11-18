@@ -147,10 +147,10 @@ class QuickTestActivity : AppCompatActivity() {
         val status = Downloads.status[spec.id]
         when {
             app.isInstalled(spec) -> card.value(getString(R.string.quick_installed_redo))
-            busy && status != null -> card.value(getString(R.string.setup_downloading, status.percent, size(status.downloaded), size(status.total)))
+            busy && status != null -> card.value(getString(R.string.setup_downloading, status.percent, SizeFormat.format(status.downloaded), SizeFormat.format(status.total)))
             else -> {
                 card.value(getString(R.string.quick_not_installed))
-                card.button(getString(R.string.quick_download, size(spec.totalBytes)), outlined = true) {
+                card.button(getString(R.string.quick_download, SizeFormat.format(spec.totalBytes)), outlined = true) {
                     Downloads.start(this, spec.asDownloadable(), getString(R.string.setup_downloading_label, ModelPlainNames.inSentence(spec)))
                     render()
                 }.tag = downloadTag(spec)

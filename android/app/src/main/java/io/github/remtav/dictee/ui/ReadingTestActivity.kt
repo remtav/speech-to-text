@@ -416,7 +416,7 @@ class ReadingTestActivity : AppCompatActivity() {
                 isEnabled = offer.consent
             }
         } else {
-            card.value(getString(R.string.contrib_share_ready, archive.name, size(archive.length()))).tag = TAG_SHARE_READY
+            card.value(getString(R.string.contrib_share_ready, archive.name, SizeFormat.format(archive.length()))).tag = TAG_SHARE_READY
             card.body(getString(R.string.contrib_share_ready_where), small = true)
             if (model.mailOpened) card.body(getString(R.string.contrib_share_mail_opened), small = true).tag = TAG_SHARE_MAIL_OPENED
             card.button(getString(R.string.contrib_share_email)) { sendByEmail(result.textVersion, modelLabel) }.tag = TAG_SHARE_EMAIL
