@@ -96,8 +96,10 @@ class WholeDictationTest {
         url: String = base(),
         waitBase: Long = 5_000,
         polish: Boolean = true,
+        language: String = "fr",
+        detectLanguages: List<String> = emptyList(),
     ) = RemoteConfig(
-        url, api, language = "fr",
+        url, api, language = language, detectLanguages = detectLanguages,
         cfAccessClientId = if (cf) clientId else "", cfAccessClientSecret = if (cf) secret else "",
         connectTimeoutMillis = 500, waitBaseMillis = waitBase, pollIntervalMillis = 30, polish = polish,
     )
@@ -388,6 +390,30 @@ class WholeDictationTest {
         assertEquals("sync", rec.results.single().transport)
         val sync = reqs().single { it.path == "/transcribe/streaming" }
         assertEquals("true", field(sync.body, "polish"))
+    }
+
+    /** Issue #86: in automatic mode, the server's detection is limited to the user's languages. */
+    @Test fun automaticLanguageSendsTheUsersLanguages() {
+        dictate(remote(config(language = "", detectLanguages = listOf("fr", "en"))))
+        val post = jobPosts().single()
+        assertEquals(null, field(post.body, "language"))
+        assertEquals("fr,en", field(post.body, "languages"))
+    }
+
+    @Test fun automaticLanguageSendsTheUsersLanguagesOnTheSynchronousRoute() {
+        jobsCode = 404
+        dictate(remote(config(language = "", detectLanguages = listOf("fr", "en"))))
+        assertEquals("fr,en", field(reqs().single { it.path == "/transcribe/streaming" }.body, "languages"))
+    }
+
+    @Test fun forcedLanguageSendsNoLanguages() {
+        dictate(remote(config(detectLanguages = listOf("fr", "en"))))
+        assertEquals(null, field(jobPosts().single().body, "languages"))
+    }
+
+    @Test fun openAiApiSendsNoLanguages() {
+        dictate(remote(config(api = RemoteApi.OPENAI, language = "", detectLanguages = listOf("fr", "en"))))
+        assertEquals(null, field(reqs().single { it.path == "/v1/audio/transcriptions" }.body, "languages"))
     }
 
     @Test fun cloudflareHeadersOnEveryRequestWhenConfigured() {

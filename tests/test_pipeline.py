@@ -55,6 +55,12 @@ def engine(monkeypatch):
         "segments": [{"start": 0.0, "end": 2.0, "text": " Hello. Hi there", "avg_logprob": -0.2}],
         "language": "en",
     }
+    # Language detection (issue #86): scores of the first 30 s, as CTranslate2 gives them (best first)
+    fake_audio = MagicMock(N_SAMPLES=480000)
+    fake_audio.log_mel_spectrogram.side_effect = lambda audio, n_mels, padding: ("mel", len(audio), n_mels, padding)
+    monkeypatch.setitem(sys.modules, "whisperx.audio", fake_audio)
+    eng.model.model.feat_kwargs = {"feature_size": 128}
+    eng.model.model.model.detect_language.return_value = [[("<|en|>", 0.6), ("<|fr|>", 0.3), ("<|de|>", 0.1)]]
     eng.model_name, eng.device = "base", "cpu"
     eng.align_models["en"] = ("align-model", {"language": "en"})
     eng.diarizer = MagicMock(return_value="diarize-df")
@@ -127,7 +133,7 @@ class TestTranscription:
 
     def test_quick(self, engine):
         data = engine.transcribe("a.wav", {"quick": True})
-        assert data == {"text": "Hello. Hi there", "language": "en", "task": "transcribe"}
+        assert data == {"text": "Hello. Hi there", "language": "en", "language_probability": 0.6, "task": "transcribe"}
         engine.whisperx.align.assert_not_called()
 
     def test_diarization_without_token_fails_fast(self, engine, monkeypatch):
@@ -148,6 +154,62 @@ class TestTranscription:
         with patch.object(engine, "load") as load:
             engine.transcribe("a.wav", {"model": "small", "device": "cpu"})
         assert load.call_args.args[:2] == ("small", "cpu")
+
+
+class TestLanguageDetection:
+    """Issue #86: a language Whisper detects wrongly makes it translate instead of transcribe."""
+
+    @staticmethod
+    def _scores(engine, scores):
+        engine.model.model.model.detect_language.return_value = [scores]
+
+    @pytest.mark.parametrize("quick", [True, False])
+    def test_detected_language_is_given_to_whisper(self, engine, quick):
+        data = engine.transcribe("a.wav", {"quick": quick})
+        assert engine.model.transcribe.call_args.kwargs["language"] == "en"
+        assert (data["language"], data["language_probability"]) == ("en", 0.6)
+
+    @pytest.mark.parametrize("quick", [True, False])
+    def test_detection_limited_to_the_users_languages(self, engine, quick):
+        # French dictation that Whisper hesitates on: Spanish first, French second, English third.
+        engine.align_models["fr"] = None
+        self._scores(engine, [("<|es|>", 0.45), ("<|fr|>", 0.35), ("<|en|>", 0.2)])
+        data = engine.transcribe("a.wav", {"quick": quick, "languages": ["fr", "en"]})
+        assert engine.model.transcribe.call_args.kwargs["language"] == "fr"
+        assert (data["language"], data["language_probability"]) == ("fr", 0.35)
+
+    def test_without_languages_the_best_language_wins(self, engine):
+        self._scores(engine, [("<|es|>", 0.45), ("<|fr|>", 0.35), ("<|en|>", 0.2)])
+        engine.transcribe("a.wav", {"quick": True})
+        assert engine.model.transcribe.call_args.kwargs["language"] == "es"
+
+    def test_languages_absent_from_the_scores_are_ignored(self, engine):
+        engine.transcribe("a.wav", {"quick": True, "languages": ["xx"]})
+        assert engine.model.transcribe.call_args.kwargs["language"] == "en"
+
+    @pytest.mark.parametrize("quick", [True, False])
+    def test_forced_language_is_not_detected(self, engine, quick):
+        engine.align_models["fr"] = None
+        data = engine.transcribe("a.wav", {"quick": quick, "language": "fr", "languages": ["en"]})
+        engine.model.model.model.detect_language.assert_not_called()
+        assert engine.model.transcribe.call_args.kwargs["language"] == "fr"
+        assert (data["language"], data["language_probability"]) == ("fr", None)
+
+    def test_detection_reads_the_first_30_seconds(self, engine):
+        engine.transcribe("a.wav", {"quick": True})
+        audio_mod = sys.modules["whisperx.audio"]
+        # 2 s of audio (see the fixture), padded to 30 s like Whisper does, with the model's mel bins
+        assert audio_mod.log_mel_spectrogram.call_args.kwargs == {"n_mels": 128, "padding": 480000 - 32000}
+        engine.model.model.encode.assert_called_once_with(("mel", 32000, 128, 480000 - 32000))
+
+    def test_detected_language_is_logged_without_text(self, engine, caplog):
+        self._scores(engine, [("<|es|>", 0.45), ("<|fr|>", 0.35), ("<|en|>", 0.2)])
+        engine.align_models["fr"] = None
+        with caplog.at_level("INFO", logger="app.pipeline"):
+            engine.transcribe("a.wav", {"quick": True, "languages": ["fr", "en"]})
+        line = next(r.getMessage() for r in caplog.records if "Detected language" in r.getMessage())
+        assert "fr (0.35)" in line and "es (0.45)" in line
+        assert "Hello" not in caplog.text
 
 
 class TestInitialPrompt:

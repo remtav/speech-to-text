@@ -42,6 +42,16 @@ class DictationLanguagesTest {
         assertEquals("", DictationLanguages.remoteLanguage(setOf(SPANISH)))
     }
 
+    /** Issue #86: in automatic mode, the server's detection is limited to the user's languages. */
+    @Test
+    fun detectionIsLimitedToSeveralChosenLanguagesInListOrder() {
+        assertEquals(listOf("fr", "en"), DictationLanguages.detectionLanguages(setOf(ENGLISH, FRENCH_QUEBEC)))
+        assertEquals(listOf("fr", "en", "es"), DictationLanguages.detectionLanguages(setOf(SPANISH, FRENCH_FRANCE, ENGLISH, FRENCH_QUEBEC)))
+        // A single language: nothing to choose between, the server is left free (a forced language is the setting's job).
+        assertEquals(emptyList<String>(), DictationLanguages.detectionLanguages(setOf(FRENCH_QUEBEC, FRENCH_FRANCE)))
+        assertEquals(emptyList<String>(), DictationLanguages.detectionLanguages(setOf(ENGLISH)))
+    }
+
     @Test
     fun emptyOrUnknownStoredChoiceFallsBackToTheDefault() {
         assertEquals(setOf(FRENCH_QUEBEC), DictationLanguages.parse(null))
