@@ -5,6 +5,9 @@ name: Android
 # instrumented tests of the keyboard on an emulator. A push to main, or a manual
 # run (Actions -> Android -> Run workflow) on main, also publishes the APK as a
 # GitHub release; a manual run on any other branch only builds and tests.
+# If the PLAY_SERVICE_ACCOUNT_JSON secret is set, the release job also sends the .aab to the
+# internal testing track of Google Play (android/README.md, "Play Store"); nothing reaches the
+# public without a human gesture in the Play Console.
 # Publishing needs every job green, except on a manual run with "skip_slow_tests"
 # checked: the model and emulator jobs are then skipped and the APK is published
 # once the build job (unit tests, release signature) is green.
@@ -184,26 +187,26 @@ jobs:
             jarsigner -verify -certs "$AAB" | tee aab-signature.txt
             grep -q "jar verified" aab-signature.txt || { echo "::error::bundle is not signed"; exit 1; }
             if grep -q "CN=Android Debug" aab-signature.txt; then echo "::error::bundle signed with the debug key"; exit 1; fi
-            cp "$AAB" dictee-$VERSION_NAME.aab
+            cp "$AAB" kalmia-blabla-$VERSION_NAME.aab
           fi
           if [ -f app/build/outputs/apk/release/app-release.apk ]; then
             APKSIGNER=$(ls -d "$ANDROID_HOME"/build-tools/*/apksigner | sort -V | tail -1)
             "$APKSIGNER" verify --print-certs app/build/outputs/apk/release/app-release.apk | tee signature.txt
             # Never publish an APK signed with the public debug key.
             if grep -q "CN=Android Debug" signature.txt; then echo "::error::release signed with the debug key"; exit 1; fi
-            cp app/build/outputs/apk/release/app-release.apk dictee-$VERSION_NAME.apk
+            cp app/build/outputs/apk/release/app-release.apk kalmia-blabla-$VERSION_NAME.apk
           else
-            cp app/build/outputs/apk/release/app-release-unsigned.apk dictee-$VERSION_NAME-unsigned.apk
+            cp app/build/outputs/apk/release/app-release-unsigned.apk kalmia-blabla-$VERSION_NAME-unsigned.apk
           fi
       - uses: actions/upload-artifact@v4
         with:
-          name: dictee-apk
-          path: android/dictee-*.apk
+          name: kalmia-blabla-apk
+          path: android/kalmia-blabla-*.apk
       - uses: actions/upload-artifact@v4
         if: steps.key.outputs.signed == 'true'
         with:
-          name: dictee-aab
-          path: android/dictee-*.aab
+          name: kalmia-blabla-aab
+          path: android/kalmia-blabla-*.aab
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -330,7 +333,7 @@ jobs:
           # the box took the window focus from the test field and failed keyboard tests at random. With it set,
           # Android closes the stuck launcher instead of showing the box (the CI emulator only, never a phone).
           # One line on purpose: the action runs each line of the script as its own command.
-          script: adb shell settings put global hide_error_dialogs 1; ./gradlew --no-daemon connectedDebugAndroidTest $SHARD_ARGS -Pandroid.injected.androidTest.leaveApksInstalledAfterRun=true; s=$?; mkdir -p screenshots; adb pull /sdcard/Android/data/io.github.remtav.dictee/files/screenshots/. screenshots/ || true; exit $s
+          script: adb shell settings put global hide_error_dialogs 1; ./gradlew --no-daemon connectedDebugAndroidTest $SHARD_ARGS -Pandroid.injected.androidTest.leaveApksInstalledAfterRun=true; s=$?; mkdir -p screenshots; adb pull /sdcard/Android/data/com.kalmia.stt/files/screenshots/. screenshots/ || true; exit $s
       - name: Test duration per class
         if: always()
         working-directory: .
@@ -362,6 +365,9 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+    env:
+      # Only to test for presence in `if:` (secrets are not readable there).
+      PLAY_JSON: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
     steps:
       - name: Say when the slow tests did not pass
         if: needs.models.result != 'success' || needs.emulator.result != 'success'
@@ -371,10 +377,10 @@ jobs:
           echo "### Published without the model and emulator tests (manual run)" >> "$GITHUB_STEP_SUMMARY"
       - uses: actions/download-artifact@v4
         with:
-          name: dictee-apk
+          name: kalmia-blabla-apk
       - uses: actions/download-artifact@v4
         with:
-          name: dictee-aab
+          name: kalmia-blabla-aab
       - uses: softprops/action-gh-release@v2
         with:
           tag_name: android-v${{ env.VERSION_NAME }}
@@ -382,11 +388,27 @@ jobs:
           target_commitish: ${{ github.sha }}
           fail_on_unmatched_files: true
           files: |
-            dictee-${{ env.VERSION_NAME }}.apk
-            dictee-${{ env.VERSION_NAME }}.aab
+            kalmia-blabla-${{ env.VERSION_NAME }}.apk
+            kalmia-blabla-${{ env.VERSION_NAME }}.aab
           body: |
             Kalmia Blabla: a voice keyboard designed in Quebec, for the French spoken here. Your voice is transcribed on your phone and sent to no one by default; no account, no ads, no telemetry, and public source code anyone can read.
             Voice keyboard APK (issue #10), built from ${{ github.sha }}.
             Signed with the project's private release key: each release installs over the previous one, and an APK signed by anyone else is refused as an update.
-            The .aab file is the bundle for the Play Console; to install on a phone, use the .apk.
+            The .aab file is the bundle for the Play Console (application id com.kalmia.stt); to install on a phone, use the .apk.
+            The .apk and the Play Store version carry the same signature only if Play App Signing uses the project's own key: see android/README.md, "Play Store".
             Install: download the APK on the phone, allow installs from this source, then open "Kalmia Blabla" to enable the keyboard and download a model.
+      # First version of an app: upload it by hand in the Play Console (the API cannot).
+      # After that, each release goes to the internal testing track. The status stays "draft"
+      # (the Console asks for one click to roll it out) until the repository variable
+      # PLAY_RELEASE_STATUS is set to "completed". Re-running this job re-sends the same
+      # versionCode, which Play refuses: start a new run (Run workflow) instead.
+      - name: Upload the bundle to Google Play (internal testing)
+        if: env.PLAY_JSON != ''
+        uses: r0adkll/upload-google-play@v1
+        with:
+          serviceAccountJsonPlainText: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+          packageName: com.kalmia.stt
+          releaseFiles: kalmia-blabla-${{ env.VERSION_NAME }}.aab
+          releaseName: ${{ env.VERSION_NAME }}
+          track: internal
+          status: ${{ vars.PLAY_RELEASE_STATUS || 'draft' }}
