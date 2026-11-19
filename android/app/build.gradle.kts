@@ -176,13 +176,22 @@ android {
         jniLibs { useLegacyPackaging = true }
     }
 
+    // Issue #84, CTranslate2 trial: `-Pct2Libs=<dir>` packages <dir>/arm64-v8a/libct2whisper.so (built by
+    // android/tools/ctranslate2-android/compiler.sh). Without it the APK is unchanged and the trial hides.
+    (project.findProperty("ct2Libs") as String?)?.let { sourceSets.getByName("main").jniLibs.srcDir(it) }
+
     testOptions {
         unitTests.isReturnDefaultValues = true
         unitTests.all { test ->
             test.dependsOn(fetchHostNative)
-            val nativeDir = File(hostNativeDir, "linux-x64").absolutePath
+            // Issue #84: `-Pct2HostLib=<dir>` adds the host build of libct2whisper.so (compiler.sh … host).
+            val nativeDir = listOfNotNull(
+                File(hostNativeDir, "linux-x64").absolutePath,
+                (project.findProperty("ct2HostLib") as String?)?.let { file(it).absolutePath },
+            ).joinToString(File.pathSeparator)
             test.systemProperty("java.library.path", nativeDir)
             test.environment("LD_LIBRARY_PATH", nativeDir)
+            (project.findProperty("ct2Model") as String?)?.let { test.systemProperty("dictee.ct2Model", file(it).absolutePath) }
             test.systemProperty("dictee.assetsDir", file("src/main/assets").absolutePath)
             test.systemProperty("dictee.refDir", file("src/main/assets/reference").absolutePath)
             // Directory holding (or receiving) the STT models for the model tests;

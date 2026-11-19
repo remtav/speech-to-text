@@ -107,6 +107,8 @@ fun interface SttEngineFactory {
  */
 class DefaultEngineFactory(private val dirFor: (ModelSpec) -> File) : SttEngineFactory {
     override fun create(spec: ModelSpec, modelDir: File, options: EngineOptions): SttEngine {
+        // Issue #84: the CTranslate2 trial, offered by the comparison screen only (never a dictation model).
+        if (spec.id == Ct2Experiment.MODEL_ID) return Ct2WhisperEngine(spec, modelDir, options)
         if (spec.family != ModelFamily.REMOTE) return SherpaEngine(spec, modelDir, options)
         val config = options.remote ?: throw IllegalStateException("Serveur distant non configuré")
         val remote = RemoteEngine(spec, config, options.hotwords)

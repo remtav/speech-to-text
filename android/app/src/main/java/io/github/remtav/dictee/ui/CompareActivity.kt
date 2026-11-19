@@ -26,11 +26,13 @@ import io.github.remtav.dictee.audio.WavReader
 import io.github.remtav.dictee.dictation.LocalCut
 import io.github.remtav.dictee.dictation.LocalGrouping
 import io.github.remtav.dictee.stt.BenchSample
+import io.github.remtav.dictee.stt.Ct2Experiment
 import io.github.remtav.dictee.stt.Benchmark
 import io.github.remtav.dictee.stt.EngineChoice
 import io.github.remtav.dictee.stt.ModelCatalog
 import io.github.remtav.dictee.stt.ModelFamily
 import io.github.remtav.dictee.stt.ModelResult
+import io.github.remtav.dictee.stt.ModelSpec
 import io.github.remtav.dictee.stt.WhisperTuning
 import java.util.Locale
 import kotlin.concurrent.thread
@@ -138,8 +140,12 @@ class CompareActivity : AppCompatActivity() {
         recording?.let { samples += BenchSample("enregistrement", "?", it, null) }
         // Issue #22: the models offered for the languages (Parakeet and Whisper), and the user's server only when
         // dictations go to it (address and "server" mode, issue #57): an address alone sends nothing.
+        // Issue #84: the CTranslate2 trial joins only when its library is in the APK and its model was copied
+        // by hand (adb); it never shows up otherwise.
+        val ct2Dir = Ct2Experiment.modelDir(getExternalFilesDir(null))
+        val ct2 = Ct2Experiment.spec.takeIf { Ct2Experiment.isReady(ct2Dir) }
         val models = EngineChoice.comparedModels(ModelCatalog.offered(app.settings.languages), app.settings.serverInUse)
-            .filter { app.isInstalled(it) }
+            .filter { app.isInstalled(it) } + listOfNotNull(ct2)
         if (models.isEmpty() || samples.isEmpty()) {
             Toast.makeText(this, R.string.compare_nothing, Toast.LENGTH_LONG).show()
             return
@@ -158,7 +164,8 @@ class CompareActivity : AppCompatActivity() {
         app.engines.release()
         // The same options as the dictation (forced language when one language is chosen, Whisper
         // padding), so the screen measures what the keyboard does; the server never falls back here.
-        val bench = Benchmark(app.engineFactory(), { app.store.dirFor(it.id) }, optionsFor = { spec ->
+        val dirFor = { spec: ModelSpec -> if (spec.id == Ct2Experiment.MODEL_ID) checkNotNull(ct2Dir) else app.store.dirFor(spec.id) }
+        val bench = Benchmark(app.engineFactory(), dirFor, optionsFor = { spec ->
             app.engineOptions(spec).copy(remote = app.settings.remoteConfig().takeIf { it.isConfigured }, remoteFallback = null)
         }, cutFor = { spec ->
             // Issue #53: with « Regrouper les énoncés » on, each sample is cut as the dictation cuts it (VAD + groups).
@@ -187,7 +194,8 @@ class CompareActivity : AppCompatActivity() {
                             // Issue #53: the grouping setting, and that the samples are then cut as a dictation.
                             " · " + (WhisperTuning.groupingFor(whisper, app.settings.whisperGroupSeconds)
                                 ?.let { "${it.describe()}, extraits découpés comme une dictée" } ?: LocalGrouping.OFF_DESCRIPTION)
-                    } ?: "")
+                    } ?: "") +
+                    (ct2?.let { " · ${Ct2Experiment.describe(ct2Dir)}" } ?: "")
                 report = Benchmark.report(results, header) { spec -> app.engineOptions(spec).whisperRepetitionFix != null }
                 main.post {
                     progress.text = getString(R.string.compare_done)
