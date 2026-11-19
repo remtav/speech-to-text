@@ -717,8 +717,8 @@ jetée, trois exécutions notées, une minute de pause entre elles), Whisper lar
 | faster-whisper / CTranslate2 | Moteur Python/C++ pour serveur et PC | — | Pas de version Android officielle trouvée | **À écarter** (déjà utilisable côté serveur personnel, voir `DECISIONS.md`, serveur distant) |
 
 > **Mise à jour #84 (2026-11-19).** CTranslate2 se compile pour arm64-v8a (Ruy, NEON) et tourne dans l'application
-> en essai : voir [`CTRANSLATE2_ANDROID.md`](CTRANSLATE2_ANDROID.md). Exactitude égale ou meilleure à marge égale
-> sur l'hôte ; vitesse sur le téléphone à mesurer.
+> en essai : voir [`CTRANSLATE2_ANDROID.md`](CTRANSLATE2_ANDROID.md). Exactitude comparable, mais 2 à 3 fois plus
+> lent que sherpa-onnx sur le Snapdragon 8 Gen 2 : **écarté** (essai clos).
 | ExecuTorch / LiteRT (Arm AI Portal) | Whisper tiny/small/medium int8 (XNNPACK ExecuTorch, LiteRT) publiés par Arm | Inconnu pour turbo : modèles publiés jusqu'à medium (liste de recherche, non ouverte) | Élevé : autre environnement d'exécution | **À écarter** |
 | NPU Qualcomm (QNN, AI Hub) | Voir section 5 | Élevé en théorie | Très élevé | **Étude séparée** si Whisper devient le modèle courant |
 

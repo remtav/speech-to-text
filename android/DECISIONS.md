@@ -5026,7 +5026,7 @@ La Play Console refusait le `.aab` : la fiche existe sous `com.kalmia.stt`, `mai
 
 ## Issue #84 — Essai CTranslate2 (faster-whisper) sur Android
 
-- **Prototype, pas de décision.** CTranslate2 v4.9.0 compilé pour arm64-v8a (Ruy, NEON, OpenMP et libc++
+- **Essai clos, CTranslate2 écarté (2026-11-19).** CTranslate2 v4.9.0 compilé pour arm64-v8a (Ruy, NEON, OpenMP et libc++
   statiques) dans une seule `libct2whisper.so` de 2,4 Mo avec le pont Whisper et le JNI. Rapport :
   `docs/CTRANSLATE2_ANDROID.md`.
 - **Hors de l'APK normal.** La bibliothèque n'est empaquetée qu'avec `-Pct2Libs=<dossier>`. Le modèle (780 Mo,
@@ -5037,10 +5037,10 @@ La Play Console refusait le `.aab` : la fiche existe sous `com.kalmia.stt`, `mai
   Whisper de l'application, sur les mêmes extraits et options, avec un bloc de comparaison dans le rapport.
 - **Même entrée d'encodeur que sherpa-onnx** : audio + `tailPaddings` images de zéros (espace des
   caractéristiques), pas la fenêtre de 30 s de faster-whisper (3 fois plus lente pour la même exactitude, hôte).
-- **Décision provisoire : écarter.** Sur l'hôte, exactitude 13,1 % contre 14,5 % (172 extraits québécois). Sur le
+- **Décision : écarter.** Sur l'hôte, exactitude 13,1 % contre 14,5 % (172 extraits québécois). Sur le
   téléphone (S23 Ultra, Snapdragon 8 Gen 2, `ISA NEON` actif), RTF 1,37 contre 0,43 pour le Whisper de
   l'application, soit 2,8 fois plus lent, à exactitude comparable (8,2 % contre 8,9 %). Les réglages
   différaient (marge 1 000 / 4 threads contre 300 / 8 threads) ; corrigé de la marge, l'écart resterait
-  d'environ 2 fois. Une mesure dans le même APK, mêmes réglages, peut encore trancher ; au-delà d'un facteur
-  1,5, l'essai est clos et le code reste hors de l'APK.
+  d'environ 2 fois. Le code reste dans le dépôt, hors de l'APK, pour une reprise éventuelle (mesure à faire
+  alors : les deux moteurs dans le même APK d'essai, mêmes réglages).
 

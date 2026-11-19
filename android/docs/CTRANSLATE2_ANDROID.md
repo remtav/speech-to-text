@@ -1,8 +1,9 @@
 # CTranslate2 (moteur de faster-whisper) sur Android : essai de l'issue #84
 
-Statut : 2026-11-19, **prototype fonctionnel, première mesure sur le téléphone faite** (section 5).
-Décision provisoire : **écarter** — CTranslate2 est 2 à 3 fois plus lent que le Whisper de l'application sur le
-Snapdragon 8 Gen 2, à exactitude comparable ; une mesure dans des conditions identiques reste à faire. L'application normale est inchangée :
+Statut : **essai clos le 2026-11-19. Décision : écarter.** CTranslate2 est 2 à 3 fois plus lent que le Whisper
+de l'application sur le Snapdragon 8 Gen 2, à exactitude comparable (section 5). Le code reste dans le dépôt
+(outils, pont, moteur expérimental), hors de l'APK normal, pour reprendre l'essai si une version de CTranslate2
+ou de Ruy change la donne. L'application normale est inchangée :
 la bibliothèque n'entre dans l'APK qu'avec `-Pct2Libs`, et l'essai n'apparaît que dans « Comparer les modèles »,
 qui propose alors de télécharger le modèle (780 Mo, révision fixée, SHA-256 vérifié).
 
@@ -133,11 +134,12 @@ Chargement 1,21 s ; mémoire en pointe 1 309 Mo.
 - Exactitude : comparable (8,2 % contre 8,9 % ; une phrase meilleure de chaque côté), avec des réglages
   différents. Rien ne compense la vitesse.
 
-**Décision provisoire : écarter** (critère de l'issue : « gain faible ou nul »). Ici, ce n'est pas un gain
+**Décision : écarter** (critère de l'issue : « gain faible ou nul »), prise par l'utilisateur sur ces chiffres
+le 2026-11-19, sans la mesure à conditions identiques décrite ci-dessous. Ici, ce n'est pas un gain
 faible, c'est une perte d'un facteur 2 à 3. Une seule mesure peut encore la renverser : les deux moteurs **dans le
-même APK d'essai**, mêmes réglages (le Whisper normal téléchargé aussi dans l'APK d'essai, 4 threads, CPU,
+même APK d'essai**, mêmes réglages, à faire si l'essai est rouvert (le Whisper normal téléchargé aussi dans l'APK d'essai, 4 threads, CPU,
 marge 1 000 puis 300) ; le bloc « CTranslate2 face au Whisper de l'application » donnera alors le rapport exact.
-Si le facteur reste supérieur à 1,5, l'essai est clos : le code reste dans le dépôt, hors de l'APK.
+
 
 Critères (issue) : **adopter ou garder en option** si la vitesse est nettement meilleure à exactitude égale ;
 **écarter** si le gain est faible ou nul.

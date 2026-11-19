@@ -1,6 +1,6 @@
 # CTranslate2 (moteur de faster-whisper) sur Android : essai de l'issue #84
 
-Statut : **expérimental**. Rien de ceci n'entre dans l'APK normal ni dans le catalogue des modèles. Rapport et
+Statut : **essai clos, CTranslate2 écarté** (2 à 3 fois plus lent que sherpa-onnx sur le téléphone). Rien de ceci n'entre dans l'APK normal ni dans le catalogue des modèles. Rapport et
 mesures : [`android/docs/CTRANSLATE2_ANDROID.md`](../../docs/CTRANSLATE2_ANDROID.md).
 
 | Fichier | Rôle |
