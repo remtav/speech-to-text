@@ -50,6 +50,9 @@ import io.github.remtav.dictee.stt.Transcription
 import io.github.remtav.dictee.ui.HowToActivity
 import io.github.remtav.dictee.ui.ProActivity
 import io.github.remtav.dictee.ui.SetupActivity
+import io.github.remtav.dictee.ime.words.GestureText
+import io.github.remtav.dictee.ime.words.KeyGeometry
+import io.github.remtav.dictee.ime.words.KeyPoint
 import io.github.remtav.dictee.ime.words.Suggestions
 import io.github.remtav.dictee.ime.words.WordTyping
 import java.lang.ref.WeakReference
@@ -95,6 +98,8 @@ class DicteeImeService : InputMethodService(), DictationListener, EngineManager.
     private var suggestionRequest = 0
     /** The current field takes suggestions (plain text, see [suggestionsWanted]). */
     private var suggestionField = false
+    /** Drops a traced word decoded for an older gesture (issue #71, lot 2). */
+    private var gestureRequest = 0
     /** Page the current field asked for (text views or a number pad), from its `inputType`. */
     private var inputPage: InputPage = InputPage.Text
     /** Decimal separators to try in the current pad, preferred first (see [typeDecimal]). */
@@ -254,6 +259,7 @@ class DicteeImeService : InputMethodService(), DictationListener, EngineManager.
         keys.onKeyPressed = { haptic(it) }
         keys.listener = object : LetterKeyboardView.Listener {
             override fun onText(text: String) = typeKey(text)
+            override fun onGesture(trace: List<KeyPoint>, geometry: KeyGeometry, shift: ShiftState) = typeGesture(trace, geometry, shift)
         }
         keys.backspaceTouchListener = RepeatListener(main) { typedBackspace() }
         symbolsButton = v.findViewById<MaterialButton>(R.id.kb_symbols).apply {
@@ -370,7 +376,34 @@ class DicteeImeService : InputMethodService(), DictationListener, EngineManager.
         updateSymbolsButton()
         // The bar keeps its place whatever the field, so the keys do not move from one field to the next.
         strip?.visibility = if (text && app.settings.wordSuggestions) View.VISIBLE else View.GONE
+        letters?.gestureTyping = gestureTypingOn()
         refreshSuggestions()
+    }
+
+    // ------------------------------------------------------------ gesture typing (issue #71, lot 2)
+
+    /** Where the suggestions are offered (plain text, not a password), and the setting on. */
+    private fun gestureTypingOn(): Boolean = app.settings.gestureTyping && suggestionField && !passwordField
+
+    /** A word traced on the letters: guessed in the background, then written with the other guesses in the bar. */
+    private fun typeGesture(trace: List<KeyPoint>, geometry: KeyGeometry, shift: ShiftState) {
+        stopDictationForTyping()
+        val request = ++gestureRequest
+        app.wordLists.decodeGesture(KeyLanguage.forDictation(app.settings.languages), geometry, trace) { words ->
+            main.post { if (request == gestureRequest) writeGesture(words, shift) }
+        }
+    }
+
+    private fun writeGesture(found: List<String>, shift: ShiftState) {
+        val ic = currentInputConnection ?: return
+        val words = found.map { GestureText.withCase(it, shift) }.distinct()
+        val word = words.firstOrNull() ?: return
+        wordTyping.forget()
+        ic.commitText(GestureText.commit(ic.getTextBeforeCursor(1, 0) ?: "", word), 1)
+        // The other guesses in the bar: a tap puts one in place of the traced word (as a suggestion does). The bar
+        // keeps them while the cursor stays after the word (see refreshSuggestions).
+        ++suggestionRequest
+        showSuggestions(Suggestions(word, words.drop(1), null, typedIsWord = true))
     }
 
     // ------------------------------------------------------------ suggestions (issue #71)
@@ -479,6 +512,8 @@ class DicteeImeService : InputMethodService(), DictationListener, EngineManager.
 
     private fun typeKey(text: String) {
         stopDictationForTyping()
+        // A word still being guessed from a trace would land after this key: it is dropped.
+        ++gestureRequest
         val ic = currentInputConnection ?: return
         if (WordTyping.isSeparator(text)) {
             typeSeparator(ic, text)
@@ -490,6 +525,7 @@ class DicteeImeService : InputMethodService(), DictationListener, EngineManager.
 
     private fun typedBackspace() {
         stopDictationForTyping()
+        ++gestureRequest
         val ic = currentInputConnection ?: return
         // Right after an automatic correction, Backspace puts back the word as typed (issue #71).
         if (!wordTyping.undoCorrection(ic)) ic.deleteBackward()
@@ -528,6 +564,8 @@ class DicteeImeService : InputMethodService(), DictationListener, EngineManager.
         passwordField = attribute.isPassword()
         suggestionField = suggestionsWanted(attribute.inputType)
         wordTyping.forget()
+        // A word still being guessed from a trace made in the previous field is not written in this one.
+        ++gestureRequest
         suggestions = Suggestions.NONE
         inputPage = InputPages.forInputType(attribute.inputType)
         // The separator learned in this field stays through a restart of the same field (rotation).
@@ -572,7 +610,7 @@ class DicteeImeService : InputMethodService(), DictationListener, EngineManager.
         if (inflatedTheme != null && inflatedTheme != app.settings.theme) rebuildInputView()
         if (passwordField && controller.isActive) controller.cancel()
         // Issue #71: the word lists are read in the background before the first key; the setting may have changed.
-        if (app.settings.wordSuggestions && suggestionField) app.wordLists.preload(KeyLanguage.forDictation(app.settings.languages))
+        if ((app.settings.wordSuggestions || app.settings.gestureTyping) && suggestionField) app.wordLists.preload(KeyLanguage.forDictation(app.settings.languages))
         applyView()
         // Preload the model so the first tap is fast.
         val spec = app.dictationSpec()

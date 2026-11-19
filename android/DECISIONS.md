@@ -4993,6 +4993,55 @@ l'implémentation part de `main` (la branche d'essai `ccr-67305f2c-9rtymc` n'est
   (ouverture et retour, insertion au curseur, émojis de plusieurs caractères et effacement en un appui, noms lus, bouton
   distinct, rangée du bas en portrait et en paysage), `ScreenshotTest.emojiPanel` (clair et sombre).
 
+## Issue #71, lot 2 : saisie par glissement
+
+Après l'essai du lot 1 par Rémi (2026-11-18, #78). Part de `main` ; la branche d'essai n'est pas reprise.
+
+Décisions de Rémi (2026-11-18, revue de la PR #121) :
+- **Désactivée par défaut** : l'usager active le glissement dans les Réglages. Pas de migration.
+- **On garde le moteur écrit dans le projet** (`GestureDecoder`), pas de port de `GestureTypingDetector`
+  d'AnySoftKeyboard ; rien à ajouter à la page des licences. Si le glissement déçoit à l'essai sur le téléphone, la
+  suite prévue reste CleverKeys (#78).
+
+- **Moteur écrit ici, en Kotlin pur** (`ime/words/GestureDecoder`), sur les listes de mots du lot 1. Le code de
+  `GestureTypingDetector` d'AnySoftKeyboard n'est pas recopié : on en garde l'idée générale (candidats tirés du
+  dictionnaire, puis comparaison de la forme du tracé avec le tracé idéal du mot), commune à la plupart des claviers.
+  Aucune bibliothèque, aucun modèle, aucune compilation native ; rien à ajouter à la page des licences.
+  1. **Candidats** : la liste est parcourue comme un arbre de préfixes repliés. Une lettre n'est gardée que si sa
+     touche est à moins de 0,9 largeur de touche d'un point du tracé situé après la lettre précédente ; la première
+     sous le début du tracé, la dernière sous sa fin (1,1 touche). Une lettre doublée (« belle ») compte une fois ;
+     l'apostrophe et le trait d'union ne se tracent pas (« aujourd'hui »). Une branche est quittée dès qu'une lettre
+     sort du tracé : quelques centaines de mots examinés.
+  2. **Forme** : tracé réel et tracé idéal (droites de centre de touche en centre de touche) rééchantillonnés à
+     48 points ; la distance moyenne, en largeurs de touche, coûte 160 points contre la fréquence du mot (1 à 255).
+  Les accents reviennent de la liste (`ecole` tracé → « école »), jamais un mot marqué offensant.
+- **Géométrie** : les centres des touches sont mesurés sur la vue au moment du tracé (`KeyGeometry.fromBounds`),
+  divisés par la largeur d'une touche : même calcul sur tout écran, en portrait et en paysage, QWERTY et AZERTY.
+  `KeyGeometry.of` refait la même disposition sans vue, pour les tests.
+- **Mesures** (`GestureDecoderTest`, ordinateur de développement, tracés **simulés** : visée décalée jusqu'à 0,3
+  touche, virages arrondis, 2 000 mots les plus fréquents) : mot voulu en premier fr 94 % (QWERTY et AZERTY),
+  en 96 %, es 97 %, pt 95 % ; dans les quatre premiers, 99,8 % et plus. 2 à 5 ms par mot avec les quatre langues.
+  Un vrai doigt est moins régulier : ces chiffres sont un plafond, **pas encore vérifiés sur téléphone**.
+- **Dans la vue** (`LetterKeyboardView`) : un doigt posé sur une lettre qui s'en éloigne de plus de 0,6 touche devient
+  un tracé ; la vue reprend le toucher aux touches (elles reçoivent `ACTION_CANCEL` : ni lettre tapée, ni appui long)
+  et dessine le tracé par-dessus. Pas de tracé sur les pages de symboles, depuis Maj ou Retour arrière, quand la
+  fenêtre des accents est ouverte, ni dès qu'un deuxième doigt se pose (frappe à deux pouces).
+- **Mot deviné en retard** : un tracé dont le mot n'est pas encore deviné est abandonné si une touche est tapée ou
+  si le champ change entre-temps (le mot n'arrive jamais après cette touche, ni dans un autre champ).
+- **Dans le champ** : le mot est validé tel quel, sans texte en composition (comme `WordTyping`), précédé d'une espace
+  après un mot, un chiffre ou une ponctuation de fin, sans espace en début de champ, après une espace, une
+  parenthèse ou un guillemet ouvrant, une apostrophe ou un trait d'union (`GestureText`). Maj donne la capitale
+  initiale (une fois) ou les capitales (verrouillée). Les autres mots possibles vont dans la barre ; un toucher
+  remplace le mot tracé (suivi d'une espace, comme une suggestion).
+- **Où** : là où les suggestions sont offertes (pas de mot de passe, d'adresse courriel ou web, de champ qui refuse les
+  suggestions). Réglage « Saisie par glissement », **désactivé par défaut** : l'usager l'active dans les Réglages
+  (décision de Rémi, 2026-11-18, en revue de la PR #121). Pas de migration.
+- **Hors de ce lot** : effacer le mot tracé entier d'un seul retour arrière, espace automatique avant une lettre tapée
+  après un tracé, mots appris.
+- Tests : `GestureDecoderTest`, `GestureTextTest` (JVM) ; `GestureTypingInstrumentedTest` (tracés par uiautomator
+  de touche en touche : mot écrit, espace avant le suivant, autres mots dans la barre, AZERTY, toucher simple, réglage
+  coupé, mot de passe, réglage présent). Non lancés en local (émulateur en CI).
+
 ## Issue #122 — Premier lancement sur Google Play
 
 La Play Console refusait le `.aab` : la fiche existe sous `com.kalmia.stt`, `main` compilait `io.github.remtav.dictee`.
@@ -5023,4 +5072,3 @@ La Play Console refusait le `.aab` : la fiche existe sous `com.kalmia.stt`, `mai
 - **Reste hors du dépôt** (issue #122, liste « Exigences de Play ») : test fermé de 12 testeurs pendant 14 jours si le compte
   personnel date d'après novembre 2023, politique de confidentialité à une adresse publique, formulaire « Sécurité des
   données », déclaration du service de premier plan, classification, captures.
-

@@ -27,6 +27,8 @@
     <string name="settings_suggestions_help">Trois mots proposés au-dessus des touches pendant que vous tapez ; touchez-en un pour l\'écrire. Français, anglais, espagnol et portugais, selon les langues choisies. Tout reste sur le téléphone.</string>
     <string name="settings_autocorrect">Correction automatique</string>
     <string name="settings_autocorrect_help">Désactivée par défaut. Quand elle est activée, le mot en gras au milieu de la barre remplace le mot tapé dès que vous tapez une espace ou une ponctuation. Retour arrière juste après : le mot tapé revient.</string>
+    <string name="settings_gesture">Saisie par glissement</string>
+    <string name="settings_gesture_help">Désactivée par défaut. Une fois activée, glissez le doigt d\'une lettre à l\'autre sans le lever : le mot s\'écrit quand vous le levez, et les autres mots possibles s\'affichent dans la barre. Tout reste sur le téléphone.</string>
     <string name="cd_suggestion">Suggestion : %1$s</string>
     <string name="cd_suggestion_correction">Correction : %1$s</string>
     <string name="cd_suggestion_keep">Garder « %1$s »</string>

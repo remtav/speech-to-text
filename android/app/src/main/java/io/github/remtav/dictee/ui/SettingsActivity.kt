@@ -110,6 +110,9 @@ class SettingsActivity : AppCompatActivity() {
         col.body(getString(R.string.settings_suggestions_help), small = true)
         col.switch(getString(R.string.settings_autocorrect), s.autoCorrect) { s.autoCorrect = it }.tag = AUTOCORRECT_TAG
         col.body(getString(R.string.settings_autocorrect_help), small = true)
+        // Issue #71, lot 2: gesture typing, off by default (Rémi, 2026-11-18).
+        col.switch(getString(R.string.settings_gesture), s.gestureTyping) { s.gestureTyping = it }.tag = GESTURE_TAG
+        col.body(getString(R.string.settings_gesture_help), small = true)
         col.button(getString(R.string.licences_open), outlined = true) {
             startActivity(android.content.Intent(this, LicencesActivity::class.java))
         }.tag = LICENCES_TAG
@@ -423,6 +426,7 @@ class SettingsActivity : AppCompatActivity() {
         const val ADVANCED_TAG = "settings_advanced"
         const val SUGGESTIONS_TAG = "settings_suggestions"
         const val AUTOCORRECT_TAG = "settings_autocorrect"
+        const val GESTURE_TAG = "settings_gesture"
         const val LICENCES_TAG = "settings_licences"
         const val WHISPER_TAIL_TAG = "settings_whisper_tail"
         const val WHISPER_REPETITION_TAG = "settings_whisper_repetition"
