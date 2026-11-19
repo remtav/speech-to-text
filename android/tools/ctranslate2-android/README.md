@@ -75,7 +75,7 @@ et copier le rapport dans l'issue.
 # Pont C++ (Ruy en noyaux portables sur x86-64 : texte fiable, temps non représentatifs)
 /tmp/ct2out/host/jni/bin/ct2_whisper_cli /tmp/turbo-ct2-int8 4 1000 fr ../../app/src/main/assets/reference/fr1.wav
 # Moteur Kotlin
-./gradlew testDebugUnitTest --tests '*Ct2WhisperHostTest' -Pct2HostLib=/tmp/ct2out/jniLibs/host -Pct2Model=/tmp/turbo-ct2-int8
+./gradlew testDebugUnitTest --tests '*Ct2WhisperHostTest' -Pct2HostLib=/tmp/ct2out/host-lib -Pct2Model=/tmp/turbo-ct2-int8
 # Banc Python (CTranslate2 de PyPI, oneDNN/MKL sur x86-64), jeu de 172 extraits de ../jeu-quebecois
 pip install faster-whisper sherpa-onnx==2.0.1 soundfile
 python banc_hote.py qc172 4 1 '*' sherpa1000=sherpa:enc.onnx,dec.onnx,tokens.txt,1000 ct2_1000=ct2:/tmp/turbo-ct2-int8,1000

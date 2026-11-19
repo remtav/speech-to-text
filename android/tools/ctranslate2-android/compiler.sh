@@ -5,7 +5,8 @@
 #
 # usage : NDK=/chemin/android-ndk-r27d ./compiler.sh SOURCES SORTIE [ABI]
 #   SOURCES : clone de CTranslate2 au tag v4.9.0 avec ses sous-modules (voir README.md).
-#   SORTIE  : dossier de travail ; la bibliothèque finit dans SORTIE/jniLibs/ABI/libct2whisper.so.
+#   SORTIE  : dossier de travail ; la bibliothèque finit dans SORTIE/jniLibs/ABI/libct2whisper.so
+#             (SORTIE/host-lib/libct2whisper.so pour l'hôte).
 #   ABI     : arm64-v8a (défaut) ; « host » compile pour la machine (Linux x86-64) avec les mêmes
 #             options, pour les tests JVM et l'outil ct2_whisper_cli.
 set -euo pipefail
@@ -25,7 +26,10 @@ cmake -S "$ICI/jni" -B "$OUT/$ABI/jni-build" -G Ninja "${CIBLE[@]}" \
   -DCMAKE_BUILD_TYPE=Release -DCT2_SRC="$SRC" -DCMAKE_INSTALL_PREFIX="$OUT/$ABI/jni"
 cmake --build "$OUT/$ABI/jni-build" -j"$(nproc)"
 cmake --install "$OUT/$ABI/jni-build" --strip
-mkdir -p "$OUT/jniLibs/$ABI"
-cp "$OUT/$ABI/jni/lib/libct2whisper.so" "$OUT/jniLibs/$ABI/"
-ls -l "$OUT/jniLibs/$ABI/libct2whisper.so"
-sha256sum "$OUT/jniLibs/$ABI/libct2whisper.so"
+# jniLibs/ ne contient que des ABI Android (Gradle refuse tout autre dossier) ; l'hôte va dans host-lib/.
+DEST="$OUT/jniLibs/$ABI"
+[ "$ABI" = host ] && DEST="$OUT/host-lib"
+mkdir -p "$DEST"
+cp "$OUT/$ABI/jni/lib/libct2whisper.so" "$DEST/"
+ls -l "$DEST/libct2whisper.so"
+sha256sum "$DEST/libct2whisper.so"

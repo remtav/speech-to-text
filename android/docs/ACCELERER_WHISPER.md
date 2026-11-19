@@ -715,6 +715,10 @@ jetée, trois exécutions notées, une minute de pause entre elles), Whisper lar
 | --- | --- | --- | --- | --- |
 | whisper.cpp | Moteur C/C++ (ggml) avec exemple Android (`examples/whisper.android`), quantifications q5_0/q8_0 (turbo q5_0 : 574 Mo), option `-ac` (contexte audio réduit : même idée que `tailPaddings`) | Incertain : on ne dispose d'aucun chiffre vérifié de turbo sur Android ; un banc tiers cite une grande différence entre moteurs sur Whisper tiny, non reproduit ici. Pas de NPU pour Android dans le README (Core ML pour Apple, VitisAI pour AMD, Vulkan pour GPU) | Élevé : second moteur à côté de sherpa-onnx (JNI, NDK, modèles ggml à héberger et à vérifier par SHA-256), dérive du pipeline VAD/texte | **À écarter** tant que les leviers 1 à 3 n'ont pas été essayés |
 | faster-whisper / CTranslate2 | Moteur Python/C++ pour serveur et PC | — | Pas de version Android officielle trouvée | **À écarter** (déjà utilisable côté serveur personnel, voir `DECISIONS.md`, serveur distant) |
+
+> **Mise à jour #84 (2026-11-19).** CTranslate2 se compile pour arm64-v8a (Ruy, NEON) et tourne dans l'application
+> en essai : voir [`CTRANSLATE2_ANDROID.md`](CTRANSLATE2_ANDROID.md). Exactitude égale ou meilleure à marge égale
+> sur l'hôte ; vitesse sur le téléphone à mesurer.
 | ExecuTorch / LiteRT (Arm AI Portal) | Whisper tiny/small/medium int8 (XNNPACK ExecuTorch, LiteRT) publiés par Arm | Inconnu pour turbo : modèles publiés jusqu'à medium (liste de recherche, non ouverte) | Élevé : autre environnement d'exécution | **À écarter** |
 | NPU Qualcomm (QNN, AI Hub) | Voir section 5 | Élevé en théorie | Très élevé | **Étude séparée** si Whisper devient le modèle courant |
 

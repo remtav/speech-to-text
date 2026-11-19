@@ -20,7 +20,7 @@ import java.io.File
  * Skipped unless both are given:
  *
  *   ./gradlew testDebugUnitTest --tests '*Ct2WhisperHostTest' \
- *       -Pct2HostLib=<sortie>/jniLibs/host -Pct2Model=<dossier du modèle CTranslate2 int8> [-PmodelsDir=…]
+ *       -Pct2HostLib=<sortie>/host-lib -Pct2Model=<dossier du modèle CTranslate2 int8> [-PmodelsDir=…]
  *
  * [againstTheAppWhisper] also needs -PmodelsDir (the app's Whisper, downloaded there by the app's own code).
  *

@@ -5024,3 +5024,18 @@ La Play Console refusait le `.aab` : la fiche existe sous `com.kalmia.stt`, `mai
   personnel date d'après novembre 2023, politique de confidentialité à une adresse publique, formulaire « Sécurité des
   données », déclaration du service de premier plan, classification, captures.
 
+## Issue #84 — Essai CTranslate2 (faster-whisper) sur Android
+
+- **Prototype, pas de décision.** CTranslate2 v4.9.0 compilé pour arm64-v8a (Ruy, NEON, OpenMP et libc++
+  statiques) dans une seule `libct2whisper.so` de 2,4 Mo avec le pont Whisper et le JNI. Rapport :
+  `docs/CTRANSLATE2_ANDROID.md`.
+- **Hors de l'APK normal.** La bibliothèque n'est empaquetée qu'avec `-Pct2Libs=<dossier>` ; le modèle (780 Mo,
+  converti depuis les poids d'OpenAI à une révision fixée) se copie par adb dans le dossier externe de l'app.
+  Rien dans `ModelCatalog`, aucun réglage : l'essai n'apparaît que dans « Comparer les modèles », juste après le
+  Whisper de l'application, sur les mêmes extraits et options, avec un bloc de comparaison dans le rapport.
+- **Même entrée d'encodeur que sherpa-onnx** : audio + `tailPaddings` images de zéros (espace des
+  caractéristiques), pas la fenêtre de 30 s de faster-whisper (3 fois plus lente pour la même exactitude, hôte).
+- **Décision reportée** à la mesure sur le téléphone : sur l'hôte, exactitude 13,1 % contre 14,5 % (172 extraits
+  québécois) et vitesse 1,08 fois moindre avec le CTranslate2 de PyPI ; le chemin Ruy/NEON du téléphone ne se
+  mesure pas sur x86-64.
+
