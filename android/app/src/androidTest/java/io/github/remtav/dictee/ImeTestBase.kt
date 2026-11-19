@@ -36,7 +36,8 @@ abstract class ImeTestBase {
     protected lateinit var scenario: ActivityScenario<TestFieldActivity>
     protected lateinit var factory: ScriptedEngine.Factory
 
-    private val imeId = "${BuildConfig.APPLICATION_ID}/.ime.DicteeImeService"
+    // Full class name: the short ".ime..." form resolves against the applicationId, while the class lives in the namespace.
+    private val imeId = "${BuildConfig.APPLICATION_ID}/${DicteeImeService::class.java.name}"
 
     protected fun shell(cmd: String): String {
         val pfd = instrumentation.uiAutomation.executeShellCommand(cmd)

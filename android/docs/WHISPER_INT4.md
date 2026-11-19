@@ -111,7 +111,7 @@ on ne peut donc pas simplement remplacer les fichiers de Whisper turbo. Procédu
    tailles ; et dans la branche `WHISPER` de `SherpaEngine.buildConfig`, lire les noms de fichiers de l'entrée (`spec.files`)
    au lieu de `turbo-encoder.int8.onnx` / `turbo-decoder.int8.onnx` écrits en dur. Construire l'APK debug (`./gradlew assembleDebug`).
 3. Installer l'APK debug, puis copier les fichiers : `adb push` vers `/data/local/tmp/`, puis
-   `adb shell run-as io.github.remtav.dictee sh -c 'mkdir -p files/models/<id> && cp /data/local/tmp/<fichier> files/models/<id>/'`
+   `adb shell run-as com.kalmia.stt sh -c 'mkdir -p files/models/<id> && cp /data/local/tmp/<fichier> files/models/<id>/'`
    (vérifier le dossier réel de `ModelStore` dans `DicteeApp.kt`), le fichier `turbo-tokens.txt` aussi, puis le marqueur :
    `.verified` contenant une ligne `<sha256>  <nom>` par fichier, dans l'ordre du catalogue.
 4. Dans Réglages > Comparer les modèles : cocher tous les extraits de référence, comparer Whisper turbo (int8) et l'essai, même nombre
