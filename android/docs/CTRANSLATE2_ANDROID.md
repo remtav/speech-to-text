@@ -5,6 +5,8 @@ l'instant** ; elle attend la comparaison sur le téléphone (section 5). L'appli
 la bibliothèque n'entre dans l'APK qu'avec `-Pct2Libs`, et l'essai n'apparaît que dans « Comparer les modèles ».
 
 Outils et procédure : [`android/tools/ctranslate2-android/README.md`](../tools/ctranslate2-android/README.md).
+Modèle converti publié : [huggingface.co/remiavelo/whisper-large-v3-turbo-ct2-int8](https://huggingface.co/remiavelo/whisper-large-v3-turbo-ct2-int8)
+(révision `bda4424`, SHA-256 dans `SHA256SUMS`).
 
 Convention : **[vérifié]** lu ou exécuté ; **[mesuré hôte]** sur x86-64 (4 cœurs partagés), pas sur un
 téléphone ; **[supposé]** à confirmer.

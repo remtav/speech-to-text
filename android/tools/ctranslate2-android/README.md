@@ -46,6 +46,18 @@ pip install ctranslate2==4.9.0 transformers torch --extra-index-url https://down
 ./convertir_modele.sh /tmp/turbo-ct2-int8        # 780 Mo, SHA256SUMS à côté
 ```
 
+Conversion déjà publiée (même commande, même révision) :
+[huggingface.co/remiavelo/whisper-large-v3-turbo-ct2-int8](https://huggingface.co/remiavelo/whisper-large-v3-turbo-ct2-int8),
+révision `bda4424be813aefe0015da536637ccd72f66cf18`, `model.bin` SHA-256
+`7482f978f9493b93b3d0bf68a148a1a62ca02547e8ee981358ff8ef2de8a9418` :
+
+```bash
+B=https://huggingface.co/remiavelo/whisper-large-v3-turbo-ct2-int8/resolve/bda4424be813aefe0015da536637ccd72f66cf18
+mkdir -p /tmp/turbo-ct2-int8 && cd /tmp/turbo-ct2-int8
+for f in model.bin config.json vocabulary.json SHA256SUMS; do curl -fLO "$B/$f"; done
+grep -E 'model.bin|config.json|vocabulary.json' SHA256SUMS | sha256sum -c -
+```
+
 ## 4. Essayer sur le téléphone
 
 ```bash
