@@ -38,7 +38,7 @@ internal object Ct2Native {
 /**
  * Whisper large-v3-turbo on CTranslate2 (issue #84): a trial next to [SherpaEngine], kept out of the model
  * catalog and the visible settings. Only the « Comparer les modèles » screen offers it, and only when the
- * library is packaged and a converted model sits in [Ct2Experiment.modelDir].
+ * library is packaged and the model was downloaded (or copied) where [Ct2Experiment.modelDir] finds it.
  *
  * Same contract as the sherpa-onnx Whisper: 16 kHz mono samples, forced or detected language, greedy decoding,
  * the user's tail padding ([EngineOptions.whisperTailPaddings], zeros in feature space as in sherpa-onnx) and
@@ -150,13 +150,18 @@ data class Ct2Timings(
 
 /**
  * The trial's model (issue #84): Whisper large-v3-turbo converted to CTranslate2 int8 by
- * `android/tools/ctranslate2-android/convertir_modele.sh`, copied by hand (adb) to [modelDir]. Not in
- * [ModelCatalog]: nothing to download, no card, no setting.
+ * `android/tools/ctranslate2-android/convertir_modele.sh`, published at [REPO] (public, MIT). The comparison
+ * screen downloads it through [ModelStore] (resume, SHA-256 of each file) when the library is in the APK.
+ * Not in [ModelCatalog]: no card, no setting, never a dictation model.
  */
 object Ct2Experiment {
     const val MODEL_ID = "whisper-large-v3-turbo-ct2-int8"
 
-    /** Files the bridge reads; the converter also writes tokenizer.json and preprocessor_config.json. */
+    const val REPO = "https://huggingface.co/remiavelo/whisper-large-v3-turbo-ct2-int8"
+    /** Pinned revision: a later push to the repository cannot change what the app downloads. */
+    private const val BASE = "$REPO/resolve/bda4424be813aefe0015da536637ccd72f66cf18"
+
+    /** Files the bridge reads; the repository also holds tokenizer.json and preprocessor_config.json. */
     val REQUIRED_FILES = listOf("model.bin", "config.json", "vocabulary.json")
 
     val spec = ModelSpec(
@@ -168,17 +173,30 @@ object Ct2Experiment {
         family = ModelFamily.WHISPER,
         description = "Essai #84 : moteur de faster-whisper (CTranslate2), int8, CPU NEON.",
         license = "MIT",
-        files = emptyList(),
+        files = listOf(
+            ModelFile("model.bin", "$BASE/model.bin",
+                "7482f978f9493b93b3d0bf68a148a1a62ca02547e8ee981358ff8ef2de8a9418", 814054531),
+            ModelFile("config.json", "$BASE/config.json",
+                "b0253ea6c0d3bea6b1e19e91a02acfd3b53f4467362efcb5a3e6b16c9b3a9b7e", 2263),
+            ModelFile("vocabulary.json", "$BASE/vocabulary.json",
+                "c69260f2ab26d659b7c398f9a2b2b48ed0df16c3b47d7326782fd9cba71690c1", 1068114),
+        ),
     )
 
     /**
-     * `/sdcard/Android/data/<applicationId>/files/ct2/whisper-large-v3-turbo-int8` for [externalFilesDir]
-     * = `Context.getExternalFilesDir(null)`: `adb push` reaches it on any build, no root, no run-as.
+     * Where the model is: the app's download ([ModelStore], verified) first, else a copy pushed by hand to
+     * `/sdcard/Android/data/<applicationId>/files/ct2/whisper-large-v3-turbo-int8` ([externalFilesDir] =
+     * `Context.getExternalFilesDir(null)`); null when neither holds it.
      */
-    fun modelDir(externalFilesDir: File?): File? =
-        externalFilesDir?.let { File(it, "ct2/whisper-large-v3-turbo-int8") }
+    fun modelDir(store: ModelStore, externalFilesDir: File?): File? {
+        if (store.isInstalled(spec)) return store.dirFor(MODEL_ID)
+        return externalFilesDir?.let { File(it, "ct2/whisper-large-v3-turbo-int8") }?.takeIf { hasModel(it) }
+    }
 
     fun hasModel(dir: File?): Boolean = dir != null && REQUIRED_FILES.all { File(dir, it).isFile }
+
+    /** The APK carries libct2whisper.so (built with `-Pct2Libs`): only then is the trial offered at all. */
+    val libraryAvailable: Boolean get() = Ct2Native.available
 
     /** The trial can run: library packaged and loaded, model present. */
     fun isReady(dir: File?): Boolean = Ct2Native.available && hasModel(dir)

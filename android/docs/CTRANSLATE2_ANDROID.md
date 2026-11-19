@@ -2,7 +2,8 @@
 
 Statut : 2026-11-19, **prototype fonctionnel, mesure sur le téléphone à faire**. Décision : **aucune pour
 l'instant** ; elle attend la comparaison sur le téléphone (section 5). L'application normale est inchangée :
-la bibliothèque n'entre dans l'APK qu'avec `-Pct2Libs`, et l'essai n'apparaît que dans « Comparer les modèles ».
+la bibliothèque n'entre dans l'APK qu'avec `-Pct2Libs`, et l'essai n'apparaît que dans « Comparer les modèles »,
+qui propose alors de télécharger le modèle (780 Mo, révision fixée, SHA-256 vérifié).
 
 Outils et procédure : [`android/tools/ctranslate2-android/README.md`](../tools/ctranslate2-android/README.md).
 Modèle converti publié : [huggingface.co/remiavelo/whisper-large-v3-turbo-ct2-int8](https://huggingface.co/remiavelo/whisper-large-v3-turbo-ct2-int8)
@@ -48,7 +49,8 @@ téléphone ; **[supposé]** à confirmer.
 - **Garde-fou** : au plus 15 jetons par seconde d'audio (+ 8). Le filtre de répétition de « Automatique »
   (`WhisperRepetition`, issue #49) s'applique, sans la règle du plafond de 6 jetons/s, propre à sherpa-onnx.
 - Kotlin : `stt/Ct2WhisperEngine.kt` (`Ct2Native`, `Ct2WhisperEngine`, `Ct2Experiment`), une ligne dans
-  `DefaultEngineFactory`, l'ajout à `CompareActivity`. Pas d'entrée dans `ModelCatalog`, aucun réglage.
+  `DefaultEngineFactory`, l'ajout à `CompareActivity` (section « Essai CTranslate2 » : téléchargement par
+  `ModelStore` et `Downloads`, comme les autres modèles). Pas d'entrée dans `ModelCatalog`, aucun réglage.
 
 ## 3. Mesures hôte (x86-64, 4 threads, langue fr forcée)
 

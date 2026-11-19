@@ -33,6 +33,7 @@ import io.github.remtav.dictee.stt.ModelCatalog
 import io.github.remtav.dictee.stt.ModelFamily
 import io.github.remtav.dictee.stt.ModelResult
 import io.github.remtav.dictee.stt.ModelSpec
+import io.github.remtav.dictee.stt.asDownloadable
 import io.github.remtav.dictee.stt.WhisperTuning
 import java.util.Locale
 import kotlin.concurrent.thread
@@ -55,6 +56,8 @@ class CompareActivity : AppCompatActivity() {
     private var report = ""
     @Volatile private var recordingNow = false
     @Volatile private var busy = false
+    private var ct2Box: LinearLayout? = null
+    private val ct2Refresh = { renderCt2() }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -75,6 +78,16 @@ class CompareActivity : AppCompatActivity() {
         recordInfo = col.body(getString(R.string.compare_no_recording), small = true)
         recordButton = col.button(getString(R.string.compare_record)) { toggleRecording() }
 
+        // Issue #84: the CTranslate2 trial's model, downloadable here only when the APK carries the library.
+        if (Ct2Experiment.libraryAvailable) {
+            col.heading(getString(R.string.compare_ct2_heading))
+            col.body(getString(R.string.compare_ct2_intro), small = true)
+            ct2Box = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+            col.addView(ct2Box)
+            renderCt2()
+            Downloads.addListener(ct2Refresh)
+        }
+
         col.heading(getString(R.string.compare_run_heading))
         runButton = col.button(getString(R.string.compare_run)) { runComparison() }.apply { tag = TAG_RUN }
         progress = col.body("", small = true).apply { tag = TAG_PROGRESS }
@@ -83,6 +96,44 @@ class CompareActivity : AppCompatActivity() {
         col.row().apply {
             button(getString(R.string.compare_share), outlined = true) { share() }.spaced()
             button(getString(R.string.compare_copy), outlined = true) { copy() }
+        }
+    }
+
+    override fun onDestroy() {
+        Downloads.removeListener(ct2Refresh)
+        super.onDestroy()
+    }
+
+    /** State of the trial's model: download progress, installed (with Delete), or the Download button. */
+    private fun renderCt2() {
+        val box = ct2Box ?: return
+        box.removeAllViews()
+        val spec = Ct2Experiment.spec
+        val id = spec.id
+        val installed = app.store.isInstalled(spec)
+        val st = Downloads.status[id]
+        box.body(
+            when {
+                Downloads.isBusy(id) && st != null ->
+                    getString(R.string.setup_downloading, st.percent, SizeFormat.format(st.downloaded), SizeFormat.format(st.total))
+                st?.error != null -> getString(R.string.setup_download_error, st.error)
+                installed -> getString(R.string.setup_installed, SizeFormat.format(spec.totalBytes))
+                else -> getString(R.string.setup_not_installed, SizeFormat.format(spec.totalBytes))
+            },
+            small = true,
+        ).apply { if (!Downloads.isBusy(id) && st?.error != null) markError() }
+        box.row().apply {
+            when {
+                Downloads.isBusy(id) -> button(getString(R.string.cancel), outlined = true) { Downloads.cancel(id) }
+                installed -> button(getString(R.string.delete), outlined = true) {
+                    if (!busy) { app.store.delete(spec); renderCt2() }
+                }
+                else -> button(getString(R.string.download)) {
+                    Downloads.start(this@CompareActivity, spec.asDownloadable(),
+                        getString(R.string.setup_downloading_label, spec.displayName))
+                    renderCt2()
+                }
+            }.apply { tag = TAG_CT2_ACTION }
         }
     }
 
@@ -140,9 +191,9 @@ class CompareActivity : AppCompatActivity() {
         recording?.let { samples += BenchSample("enregistrement", "?", it, null) }
         // Issue #22: the models offered for the languages (Parakeet and Whisper), and the user's server only when
         // dictations go to it (address and "server" mode, issue #57): an address alone sends nothing.
-        // Issue #84: the CTranslate2 trial joins only when its library is in the APK and its model was copied
-        // by hand (adb); it never shows up otherwise.
-        val ct2Dir = Ct2Experiment.modelDir(getExternalFilesDir(null))
+        // Issue #84: the CTranslate2 trial joins only when its library is in the APK and its model was downloaded
+        // (section above) or copied by hand (adb); it never shows up otherwise.
+        val ct2Dir = Ct2Experiment.modelDir(app.store, getExternalFilesDir(null))
         val ct2 = Ct2Experiment.spec.takeIf { Ct2Experiment.isReady(ct2Dir) }
         // The trial is measured against the app's Whisper (sherpa-onnx) right before it, whatever the languages,
         // so the two run on the same samples with the same options.
@@ -264,6 +315,8 @@ class CompareActivity : AppCompatActivity() {
     companion object {
         /** Who holds `DicteeApp.benchmark` during a comparison. */
         const val HOLDER = "comparer"
+        /** Download / Cancel / Delete of the CTranslate2 trial's model (issue #84). */
+        const val TAG_CT2_ACTION = "compare_ct2_action"
         /** « Lancer la comparaison ». */
         const val TAG_RUN = "compare_run"
         /** The progress line (also where a refused run says why). */

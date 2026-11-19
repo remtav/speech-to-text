@@ -64,6 +64,16 @@ grep -E 'model.bin|config.json|vocabulary.json' SHA256SUMS | sha256sum -c -
 cd android
 ./gradlew assembleDebug -Pct2Libs=/tmp/ct2out/jniLibs
 adb install -r app/build/outputs/apk/debug/app-debug.apk
+```
+
+Dans l'application : Réglages → « Comparer les modèles » → section « Essai CTranslate2 » → **Télécharger**
+(780 Mo, depuis le dépôt Hugging Face ci-dessus, révision fixée, chaque fichier vérifié par SHA-256, reprise
+possible, comme les autres modèles). « Supprimer » le retire. La section n'existe que dans un APK construit avec
+`-Pct2Libs`.
+
+Variante sans téléchargement dans l'application (copie à la main, utilisée si le modèle n'est pas téléchargé) :
+
+```bash
 D=/sdcard/Android/data/com.kalmia.stt/files/ct2/whisper-large-v3-turbo-int8
 adb shell mkdir -p $D
 adb push /tmp/turbo-ct2-int8/model.bin /tmp/turbo-ct2-int8/config.json /tmp/turbo-ct2-int8/vocabulary.json $D/
@@ -87,7 +97,7 @@ et copier le rapport dans l'issue.
 # Pont C++ (Ruy en noyaux portables sur x86-64 : texte fiable, temps non représentatifs)
 /tmp/ct2out/host/jni/bin/ct2_whisper_cli /tmp/turbo-ct2-int8 4 1000 fr ../../app/src/main/assets/reference/fr1.wav
 # Moteur Kotlin
-./gradlew testDebugUnitTest --tests '*Ct2WhisperHostTest' -Pct2HostLib=/tmp/ct2out/host-lib -Pct2Model=/tmp/turbo-ct2-int8
+./gradlew testDebugUnitTest --tests '*Ct2*' -Pct2HostLib=/tmp/ct2out/host-lib -PmodelsDir=/tmp/dictee-models  # télécharge comme l'app
 # Banc Python (CTranslate2 de PyPI, oneDNN/MKL sur x86-64), jeu de 172 extraits de ../jeu-quebecois
 pip install faster-whisper sherpa-onnx==2.0.1 soundfile
 python banc_hote.py qc172 4 1 '*' sherpa1000=sherpa:enc.onnx,dec.onnx,tokens.txt,1000 ct2_1000=ct2:/tmp/turbo-ct2-int8,1000

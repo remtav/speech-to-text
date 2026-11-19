@@ -20,8 +20,9 @@ import java.io.File
  * Skipped unless both are given:
  *
  *   ./gradlew testDebugUnitTest --tests '*Ct2WhisperHostTest' \
- *       -Pct2HostLib=<sortie>/host-lib -Pct2Model=<dossier du modèle CTranslate2 int8> [-PmodelsDir=…]
+ *       -Pct2HostLib=<sortie>/host-lib [-Pct2Model=<dossier du modèle CTranslate2 int8>] [-PmodelsDir=…]
  *
+ * The model comes from -Pct2Model, or else is downloaded into -PmodelsDir like on the phone (see [assumeReady]).
  * [againstTheAppWhisper] also needs -PmodelsDir (the app's Whisper, downloaded there by the app's own code).
  *
  * The host library is the same code as the arm64-v8a one; on x86-64 Ruy runs its portable kernels, so the
@@ -29,11 +30,18 @@ import java.io.File
  */
 class Ct2WhisperHostTest {
 
-    private val modelDir: File? = System.getProperty("dictee.ct2Model")?.let { File(it) }
+    private var modelDir: File? = System.getProperty("dictee.ct2Model")?.let { File(it) }
 
+    /**
+     * Without -Pct2Model, the model is downloaded into -PmodelsDir by the app's own downloader ([Host.ensureModel]:
+     * ModelStore, resume, SHA-256 of each file), as the comparison screen does on the phone.
+     */
     private fun assumeReady() {
         assumeTrue("set -Pct2HostLib=... (libct2whisper.so for the host): ${Ct2Native.loadError}", Ct2Native.available)
-        assumeTrue("set -Pct2Model=... (Whisper turbo converted to CTranslate2 int8)", Ct2Experiment.hasModel(modelDir))
+        if (modelDir == null && Host.modelsDir != null) {
+            modelDir = Host.ensureModel(Ct2Experiment.spec).dirFor(Ct2Experiment.MODEL_ID)
+        }
+        assumeTrue("set -Pct2Model=... or -PmodelsDir=... (Whisper turbo in CTranslate2 int8)", Ct2Experiment.hasModel(modelDir))
     }
 
     @Test

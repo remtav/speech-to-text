@@ -240,6 +240,8 @@
     <string name="compare_done">Terminé.</string>
     <string name="compare_nothing">Installez au moins un modèle et choisissez un audio.</string>
     <string name="compare_error">Erreur : %1$s</string>
+    <string name="compare_ct2_heading">Essai CTranslate2 (moteur de faster-whisper)</string>
+    <string name="compare_ct2_intro">Essai de l\'issue #84 : le même Whisper large-v3-turbo, sur un autre moteur. Une fois le modèle téléchargé, « Lancer la comparaison » le mesure juste après le Whisper de l\'application, sur les mêmes extraits, et le rapport compare les deux.</string>
     <string name="compare_summary">Chargement %1$.2f s · RTF %2$.3f · mémoire en pointe %3$d Mo · WER %4$s</string>
     <string name="compare_share">Partager</string>
     <string name="compare_copy">Copier</string>

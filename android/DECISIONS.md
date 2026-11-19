@@ -5029,8 +5029,10 @@ La Play Console refusait le `.aab` : la fiche existe sous `com.kalmia.stt`, `mai
 - **Prototype, pas de décision.** CTranslate2 v4.9.0 compilé pour arm64-v8a (Ruy, NEON, OpenMP et libc++
   statiques) dans une seule `libct2whisper.so` de 2,4 Mo avec le pont Whisper et le JNI. Rapport :
   `docs/CTRANSLATE2_ANDROID.md`.
-- **Hors de l'APK normal.** La bibliothèque n'est empaquetée qu'avec `-Pct2Libs=<dossier>` ; le modèle (780 Mo,
-  converti depuis les poids d'OpenAI à une révision fixée) se copie par adb dans le dossier externe de l'app.
+- **Hors de l'APK normal.** La bibliothèque n'est empaquetée qu'avec `-Pct2Libs=<dossier>`. Le modèle (780 Mo,
+  converti depuis les poids d'OpenAI à une révision fixée) est publié sur huggingface.co/remiavelo/
+  whisper-large-v3-turbo-ct2-int8 ; « Comparer les modèles » le télécharge (révision fixée, SHA-256 par fichier,
+  `ModelStore`) ; une copie par adb dans le dossier externe de l'app reste possible.
   Rien dans `ModelCatalog`, aucun réglage : l'essai n'apparaît que dans « Comparer les modèles », juste après le
   Whisper de l'application, sur les mêmes extraits et options, avec un bloc de comparaison dans le rapport.
 - **Même entrée d'encodeur que sherpa-onnx** : audio + `tailPaddings` images de zéros (espace des

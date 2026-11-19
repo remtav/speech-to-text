@@ -29,6 +29,20 @@ class Ct2ComparisonTest {
         assertTrue(text, text.contains("TOTAL 2 extrait(s) · sherpa 6.00 s · CTranslate2 3.00 s · vitesse ×2.00 · WER moyen 5.0 % → 15.0 %"))
     }
 
+    /** The download the comparison screen offers: the files the bridge reads, at a pinned revision, with hashes. */
+    @Test
+    fun theTrialModelIsDownloadableAndPinned() {
+        val files = Ct2Experiment.spec.files
+        assertTrue(files.map { it.path } == Ct2Experiment.REQUIRED_FILES)
+        for (f in files) {
+            assertTrue(f.url, f.url.startsWith("${Ct2Experiment.REPO}/resolve/bda4424be813aefe0015da536637ccd72f66cf18/"))
+            assertTrue(f.sha256, Regex("[0-9a-f]{64}").matches(f.sha256))
+            assertTrue(f.size > 0)
+        }
+        // Never in the catalog: no card, no setting, never a dictation model.
+        assertTrue(ModelCatalog.all.none { it.id == Ct2Experiment.MODEL_ID })
+    }
+
     @Test
     fun nothingWhenARunFailedOrNoSampleIsShared() {
         val reference = result(ModelCatalog.whisperTurbo, sample("fr1", 4000, 0.1))
