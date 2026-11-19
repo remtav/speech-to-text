@@ -617,6 +617,28 @@ cd android
 ./gradlew connectedDebugAndroidTest  # tests du clavier sur émulateur/appareil
 ```
 
+### SDK Android sans Android Studio (sessions Claude Code, machine sans IDE)
+
+JDK 17 et SDK Android en espace utilisateur (sans root) ; Gradle (8.14.3)
+est téléchargé par `./gradlew`, le NDK n'est pas requis. L'émulateur
+(`connectedDebugAndroidTest`) reste réservé à la CI.
+
+```bash
+export ANDROID_HOME=$HOME/Android            # ou /opt/android-sdk en root
+mkdir -p "$ANDROID_HOME/cmdline-tools"
+curl -fsSLo /tmp/clt.zip https://dl.google.com/android/repository/commandlinetools-linux-13114758_latest.zip
+unzip -q /tmp/clt.zip -d "$ANDROID_HOME/cmdline-tools"
+mv "$ANDROID_HOME/cmdline-tools/cmdline-tools" "$ANDROID_HOME/cmdline-tools/latest"
+yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null
+"$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" \
+    "platform-tools" "platforms;android-36" "build-tools;36.0.0"
+echo "sdk.dir=$ANDROID_HOME" > android/local.properties   # ignoré par git
+```
+
+Pour un environnement cloud Claude Code dédié au dépôt, ces commandes
+servent de *Setup script* (avec `ANDROID_HOME=/opt/android-sdk` en variable
+d'environnement) ; voir l'issue #125.
+
 ### Clé de signature des releases
 
 Les releases sont signées par une clé privée que seule la CI utilise, fournie
