@@ -144,8 +144,13 @@ class CompareActivity : AppCompatActivity() {
         // by hand (adb); it never shows up otherwise.
         val ct2Dir = Ct2Experiment.modelDir(getExternalFilesDir(null))
         val ct2 = Ct2Experiment.spec.takeIf { Ct2Experiment.isReady(ct2Dir) }
-        val models = EngineChoice.comparedModels(ModelCatalog.offered(app.settings.languages), app.settings.serverInUse)
-            .filter { app.isInstalled(it) } + listOfNotNull(ct2)
+        // The trial is measured against the app's Whisper (sherpa-onnx) right before it, whatever the languages,
+        // so the two run on the same samples with the same options.
+        val offered = EngineChoice.comparedModels(ModelCatalog.offered(app.settings.languages), app.settings.serverInUse)
+            .filter { app.isInstalled(it) }
+        val models = if (ct2 == null) offered else
+            offered.filter { it != ModelCatalog.whisperTurbo } +
+                listOfNotNull(ModelCatalog.whisperTurbo.takeIf { app.isInstalled(it) }) + ct2
         if (models.isEmpty() || samples.isEmpty()) {
             Toast.makeText(this, R.string.compare_nothing, Toast.LENGTH_LONG).show()
             return
@@ -197,6 +202,16 @@ class CompareActivity : AppCompatActivity() {
                     } ?: "") +
                     (ct2?.let { " · ${Ct2Experiment.describe(ct2Dir)}" } ?: "")
                 report = Benchmark.report(results, header) { spec -> app.engineOptions(spec).whisperRepetitionFix != null }
+                if (ct2 != null) {
+                    val reference = results.firstOrNull { it.spec == ModelCatalog.whisperTurbo }
+                    val trial = results.first { it.spec == ct2 }
+                    val versus = reference?.let { Ct2Experiment.comparison(it, trial) }
+                        ?: "== CTranslate2 : pas de comparaison, ${
+                            if (reference == null) "le Whisper de l'application n'est pas installé" else "une des deux mesures a échoué"
+                        }"
+                    report += versus + "\n"
+                    main.post { resultsBox.card().body(versus) }
+                }
                 main.post {
                     progress.text = getString(R.string.compare_done)
                     runButton.isEnabled = true

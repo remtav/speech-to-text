@@ -57,10 +57,17 @@ adb shell mkdir -p $D
 adb push /tmp/turbo-ct2-int8/model.bin /tmp/turbo-ct2-int8/config.json /tmp/turbo-ct2-int8/vocabulary.json $D/
 ```
 
-Puis Réglages → « Comparer les modèles » : « Whisper large-v3-turbo · CTranslate2 (essai) » s'ajoute à la
-liste, à côté du Whisper de sherpa-onnx s'il est installé, avec les mêmes options (threads, langue forcée,
-silence ajouté, mode « Automatique »). L'en-tête du rapport dit `ISA NEON` quand les noyaux NEON sont actifs.
-Sans la bibliothèque ou sans le modèle, l'écran ne montre rien de nouveau.
+Installer aussi le Whisper normal de l'application (sherpa-onnx), c'est la référence. Puis Réglages →
+« Comparer les modèles » : le Whisper de l'application est mesuré, puis « Whisper large-v3-turbo ·
+CTranslate2 (essai) » juste après, sur les mêmes extraits, avec les mêmes options (threads, langue forcée,
+silence ajouté, mode « Automatique »). Le rapport finit par un bloc « CTranslate2 face au Whisper de
+l'application » : temps de chaque extrait pour les deux moteurs, rapport de vitesse (×2,00 = CTranslate2 deux
+fois plus rapide), WER avant → après, textes différents, chargement et mémoire. L'en-tête dit `ISA NEON` quand
+les noyaux NEON sont actifs. Sans la bibliothèque ou sans le modèle, l'écran ne montre rien de nouveau.
+
+Pour la mesure de l'issue : cocher les extraits de référence, enregistrer en plus un mot isolé (~1 s,
+« friperie »), une phrase (~5 s) et un long segment (~20 à 30 s), relancer avec 2, 4 et 6 threads (Réglages),
+et copier le rapport dans l'issue.
 
 ## 5. Mesurer sur l'hôte
 

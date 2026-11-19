@@ -2,6 +2,7 @@ package io.github.remtav.dictee.stt
 
 import io.github.remtav.dictee.text.WhisperRepetition
 import java.io.File
+import java.util.Locale
 
 /**
  * JNI entry points of `libct2whisper.so` (issue #84, experimental): CTranslate2, the engine of
@@ -181,6 +182,48 @@ object Ct2Experiment {
 
     /** The trial can run: library packaged and loaded, model present. */
     fun isReady(dir: File?): Boolean = Ct2Native.available && hasModel(dir)
+
+    /**
+     * The trial against the app's Whisper ([reference]: sherpa-onnx, `turbo-*.int8.onnx`), sample by sample, on
+     * the same phone, samples, threads and options: the measure the issue's decision rests on. Null when either
+     * run failed or they share no sample. Speed ratio > 1: CTranslate2 is faster.
+     */
+    fun comparison(reference: ModelResult, trial: ModelResult): String? {
+        if (reference.error != null || trial.error != null) return null
+        val byName = reference.samples.associateBy { it.sample }
+        val pairs = trial.samples.mapNotNull { t -> byName[t.sample]?.let { it to t } }
+        if (pairs.isEmpty()) return null
+        fun pct(w: Double?) = w?.let { String.format(Locale.ROOT, "%.1f %%", it * 100) } ?: "—"
+        fun ratio(ref: Long, trial: Long) = if (trial > 0) String.format(Locale.ROOT, "×%.2f", ref.toDouble() / trial) else "—"
+        return buildString {
+            appendLine("== CTranslate2 face au Whisper de l'application (sherpa-onnx), mêmes extraits et réglages")
+            for ((r, t) in pairs) {
+                appendLine(
+                    String.format(
+                        Locale.ROOT, "   [%s] %.1f s audio · sherpa %.2f s · CTranslate2 %.2f s · vitesse %s · WER %s → %s",
+                        t.sample, t.audioSeconds, r.decodeMillis / 1000f, t.decodeMillis / 1000f,
+                        ratio(r.decodeMillis, t.decodeMillis), pct(r.wer), pct(t.wer),
+                    ) + if (r.text != t.text) " · textes différents" else "",
+                )
+            }
+            val refMs = pairs.sumOf { it.first.decodeMillis }
+            val trialMs = pairs.sumOf { it.second.decodeMillis }
+            val refWer = pairs.mapNotNull { it.first.wer }.takeIf { it.isNotEmpty() }?.average()
+            val trialWer = pairs.mapNotNull { it.second.wer }.takeIf { it.isNotEmpty() }?.average()
+            appendLine(
+                String.format(
+                    Locale.ROOT, "   TOTAL %d extrait(s) · sherpa %.2f s · CTranslate2 %.2f s · vitesse %s · WER moyen %s → %s",
+                    pairs.size, refMs / 1000f, trialMs / 1000f, ratio(refMs, trialMs), pct(refWer), pct(trialWer),
+                ),
+            )
+            append(
+                String.format(
+                    Locale.ROOT, "   chargement %.2f s → %.2f s · mémoire en pointe %d Mo → %d Mo",
+                    reference.loadMillis / 1000f, trial.loadMillis / 1000f, reference.peakRssMb, trial.peakRssMb,
+                ),
+            )
+        }
+    }
 
     /** One line for the comparison report: library state and, when loaded, what CTranslate2 dispatches to. */
     fun describe(dir: File?): String = when {
