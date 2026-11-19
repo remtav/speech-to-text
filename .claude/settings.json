@@ -1,0 +1,14 @@
+{
+  "extraKnownMarketplaces": {
+    "outils-claude": {
+      "source": {
+        "source": "github",
+        "repo": "remtav/outils-claude"
+      },
+      "autoUpdate": true
+    }
+  },
+  "enabledPlugins": {
+    "vagues@outils-claude": true
+  }
+}
