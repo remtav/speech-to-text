@@ -69,6 +69,19 @@ def match_token(candidate, tokens):
     return found
 
 
+def websocket_owner(websocket, settings):
+    """``(ok, owner)`` for a WebSocket handshake.
+
+    The HTTP middleware of ``install`` does not see WebSockets, so a WebSocket route checks the
+    token itself. Without DICTEE_TOKENS: ``(True, None)``.
+    """
+    if not settings.auth_required:
+        return True, None
+    token = bearer_token(websocket)
+    ok = match_token(token, settings.tokens)
+    return ok, (token_id(token) if ok else None)
+
+
 class RateLimiter:
     """Sliding one-minute window per key, in memory (one server process)."""
 
