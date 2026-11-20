@@ -33,3 +33,4 @@ Une ligne par événement, ajoutée **à la fin** du fichier (jamais de modifica
 Le journal est commité directement sur `main` par la session principale de `/vagues:vague` (voir « Écrire une ligne au journal » dans la commande `vague` du plugin vagues). Il est sous `.claude/`, en principe hors des chemins de la CI du projet : ses commits ne devraient déclencher aucune CI.
 
 ## Événements
+- 2026-11-20T03:21Z | vague 1 | ouverte | prévus 6
