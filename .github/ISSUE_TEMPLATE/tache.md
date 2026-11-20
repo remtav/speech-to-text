@@ -1,6 +1,6 @@
 ---
 name: Tâche
-about: Une unité de travail implémentable seule, préparée (/vagues:preparer-issue, étiquette prête) pour une vague (/vagues:vague)
+about: Une unité de travail implémentable seule, préparée (/kalmia:preparer-issue, étiquette prête) pour une vague (/kalmia:vague)
 labels: []
 ---
 
