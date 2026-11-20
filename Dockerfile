@@ -31,7 +31,7 @@ COPY --from=buildinfo /build-info.json ./app/build-info.json
 COPY templates/ ./templates/
 COPY static/ ./static/
 
-ENV WHISPER_MODEL=base
+ENV WHISPER_MODEL=large-v3
 ENV WHISPER_PORT=8081
 ENV PYTHONUNBUFFERED=1
 # CTranslate2 (faster-whisper) loads cuDNN/cuBLAS from the pip-installed NVIDIA wheels

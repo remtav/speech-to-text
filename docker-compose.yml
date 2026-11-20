@@ -7,7 +7,10 @@ services:
     ports:
       - "8081:8081"
     environment:
-      - WHISPER_MODEL=base
+      # Model and device: from the shell or `--env-file` (docs/DEPLOIEMENT_SERVEUR.md);
+      # the server falls back to the CPU when CUDA is missing.
+      - WHISPER_MODEL=${WHISPER_MODEL:-large-v3}
+      - WHISPER_DEVICE=${WHISPER_DEVICE:-cuda}
       - WHISPER_PORT=8081
       # Speaker diarization: Hugging Face token with the pyannote model terms accepted.
       # Optional: the token can also be added from the web UI (saved in the model-cache volume).

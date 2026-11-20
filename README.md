@@ -419,7 +419,7 @@ Set environment variables in `.env` or at startup:
 | Variable            | Default                                         | Description                    |
 |---------------------|-------------------------------------------------|--------------------------------|
 | `WHISPER_PORT`      | `8081`                                          | HTTP server port               |
-| `WHISPER_MODEL`     | `base`                                          | Whisper model name             |
+| `WHISPER_MODEL`     | `large-v3`                                      | Whisper model name             |
 | `WHISPER_DEVICE`    | `cpu`                                           | Inference device (`cpu`/`cuda`)|
 | `WHISPER_COMPUTE_TYPE` | `float16` on GPU, `int8` on CPU              | CTranslate2 compute type (`float16`, `int8_float16`, `int8`, `float32`) |
 | `WHISPER_BATCH_SIZE`| `16`                                            | Batch size for VAD chunks (lower it if GPU runs out of memory) |
@@ -462,7 +462,9 @@ Whisper models run through faster-whisper (CTranslate2), which is faster and lig
 | `medium` | 769M    | Slow    | Excellent|
 | `large-v3-turbo` | 809M | Fast | Near large-v3 |
 | `large-v2`| 1550M  | Slowest | Best     |
-| `large` / `large-v3`| 1550M  | Slowest | Best     |
+| `large` / `large-v3` (default)| 1550M  | Slowest | Best     |
+
+On CPU, large-v3 is very slow: set `WHISPER_MODEL=small` or `base` there.
 
 Word alignment additionally downloads a ~360 MB–1.2 GB wav2vec2 model per language (first use), and diarization a ~30 MB pyannote pipeline.
 
@@ -543,7 +545,7 @@ If you don't want to use `docker compose` or have a custom image/tag, you can st
 
 ```bash
 docker run -d --name whisper --gpus all -p 8081:8081 \
-  -e WHISPER_MODEL=base \
+  -e WHISPER_MODEL=large-v3 \
   -e WHISPER_DEVICE=cuda \
   -e WHISPER_PORT=8081 \
   -e FFMPEG_PATH=/usr/bin/ffmpeg \

@@ -64,7 +64,7 @@ class TestHealth:
                     "diarization_available", "diarize_default", "valid_models", "languages", "busy"):
             assert key in data
         assert data["status"] in ("green", "yellow", "red")
-        assert data["model"] == "base"
+        assert data["model"] == "large-v3"
         assert data["device"] == "cpu"
 
     def test_health_reports_settings(self, make_client):
@@ -132,12 +132,13 @@ class TestSwitchModel:
         assert response.status_code == 400
 
     def test_load_failure(self, client, monkeypatch):
+        assert client.post("/switch-model", json={"model": "small", "device": "cpu"}).status_code == 200
         monkeypatch.setenv("FAKE_ENGINE_LOAD_FAILS", "1")
         with patch.object(app.main.system, "cuda_available", return_value=True):
             response = client.post("/switch-model", json={"model": "large-v3", "device": "cuda"})
         assert response.status_code == 500
         assert "out of memory" in response.json()["detail"]
-        assert client.get("/health").json()["model"] == "base"  # unchanged
+        assert client.get("/health").json()["model"] == "small"  # unchanged
 
     def test_no_wait_returns_job(self, client):
         response = client.post("/switch-model", json={"model": "small", "device": "cpu", "wait": False})
