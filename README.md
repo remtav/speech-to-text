@@ -173,6 +173,33 @@ curl -F "file=@recording.webm" http://localhost:8081/transcribe
 Fast transcription with language detection, skipping alignment and diarization. Returns `text`, `language`,
 `language_probability` and `task`. Takes `language`, `languages` and `polish` as `/transcribe`.
 
+### WebSocket `/ws/stream`
+
+Live text while dictating (the Android keyboard uses it). The client sends audio, the server answers with
+confirmed text (stable) and provisional text (may still change).
+
+- **Handshake**: `Authorization: Bearer <token>` when `DICTEE_TOKENS` is set. Refused before the upgrade:
+  close `1008` (missing or wrong token), `1013` (streaming off with `STREAM_MAX_SESSIONS=0`, too many
+  sessions, or rate limit: opening counts as one request).
+- **Client to server**: first a text message `{"type": "start", "language": "fr" | null, "languages": ["fr", "en"], "prompt": ""}`
+  (within 10 s); then binary messages of PCM 16-bit little-endian, mono, 16 kHz (any even length);
+  finally `{"type": "stop"}`.
+- **Server to client**: `{"type": "ready", "step_ms": 1000}` after a valid `start`;
+  `{"type": "update", "committed": "...", "provisional": "...", "audio_ms": 12345}` whenever a pass changes the text;
+  `{"type": "final", "text": "..."}` after `stop` (then close `1000`);
+  `{"type": "error", "message": "..."}` then close `1003` (no or invalid `start`, unsupported language),
+  `1009` (more than `STREAM_MAX_SECONDS` of audio) or `1011` (engine error).
+
+Passes run on the same dispatcher thread as the jobs: before the queued jobs, never interrupting the running
+one (a long transcription delays them). They are not jobs: nothing in `GET /jobs` or `/progress`. No audio or
+text is logged or kept after the session.
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `STREAM_STEP_SECONDS` | `1` | Seconds (0.25-5) between two passes of a session |
+| `STREAM_MAX_SESSIONS` | `2` | Simultaneous sessions (0-64); `0` turns streaming off |
+| `STREAM_MAX_SECONDS`  | `360` | Audio accepted per session (10-3600) |
+
 ### Jobs
 
 | Method & path                     | Description |
@@ -417,6 +444,9 @@ Set environment variables in `.env` or at startup:
 | `POLISH_LOG`        | *(unset)*                                       | Path to the local JSONL tuning log (contains transcripts; ignored when `DICTEE_TOKENS` is set) |
 | `DICTEE_TOKENS`     | *(unset: no authentication)*                    | Comma-separated access tokens. When set, every route except `/`, `/healthz` and `/static/` needs `Authorization: Bearer <token>` (401 otherwise) and each token only sees its own jobs. Set it before exposing the server to the internet: see [docs/DEPLOIEMENT_SERVEUR.md](docs/DEPLOIEMENT_SERVEUR.md) |
 | `DICTEE_RATE_LIMIT` | `30`                                            | With `DICTEE_TOKENS`: transcription / model requests per minute and per token (429 beyond); `0` = no limit. Polling a job is not counted |
+| `STREAM_STEP_SECONDS` | `1`                                           | Seconds between two passes of a `/ws/stream` session (0.25-5) |
+| `STREAM_MAX_SESSIONS` | `2`                                           | Simultaneous `/ws/stream` sessions (0-64); `0` = streaming off |
+| `STREAM_MAX_SECONDS` | `360`                                          | Audio accepted per `/ws/stream` session, in seconds (10-3600) |
 
 Invalid values (e.g. a port above 65535) are logged as warnings and replaced by the default.
 
