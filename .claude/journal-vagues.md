@@ -39,3 +39,4 @@ Le journal est commité directement sur `main` par la session principale de `/va
 - 2026-11-20T03:51Z | vague 1 | issue #133 | taille 2 | fusionnée | PR #138
 - 2026-11-20T03:51Z | vague 1 | fermée | complétés 6/6 | utilisation: __ %
 - 2026-11-20T03:55Z | vague 2 | ouverte | prévus 9
+- 2026-11-20T04:04Z | vague 2 | issue #134 | taille 4 | fusionnée | PR #142

@@ -106,6 +106,10 @@ class Settings:
     tokens: tuple = field(default=(), repr=False)  # DICTEE_TOKENS; never logged
     auth_required: bool = False  # True as soon as DICTEE_TOKENS is set (even to an unusable value)
     rate_limit: int = 30  # transcription requests per minute and per token; 0 = no limit
+    # Issue #134: live text over WebSocket (/ws/stream)
+    stream_step: float = 1.0  # seconds between two passes of a session
+    stream_max_sessions: int = 2  # simultaneous sessions; 0 = streaming off
+    stream_max_seconds: int = 360  # audio accepted per session
 
     @property
     def diarize_model_name(self):
@@ -156,4 +160,7 @@ def load_settings():
         tokens=tokens,
         auth_required=auth_required,
         rate_limit=env_int("DICTEE_RATE_LIMIT", 30, 0, 100000),
+        stream_step=env_float("STREAM_STEP_SECONDS", 1.0, 0.25, 5),
+        stream_max_sessions=env_int("STREAM_MAX_SESSIONS", 2, 0, 64),
+        stream_max_seconds=env_int("STREAM_MAX_SECONDS", 360, 10, 3600),
     )
