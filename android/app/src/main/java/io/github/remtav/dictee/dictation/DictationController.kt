@@ -5,6 +5,7 @@ import io.github.remtav.dictee.audio.SpeechChunk
 import io.github.remtav.dictee.stt.AudioBlock
 import io.github.remtav.dictee.stt.BlockDictation
 import io.github.remtav.dictee.stt.DictationResult
+import io.github.remtav.dictee.stt.LiveStream
 import io.github.remtav.dictee.stt.RemoteException
 import io.github.remtav.dictee.stt.Transcription
 import io.github.remtav.dictee.stt.WaitControl
@@ -143,6 +144,9 @@ class DictationController(
         private val jobs = LinkedBlockingDeque<Job>()
         @Volatile var finalsPending = 0
         @Volatile var partialInFlight = false
+        /** Live preview (issue #130): once set, no late update touches the composition any more. */
+        @Volatile var liveDone = false
+        @Volatile var stream: LiveStream? = null
         @Volatile var stopRequested = false
         val control = WaitControl()
         private val blockMode = s.blocks != null
@@ -169,7 +173,14 @@ class DictationController(
             capture.start()
         }
 
+        /** Ends the live preview: the stream is dropped and no later update is shown. */
+        private fun endLive() {
+            liveDone = true
+            stream?.cancel()
+        }
+
         fun abort() {
+            endLive()
             stopRequested = true
             control.abandon()
             jobs.clear()
@@ -178,6 +189,21 @@ class DictationController(
         }
 
         // ------------------------------------------------------------------ capture
+
+        /** Callbacks arrive on an OkHttp thread: everything goes through [post]. The final text comes from the blocks. */
+        private val liveListener = object : LiveStream.Listener {
+            override fun onUpdate(committed: String, provisional: String) {
+                post(id) {
+                    if (!liveDone) {
+                        sinkProvider()?.setComposing(listOf(committed, provisional).filter { it.isNotBlank() }.joinToString(" "))
+                    }
+                }
+            }
+
+            override fun onFinal(text: String) {}
+
+            override fun onClosed(reason: String?) {}
+        }
 
         private fun captureLoop() {
             val chunk = FloatArray(CHUNK)
@@ -203,6 +229,15 @@ class DictationController(
             var wholeLen = 0
             var firstSpeech = -1L
             val segments = ArrayList<FloatArray>()
+            // Live preview (issue #130): a failing stream never changes the dictation, it just shows nothing.
+            stream = s.live?.let { factory ->
+                try {
+                    factory(liveListener)
+                } catch (_: Exception) {
+                    null
+                }
+            }
+            if (liveDone) stream?.cancel()
             try {
                 while (!stopRequested && sessionId.get() == id) {
                     val n = s.audio.read(chunk)
@@ -221,6 +256,7 @@ class DictationController(
                         segments.clear()
                     }
                     ring.write(samples)
+                    stream?.send(samples, n)
                     totalSamples += n
                     s.vad.accept(samples.copyOf())
 
@@ -282,6 +318,7 @@ class DictationController(
                 error = "Erreur audio : ${e.message ?: e.javaClass.simpleName}"
             } finally {
                 try { s.audio.stop() } catch (_: Exception) {}
+                try { stream?.stop() } catch (_: Exception) {}
             }
             if (sessionId.get() == id) {
                 // Whatever was being said when the user tapped stop still counts.
@@ -437,6 +474,7 @@ class DictationController(
                 stopRequested = true
             }
             decodeEnded = true
+            endLive()
             setWaiting(id, false)
             if (sessionId.get() == id) {
                 post(id) {
@@ -517,6 +555,7 @@ class DictationController(
         /** Inserts a whole result in one go (or keeps it until the field is back). */
         private fun deliver(result: DictationResult) {
             val pieces = result.texts.flatMap { s.pipeline.prepare(it, s.spec.family) }
+            endLive()
             post(id) {
                 val sink = sinkProvider()
                 val t = Transcription(result.texts.joinToString(" "), result.language, result.totalMillis, result.audioSeconds)

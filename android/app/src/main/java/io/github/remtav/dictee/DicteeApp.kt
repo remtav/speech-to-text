@@ -35,6 +35,9 @@ import io.github.remtav.dictee.stt.RemoteLog
 import io.github.remtav.dictee.stt.BlockDictation
 import io.github.remtav.dictee.stt.DictationResult
 import io.github.remtav.dictee.stt.LentBlockBackend
+import io.github.remtav.dictee.stt.LiveStream
+import io.github.remtav.dictee.stt.RemoteApi
+import io.github.remtav.dictee.stt.RemoteStream
 import io.github.remtav.dictee.stt.WholeDictationEngine
 import io.github.remtav.dictee.stt.WhisperTuning
 import io.github.remtav.dictee.text.RuleCleaner
@@ -236,7 +239,17 @@ class DicteeApp : Application() {
             canFallBack = options.remoteFallback != null,
             // Issue #53: off by default (null), Whisper only.
             localGrouping = WhisperTuning.groupingFor(spec, settings.whisperGroupSeconds),
+            // Issue #130: live preview, server mode only.
+            live = liveFactory(spec),
         ) to null
+    }
+
+    /** A started [RemoteStream] per dictation, or null: setting off, local model, or an API without `/ws/stream`. */
+    private fun liveFactory(spec: ModelSpec): ((LiveStream.Listener) -> LiveStream)? {
+        if (spec.family != ModelFamily.REMOTE || !settings.remoteLive) return null
+        val cfg = settings.remoteConfig()
+        if (!cfg.isConfigured || cfg.api != RemoteApi.DICTEE_SERVER) return null
+        return { listener -> RemoteStream(cfg, listener).also { it.start(cfg.language, cfg.detectLanguages) } }
     }
 
     override fun onTrimMemory(level: Int) {

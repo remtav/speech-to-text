@@ -5072,3 +5072,17 @@ La Play Console refusait le `.aab` : la fiche existe sous `com.kalmia.stt`, `mai
 - **Reste hors du dépôt** (issue #122, liste « Exigences de Play ») : test fermé de 12 testeurs pendant 14 jours si le compte
   personnel date d'après novembre 2023, politique de confidentialité à une adresse publique, formulaire « Sécurité des
   données », déclaration du service de premier plan, classification, captures.
+
+## Issue #130 : texte en direct en mode serveur (aperçu)
+
+- **Aperçu seulement** : le texte reçu par le flux WebSocket s'affiche en composition (souligné) ; le texte inséré reste celui
+  des blocs (#35) et du polissage, inséré d'un coup à la fin, et remplace la composition. Le texte du flux est brut et
+  provisoire : le faire remplacer le texte final changerait le résultat et casserait le polissage.
+- **Réglage « Texte en direct » coupé par défaut** (`remote_live`), en attendant les mesures sur le GPU du serveur.
+- **Texte brut** : ni commandes vocales ni vocabulaire (`TextPipeline`) dans l'aperçu ; « nouvelle ligne » s'affiche en clair,
+  puis disparaît au remplacement final. Accepté.
+- **Repli silencieux** : un flux qui échoue (`onClosed` avec une raison) n'affiche rien et ne change pas la dictée.
+  Rien du texte reçu n'est journalisé.
+- **Coût** : une connexion WebSocket par dictée, audio envoyé en plus des blocs (double coût réseau, environ 32 ko/s).
+- **Fin** : le flux est annulé avant l'insertion du résultat, à l'annulation et en cas d'erreur ; une mise à jour tardive
+  est ignorée (`liveDone`).

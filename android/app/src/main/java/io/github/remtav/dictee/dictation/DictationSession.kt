@@ -4,6 +4,7 @@ import io.github.remtav.dictee.audio.AudioSource
 import io.github.remtav.dictee.audio.VoiceActivityDetector
 import io.github.remtav.dictee.stt.BlockDictation
 import io.github.remtav.dictee.stt.DictationResult
+import io.github.remtav.dictee.stt.LiveStream
 import io.github.remtav.dictee.stt.ModelSpec
 import io.github.remtav.dictee.stt.Transcription
 import io.github.remtav.dictee.stt.WaitControl
@@ -43,6 +44,8 @@ class DictationSession(
      * transcribed, see [LocalGrouping]. Null (the default): one transcription per utterance.
      */
     val localGrouping: LocalGrouping? = null,
+    /** Live preview (issue #130): a started stream fed with the captured audio; null = no preview. */
+    val live: ((LiveStream.Listener) -> LiveStream)? = null,
 )
 
 interface DictationListener {

@@ -262,6 +262,11 @@ class AppSettings(context: Context, private val defaultServerUrl: String = Build
         get() = prefs.getBoolean("remote_polish", true)
         set(v) = prefs.edit().putBoolean("remote_polish", v).apply()
 
+    /** Live preview of the text while dictating to the server (issue #130). Off by default: preview only, final text unchanged. */
+    var remoteLive: Boolean
+        get() = prefs.getBoolean("remote_live", false)
+        set(v) = prefs.edit().putBoolean("remote_live", v).apply()
+
     fun remoteConfig() = ServerTimeout.apply(
         RemoteConfig(
             baseUrl = remoteUrl,

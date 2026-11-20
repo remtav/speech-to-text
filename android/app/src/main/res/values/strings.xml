@@ -195,6 +195,7 @@
     <string name="collapsible_closed">replié</string>
     <string name="settings_remote_help">Avec une adresse ici et le choix « Sur le serveur configuré » ci-dessous, vos dictées y sont transcrites au lieu du téléphone : l\'audio est envoyé au serveur par blocs pendant la dictée, puis le texte transcrit est inséré (poli par son LLM si « Polissage par le serveur » est actif). Le serveur de ce dépôt supprime l\'audio dès la transcription et ne journalise ni l\'audio ni le texte. Sans adresse, ou sans ce choix, tout reste sur le téléphone. Pour installer votre serveur : docs/DEPLOIEMENT_SERVEUR.md dans le dépôt.</string>
     <string name="settings_remote_polish">Polissage par le serveur</string>
+    <string name="settings_remote_live">Texte en direct pendant la dictée (aperçu, corrigé à la fin)</string>
     <string name="settings_remote_polish_help">Le serveur repasse sur la dictée entière avec un LLM : il corrige la ponctuation et retire les hésitations. Mais un LLM peut parfois remplacer un mot bien transcrit par un autre. Si vous voyez des mots changés, coupez ce réglage : le texte brut de la transcription est alors inséré tel quel.</string>
     <string name="settings_remote_api">Type d\'API</string>
     <string name="settings_remote_model_hint">Nom du modèle (API OpenAI uniquement, ex. whisper-1)</string>
