@@ -1,5 +1,7 @@
 """FastAPI application: web UI and HTTP API."""
 import asyncio
+import contextlib
+import json
 import logging
 import os
 import re
@@ -11,7 +13,9 @@ from pathlib import Path
 from typing import Optional
 from urllib.parse import urlsplit
 
-from fastapi import Body, FastAPI, File, Form, HTTPException, Query, Request, UploadFile
+import numpy as np
+from fastapi import (Body, FastAPI, File, Form, HTTPException, Query, Request, UploadFile, WebSocket,
+                     WebSocketDisconnect)
 from fastapi.concurrency import run_in_threadpool
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, JSONResponse, Response
@@ -25,6 +29,7 @@ from app.jobs import JobManager
 from app.languages import LANGUAGES
 from app.polish import polisher_from_settings
 from app.pipeline import Engine, model_cache_dir
+from app.streaming import StreamState, Word
 from app.version import __version__, build_info, build_label
 from app.worker import InlineBackend, ProcessBackend
 
@@ -33,6 +38,7 @@ TEMPLATES_DIR = ROOT / "templates"
 STATIC_DIR = ROOT / "static"
 UPLOAD_CHUNK = 1024 * 1024
 MAX_PROMPT_CHARS = 1000  # Whisper reads at most the last 224 tokens of it
+STREAM_FIRST_MESSAGE_TIMEOUT = 10  # seconds to send the `start` message of /ws/stream
 MAX_POLISH_CHARS = 100_000  # far above what the polish step accepts; only bounds memory
 
 log = logging.getLogger("app")
@@ -496,6 +502,133 @@ def create_app(settings=None, backend=None, polish_client=None):
             media_type=EXPORT_FORMATS[format],
             headers={"Content-Disposition": f'attachment; filename="{stem}.{format}"'},
         )
+
+    # ------------------------------------------------- live streaming
+
+    app.state.stream_sessions = 0  # only touched on the asyncio loop: no lock needed
+
+    @app.websocket("/ws/stream")
+    async def stream_ws(websocket: WebSocket):
+        """Live text while dictating: PCM s16le mono 16 kHz in, confirmed + provisional text out.
+
+        The HTTP middleware does not see WebSockets, so the token and the rate limit are checked here.
+        Passes run on the job dispatcher thread (``JobManager.decode_stream``), one at a time per
+        session. Neither audio nor text is logged or kept after the session.
+        """
+        async def close(code):
+            with contextlib.suppress(Exception):
+                await websocket.close(code=code)
+
+        async def fail(message, code):
+            with contextlib.suppress(Exception):
+                await websocket.send_json({"type": "error", "message": message})
+            await close(code)
+
+        ok, owner = security.websocket_owner(websocket, settings)
+        if not ok:
+            return await close(1008)
+        if settings.stream_max_sessions == 0 or app.state.stream_sessions >= settings.stream_max_sessions:
+            return await close(1013)
+        if settings.auth_required and settings.rate_limit:
+            allowed, _ = app.state.rate_limiter.allow(owner)
+            if not allowed:
+                return await close(1013)
+
+        app.state.stream_sessions += 1
+        passes = recv = None
+        try:
+            await websocket.accept()
+            try:
+                start = await asyncio.wait_for(websocket.receive_json(), STREAM_FIRST_MESSAGE_TIMEOUT)
+                if not isinstance(start, dict) or start.get("type") != "start":
+                    raise ValueError("The first message must be of type 'start'")
+                language, languages, prompt = start.get("language"), start.get("languages") or [], start.get("prompt") or ""
+                if (language is not None and not isinstance(language, str)) or not isinstance(prompt, str) \
+                        or not isinstance(languages, list) or not all(isinstance(c, str) for c in languages):
+                    raise ValueError("Invalid start message")
+                if len(prompt.strip()) > MAX_PROMPT_CHARS:
+                    raise ValueError("prompt too long")
+                language = _validate_language(language)
+                languages = _validate_languages(",".join(languages))
+            except WebSocketDisconnect:
+                return
+            except asyncio.TimeoutError:
+                return await fail("No start message received", 1003)
+            except HTTPException as e:
+                return await fail(str(e.detail), 1003)
+            except Exception:
+                return await fail("Invalid start message", 1003)
+
+            state = StreamState(initial_prompt=prompt.strip())
+            options = {"language": language, "languages": languages}
+            await websocket.send_json({"type": "ready", "step_ms": int(settings.stream_step * 1000)})
+
+            inflight = []  # the running pass (concurrent Future), awaited before the final one
+            seen = 0.0  # audio_seconds at the last pass
+
+            async def decode(final=False):
+                nonlocal seen
+                samples, offset, context = state.window()
+                seen = state.audio_seconds
+                future = app.state.jobs.decode_stream(samples, {**options, "prompt": context})
+                inflight.append(future)
+                result = await asyncio.wrap_future(future)
+                if not options["language"]:
+                    options["language"] = result.get("language")  # detected once
+                words = [Word(w["word"], w["start"], w["end"]) for w in result["words"]]
+                return state.apply(words, offset, final=final)
+
+            async def run_passes():
+                while True:
+                    await asyncio.sleep(settings.stream_step)
+                    if state.buffered_seconds >= 0.5 and state.audio_seconds > seen:
+                        if await decode():
+                            await websocket.send_json({
+                                "type": "update", "committed": state.committed_text,
+                                "provisional": state.provisional_text,
+                                "audio_ms": int(state.audio_seconds * 1000)})
+
+            passes = asyncio.create_task(run_passes())
+            stopped = False
+            while not stopped:
+                recv = asyncio.create_task(websocket.receive())
+                await asyncio.wait({recv, passes}, return_when=asyncio.FIRST_COMPLETED)
+                if passes.done():
+                    passes.result()  # an engine error ends the session
+                message = recv.result()
+                if message["type"] == "websocket.disconnect":
+                    return
+                if message.get("bytes") is not None:
+                    data = message["bytes"]
+                    state.add_audio(np.frombuffer(data[:len(data) // 2 * 2], "<i2").astype(np.float32) / 32768)
+                    if state.audio_seconds > settings.stream_max_seconds:
+                        return await fail("Maximum stream duration exceeded", 1009)
+                elif message.get("text") is not None:
+                    try:
+                        stopped = json.loads(message["text"]).get("type") == "stop"
+                    except (ValueError, AttributeError):
+                        return await fail("Invalid message", 1003)
+
+            passes.cancel()
+            await asyncio.gather(passes, return_exceptions=True)
+            for future in inflight:  # a pass already sent to the worker still finishes
+                if not future.done():
+                    with contextlib.suppress(Exception):
+                        await asyncio.wrap_future(future)
+            if state.buffered_seconds > 0:
+                await decode(final=True)
+            await websocket.send_json({"type": "final", "text": state.committed_text})
+            await close(1000)
+        except WebSocketDisconnect:
+            pass
+        except Exception as e:  # engine error; never include user text
+            log.warning("Stream session failed: %s", type(e).__name__)
+            await fail("Transcription engine error", 1011)
+        finally:
+            for task in (passes, recv):
+                if task is not None:
+                    task.cancel()
+            app.state.stream_sessions -= 1
 
     # -------------------------------------------------------- settings
 

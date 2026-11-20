@@ -12,6 +12,7 @@ returns, so Whisper and the LLM never compute at the same time. It adds
 ``polished_text`` and ``polish`` to the result and never fails the job:
 ``text`` always stays the raw Whisper transcript.
 """
+import collections
 import logging
 import os
 import queue
@@ -19,6 +20,7 @@ import threading
 import time
 import uuid
 from collections import OrderedDict
+from concurrent.futures import Future
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -80,6 +82,7 @@ class Job:
 # the polish stage fills the rest.
 POLISH_PROGRESS_START = 0.97
 POLISH_CANCEL_POLL = 0.05  # seconds
+_WAKE = object()  # wakes the dispatcher for a streaming pass (no job behind it)
 
 
 class JobManager:
@@ -91,6 +94,7 @@ class JobManager:
         self.history = history
         self._jobs = OrderedDict()
         self._queue = queue.Queue()
+        self._passes = collections.deque()  # streaming passes, run before queued jobs
         self._lock = threading.RLock()
         self._current = None
         self._latest = {"progress": 0.0, "message": "Waiting...", "stage": "idle", "done": False,
@@ -128,6 +132,17 @@ class JobManager:
             self._trim()
         self._queue.put(job)
         return job
+
+    def decode_stream(self, samples, options):
+        """Queue a streaming pass (``stream_decode``); returns a ``Future`` with the worker's result.
+
+        Passes have priority over queued jobs (never over the running one) and are neither
+        ``Job`` nor history entries: they do not show in ``GET /jobs`` or ``/progress``.
+        """
+        future = Future()
+        self._passes.append((samples, options, future))
+        self._queue.put(_WAKE)
+        return future
 
     def get(self, job_id):
         with self._lock:
@@ -221,6 +236,13 @@ class JobManager:
     def _run(self):
         while True:
             job = self._queue.get()
+            while self._passes:
+                try:
+                    self._run_pass(*self._passes.popleft())
+                except IndexError:
+                    break
+            if job is _WAKE:
+                continue
             if job is None:
                 return
             with self._lock:
@@ -237,6 +259,17 @@ class JobManager:
             finally:
                 with self._lock:
                     self._current = None
+
+    def _run_pass(self, samples, options, future):
+        if not future.set_running_or_notify_cancel():
+            return
+        try:
+            future.set_result(self.backend.call(
+                "stream_decode",
+                {"samples": samples, "options": {**options, "model": self.model, "device": self.device}},
+                lambda *a: None))
+        except Exception as e:
+            future.set_exception(e)
 
     def _execute(self, job):
         def progress(fraction, message, stage):
