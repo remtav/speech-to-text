@@ -253,6 +253,7 @@ class SettingsActivity : AppCompatActivity() {
         refreshRemoteLanguage = { remoteLanguageGroup.checkSilently(remoteLanguageIndex(), onRemoteLanguage) }
         col.switch(getString(R.string.settings_remote_polish), s.remotePolish) { s.remotePolish = it }
         col.body(getString(R.string.settings_remote_polish_help), small = true)
+        col.switch(getString(R.string.settings_remote_live), s.remoteLive) { s.remoteLive = it }
         // Issue #23: the mode (server / phone). Choosing "server" here, under a text that says what happens to the
         // audio, is the consent, and this is the only place where it can be chosen (issue #57); not chosen yet = phone.
         col.heading(getString(R.string.settings_server_use)).tag = SERVER_MODE_TAG
