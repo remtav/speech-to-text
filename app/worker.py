@@ -37,6 +37,8 @@ def _dispatch(engine, op, args, progress):
         return engine.load(args["model"], args["device"], progress)
     if op == "transcribe":
         return engine.transcribe(args["audio_path"], args.get("options"), progress)
+    if op == "stream_decode":
+        return engine.stream_decode(args["samples"], args.get("options"), progress)
     if op == "eject":
         return engine.eject()
     if op == "state":

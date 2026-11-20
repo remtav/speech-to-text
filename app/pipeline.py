@@ -295,6 +295,32 @@ class Engine:
                 return self._quick(audio, options, progress)
             return self._full(audio, duration, options, progress)
 
+    def stream_decode(self, samples, options=None, progress=_noop_progress):
+        """One fast pass on an in-memory 16 kHz float32 array, for live dictation: words with times
+        relative to the start of ``samples``. No ffmpeg, no WhisperX batching, no alignment.
+
+        Calls faster-whisper directly (``self.model.model``) for word timestamps. The prompt is given
+        straight to the call; it is user text and is never logged.
+        """
+        import numpy as np
+
+        options = options or {}
+        self.load(options.get("model") or self.model_name or "base",
+                  options.get("device") or self.device or "cpu",
+                  lambda f, m, s: None)
+        progress(0.1, "Live pass", "transcribe")
+        samples = np.asarray(samples, dtype=np.float32)
+        if samples.size == 0:
+            return {"words": [], "language": options.get("language")}
+        language = options.get("language") or self._detect_language(samples, options.get("languages"))[0]
+        segments, _ = self.model.model.transcribe(
+            samples, language=language, beam_size=1, word_timestamps=True,
+            condition_on_previous_text=False, vad_filter=False,
+            initial_prompt=(options.get("prompt") or "").strip() or None)
+        words = [{"word": w.word.strip(), "start": round(float(w.start), 3), "end": round(float(w.end), 3)}
+                 for seg in segments for w in (seg.words or []) if w.word.strip()]
+        return to_builtin({"words": words, "language": language})
+
     def _detect_language(self, audio, candidates=None):
         """(language, probability) of the first 30 s of ``audio``, among ``candidates`` when given.
 
