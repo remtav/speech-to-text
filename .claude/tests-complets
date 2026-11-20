@@ -1,0 +1,3 @@
+# Suite de tests complète, lancée par /vagues:release (release.py tests et tag) avant tout tag.
+# Première ligne non vide qui ne commence pas par « # ». La variable RELEASE_TEST_CMD la remplace.
+python3 -m pytest -q tests && (cd android && ./gradlew --no-daemon testDebugUnitTest)
