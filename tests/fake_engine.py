@@ -9,6 +9,8 @@ process can run it. The audio file's content selects the behaviour:
 - ``bad``: raise AudioDecodeError
 - ``boom``: raise an unexpected exception
 - anything else: return it as the transcription text
+
+``stream_decode`` returns one word ``w{i}`` per full second of samples (deterministic).
 """
 import os
 import time
@@ -40,6 +42,13 @@ class FakeEngine:
     def eject(self):
         had, self.loaded = self.loaded, False
         return had
+
+    def stream_decode(self, samples, options=None, progress=None):
+        options = options or {}
+        self.load(options.get("model") or "base", options.get("device") or "cpu", lambda *a: None)
+        self.calls.append(("stream_decode", len(samples), options))
+        words = [{"word": f"w{i}", "start": float(i), "end": i + 0.5} for i in range(len(samples) // 16000)]
+        return {"words": words, "language": options.get("language") or "fr"}
 
     def transcribe(self, audio_path, options=None, progress=None):
         options = options or {}

@@ -2,6 +2,7 @@
 import os
 import subprocess
 import sys
+import types
 from unittest.mock import MagicMock, patch
 
 import numpy as np
@@ -154,6 +155,47 @@ class TestTranscription:
         with patch.object(engine, "load") as load:
             engine.transcribe("a.wav", {"model": "small", "device": "cpu"})
         assert load.call_args.args[:2] == ("small", "cpu")
+
+
+class TestStreamDecode:
+    """Issue #132: one fast pass on an in-memory array, words with times."""
+
+    @staticmethod
+    def _prepare(engine):
+        words = [types.SimpleNamespace(word=" Bonjour ", start=0.12345, end=0.5),
+                 types.SimpleNamespace(word="  ", start=0.5, end=0.6),
+                 types.SimpleNamespace(word="monde", start=0.6, end=1.23456)]
+        seg = types.SimpleNamespace(words=words)
+        engine.model.model.transcribe.return_value = (iter([seg]), MagicMock())
+
+    def test_words_and_times(self, engine):
+        self._prepare(engine)
+        data = engine.stream_decode(np.zeros(16000, np.float32), {"language": "fr"})
+        assert data == {"words": [{"word": "Bonjour", "start": 0.123, "end": 0.5},
+                                  {"word": "monde", "start": 0.6, "end": 1.235}], "language": "fr"}
+
+    def test_options_passed(self, engine):
+        self._prepare(engine)
+        samples = np.zeros(16000, np.float32)
+        engine.stream_decode(samples, {"language": "fr", "prompt": "contexte"})
+        engine.model.model.transcribe.assert_called_once()
+        kwargs = engine.model.model.transcribe.call_args.kwargs
+        for key, value in dict(beam_size=1, word_timestamps=True, condition_on_previous_text=False,
+                               vad_filter=False, initial_prompt="contexte", language="fr").items():
+            assert kwargs[key] == value
+
+    def test_detects_language_when_missing(self, engine):
+        self._prepare(engine)
+        engine.model.model.model.detect_language.return_value = [[("<|es|>", 0.6), ("<|fr|>", 0.4)]]
+        data = engine.stream_decode(np.zeros(16000, np.float32), {})
+        engine.model.model.model.detect_language.assert_called_once()
+        assert data["language"] == "es"
+        assert engine.model.model.transcribe.call_args.kwargs["language"] == "es"
+
+    def test_empty_samples(self, engine):
+        data = engine.stream_decode(np.zeros(0, np.float32), {"language": "fr"})
+        assert data == {"words": [], "language": "fr"}
+        engine.model.model.transcribe.assert_not_called()
 
 
 class TestLanguageDetection:
