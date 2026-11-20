@@ -44,7 +44,7 @@ cat .env.secret   # à copier dans l'application, champ « Jeton d'accès »
 
 # Modèle et GPU
 cat >> .env.secret <<'EOF'
-WHISPER_MODEL=large-v3-turbo
+WHISPER_MODEL=large-v3
 WHISPER_DEVICE=cuda
 DICTEE_RATE_LIMIT=30
 EOF
@@ -52,6 +52,8 @@ EOF
 docker compose --env-file .env.secret up -d --build
 docker compose logs -f speech-to-text   # attendre « Access: token required »
 ```
+
+`WHISPER_MODEL` et `WHISPER_DEVICE` de `.env.secret` sont transmis au conteneur par `docker-compose.yml` (les versions précédentes les ignoraient et démarraient `base` sur CPU). Un `.env.secret` existant qui contient `WHISPER_MODEL=large-v3-turbo` garde turbo tant qu'on ne le modifie pas : changez la ligne pour profiter du nouveau défaut `large-v3`. Le modèle choisi dans la page web n'est pas gardé au redémarrage : le serveur recharge celui de `WHISPER_MODEL`. Le premier démarrage télécharge environ 3 Go.
 
 Avec le polissage par LLM (optionnel, voir le README, section « Transcript polish ») :
 `docker compose --env-file .env.secret --profile polish up -d`, puis
@@ -105,7 +107,7 @@ curl -H "Authorization: Bearer <jeton>" https://dictee.example.ca/health   # ét
 |---|---|---|
 | `DICTEE_TOKENS` | *(non définie : aucune authentification)* | Liste de jetons séparés par des virgules. Définie, toutes les routes sauf `/`, `/healthz` et `/static/` exigent `Authorization: Bearer <jeton>` (401 sinon), et chaque jeton ne voit que ses propres tâches. Définie mais vide de jetons valides (par exemple `,`), le serveur refuse tout. |
 | `DICTEE_RATE_LIMIT` | `30` | Requêtes de transcription, de polissage (`POST /polish`) et de changement de modèle par minute et par jeton ; 429 au-delà, avec l'en-tête `Retry-After`. `0` = sans limite. Le suivi d'une tâche (`GET /jobs/{id}`) n'est pas compté. |
-| `WHISPER_MODEL` | `base` | `large-v3-turbo` recommandé sur GPU. |
+| `WHISPER_MODEL` | `large-v3` | Le plus précis ; sur CPU, choisir `small` ou `base`. |
 | `WHISPER_DEVICE` | `cpu` | `cuda` sur la machine GPU. |
 | `WHISPER_CORS_ORIGINS` | `*` | L'application Android n'en a pas besoin ; vous pouvez le restreindre. |
 

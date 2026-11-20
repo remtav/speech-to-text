@@ -82,7 +82,7 @@ def env_choice(name, choices, default):
 class Settings:
     host: str = "0.0.0.0"
     port: int = 8081
-    model: str = "base"
+    model: str = "large-v3"
     device: str = "cpu"
     compute_type: str | None = None  # None = float16 on GPU, int8 on CPU
     batch_size: int = 16
@@ -137,7 +137,7 @@ def load_settings():
     return Settings(
         host=os.getenv("WHISPER_HOST") or "0.0.0.0",
         port=env_int("WHISPER_PORT", 8081, 1, 65535),
-        model=env_choice("WHISPER_MODEL", VALID_MODELS, "base"),
+        model=env_choice("WHISPER_MODEL", VALID_MODELS, "large-v3"),
         device=env_choice("WHISPER_DEVICE", VALID_DEVICES, "cpu"),
         compute_type=os.getenv("WHISPER_COMPUTE_TYPE") or None,
         batch_size=env_int("WHISPER_BATCH_SIZE", 16, 1, 256),

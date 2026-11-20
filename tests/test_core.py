@@ -94,7 +94,7 @@ class TestConfig:
         for name in ("WHISPER_PORT", "WHISPER_MODEL", "WHISPER_DEVICE", "WHISPER_CORS_ORIGINS"):
             monkeypatch.delenv(name, raising=False)
         settings = config.load_settings()
-        assert (settings.port, settings.model, settings.device) == (8081, "base", "cpu")
+        assert (settings.port, settings.model, settings.device) == (8081, "large-v3", "cpu")
         assert settings.cors_origins == ("*",)
         assert settings.diarize_model_name == "pyannote/speaker-diarization-community-1"
 
@@ -103,7 +103,7 @@ class TestConfig:
         monkeypatch.setenv("WHISPER_MODEL", "huge")
         monkeypatch.setenv("WHISPER_BATCH_SIZE", "lots")
         settings = config.load_settings()
-        assert (settings.port, settings.model, settings.batch_size) == (8081, "base", 16)
+        assert (settings.port, settings.model, settings.batch_size) == (8081, "large-v3", 16)
         assert "WHISPER_PORT" in caplog.text and "WHISPER_MODEL" in caplog.text
 
     def test_values(self, monkeypatch):
