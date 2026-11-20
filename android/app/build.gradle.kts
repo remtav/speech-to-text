@@ -214,6 +214,8 @@ dependencies {
     implementation("androidx.appcompat:appcompat:1.7.0")
     implementation("com.google.android.material:material:1.12.0")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
+    // WebSocket client for the live dictation stream (issue #133).
+    implementation("com.squareup.okhttp3:okhttp:4.12.0")
     // Optional text clean-up by a small local LLM (lot 3). arm64 only; guarded at runtime.
     implementation("com.google.mediapipe:tasks-genai:0.10.35")
 
@@ -221,6 +223,7 @@ dependencies {
     // Real org.json for JVM tests (android.jar only has stubs).
     testImplementation("org.json:json:20240303")
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.8.1")
+    testImplementation("com.squareup.okhttp3:mockwebserver:4.12.0")
 
     androidTestImplementation("androidx.test.ext:junit:1.2.1")
     androidTestImplementation("androidx.test:runner:1.6.2")

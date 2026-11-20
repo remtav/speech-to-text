@@ -80,6 +80,13 @@ data class RemoteConfig(
 
     fun jobsUrl(): String = normalizedBase()!! + "/jobs"
 
+    /** `GET /ws/stream` (issue #130), only for [RemoteApi.DICTEE_SERVER]: `http` becomes `ws`, `https` becomes `wss`. */
+    fun streamUrl(): String {
+        val base = normalizedBase()!!
+        val ws = if (base.startsWith("https://")) "wss://" + base.removePrefix("https://") else "ws://" + base.removePrefix("http://")
+        return "$ws/ws/stream"
+    }
+
     /** `POST /polish` (issue #35, PR #46): polish of a text without audio, through the job queue. */
     fun polishUrl(): String = normalizedBase()!! + "/polish"
 
