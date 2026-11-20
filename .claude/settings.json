@@ -9,6 +9,6 @@
     }
   },
   "enabledPlugins": {
-    "vagues@outils-claude": true
+    "kalmia@outils-claude": true
   }
 }

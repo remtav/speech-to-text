@@ -1,4 +1,4 @@
-# Commande lancée par le contrôle de fin de l'implémenteur (plugin vagues) avant qu'il termine.
+# Commande lancée par le contrôle de fin de l'implémenteur (plugin kalmia) avant qu'il termine.
 # Première ligne non vide qui ne commence pas par « # ». La variable VERIFICATION_IMPLEMENTEUR la remplace.
 # Rapide de préférence (lint + tests unitaires) : les tests lents restent à la CI.
 python3 -m pytest -q tests
