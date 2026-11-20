@@ -2,6 +2,7 @@
 import threading
 import time
 
+import numpy as np
 import pytest
 
 from app.errors import AudioDecodeError, Cancelled, PipelineError, WorkerCrashed
@@ -38,6 +39,14 @@ def test_transcribe_in_worker(backend, audio):
     assert ("load" in [s for _, _, s in events]) and events[-1][1] == "Almost done"
     assert backend.last_state["model_loaded"] is True
     assert backend.last_state["model"] == "tiny"
+
+
+def test_stream_decode_in_worker(backend):
+    result = backend.call("stream_decode", {"samples": np.zeros(3 * 16000, np.float32),
+                                            "options": {"model": "tiny", "device": "cpu", "language": "fr"}},
+                          lambda *a: None)
+    assert [w["word"] for w in result["words"]] == ["w0", "w1", "w2"]
+    assert result["language"] == "fr"
 
 
 def test_load_and_eject(backend):

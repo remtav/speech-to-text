@@ -34,3 +34,4 @@ Le journal est commité directement sur `main` par la session principale de `/va
 
 ## Événements
 - 2026-11-20T03:21Z | vague 1 | ouverte | prévus 6
+- 2026-11-20T03:29Z | vague 1 | issue #132 | taille 2 | fusionnée | PR #139
